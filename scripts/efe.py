@@ -24,8 +24,10 @@ them, and -c <file> is layered after the wrapper's job config. --list prints the
 are stamped in place (scripts/stamp_mtimes.py) and handed to Harbor as one dataset per benchmark folder (Harbor's
 local datasets are not searched recursively). A
 `harbor run` that names its own tasks (-p, -d, -t, -c) and none of these flags is Harbor's, unchanged; so is every other
-subcommand."""
-import fnmatch, json, os, shutil, subprocess, sys, tempfile
+subcommand. Before any `harbor run` on docker or podman (-e), the images Harbor's egress allowlist pulls by a short name
+are pulled by their full name if missing (prepull). With -e podman, the picked GPU tasks run from stamped copies whose
+compose files request the GPU as a CDI device (podman_copies; podman ignores `driver: nvidia`)."""
+import fnmatch, json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 # --- the task tree (board 0209): where the tasks and their scripts/ come from -------------------------------------------
@@ -118,6 +120,72 @@ DATASET = ("embodied-first-exam", "efe")
 SOURCES = ("-p", "--path", "-d", "--dataset", "-t", "--task", "-c", "--config", "--task-git-url")
 
 
+def qualified(ref: str) -> str:
+    """A Docker Hub short name with its registry: alpine:3 -> docker.io/library/alpine:3, a/b -> docker.io/a/b; a ref
+    that names its registry (a first component with a dot or a port, or localhost) is unchanged."""
+    name = ref.split("@", 1)[0]
+    first, slash, _ = name.partition("/")
+    if slash and ("." in first or ":" in first or first == "localhost"):
+        return ref
+    return ("docker.io/" if slash else "docker.io/library/") + ref
+
+
+def engine_of(argv: list[str]) -> str | None:
+    """The container engine of a `harbor run` command line: docker (no -e, or -e docker), podman (-e podman), None for
+    any other environment (a cloud sandbox, a custom class)."""
+    env, it = "docker", iter(argv)
+    for a in it:
+        if a in ("-e", "--env"):
+            env = next(it, "")
+        elif a.startswith("--env="):
+            env = a.split("=", 1)[1]
+    return env if env in ("docker", "podman") else None
+
+
+def short_name_images(engine: str) -> list[str]:
+    """The images Harbor 0.23 pulls by a short name before a trial whose task restricts egress (`network_mode =
+    "allowlist"`, every task's default): the kernel probe's alpine (docker and podman: `container run` with a 30 s timeout,
+    and a slow pull is taken for "allowlist unsupported" for the whole job) and, on podman, the egress sidecar's base
+    image (its Dockerfile's FROM; podman's enforcing short-name mode refuses a short name without a terminal, unless the
+    image is already in its store). Read from the installed Harbor; [] if it has neither."""
+    try:
+        from harbor.environments.docker import EGRESS_CONTROL_SIDECAR_CONTEXT_PATH as ctx
+        from harbor.environments.docker.docker import DockerEnvironment
+    except Exception:
+        return []
+    refs = [r for r in [getattr(DockerEnvironment, "_EGRESS_CONTROL_KERNEL_PROBE_IMAGE", None)] if r]
+    if engine == "podman":
+        try:
+            lines = (Path(ctx) / "Dockerfile").read_text().splitlines()
+        except OSError:
+            lines = []
+        for ln in lines:
+            w = [x for x in ln.split() if not x.startswith("--")]   # FROM [--platform=...] <image> [AS <stage>]
+            if len(w) > 1 and w[0].upper() == "FROM" and w[1] != "scratch" and "$" not in w[1]:
+                refs.append(w[1])
+    return [qualified(r) for r in refs]
+
+
+def prepull(engine: str | None, refs: list[str] | None = None, run=subprocess.run) -> list[str]:
+    """Pull each of `refs` (default: short_name_images(engine)) that the engine does not have, by its full name, quietly
+    (one line per pull). Returns the refs it could not pull; Harbor then reports its own error."""
+    if engine is None or not shutil.which(engine):
+        return []
+    failed = []
+    for ref in short_name_images(engine) if refs is None else refs:
+        try:
+            if run([engine, "image", "inspect", ref], capture_output=True, timeout=60).returncode == 0:
+                continue
+            print(f"pulling {ref} (Harbor's egress allowlist)", file=sys.stderr)
+            if run([engine, "pull", "-q", ref], capture_output=True, timeout=900, stdin=subprocess.DEVNULL).returncode:
+                failed.append(ref)
+        except (OSError, subprocess.SubprocessError):
+            failed.append(ref)
+    for ref in failed:
+        print(f"could not pull {ref} (`{engine} pull {ref}` tells why)", file=sys.stderr)
+    return failed
+
+
 def harbor(args: list[str], app=None) -> int:
     if app is None:
         from harbor.cli import main as hm
@@ -166,12 +234,43 @@ def stamp(pick: list[str]) -> bool:
     return not err
 
 
-def config_file(pick: list[str]) -> str:
-    """A Harbor job config (-c) with the picked task dirs: one local dataset per benchmark folder, its task_names the
-    picked dirs. Harbor reads it when the job is built; the caller removes it afterwards."""
+GPU_REQUEST = re.compile(r"^(\s*)- driver: nvidia\n(\s*)count: \d+\n", re.M)
+
+
+def cdi_compose(text: str, device: str) -> str:
+    """A compose file's NVIDIA device requests (`- driver: nvidia` / `count: N`) as CDI device requests of `device`:
+    podman ignores the first form, so the task's processes find no driver."""
+    return GPU_REQUEST.sub(lambda m: f'{m[1]}- driver: cdi\n{m[2]}device_ids: ["{device}"]\n', text)
+
+
+def podman_copies(pick: list[str], out: str) -> dict[str, str]:
+    """For -e podman: a stamped copy under <out>/<benchmark folder>/ of each picked task whose compose files request an
+    NVIDIA GPU, with those requests in CDI form (cdi_compose; device EFE_PODMAN_GPUS, default nvidia.com/gpu=all: a
+    CDI spec of the host's GPUs, docs/protocol/running.md). The task dirs in the repository are not changed. Returns
+    {task name: copy}."""
+    stamp_mtimes = _Scripts("stamp_mtimes")
+    device = os.environ.get("EFE_PODMAN_GPUS") or "nvidia.com/gpu=all"
+    copies = {}
+    for t in pick:
+        src = tc.task_dir(t)
+        composes = [f for f in src.rglob("docker-compose*.y*ml") if "driver: nvidia" in f.read_text(errors="replace")]
+        if not composes:
+            continue
+        dst = Path(stamp_mtimes.stage(str(src), os.path.join(out, src.parent.name)))
+        for f in composes:
+            c = dst / f.relative_to(src)
+            c.write_text(cdi_compose(c.read_text(), device))
+        stamp_mtimes.stamp_tree(str(dst), full=True)
+        copies[t] = str(dst)
+    return copies
+
+
+def config_file(pick: list[str], where: dict[str, str] | None = None) -> str:
+    """A Harbor job config (-c) with the picked task dirs (or their copies, `where`): one local dataset per benchmark
+    folder, its task_names the picked dirs. Harbor reads it when the job is built; the caller removes it afterwards."""
     by: dict[str, list[str]] = {}
     for t in pick:
-        by.setdefault(str(tc.task_dir(t).parent), []).append(t)
+        by.setdefault(str(Path((where or {}).get(t) or tc.task_dir(t)).parent), []).append(t)
     cfg = {"datasets": [{"path": d, "task_names": names} for d, names in sorted(by.items())]}
     fd, path = tempfile.mkstemp(prefix="efe-job-", suffix=".json")
     with os.fdopen(fd, "w") as f:
@@ -216,6 +315,8 @@ def run(argv: list[str], app=None) -> int:
     ours = ("--core", "--all", "--benchmark", "--list")
     if any(a in SOURCES or a.startswith(tuple(s + "=" for s in SOURCES if s.startswith("--"))) for a in argv):
         if not any(a in MODES or a in ours or a.startswith("--benchmark=") for a in argv):
+            if not {"-h", "--help"} & set(argv):
+                prepull(engine_of(argv))
             return harbor(["run", *argv], app)                # the user's own task source: plain Harbor
     which, modes, benches, inc, exc, paths, listing, rest = "core", set(), [], [], [], [], False, []
     n_tasks = None
@@ -275,11 +376,21 @@ def run(argv: list[str], app=None) -> int:
         print("\n".join(pick)); return 0
     if not stamp(pick):
         return 2
-    cfg = config_file(pick)
+    engine = engine_of(rest)
+    prepull(engine)
+    staged = tempfile.mkdtemp(prefix="efe-podman-") if engine == "podman" else None
     try:
-        return harbor(["run", "-c", cfg, *rest], app)
+        where = podman_copies(pick, staged) if staged else {}
+        if where:
+            print(f"{len(where)} GPU task(s) run from copies with CDI device requests (podman)", file=sys.stderr)
+        cfg = config_file(pick, where)
+        try:
+            return harbor(["run", "-c", cfg, *rest], app)
+        finally:
+            os.unlink(cfg)
     finally:
-        os.unlink(cfg)
+        if staged:
+            shutil.rmtree(staged, ignore_errors=True)
 
 
 def main() -> int:

@@ -1,6 +1,9 @@
-BUILD_ONLY: ghcr.io/mll-lab-nu/efe-private:ambench-<images/ambench/VERSION> is never pushed to a public registry (docs/protocol/README.md §2.4,
-D5). Every evaluation host builds it locally; the AM-Bench tasks reference that tag and Harbor finds it in the local Docker
-image store.
+BUILD_ONLY: ghcr.io/mll-lab-nu/efe-private:ambench-<images/ambench/VERSION> is never pushed to a public registry
+(docs/protocol/README.md §2.4, D5). Every AM-Bench task builds it itself, as its `ambench-base` stage (this Dockerfile without
+its header, copied into the task's environment/Dockerfile and tests/Dockerfile): Harbor builds it on a machine's first
+AM-Bench run from public sources only, and every later task reuses the layers. The organization keeps a prebuilt copy in
+its private package efe-private, pushed with inline cache metadata; the tasks name it as compose `cache_from`, so a
+runner that can read it pulls the layers instead of building them, and one that cannot gets a warning and builds.
 
 Why
   The image contains NVIDIA Isaac Sim 5.1 / Omniverse Kit and the pip wheels of the Isaac stack (from pypi.nvidia.com).
@@ -36,17 +39,17 @@ Data
 Host
   Linux x86_64, Docker with the NVIDIA Container Toolkit, an RTX-class NVIDIA GPU with a driver Isaac Sim 5.1 supports (Isaac
   renders with RTX even headless, and AM-Bench runs PhysX on the GPU). Checked on an RTX 4090 (AMD Ryzen 9 7950X, driver
-  580.159). Build: ~60 GB of free disk during the build (the image is ~21.5 GB), network access to github.com, astral.sh,
-  pypi.org, download.pytorch.org, pypi.nvidia.com and omniverse-content-production.s3*.amazonaws.com, about 30-45 min (acados
-  compiles). Run: a camera-free simulator (the default, and the grader's replays) takes ~3 GB of host RAM and ~3 GB of GPU
+  580.159). Build: ~60 GB of free disk during the build (the image is ~22.4 GB), network access to Docker Hub, snapshot.ubuntu.com,
+  github.com, pypi.org, download.pytorch.org, pypi.nvidia.com and omniverse-content-production.s3*.amazonaws.com; about 12 min
+  alone on that host, 24 min as a task's first build on a clean daemon beside other builds (2026-10-19; acados compiles). Run: a camera-free simulator (the default, and the grader's replays) takes ~3 GB of host RAM and ~3 GB of GPU
   memory; with the two onboard cameras on (Session(cameras=True), the verifier's filmed illustration) ~13 GB and ~6.5 GB
   (Isaac's initialisation fails when the GPU runs out of memory: start fewer at once on a shared GPU). Physics runs on the
   GPU, so the recorded state hashes are those of this GPU model; another GPU model may need its own reference run (Check a
   build). Camera rendering makes GPU PhysX timing-dependent: only camera-free runs reproduce the hashes
   (tasks/ambench/README.md, Determinism).
 
-Build (from the repository root)
-  docker build -f images/ambench/Dockerfile -t ghcr.io/mll-lab-nu/efe-private:ambench-$(cat images/ambench/VERSION) .
+Build (alone; Harbor does this inside every task's build)
+  docker build --target ambench-base -t ghcr.io/mll-lab-nu/efe-private:ambench-$(cat images/ambench/VERSION) images/ambench
   The build follows AM-Bench's scripts/setup/install.sh (torch 2.7.0+cu128, Isaac Sim 5.1.0, Isaac Lab at YAMLab's commit,
   Pyroki with JAX 0.4.28 on the CPU, acados with qpOASES, AM-Bench), then sets every Python package to
   images/ambench/requirements.lock (the reference build's `uv pip freeze`) without resolving and fails unless the environment
@@ -63,8 +66,7 @@ Check a build
   expects instance_matches true, success true and, from the replay, the end state_sha of the task README's Verification
   section (the oracle's hash; both commands run camera-free). Or run `harbor run -p tasks/ambench/ambench-press-button-fahexa-i00-privileged -a oracle`.
 
-On a CI machine (maintainers)
-  A self-hosted runner with such a GPU builds the image with the command above when images/ambench/ changes, runs the check,
-  and keeps the image in its local Docker store (or in a registry the organization keeps private), never on a public
-  registry. Hosts of the same organization may copy a built image among themselves (docker save ... | zstd, docker load); a
-  new VERSION means a rebuild on every host.
+Publishing the cache copy (maintainers, after a change here and a VERSION bump)
+  Build it as above with --build-arg BUILDKIT_INLINE_CACHE=1, check it (above), push it to
+  ghcr.io/mll-lab-nu/efe-private:ambench-$(cat images/ambench/VERSION) (organization members only, never a public package),
+  and copy the new stage into every task (with the new tag in their compose `cache_from`).

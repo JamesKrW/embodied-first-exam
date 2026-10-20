@@ -187,10 +187,10 @@ node-local scratch (podman's storage does not work on most network file systems)
    [network]
    firewall_driver = "none"           # only on a node without iptables
    ```
-   plus `policy.json` (the build's `etc/containers/policy.json`), `registries.conf` with
-   `unqualified-search-registries = ["docker.io"]` and `short-name-mode = "permissive"` (Harbor's egress sidecar is
-   built `FROM` a short image name, and without a terminal podman refuses to ask), and, without `/etc/subuid` entries,
-   `storage.conf` with `[storage.options.overlay] ignore_chown_errors = "true"`.
+   plus `policy.json` (the build's `etc/containers/policy.json`) and, without `/etc/subuid` entries, `storage.conf` with
+   `[storage.options.overlay] ignore_chown_errors = "true"`. Harbor's egress sidecar is built `FROM` a short image name,
+   which podman's enforcing short-name mode refuses without a terminal; this repository's `harbor run` pulls it (and the
+   allowlist probe's alpine) by its full `docker.io/` name first, so `registries.conf` needs no change.
 3. Without a user systemd session netavark cannot start aardvark-dns through `systemd-run`; a `systemd-run` early on
    `PATH` that drops its options and execs the command works.
 4. Start the API and run:
@@ -202,16 +202,25 @@ node-local scratch (podman's storage does not work on most network file systems)
 5. GPU tasks: podman ignores compose's `driver: nvidia` device request, and the task's processes then find no driver
    (`Found no NVIDIA driver`, `libnvidia-ml.so.1: cannot open shared object file`). Generate a CDI spec for the
    allocation's GPUs (`nvidia-ctk cdi generate --output=<dir>/nvidia.yaml`, and `cdi_spec_dirs = ["<dir>"]` under
-   `[engine]`), and run a stamped copy whose compose files ask for the CDI device instead (both
-   `environment/docker-compose.yaml` and `tests/docker-compose.yaml`):
+   `[engine]`). `harbor run -e podman` with this repository's set flags (`-d embodied-first-exam`, as above) then runs
+   each GPU task from a stamped copy whose compose files (`environment/` and `tests/`) ask for the CDI device
+   `nvidia.com/gpu=all` instead (`EFE_PODMAN_GPUS` names another, e.g. `nvidia.com/gpu=0` on a node with several GPUs
+   for RoboARC, whose renderer needs exactly one), and removes the copies after the job. For a bare `harbor run -p`,
+   make that copy yourself:
    ```bash
    c=$(python3 scripts/stamp_mtimes.py stage tasks/<benchmark>/<task> "$(mktemp -d)")
    find "$c" -name docker-compose.yaml -exec sed -i -e 's/- driver: nvidia/- driver: cdi/' \
      -e 's/^\( *\)count: 1$/\1device_ids: ["nvidia.com\/gpu=all"]/' {} +
+   python3 scripts/stamp_mtimes.py "$c"
    harbor run -e podman -p "$c" -a oracle -y -o $PWD/jobs
    ```
 6. The `rcb_monitor` sidecar can stay "Stopping" after a trial under rootless podman on cgroup v2; stop its container
    (or the `monitor.py` process) by hand. On cgroup v1 the resource caps are not applied (`RCB_LIMITS_ENFORCE` stays 0).
+7. On cgroup v2 the containers' CPU caps need the `cpu` controller delegated to your user: when
+   `/sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.controllers` lacks `cpu` (systemd
+   delegates only `memory pids` by default on some distributions), every container fails to start with
+   ``crun: controller `cpu` is not available``. An administrator enables it (systemd `Delegate=cpu cpuset io memory
+   pids` for `user@.service`); a user cannot.
 
 ## Running a two-mode batch (privileged + standard)
 ```bash
@@ -335,6 +344,9 @@ places where solutions are published out of reach). Both installs work with and 
 usage gateway (Debian 12 and 13, Ubuntu 22.04 images).
 In the Ubuntu images built on NVIDIA's CUDA base, `apt-get update` warns about NVIDIA's own repository
 (developer.download.nvidia.com is not on the list) and goes on; the Ubuntu archives answer.
+Before it applies an allowlist, Harbor checks the host kernel once per job by running a small alpine image, and gives
+the pull and run 30 s: a slower pull reads as "allowlist unsupported" for the whole job. On docker and podman this
+repository's `harbor run` (`scripts/efe.py`) pulls that image first when it is missing.
 
 The list is the one switch.
 - Another host for every task: add it to `HOSTS` (to `PACKAGE_HOSTS` too if a run through the gateway should reach it
