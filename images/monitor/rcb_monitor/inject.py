@@ -36,13 +36,13 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parent
 CODE = ("monitor.py", "rcb_limits.py", "selftest.py")   # in the monitor image at /opt/rcb_monitor/ (images/monitor/Dockerfile)
-IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.3.0@sha256:53154417782408df8309194971b08b18c3682d2b337e2e3b2eb4c88fe025ab85"
+IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.3.1@sha256:dd6eacbf8886a62365d53bd0b3832d09749ea0e10b098b3442bb0cd26cbfd35d"
 # The sha256 of each CODE file in IMAGE (`inject.py verify-image` reads them back from the image; `inject.py contents`
 # prints them for this directory's files). A change to a CODE file needs a new image: build images/monitor/, bump its
 # VERSION, push it, then put the new digest in IMAGE and the new hashes here.
 CONTENTS = {
     "monitor.py": "31426a43a478ff47a07ad8046a4ce91f73a18c106ed80caeb17c00f64f1f2f49",
-    "rcb_limits.py": "a94b46c6b977101ba3e420f8d3131933f1b982d8864b6786f83a634154ecc428",
+    "rcb_limits.py": "c666af695c71d5c5991279282d76ca4ffefe56196c54a4b00385b0cb1806d74a",
     "selftest.py": "da38094402e9c9c83d69fbaf7e723e1d227ff440cafb30c7830e758179e03ab5",
 }
 CODE_DIR = "/opt/rcb_monitor"
