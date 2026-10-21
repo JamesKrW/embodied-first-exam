@@ -47,7 +47,7 @@ for f in ("replay.mp4", "trajectory.npz", "episode.jsonl"):
 live = d.get("graded_by") == "live"
 unfinished = not d.get("finalized") or not (live or d.get("gave_up"))
 infra = bool(d.get("infra_error")) or unfinished or bool(d.get("instance_mismatch"))
-ok = bool(d.get("success")) and live and not infra
+ok = bool(d.get("success")) and live and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
 num = lambda k: float(d.get(k) or 0)  # noqa: E731
 write(
     ok,

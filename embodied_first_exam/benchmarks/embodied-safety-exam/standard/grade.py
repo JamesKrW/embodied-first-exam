@@ -160,7 +160,7 @@ def main() -> None:
             ok = bool(d.get("success")) and live
         else:                                         # a record from before 2026-10-17: its live verdict; a give-up: 0
             ok = live and old
-        ok = ok and not infra
+        ok = ok and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
         out = {"success": int(ok), "live_success": int(live), "live_rule": int(bool(d.get("live_rule", live))),
                "graded_by_live": int(by_live), "replays": int(num(d.get("replays"))),
                "finalized": int(not unfinished), "missing_log": 0, "infra_error": int(infra),

@@ -3,7 +3,7 @@
 FROM ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0
 COPY test.sh instance.npz /tests/
 COPY --from=ghcr.io/mll-lab-nu/efe:robocasa365-files-0.3.0@sha256:7239869e98f61c352b412536a6e2a465a793aa7fffadc7b31858091347cfcebb /privileged/environment/casa_tool.py /tests/casa_tool.py
-COPY --from=ghcr.io/mll-lab-nu/efe:robocasa-files-0.1.1@sha256:085a6fe1c9316f02288cd372128accb0b0e1cdade86e64e35884ab9bc583fc56 /privileged/tests/grade.py /tests/grade.py
+COPY --from=ghcr.io/mll-lab-nu/efe:robocasa-files-0.1.2@sha256:5d0e5aa691ff90b770ef62a8ee04829e838bf8c4b4744f06253a2f9f10654de9 /privileged/tests/grade.py /tests/grade.py
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests

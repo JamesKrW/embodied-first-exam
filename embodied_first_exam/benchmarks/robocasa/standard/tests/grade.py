@@ -60,7 +60,7 @@ def main() -> None:
     finalize_error = bool(d.get("finalize_error"))
     infra = bool(d.get("infra_error")) or finalize_error or not d.get("finalized")
     # the service's verdict (live success, not solved at the start, no simulator error), and the live check itself
-    ok = d.get("graded_by") == "live" and d.get("success") is True and live and not infra
+    ok = d.get("graded_by") == "live" and d.get("success") is True and live and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
     write(
         {
             "success": int(ok),

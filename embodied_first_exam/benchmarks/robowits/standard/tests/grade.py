@@ -36,7 +36,7 @@ grade_error = bool(d.get("grade_error")) and not sim_error
 # because it could not rebuild the frozen instance (instance_mismatch), never wrote the live verdict, or could not record it
 infra = (bool(d.get("infra_error")) or not (live_verdict or d.get("gave_up")) or not d.get("finalized") or grade_error)
 live = bool(d.get("success"))                          # the verdict: final.json `success` decides (live_success beside it)
-ok = live and live_verdict and not infra
+ok = live and live_verdict and not infra and not sim_error   # PROTOCOL §4: a simulator error is the agent's 0
 num = lambda k, cast=int: cast(d.get(k) or 0)  # noqa: E731
 write(ok, {"success": int(ok), "live_success": int(bool(d.get("live_success", d.get("success")))), "graded_by_live": int(live_verdict), "replays": 0,
            "gpu_backend": int(gpu), "finalized": int(bool(d.get("finalized"))), "missing_log": 0,
