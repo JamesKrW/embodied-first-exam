@@ -13,14 +13,48 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Place the alarm clock on the drawer, put the figurine on the stand, place the mouse on the mouse pad, and push the keyboard into the frame."*
 
 ## Success (RoboDojo's own check for this task)
-- All four item groups hold at the same action boundary, plus the arms-back condition. Each item's first check, is_not_moved(update=True), means the item moved less than 0.002 m (3-D) since this check was last evaluated (the previous action boundary at which evaluation reached it) -- i.e. the item is at rest.
-- mouse: not moved (<0.002 m); mouse origin in mousemat (is_A_in_B: origin xy inside the mousemat bbox hull, origin z > mousemat bbox z_min); mouse local +y axis within 45 deg of world +x (3-D angle; one direction only).
-- keyboard: not moved (<0.002 m); keyboard's world-projected bbox footprint covers the whole rectangle x in [0.0, 0.2], y in [-0.03, 0.03] (world/table coordinates; the frame is at (0.10, 0.0)) with 1e-6 m tolerance (is_A_bbox_cover_rect_region; code unpacks rect_bounds as [x_min, y_min, x_max, y_max]); keyboard local +y within 45 deg of world +y; keyboard local z within 15 deg of world up (default).
-- garage (the figurine): not moved (<0.002 m); 0.005 m < (garage origin z - cube_cushion origin z) < 0.1 m (is_A_up_B); garage local z within 15 deg of world up; garage origin and cube_cushion origin within L metres in xy, where L depends on the figurine model index: {5: 0.045, 6: 0.025, 7: 0.045, 8: 0.02, 11: 0.032}, default 0.02.
-- alarm: not moved (<0.002 m); 0.225 m < (alarm origin z - drawer origin z) < 0.3 m; alarm local z within 15 deg of world up. (No xy requirement relative to the drawer is coded.)
-- all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, at the same action boundary as all other conditions. Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the computer mouse: black, with a blue scroll wheel, right of centre, its buttons pointing away from you [mouse];
+- the mouse pad: the thin black pad (24 x 19 cm) at the far right [mousemat];
+- the keyboard: grey, 32 cm wide and 15 cm deep, lying flat in front of you, its long side left-right [keyboard];
+- the frame: the thin rectangular outline drawn on the table straight ahead, behind the keyboard (24 cm wide, 10 cm deep) [frame];
+- the figurine: a green cactus in a small brown pot, front left near the left gripper [garage];
+- the stand: the small flat dark square (5 x 5 cm) on the table just behind the alarm clock [cube_cushion];
+- the alarm clock: the beige clock left of centre [alarm];
+- the drawer: the white drawer unit at the far left, its top 0.227 m above the table [drawer].
 
-**When it is checked.** All listed conditions are checked together, in order, after every action (reward_manager.step runs once per action, after the action's whole control sequence has executed; nothing is checked between actions). They form a single stage: all must be true at the same action boundary (any list inside the conditions means 'at least one of'). Success is declared at the first action boundary where all hold; the episode then ends. No final_check list is used. Otherwise the episode ends as a failure after step_lim actions. Because the 'not moved' checks compare with the previous evaluation and the list is short-circuited in order (mouse, keyboard, garage, alarm, back-to-origin), all four items must be stationary and in place simultaneously; an item's stationarity is only measured on actions where all earlier checks passed. No early-fail rule.
+An object's *centre* below is the point RoboDojo tests for it (its origin); for every object here that is the middle of
+its bounding box. All of these must hold at the same action boundary:
+- **Mouse.** At rest (below); its centre over the mouse pad: seen from above inside the pad's outline, and higher than the
+  pad's underside [is_A_in_B]; and still heading the way it started: its right-hand side (the direction that points
+  world +x at the start) within 45 deg of world +x, measured in 3-D [mouse local +y; is_axis_aligned]. That is, the
+  buttons keep pointing away from you, turned at most 45 deg either way and not tipped over; turning the mouse around
+  fails. Already true at the start.
+- **Keyboard.** At rest; seen from above, its outline (its bounding box as it is turned) covers the whole rectangle
+  x 0.0 to 0.2 m, y -0.03 to 0.03 m (world coordinates; 1e-6 m tolerance), the middle part of the frame
+  [is_A_bbox_cover_rect_region]. Its front-to-back direction (the short side, pointing away
+  from you at the start) within 45 deg of world +y [keyboard local +y; is_axis_aligned]: keep the long side left-right
+  and the keys the way they face now; already true at the start. Lying flat, keys up, within 15 deg [keyboard local +z;
+  is_axis_up]; already true. Unturned, this means its centre within x 0.04-0.16 m and |y| <= 0.046 m: slide it about
+  17 cm straight away from you into the frame.
+- **Figurine.** At rest; standing upright within 15 deg (pot down, as at the start) [garage local +z; is_axis_up];
+  its centre, which is about 9 cm above the bottom of the pot, between 0.005 and 0.1 m higher than the stand's top
+  surface [is_A_up_B]: standing on the stand gives about 0.09 m, so it must stand on it, not be held above it; and its
+  centre within 0.02 m of the stand's centre horizontally [is_AB_xy_distance_within_threshold; RoboDojo picks the limit
+  by the figurine's model, here model 8: 0.02 m; other models 0.025-0.045 m].
+- **Alarm clock.** At rest; upright within 15 deg (as at the start) [alarm local +z; is_axis_up]; its centre, 4 cm above
+  its base, between 0.225 and 0.3 m higher than the drawer's base (the table top) [is_A_up_B]: standing on top of the
+  drawer gives 0.267 m. Nothing is checked horizontally: any place at that height counts.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), in the order mouse, keyboard, figurine, alarm
+clock, arms, stopping at the first condition that fails; all must hold at the same action boundary (one stage). *At
+rest* [is_not_moved, update=True] means the item moved less than 0.002 m (3-D) since the last action at which the check
+reached it; the first time it is reached after the item moved, it counts as moved. So each item needs two consecutive
+checked actions at rest, and an item's rest is measured only at actions where every earlier item passed. Success is
+declared at the first action boundary where everything holds, and the episode ends. No condition ends the episode early
+as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -29,9 +63,15 @@ RoboDojo's own evaluation gives a policy 1000 actions (40 s) for this task; no c
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, (part of the success condition). Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** The garage xy tolerance is only 2-4.5 cm and is checked on origins (not bboxes). The alarm only needs to be 0.225-0.3 m above the drawer's origin z, so the exact xy placement relative to the drawer is not tested. The keyboard must fully cover the 0.2 x 0.06 m region: the keyboard must be pushed to the frame location (x 0-0.2, around y=0) with its long side (local y within 45 deg of world y). The mouse condition uses 3-D angle to world +x, not projected. The 'not moved' test returns 'moved' on the first evaluation of each item if it has moved since episode start, then re-arms, so each item effectively needs two consecutive evaluated actions at rest. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** The start pose of the keyboard is already the required orientation: only its place
+changes (turning its long side front-to-back fails both the direction test and the cover test). The mouse's heading
+and the upright tests of the keyboard, figurine and alarm clock also hold at the start: keep those orientations while
+moving the objects. The figurine and the alarm clock are tested on their centres only, so a tilt under 15 deg and any
+spot on the drawer's top are fine. "Over the mouse pad" is tested on the mouse's centre alone; the rest of the mouse
+may overhang the pad.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

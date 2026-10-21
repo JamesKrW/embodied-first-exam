@@ -20,14 +20,34 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- Define the order of the dolls by their model index mod 5, as the code does: 0 = the LARGEST doll, 4 = the SMALLEST (measured on the dolls of the frozen layout: their bounding boxes shrink as index mod 5 grows; the comments in RoboDojo's config, index 5 smallest and index 9 largest, have it the wrong way round). The code lists the dolls sorted by (index mod 5) DESCENDING: L0 = the smallest doll, L1, L2, L3, L4 = the largest.
-- Row straightness: the maximum minus the minimum world Y of the five dolls' root positions is <= 0.035 m.
-- Order along X: for each consecutive pair (L_k, L_{k+1}), k=0..3: x(L_{k+1}) - x(L_k) > 0.03 m (strict), i.e. the SMALLEST doll has the smallest world x, and x increases by more than 3 cm with each larger doll; the largest doll has the largest world x. (This matches the instruction's 'left to right, from smallest to largest' with left = smaller world x.)
-- Upright: each of doll0..doll4 has its local +Z axis within 15 deg (default threshold, strict) of world +Z (standing, not lying).
-- Both target arms are back at origin: all target arms (left_arm and right_arm; the support arm is not counted) have their end-effector pose within 0.15 m on EACH axis (|dx|,|dy|,|dz| all <= 0.15 m) and within 20 degrees (quaternion angle) of the pose they had at the start of the episode (recorded after the scene settled).
-- All conditions hold simultaneously after one action.
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x as seen from the arms, "away" = +y).
+The five nesting dolls are round, penguin-like dolls with a dark body and a white face (the scene light is purple), of
+five sizes, all standing upright on the table at the start among unrelated clutter (a game console, a calculator, a
+ball, money, a book ...; none of it is checked):
+- the smallest doll, 5 cm tall, right of centre, near you [doll1];
+- the second smallest, 7 cm tall, at the left, further back than the others [doll3];
+- the middle-sized one, 9 cm tall, left of centre, near you [doll2];
+- the second largest, 11 cm tall, at the far left, under the left gripper [doll4];
+- the largest, 13 cm tall, at the right, under the right gripper [doll0].
+RoboDojo ranks them by model (largest = model index mod 5 of 0, smallest = 4) [doll0 mod 0, doll4 mod 1, doll2 mod 2,
+doll3 mod 3, doll1 mod 4]; that ranking is the same as ranking them by height.
 
-**When it is checked.** Single stage; all 1 + 4 + 5 + 1 = 11 conditions must hold at the same time after one action. The reward manager is evaluated only once per action (after the sim sub-steps of that action are finished), never between sub-steps. In each evaluation the FIRST pending stage of the check list is tested (every condition in it, all at that same moment; a condition that is a nested list is an OR); when it passes it is removed permanently (never re-verified later) and the next stage becomes pending; at most one stage is removed per action. Reward is 1.0 only when the check list is empty (and no query/trigger counter is violated); the episode is declared a success as soon as reward >= 0.999 after an action, and ends as a failure if the action counter reaches step_lim without that, or earlier if the environment is flagged failed (query counter exceeded, see below). No final_check list is registered by this task, so the final-check logic at step_lim adds nothing. No early failure.
+A doll's *centre* below is the point RoboDojo tests for it (its origin): the middle of its bounding box, i.e. half its
+height above its base. All of these must hold at the same action boundary:
+- **Order, smallest at the left.** Going from the smallest doll to the largest, each next doll's centre is more than
+  0.03 m (strictly) further right (world +x) than the one before [is_A_on_B_left, x_threshold 0.03]: smallest at the
+  left end, largest at the right end, in size order. Only the four consecutive pairs are compared, centre to centre (not
+  edge to edge). Not true at the start.
+- **In a row.** The five centres' front-to-back positions (world y) span at most 0.035 m (largest minus smallest, <= 0.035
+  passes) [is_labels_axis_difference_in_range, axis y]. Not true at the start.
+- **Upright.** Each of the five dolls stands with its top up within 15 deg (strictly less) of vertical [each doll's
+  local +z; is_axis_up]: a doll lying on its side fails. Already true at the start.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each of
+  x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions). All of the conditions above form one stage and must
+hold at the same action boundary; success is declared at the first action boundary where they all hold, and the episode
+ends. Otherwise the episode ends as a failure after the action limit. No condition ends the episode early as a failure.
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -35,9 +55,16 @@ simulated time). RoboDojo's own evaluation gives a policy 1050 actions (42 s) fo
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** Both arms within 0.15 m per axis and 20 deg of their start pose in the same action as the dolls are correctly sorted, upright, and in a row.
+**At the end.** Both arms back near their start poses (above), in the same action in which the five dolls stand upright
+in one size-ordered row; the grippers need not be open.
 
-**Notes from RoboDojo's code.** The required X gap between consecutive dolls is only > 0.03 m between root positions (roots, not edges), while the row's Y spread must be <= 3.5 cm for all five, so the dolls need to be tightly aligned in y but only loosely spaced in x. The yml comments place the targets at table-frame x = -0.24 (index mod 5 = 4), -0.12, 0.0, 0.12, 0.24 (index mod 5 = 0) and call index mod 5 = 4 the largest; the dolls' measured sizes say the opposite (index mod 5 = 4 is the smallest), so the smallest doll goes at the smallest x. Any positions satisfying the stated rules succeed. Dolls must stay upright (within 15 deg) - a doll left lying fails. The random variant has different texture models and clutter distractors; reward identical.
+**Notes from RoboDojo's code.** The spacing rule is loose (more than 3 cm between consecutive centres) but the row must
+be straight front-to-back: all five centres within 3.5 cm in y. The dolls are 4.4 to 11 cm wide, so leave roughly their
+half-widths plus a little between neighbouring centres, and keep the row clear of the clutter. Any place on the table
+works: only the relative positions are tested. The comments in RoboDojo's config call the model with index mod 5 of 4
+the largest; the dolls' measured sizes (and the scene) show it is the smallest, and the check ranks them so that this
+smallest doll goes at the left. This variant differs from the plain task only in the doll models and the clutter; the
+check is the same.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

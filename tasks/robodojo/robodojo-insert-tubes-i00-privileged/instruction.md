@@ -20,13 +20,30 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- For each tube t in {tube0, tube1, tube2}:
--   - slot bbox z_max - t bbox z_min > 0.045 m (tube's lowest point at least 4.5 cm below the rack's top; is_A_depth_in_B).
--   - t's origin xy is inside the convex hull of the rack's (slot) world bbox and t's origin z > rack bbox z_min (is_A_in_B).
--   - t's local y-axis is within 30 deg of world up (is_axis_up axis [0,1,0], threshold=30) -- the tube's long axis is its local y.
-- all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, at the same action boundary as all other conditions. Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the three test tubes: identical white tubes, 14 cm long and about 4 cm across, with an orange cap on one end and a
+  closed, tapered white bottom on the other; they lie on their sides on the table, caps pointing roughly away from you
+  (turned up to 36 deg): one left of centre, one right of centre close to you, one at the far right [tube0, tube1,
+  tube2; interchangeable];
+- the rack: the blue tube rack (20.5 cm wide, 9.6 cm deep, 6 cm tall) in the middle of the table, straight ahead, with
+  two rows of five holes [slot].
 
-**When it is checked.** All listed conditions are checked together, in order, after every action (reward_manager.step runs once per action, after the action's whole control sequence has executed; nothing is checked between actions). They form a single stage: all must be true at the same action boundary (any list inside the conditions means 'at least one of'). Success is declared at the first action boundary where all hold; the episode then ends. No final_check list is used. Otherwise the episode ends as a failure after step_lim actions. No early-fail rule.
+A tube's *centre* (the point RoboDojo tests) is the middle of its closed bottom end, not the middle of the tube. All of
+these must hold at the same action boundary:
+- **Each of the three tubes.**
+  - Deep in the rack: its lowest point more than 0.045 m below the rack's top [rack bbox top minus tube bbox bottom
+    > 0.045 m; is_A_depth_in_B].
+  - Over the rack: seen from above, its bottom-end centre inside the rack's outline, and higher than the rack's
+    underside [is_A_in_B].
+  - Upright, cap up: its long direction, from the closed bottom to the cap, within 30 deg of straight up [tube local +y;
+    is_axis_up, threshold 30]. Not true at the start (lying down); a tube standing cap down fails.
+  Any holes will do; the tubes are interchangeable.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), all conditions together (one stage). Success is
+declared at the first action boundary where everything holds, and the episode ends. No condition ends the episode
+early as a failure; otherwise it runs on until the length cap (below) [step_lim].
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -34,9 +51,13 @@ simulated time). RoboDojo's own evaluation gives a policy 500 actions (20 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, at the same action boundary as all other conditions. Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** Tubes are indistinguishable and the success test does not assign tubes to particular holes. The check that the tube's local y is the long axis is inferred from the 30-deg-from-vertical requirement; confirm with the asset if needed. The 'one by one' wording is not enforced. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** The tubes are interchangeable and no tube is assigned to a particular hole; the
+"one by one" wording is not checked. The tube's long direction runs from its closed bottom, where its tested centre
+sits, to the orange cap, so a tube in a hole cap up passes both the upright test and the "over the rack" test (its
+bottom is inside the rack's outline). Thresholds are strict (more than 0.045 m, less than 30 deg).
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

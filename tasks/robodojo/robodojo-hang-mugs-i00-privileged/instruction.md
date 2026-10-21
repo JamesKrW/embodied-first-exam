@@ -20,15 +20,47 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- For each mug m in {mug0, mug1, mug2} (all three, simultaneously):
--   - lifted: m's current origin z is more than 0.045 m above its origin z at episode start (is_lift, z_threshold=0.045; current height, not 'ever lifted').
--   - m's 'handle' active functional point has world z > 0.9 m (any handle point; is_A_functional_point_higher_than_z, z=0.9).
--   - m's 'handle' active functional-point frame z-axis is within 60 deg of the z-axis of the cup_holder's 'handle_support_point' passive functional-point frame. Both frames are the FIRST functional point of that tag (RoboDojo's is_axis_aligned takes element [0] of each list): the mug's first 'handle' point and the rack's first 'handle_support_point', whichever hook the mug actually hangs on.
--   - m's handle frame x-axis is within 60 deg of the cup_holder handle_support_point frame's +x OR -x axis (either sign accepted; again the first handle point and the rack's first support point).
--   - m's 'handle' active functional point is within 0.045 m (3-D Euclidean) of a cup_holder 'handle_support_point' passive functional point (is_A_functional_point_close_to_B_functional_point, threshold=0.045, no orientation-alignment option).
-- all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, at the same action boundary as all other conditions. Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the three mugs [mug0, mug1, mug2; interchangeable for the check]: a white polka-dot teacup with a red handle at the
+  far left, handle to the right [mug0]; a yellow mug shaped like a toy figure's head, left of centre in front of you,
+  handle pointing away and to the left [mug1]; an ochre (dark yellow) mug at the right, just beyond the right gripper,
+  handle pointing away [mug2]. All stand upright on the table;
+- the mug rack: the wooden mug tree right of centre, behind the mugs: a round base and a pole about 35 cm tall with six
+  arms (hooks) at three heights, about 16, 25 and 33 cm above the table. At the lowest and the top level one arm points
+  left (slightly away from you) and one right (slightly toward you); at the middle level one points toward you and one
+  away. All arms rise about 22 deg [cup_holder].
 
-**When it is checked.** All listed conditions are checked together, in order, after every action (reward_manager.step runs once per action, after the action's whole control sequence has executed; nothing is checked between actions). They form a single stage: all must be true at the same action boundary (any list inside the conditions means 'at least one of'). Success is declared at the first action boundary where all hold; the episode then ends. No final_check list is used. Otherwise the episode ends as a failure after step_lim actions. Conditions are not required to be held for any duration; one action boundary where everything is true is enough. Nothing makes the episode fail early (no queries).
+Points RoboDojo tests: a mug's *centre* is the middle of the mug [its origin]. Its *handle point* is inside the handle,
+about 1 cm in from the handle's outer edge, at the mug's mid-height [the mug's 'handle' point]. A *hook point* is on an
+arm, 4.5-5.5 cm out from the pole's axis [the rack's 'handle_support_point' points, one per arm]. The *first hook* is
+the lower arm pointing right [handle_support_point [0]]; the direction tests below compare every mug with that arm,
+whichever arm the mug hangs on. Each mug's *handle direction* is the horizontal direction from the mug's axis out
+through its handle (at the start) [handle frame z = mug local +x]; its *handle cross direction* is the horizontal
+direction across the handle, the way a hook passes through it [handle frame x = mug local +y].
+
+All of these must hold at the same action boundary, for each of the three mugs:
+- **Lifted.** Its centre is more than 0.045 m higher than at the start [is_lift, z_threshold 0.045]; the current
+  height counts, not the highest reached.
+- **Handle high.** Its handle point is higher than z = 0.9 m in the world frame, which is 0.135 m above the table top
+  [is_A_functional_point_higher_than_z]. Every hook point is above that height.
+- **Handle up.** Its handle direction is within 60 deg of the first hook's up direction, which leans 22 deg from
+  vertical toward the pole [handle frame z vs first hook frame z; is_axis_aligned, threshold 60]: the mug hangs from
+  its handle, handle above the mug's centre. Not true at the start (the handle direction is horizontal).
+- **Along the hook line.** Its handle cross direction is within 60 deg of the first hook's arm direction, either way
+  round (that arm points right, slightly toward you, rising 22 deg) [handle frame x vs first hook frame +x OR -x;
+  is_axis_aligned, threshold 60]. A mug hanging through its handle on one of the four arms that point left or right
+  passes; on the middle arms that point toward or away from you its cross direction is about 80 deg off and it fails.
+- **On a hook.** Its handle point is less than 0.045 m (3-D distance) from some hook point
+  [is_A_functional_point_close_to_B_functional_point, threshold 0.045]. Any arm may be used; the mugs need not use
+  different arms in the test (physically one arm holds one mug).
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), all conditions for all three mugs and the arms
+together (one stage). Success is declared at the first action boundary where everything holds, and the episode ends;
+nothing needs to hold for longer. Since the arms must be back, the mugs must be hanging on the rack by themselves at
+that moment. No condition ends the episode early as a failure; otherwise it runs on until the length cap (below)
+[step_lim].
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -36,9 +68,15 @@ simulated time). RoboDojo's own evaluation gives a policy 800 actions (32 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, (part of the success condition). Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open, but the mugs must hang on the rack without being held.
 
-**Notes from RoboDojo's code.** The success test does not name which hook each mug goes on, and the check is per mug against ANY handle_support_point of the rack, so assignment of mugs to hooks is free (physically they cannot share one). 'handle' and 'handle_support_point' are asset-defined functional points whose exact positions/frames cannot be read statically. Intermediate partial-credit get_score (transition 15/40/100 for 1/2/3 mugs hung with grippers open) is not part of success. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** The check does not say which arm each mug goes on: each mug is tested against every
+hook point, so any assignment works. The two direction tests, though, always use the first hook (the lower arm pointing
+right), so in practice only the four arms that point left or right (lower and top level) work, with the mug hanging
+from its handle. The 0.9 m handle height is an absolute world height (13.5 cm above the table top). Partial credit
+(15 / 40 / 100 for one / two / three mugs hung with the grippers open) is separate from success. In a recorded success
+the mugs hung from the lower left, lower right and top left arms.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

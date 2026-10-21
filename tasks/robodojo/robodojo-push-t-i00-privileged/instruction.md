@@ -20,13 +20,39 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- Orientation: the angular distance between the full 3D orientations of block t and pad target_t is < 7 deg.
-- Position: the XY distance between the root position of t and the root position of target_t is < 0.007 m (7 mm, strict).
-- Both target arms are back at origin: all target arms (left_arm and right_arm; the support arm is not counted) have their end-effector pose within 0.15 m on EACH axis (|dx|,|dy|,|dz| all <= 0.15 m) and within 20 degrees (quaternion angle) of the pose they had at the start of the episode (recorded after the scene settled).
-- The above three hold simultaneously after one action.
-- Lift constraint (query, must stay 0 for the whole episode): the block t must never be higher than 0.01 m above its initial z (root z at the start of the episode, measured every action); a single action at which z(t) - z0 > 0.01 m fails the episode immediately.
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the T block: the red plastic T, 8 cm long, 6 cm across its crossbar and 1.5 cm thick, lying flat at the front left
+  just in front of the left gripper; its crossbar is on its left end, running front-to-back, and its stem points to
+  the right, turned about 17 deg away from you [t];
+- the pad: the flat grey T drawn on the table (8.4 x 6.8 cm, a little larger than the block), left of centre and
+  near you, about 30 cm to the right of the block and 8 cm closer to you; its crossbar is at its near right, and its
+  stem points left and away from you (about 136 deg counter-clockwise from world +x, seen from above) [target_t].
 
-**When it is checked.** Single stage, checked after every action; the three alignment/arm conditions must hold at the same time. The reward manager is evaluated only once per action (after the sim sub-steps of that action are finished), never between sub-steps. In each evaluation the FIRST pending stage of the check list is tested (every condition in it, all at that same moment; a condition that is a nested list is an OR); when it passes it is removed permanently (never re-verified later) and the next stage becomes pending; at most one stage is removed per action. Reward is 1.0 only when the check list is empty (and no query/trigger counter is violated); the episode is declared a success as soon as reward >= 0.999 after an action, and ends as a failure if the action counter reaches step_lim without that, or earlier if the environment is flagged failed (query counter exceeded, see below). No final_check list is registered by this task, so the final-check logic at step_lim adds nothing. The lift query is evaluated after every action; as soon as the counter exceeds the aim of 0 the environment is flagged failed and the episode ends as a failure.
+An object's *centre* below is the point RoboDojo tests for it (its origin): for both the block and the pad it is the
+middle of the T's bounding rectangle (half-way between the outer edge of the crossbar and the tip of the stem, and
+half-way across the crossbar), at mid-thickness for the block. The two shapes share this layout, so when the block lies
+exactly over the drawn T, crossbar on crossbar and stem on stem, their centres coincide and their orientations match
+(a successful trial ends with the red T covering the grey one exactly). All of these must hold at the same action
+boundary:
+- **Same orientation.** The block's full 3-D orientation within 7 deg of the pad's (one rotation angle, strict)
+  [is_qpos_close, dis_threshold=7]. The pad lies flat, so the block must lie flat, face up, as it does now, and its
+  stem must point the same way as the drawn stem: turn the block about 120 deg counter-clockwise seen from above (its
+  stem from pointing right to pointing left and away). Not true at the start. The T has no symmetry: only this one
+  heading passes.
+- **Same place.** The block's centre within 0.007 m of the pad's centre, measured horizontally (strict)
+  [is_AB_xy_distance_within_threshold, threshold=0.007]. Not true at the start.
+- **Both arms back** [all_robot_back_to_origin]: each of the two arms you control has its end-effector within 0.15 m
+  of its start position on each of x, y and z separately, and within 20 deg of its start orientation. The grippers need
+  not be open.
+- **Never lifted** (checked after every action for the whole episode): the block's centre may never be more than
+  0.01 m higher than at the start [is_lift, z_threshold=0.01; a query whose count must stay 0]. A single action at which
+  it is higher ends the episode at once as a failure. Picking the block up, tipping it onto an edge or letting it hop
+  all break this; push it along the table.
+
+**When it is checked.** After every action (never between actions). The orientation, place and arms conditions form
+one stage: all three must hold at the same action boundary, and success is declared at the first such boundary; the
+episode then ends. The lift rule is checked after every action as well and ends the episode as a failure as soon as it
+is broken. Otherwise the episode ends as a failure after step_lim actions.
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -34,9 +60,13 @@ simulated time). RoboDojo's own evaluation gives a policy 600 actions (24 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** Both arms within 0.15 m per axis and 20 deg of their start pose at the same action as the block alignment (position < 7 mm, orientation < 7 deg).
+**At the end.** Both arms near their start poses (above), at the same action as the block lies on the pad (centre
+within 7 mm, orientation within 7 deg); the grippers need not be open.
 
-**Notes from RoboDojo's code.** Very strict tolerance: 7 mm and 7 deg. The orientation test is the full-quaternion angle (so a tilted block would also fail), and the block's root point (not an edge) is compared with the pad's root. The block may not be lifted more than 1 cm at any time, so grasping and carrying it is effectively prohibited (small tilts or hops above 1 cm during pushing also fail). The pad is a static geometry on the table and is not an obstacle (the block can be pushed over it).
+**Notes from RoboDojo's code.** The tolerances are tight: 7 mm and 7 deg. The orientation test compares whole 3-D
+orientations, so a block that is tilted (resting on another object or on an edge) fails even when its heading is
+right. The place test compares centres, not edges. The pad is only a drawing on the table, not an obstacle: the block
+slides over it.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

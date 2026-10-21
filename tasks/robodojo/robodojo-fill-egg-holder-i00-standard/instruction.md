@@ -13,12 +13,36 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Place the four eggs from the basket into the egg holder, then close the lid."*
 
 ## Success (RoboDojo's own check for this task)
-- For each egg target0, target1, target2, target3: the egg's root origin xy lies inside egg_holder's bbox footprint (convex hull of the oriented bbox projected on xy) and its root z is above the egg_holder's bbox lowest z (is_A_in_B).
-- For each of the four eggs: egg root z minus the z of egg_holder's passive functional point 'bottom' is strictly between 0.01 m and 0.04 m (is_A_point_above_B_point_by_z_range, z_lower default 0.01, z_upper 0.04): the egg must sit in a holder cup/slot, resting just above the bottom point (not on top of the lid or floating).
-- The egg_holder's lid joint (joint(s) listed under the passive functional entry 'GetParentLink' of the egg_holder asset) has normalised position (position - lower)/(upper - lower) > 0.9 for at least one such joint, i.e. the lid is more than 90 percent of its joint range (which end of the range is 'closed' is defined by the asset's limits; the task intends this to be the closed lid).
-- All target robots back at start end-effector pose: |dx|,|dy|,|dz| each <= 0.15 m and rotation <= 20 degrees (all_robot_back_to_origin defaults).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the four eggs: identical light-brown eggs, 6.3 cm long and about 5 cm thick, lying on their sides in the woven
+  basket on the right, in front of the right gripper [target0, target1, target2, target3] (the basket is fixed and not
+  checked [egg_basket]);
+- the egg holder: the white egg carton in front of you, just right of centre: four round cups in a 2 x 2 block, 9 cm
+  wide, with its lid hinged at the cups' far edge and standing open, upright, behind them [egg_holder].
 
-**When it is checked.** Checked after every action; all conditions must hold at the same step (4 eggs in place, lid > 90 percent of range, arm home); the first such step is success. Fails at step_lim=700 actions. No early-fail rule. Process score (partial only): transition mode with scores 10/25/40/90 for 1/2/3/4 eggs in place and grippers open (>= 0.8); success gives the final 100 tier via reward.
+All of these must hold at the same action boundary, for each of the four eggs (any egg in any cup):
+- **In the holder** [is_A_in_B]: the egg's centre (the middle of the egg, its origin), seen from above, inside the
+  holder's outline as RoboDojo stores it (a fixed 9 x 17.7 cm rectangle, the carton's width, reaching from 1.6 cm in
+  front of the carton's front edge to about 4 cm behind the open lid), and higher than that outline's lowest point.
+- **Seated in a cup** [is_A_point_above_B_point_by_z_range, z_lower=0.01 (default), z_upper=0.04]: the egg's centre
+  strictly between 0.01 and 0.04 m higher than the carton's floor point (the holder's 'bottom' point: in the middle of
+  the carton's base, 5 mm above the base). An egg resting in a cup passes; an egg on top of the closed lid, on the rim
+  or held above the carton fails.
+
+And, at the same time:
+- **Lid closed** [is_joint_position_above_ratio, percentage=0.9, the lid hinge named by the holder's 'GetParentLink'
+  entry]: the lid's hinge more than 90 % of the way along its range toward closed, i.e. the lid swung forward and
+  down over the cups. At the start it stands open.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), egg by egg (in the holder, seated), then the lid,
+then the arms, stopping at the first condition that fails; all must hold at the same action boundary (one stage).
+Success is declared at the first action boundary where everything holds, and the episode ends. No condition ends the
+episode early as a failure. A separate partial-credit score (not part of success) climbs the tiers 10, 25, 40, 90 as
+1, 2, 3, then 4 eggs are in the holder and seated while both grippers are open (each at least 0.8 of its full
+opening); there is no 100 tier, so this score tops out at 90 whether or not the episode succeeds [process score,
+transition mode].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -27,9 +51,13 @@ RoboDojo's own evaluation gives a policy 700 actions (28 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** Target arms back within 0.15 m per axis and 20 degrees of start end-effector pose at the moment of success; the lid must be closed (joint ratio > 0.9).
+**At the end.** The lid closed (above) and both arms back near their start poses, as part of the success condition;
+the grippers need not be open.
 
-**Notes from RoboDojo's code.** Lid condition uses the joint ratio of the joint named in the asset's functional metadata ('GetParentLink'); the direction (which end is 'closed') cannot be determined statically. The egg height window (0.01 m < z_egg - z_bottom_point < 0.04 m) is tight: eggs must be seated in the holder. The same egg_holder 'bottom' functional point (possibly several points; any point passing counts per egg) is used for all 4 eggs. Eggs are matched to any slot (no per-slot assignment).
+**Notes from RoboDojo's code.** Put all four eggs in first, then close the lid: an egg must sit low in a cup (its
+centre 1-4 cm above the carton's floor), so eggs cannot be placed on the closed lid. Any egg may go in any cup, and
+the check does not even require one egg per cup, only that each is seated low inside the carton. The lid test reads
+the lid hinge alone. The carton is not fixed to the table: if it is pushed, its outline and floor point move with it.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

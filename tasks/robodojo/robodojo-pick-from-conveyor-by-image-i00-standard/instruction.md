@@ -13,10 +13,30 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Lift the basket more than 8 cm, identify the target object on the conveyor according to the image on the board, pick it up, and place it into the basket."*
 
 ## Success (RoboDojo's own check for this task)
-- target is on the bottom of the basket: (target bbox z_min - basket bbox z_min) is within [-0.01, 0.04] m AND the basket's xy footprint (convex hull of world bbox) fully contains the target's xy footprint AND target bbox z_max < basket bbox z_max AND target bbox z_min > basket bbox z_min - 0.03 (is_A_on_B_bottom with is_A_cover_B(basket, target)).
-- target's origin z is more than 0.08 m above its origin z at episode start (is_lift, z_threshold=0.08).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the basket: the light-blue plastic shopping basket with a handle, on the belt left of centre (36 cm front to back,
+  24 cm wide, 22 cm tall overall) [basket]; it rides the belt like the other objects;
+- the target: the one object on the belt that is shown in the photo on the board (the framed picture standing on the
+  stand straight in front of the arms, facing the camera) [target]. The four objects on the belt start to the left of
+  the basket, some of them out of view, and each looks different [target, object1, object2, object3].
 
-**When it is checked.** All listed conditions are checked together, in order, after every action (reward_manager.step runs once per action, after the action's whole control sequence has executed; nothing is checked between actions). They form a single stage: all must be true at the same action boundary (any list inside the conditions means 'at least one of'). Success is declared at the first action boundary where all hold; the episode then ends. No final_check list is used. Otherwise the episode ends as a failure after step_lim actions. Because the target starts on the conveyor surface, the 8 cm lift requirement can only be met while the target is raised, i.e. the basket holding the target is lifted. Nothing penalises touching the other objects.
+Both conditions must hold at the same action boundary:
+- **Target lying in the basket.** The target's lowest point between 0.01 m below and 0.04 m above the basket's lowest
+  point (both inclusive), i.e. resting on the basket's floor [is_A_on_B_bottom, min_z_gap -0.01, max_z_gap 0.04];
+  seen from above, the target's whole outline (its bounding box as it is turned) inside the basket's outline (the
+  basket's bounding box as it is turned); the target's highest point lower than the basket's highest point; and its
+  lowest point no more than 0.03 m below the basket's lowest point [is_A_cover_B(basket, target)]. Not true at the start.
+- **Target lifted.** The target's centre (the middle of its bounding box) more than 0.08 m higher than at the start of
+  the episode [is_lift on target, z_threshold 0.08]. Not true at the start. With the target lying on the basket's
+  floor and still upright, this means the basket itself is held up: its underside more than 0.08 m minus the target's
+  height above the basket's lowest point (that gap is -0.01 to 0.04 m by the first condition) above the belt, so
+  roughly 8 cm.
+
+**When it is checked.** After every action (never between actions), on the current state, in the order basket, lift,
+stopping at the first condition that fails; one stage, both must hold at the same action boundary. Success is declared
+at the first action boundary where both hold, and the episode ends. Because the target starts on the belt, the
+lift can only hold while the basket, with the target lying in it, is held up at that moment. Touching or moving the
+other objects is not penalised, and no condition ends the episode early as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -25,11 +45,17 @@ RoboDojo's own evaluation gives a policy 700 actions (28 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**What changes by itself.** Yes: the conveyor belt moves the objects during the episode (speed/direction in the conveyor asset; not statically determinable).
+**What changes by itself.** Yes: the belt runs from left to right (world +x) the whole episode, at about 0.1 m/s
+(estimated from a recorded episode), carrying the basket and the four objects; the basket leaves the arms' reach on
+the right after several seconds unless it is picked up, and the objects arrive from the left one after another.
 
-**What you must read or remember.** Yes (visual): read the photo on the board to choose the target among 4 conveyor objects. The target identity is not in the text instruction.
+**What you must read or remember.** Yes (visual): look at the photo on the board to tell which of the four objects is
+the target. The text does not name it.
 
-**Notes from RoboDojo's code.** The instruction's 'lift the basket more than 8 cm' is not an independent check; it is implied by the target lift condition (target must be >0.08 m above its start while inside the basket). The check is on the current state, so the basket must still be held up (or otherwise supported) at the moment of the test. Basket placement relative to the conveyor frame cannot be mapped to world coordinates statically. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** "Lift the basket more than 8 cm" in the task line is not a separate check: it follows
+from the target's own lift while it lies in the basket. The check reads the current state, so the basket must still be
+held up at the moment of the check. The heights are compared with each object's position at the start of the episode;
+the belt is flat, so being carried along does not change them.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

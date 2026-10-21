@@ -20,10 +20,29 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- is_stacked, label_list=[block_0, block_1, block_2], in_order=False, xy_threshold=0.015 m (fixed), no z_threshold: the three block ROOT positions are sorted by height (z); for each vertically adjacent pair, horizontal (XY) root-to-root distance <= the xy threshold AND z gap (upper minus lower root z) >= 0.005 m (no upper bound). Any stacking order of the three blocks is accepted (the order is determined by their heights).
-- all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms).
+Three small cubes of the same size, 3.0 cm on each edge, each with a different surface, among many distractor objects
+(colours as they look under the scene's pink light):
+- a red cube at the right, straight ahead of the right gripper, at mid depth [block_0];
+- an orange-peach cube at the right, nearer you, just left of the right gripper's fingers [block_1];
+- a pale lilac cube on the left, ahead of the left gripper, at mid depth [block_2].
 
-**When it is checked.** Success conditions form ONE stage: after every action (once all simulation sub-steps of that action are done) the reward manager evaluates all conditions; the episode succeeds as soon as ALL hold simultaneously at the same moment (reward 1 -> episode ends with success). Conditions are not latched or ordered. Otherwise the episode ends as a failure after step_lim=550 actions (the check made after the last action still counts). No early-fail rule exists apart from the environment being flagged invalid (e.g. a required label missing / physics broken).
+A cube's *centre* below is the point RoboDojo tests for it (its origin): the middle of the cube. All of these must hold
+at the same action boundary:
+- **The three cubes in one column** [is_stacked, in_order=False, xy_threshold=0.015]: RoboDojo sorts the three cubes
+  by the height of their centres; then, for the bottom and middle cube and for the middle and top cube, the upper centre
+  must be at most 0.015 m from the lower centre horizontally (inclusive) and at least 0.005 m higher (no upper limit).
+  Any order of the three cubes counts, and their orientation is not tested. Resting on each other, the
+  centres are 3 cm apart in height, so it means a tower of the three cubes with each cube within 1.5 cm of centred on
+  the one below. Not true at the start (all three lie on the table, two on the right and one on the left).
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions; once all simulation sub-steps of the action are
+done), both conditions are checked together: one stage, nothing latched or ordered. Success is declared at the first
+action boundary where both hold, and the episode ends. No condition ends the episode early as a failure (only a broken
+environment, e.g. a missing object or exploded physics, does). RoboDojo's own 550-action limit [step_lim] does not apply
+here (Episode length, below).
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -31,9 +50,17 @@ simulated time). RoboDojo's own evaluation gives a policy 550 actions (22 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** All target (controlled) arms must be back near their start pose when success is evaluated (it is one of the success conditions, see success list): every target arm's end-effector position within 0.15 m on EACH of x, y, z (per-axis, not Euclidean) and orientation within 20 degrees of its pose at the start of the episode (pose recorded right after the robot is set to its initial state). Gripper opening is NOT checked by the success test.
+**At the end.** Both arms back near their start poses (above, start = the pose right after the robot is set to its
+initial state), as part of the success condition; the grippers need not be open.
 
-**Notes from RoboDojo's code.** The size group is hierarchical-random per episode, so block size (and, for stack_blocks, the xy tolerance 0.015/0.0175/0.02 m) varies per episode; all three blocks in an episode share the same size. In this _random variant run_reward uses a fixed 0.015 m tolerance; the process score uses a size lookup that falls back to 0.015 m for indices 20-28, so the effective tolerance is always 0.015 m. No gripper-open requirement in success. A process score (15 when gripper open (>=0.8 normalised) and at least one pair stacked; 100 for the full stack with gripper open) exists but does not decide success. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically.
+**Notes from RoboDojo's code.** RoboDojo draws one size group per episode (3.0, 3.5 or 4.0 cm cubes) and three cubes
+of that group with different surfaces, so all three cubes have the same size (here 3.0 cm). Unlike the non-random
+stack-blocks task, the success test here uses a fixed 0.015 m horizontal limit whatever the size; the process score
+looks the limit up by the cube's model and falls back to the same 0.015 m for this variant's cubes [models 20-28], so
+the limit is always 0.015 m. The test reads only the cubes' centres: it does not need the cubes to touch, to be turned
+alike, or to be released. The distractor objects are not read. A process score (15 for one stacked pair with both
+grippers open at least 0.8 of their range, 100 for the full tower with grippers open) exists but does not decide
+success.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

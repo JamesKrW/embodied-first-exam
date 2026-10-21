@@ -21,13 +21,39 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- For slot S in {toast_slot1, toast_slot2} (both required, simultaneously): at least ONE of the four breads bread_0..bread_3 satisfies both: (a) bread origin xy lies inside the quadrilateral formed by the toaster's 4 passive functional points tagged S (is_pointA_in_B_functional_bbox; point-in-polygon, tolerance 1e-6 m, no z test there), and (b) bread origin z minus the z of one of the toaster's passive functional points tagged S lies strictly between 0.03 and 0.065 m (is_A_point_above_B_point_by_z_range, z_lower=0.03, z_upper=0.065).
-- Every one of the four breads bread_0..bread_3 must have at least one of its local axes +x, -x, +y, -y within 30 deg of world up (i.e. no bread lying flat with local z up; breads are not allowed to fall over).
-- Exactly 2 of the 4 breads have their origin inside the bread_shelf (is_N_A_in_B, N=2; is_A_in_B on the shelf bbox: origin xy in the shelf bbox hull and origin z > shelf bbox z_min) -- the count must be exactly 2, not at least 2.
-- Toaster lever: for the toaster's joint(s) tagged 'toast_botton' (sic), (position - lower)/(upper - lower) > 0.85 for at least one such joint (is_joint_position_above_ratio, percentage=0.85) at the moment of checking.
-- all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, at the same action boundary as all other conditions. Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the four bread slices: identical square slices (11.8 x 11.8 cm, 1.2 cm thick) standing upright on an edge, side by
+  side in the bread shelf, faces toward left and right [bread_0..bread_3; interchangeable];
+- the bread shelf: the small metal toast rack (16 x 8 cm, 8 cm tall) at the left, holding the four slices [bread_shelf];
+- the toaster: the grey box toaster (25 cm front to back, 14 cm wide, 15 cm tall) at the right, its long side pointing
+  toward you, with two slots side by side in its top, each running front to back, and the lever on its front face (the
+  face toward you) [toaster].
 
-**When it is checked.** All listed conditions are checked together, in order, after every action (reward_manager.step runs once per action, after the action's whole control sequence has executed; nothing is checked between actions). They form a single stage: all must be true at the same action boundary (any list inside the conditions means 'at least one of'). Success is declared at the first action boundary where all hold; the episode then ends. No final_check list is used. Otherwise the episode ends as a failure after step_lim actions. No early-fail rule. The lever condition is a current-state test, so the lever must be at >85% of its range at the same action boundary at which the breads are in the slots and the arms are back (unless the asset's lever latches down, which cannot be determined statically).
+Points RoboDojo tests: a slice's *centre* is the middle of one of its two big faces [its origin], so for an upright
+slice it is at the slice's mid-height. The *left slot area* and the *right slot area* are rectangles inside the
+toaster, 12.5 cm front to back and 4.5 cm wide, one under each slot, 6 cm above the table [the toaster's four
+'toast_slot1' points (left slot) and four 'toast_slot2' points (right slot), at the rectangles' corners].
+
+All of these must hold at the same action boundary:
+- **A slice in each slot.** For the left slot and for the right slot, at least one slice has its centre (a) inside
+  that slot area seen from above [is_pointA_in_B_functional_bbox, 1e-6 m tolerance] and (b) between 0.03 and 0.065 m
+  higher than the slot area (strictly) [is_A_point_above_B_point_by_z_range, z_lower 0.03, z_upper 0.065]. For an
+  upright slice that means its centre 9 to 12.5 cm above the table, i.e. its bottom edge 3 to 6.5 cm above the table:
+  pushed down into the slot, not resting on top of it.
+- **No slice lying flat.** Each of the four slices stands on one of its edges: one of the four directions in the plane
+  of the slice (toward any of its edges) within 30 deg of straight up [local +x, -x, +y or -y; is_axis_up, threshold 30].
+  Already true at the start; a slice that falls flat anywhere fails.
+- **Two left in the shelf.** Exactly two slices have their centre over the shelf: seen from above inside the shelf's
+  outline and higher than its underside [is_N_A_in_B, N=2; is_A_in_B]. Not two, not three: exactly two.
+- **Lever down.** The lever on the front face is pushed down near the bottom of its slot, as in the recorded
+  successes: its joint past 0.85 of its range [is_joint_position_above_ratio, 0.85, on the joint tagged 'toast_botton'
+  (sic): (position - lower)/(upper - lower) > 0.85]. Not true at the start. It must be down at that same moment.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), all conditions together (one stage). Success is
+declared at the first action boundary where everything holds, and the episode ends. No condition ends the episode
+early as a failure; otherwise it runs on until the length cap (below) [step_lim].
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -35,9 +61,14 @@ simulated time). RoboDojo's own evaluation gives a policy 1400 actions (56 s) fo
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, (part of the success condition). Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+**At the end.** Both arms back near their start poses (above), with the lever down at the same moment; the grippers
+need not be open.
 
-**Notes from RoboDojo's code.** Which two breads go in which slot is free; the test only needs one bread per slot plus exactly two left in the shelf. Since the 'z above slot point' band is 0.03..0.065 m relative to the toaster's slot functional points (any of the 4 points), bread must be seated in the slot, not hovering. make_toast_random is the clutter/other-toaster variant with a wider z band; here the band is the narrow (0.03, 0.065). The bread-up condition is an OR over four local axes for each bread; which local axis is the bread's face normal is asset-defined. 'toast_botton' is the literal tag spelling in the code. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** Which slices go into which slot is free; the test needs one slice per slot and exactly
+two left in the shelf. The slices start standing and must never be left lying flat. The lever test reads the lever's
+current position; whether the lever stays down by itself could not be established from the code. The toaster is close
+to the right arm's start pose: in a recorded success the right gripper was still holding the lever down when the arms
+counted as back (within the 0.15 m allowance). 'toast_botton' is the literal spelling of the lever's tag.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

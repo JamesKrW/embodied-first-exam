@@ -13,13 +13,47 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Hang the headphones on the headphone stand, close the laptop, then place it into the vertical laptop stand."*
 
 ## Success (RoboDojo's own check for this task)
-- Headphones on stand: the headset's active functional point 'headband_bridge' is within 0.05 m (3D Euclidean, strictly less) of the stand's passive functional point 'support_cradle' AND the orientation of the two functional-point frames differs by less than 30 degrees (quaternion angular distance; is_align_qpos=True, align_qpos_threshold=30). Any of the matching points suffices if there are several.
-- Laptop closed: the joint tagged 'laptop_hinge' of the laptop has normalised position ratio (position-lower)/(upper-lower) strictly greater than 0.85 (is_joint_position_above_ratio, percentage 0.85). The source does not state which end of the range is 'closed'; the instruction 'close the laptop' implies > 0.85 = closed.
-- Laptop upright: the laptop's local +y axis is within 10 degrees (strictly less) of world up (is_axis_up, axis [0,1,0], threshold 10).
-- Laptop in rack: the laptop's 'bottom' ACTIVE functional point lies inside the oriented 3D bounding box of vertical_laptop_storage_rack (point transformed into the rack's frame and tested against the rack's oriented bbox with tolerance 1e-6 m; any one such point suffices).
-- all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the headphones: red over-ear headphones with black ear cups, lying flat on the table in front, just left of centre,
+  ear cups toward you and to the left and right, the headband pointing away from you, turned about 25 deg (the right
+  ear cup further away) [headset];
+- the headphone stand: the tall stand at the far left (27.5 cm tall, 17.8 cm wide): a curved dark-wood hanger bar on a
+  black post over a wooden tray [stand];
+- the laptop: the dark grey laptop on the black riser in the centre, open (the screen about 110 deg from closed, leaning a
+  little back), keyboard toward you, hinge and screen on the far side; about 18 cm wide [laptop];
+- the rack: the small vertical laptop rack at the right, a little nearer to you than the laptop's front edge: a narrow
+  slot between upright panels on a base plate, 13.7 cm long (its long side pointing away from you, about 5 deg off),
+  5.3 cm across and 4.9 cm tall [vertical_laptop_storage_rack].
+The black riser under the laptop [laptop_stand] and the distractor objects are not checked.
 
-**When it is checked.** Success conditions form ONE stage: after every action (once all simulation sub-steps of that action are done) the reward manager evaluates all conditions; the episode succeeds as soon as ALL hold simultaneously at the same moment (reward 1 -> episode ends with success). Conditions are not latched or ordered. Otherwise the episode ends as a failure after step_lim=800 actions (the check made after the last action still counts). No early-fail rule exists apart from the environment being flagged invalid (e.g. a required label missing / physics broken).
+All of these must hold at the same action boundary:
+- **Headphones on the stand.** Two points must be less than 0.05 m apart (3-D): the inside of the headband's crown (the
+  middle of the headband, about 1 cm below its outer top) [headset 'headband_bridge'] and the middle of the stand's
+  curved hanger bar, about 1.6 cm below the stand's top [stand 'support_cradle']; that is, the headband rests on the
+  hanger. And the headphones must hang the way the stand is set up, within 30 deg (total 3-D rotation between the
+  headphones' and the stand's frames) [is_A_functional_point_close_to_B_functional_point, is_align_qpos, 30 deg]:
+  headband up, the ear cups hanging at the left and right ends of the hanger (the ear cup now on the right stays on the
+  right), and the side that now lies on the table facing away from you. That is the pose you get by lifting the
+  headband end straight up over the ear cups. Not true at the start (they lie flat, about 90 deg off, and turned
+  25 deg). Hanging them turned around (ear cups swapped or the other side facing away) is 180 deg off and fails.
+- **Laptop closed.** The lid within 16.5 deg of fully closed: the hinge joint's position, as a fraction of its range
+  from fully open (110 deg, fraction 0) to closed (fraction 1), above 0.85 [laptop_hinge, is_joint_position_above_ratio
+  0.85]. At the start it is fully open (fraction about 0.01).
+- **Laptop on its edge, hinge up.** The laptop's front-to-back direction, from its front edge (the edge toward you at
+  the start, opposite the hinge) to the hinge, within 10 deg of straight up [laptop local +y; is_axis_up, 10 deg]: the
+  closed laptop stands on its front edge with the hinge on top. Not true at the start (that direction is horizontal,
+  pointing away from you); standing it on the hinge edge points it down and fails.
+- **Laptop in the rack.** The middle of the laptop's front edge, on its underside (within about 1 cm of the edge)
+  [laptop 'bottom' point], inside the rack's box: within 6.85 cm of the rack's centre along its long side, within
+  2.65 cm across it, and between the table and 4.9 cm above it (1e-6 m tolerance)
+  [is_A_functional_point_in_B_bbox, the rack's bounding box in its own frame]. So the front edge stands down in the slot,
+  the laptop's width along the rack's long side.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), all five conditions together; they form a single
+stage, and none is remembered from an earlier action. Success is declared at the first action boundary where all hold,
+and the episode ends. No condition ends the episode early as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -28,9 +62,16 @@ RoboDojo's own evaluation gives a policy 800 actions (32 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** All target (controlled) arms must be back near their start pose when success is evaluated (it is one of the success conditions, see success list): every target arm's end-effector position within 0.15 m on EACH of x, y, z (per-axis, not Euclidean) and orientation within 20 degrees of its pose at the start of the episode (pose recorded right after the robot is set to its initial state). Gripper opening is NOT checked by the success test.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** All five conditions must hold at the SAME moment, so the headset must stay on the stand while the laptop is processed (if it is knocked off, the first condition fails). Headset hanging is judged by functional points ('headband_bridge' vs 'support_cradle'), whose exact locations are asset metadata not visible in the source. The hinge direction (which end is closed) and the laptop's initial opening angle cannot be determined statically. No gripper-open requirement in success; the process score (paired: +20 headset hung with gripper open >=0.8 normalised; +80 laptop closed/upright/in rack with gripper open >=0.7) does not decide success. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically.
+**Notes from RoboDojo's code.** All five conditions are tested at the same action boundary, so the headphones must still
+hang on the stand when the laptop is in the rack. None of them holds at the start except the arms. The headphones are
+tested on one point and their overall orientation, not on contact: resting on the hanger bar in the pose above is what
+passes. The laptop is tested on its hinge angle, its front-to-back direction and one point at the middle of its front
+edge, not on its whole outline: which face (keyboard or lid) points left or right does not matter.
+RoboDojo's partial-credit score (20 for the hung headphones, 80 for the closed laptop upright in the rack, each with the
+grippers open) does not decide success.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

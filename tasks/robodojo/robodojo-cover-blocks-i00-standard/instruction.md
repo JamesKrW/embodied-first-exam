@@ -13,12 +13,45 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Cover the blocks from left to right, remember their colors, then uncover them in the order: red, green, and blue."*
 
 ## Success (RoboDojo's own check for this task)
-- The success is a sequence of 6 stages that must be observed in order (see evaluation). Definitions: L, M, R = the red/green/blue cubes sorted by their world x at the start of the episode (L = smallest x, 'left'; R = largest x). 'X covered' = at least one of cup0, cup1, cup2 'covers' X: the xy convex-hull footprint of the cup's bbox fully contains the footprint of X's bbox, AND the cup's bbox top z is higher than X's bbox top z, AND X's bbox bottom z is > (cup's bbox bottom z - 0.03 m).
-- Stage 1: L covered, M not covered, R not covered. Stage 2: L covered, M covered, R not covered. Stage 3: L, M, R all covered. Stage 4: red NOT covered, green covered, blue covered. Stage 5: red NOT covered, green NOT covered, blue covered. Stage 6: red, green, blue all NOT covered AND all target robots back at their start end-effector pose (|dx|,|dy|,|dz| each <= 0.15 m, rotation <= 20 degrees).
-- In every stage (1-6), each of cup0, cup1, cup2 must have its local -z axis within 10 degrees of world +z (is_axis_up axis=[0,0,-1], threshold=10), i.e. the cups must remain in the same orientation (opening facing down, inverted) throughout; tipped or upright cups invalidate the stage.
-- Throughout the episode (query aim 0): the red, green and blue cubes must each stay within 0.05 m (3D Euclidean distance of the root position) of where they started; if any cube is ever displaced by more than 0.05 m at any checked step the episode fails immediately.
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the three blocks: small cubes, 2.5 cm on each side, one red, one green, one blue [red, green, blue], in a left-to-right
+  row across the near half of the table, 20 cm apart. *Left*, *middle* and *right* block below mean the blocks in
+  those places at the start of the episode, whatever their colour;
+- the three cups: identical yellow cups, 8 cm across and 7.2 cm tall, standing upside down (mouth on the table, base
+  up), one 10 cm in front of each block, nearer to you [cup0 left, cup1 middle, cup2 right]. Any cup may cover any
+  block.
 
-**When it is checked.** Staged and in order. After every action the stage list is evaluated once: only the FIRST remaining stage is tested; if all its conditions hold at that step it is removed and the next stage becomes active on the following action step (at most one stage advances per action). So the 6 states must be observed after separate actions in the sequence: stage 1 state, then stage 2 state, ..., stage 6 state. Skipping a state (e.g. covering two cubes within a single action before the one-cube state was ever observed) leaves the earlier stage pending and it can no longer be completed unless the state recurs. Success is declared when the last stage is removed (reward 1) i.e. at the first step after stages 1-5 are done that stage 6 holds. The three is_moved queries are checked every step; a cube displaced > 0.05 m (counter > 0) sets failure. The episode otherwise fails at step_lim=800 actions. Note the order (left cup first, etc.) is fixed by the cubes' initial x positions, not by colour, but uncovering order is by colour.
+A block is *covered* when one of the cups covers it [is_A_covered_by_any_of_B]: seen from above, the cup's outline
+(its bounding box as it is turned) fully contains the block's outline; the cup's top is higher than the block's top;
+and the cup's lowest point (its rim, when upside down) is less than 0.03 m above the block's underside, so a cup held
+higher over the block does not count [is_A_cover_B]. *Uncovered* means no cup covers it. The six states, which must
+be reached one after another, in this order:
+1. left block covered, middle and right uncovered;
+2. left and middle covered, right uncovered;
+3. all three covered;
+4. red uncovered, green and blue covered;
+5. red and green uncovered, blue covered;
+6. all three uncovered, and both arms back [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its
+   start position on each of x, y and z separately, and within 20 deg of its start orientation. The grippers need not
+   be open.
+
+In every state, each cup still upside down, its base up, within 10 deg [cup local -z; is_axis_up,
+threshold=10]: true at the start; keep the cups mouth-down while moving them (a cup turned mouth-up or tipped over
+breaks the state).
+
+For the whole episode, no block may ever be more than 0.05 m (3-D) from where it started [is_moved,
+dis_threshold=0.05; one query per block, allowed count 0]: lower the cups over the blocks and lift them off without
+pushing or dragging a block away.
+
+**When it is checked.** After every action (never between actions). First the three stay-put tests: a single action at
+which any block is more than 0.05 m from its start marks the episode failed at once. Then only the first state not yet
+reached is tested; when it holds at that action it counts as reached, and the next state is tested from the next action
+on, so at most one state is reached per action. Each state must therefore be held at some action boundary of its own:
+covering two blocks within one action skips the one-block state, and the sequence then waits until that state
+occurs again. Success is declared when state 6 is reached after states 1-5, and the episode ends. A separate
+partial-credit score (not part of success) climbs the tiers 0, 0, 5, 15, 30, 100 as states 1 to 6 are reached (state 6
+there without the arms)
+(the 100 tier counts only if the episode succeeds, otherwise the tier below) [process score, transition mode].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -27,11 +60,18 @@ RoboDojo's own evaluation gives a policy 800 actions (32 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**What you must read or remember.** Memory: after the cubes are covered the colours are hidden, so the agent must remember which colour is at which x position (it is visible only at the start) and then uncover in the order red, green, blue (instruction text is fixed). Left-to-right means ascending world x of the cube positions as in the observation.
+**What you must read or remember.** Note at the start which colour is at the left, middle and right: once the cups are
+over the blocks the colours are hidden, and states 4-6 need you to lift the cups off in the order red, green, blue.
+Covering goes by place (left, middle, right); uncovering goes by colour.
 
-**At the end.** At the last stage all cubes must be uncovered and the target arms back within 0.15 m per axis and 20 degrees of their start end-effector pose. Cups must still be oriented with their -z axis within 10 degrees of up.
+**At the end.** All blocks uncovered, every cup still upside down, and both arms back near their start poses (state 6
+above); the grippers need not be open.
 
-**Notes from RoboDojo's code.** Staged checks require intermediate states to be observed between actions, so cover the cubes one at a time (left, then middle, then right) and uncover them one at a time. Covering has to be geometrically 'bbox footprint of cup contains cube footprint with cup top higher than cube top', cups are not required to be on any specific cube (any cup counts). Cup orientation check implies cups are inverted (mouth down); the placement tag 'down' presumably means the cups start in that pose, but this cannot be verified statically. A cube pushed or dragged by a cup by more than 0.05 m fails the episode. Left/mid/right are fixed from the initial positions (run_reward is called once after reset).
+**Notes from RoboDojo's code.** Cover the blocks one at a time and uncover them one at a time, letting the check see
+each in-between state after an action. A cup counts as covering a block only if, seen from above, its whole outline
+encloses the block's and it sits low (rim less than 3 cm above the block's underside); it need not be the cup that
+started in front of that block. The cups start upside down, which is the attitude the check requires throughout. The
+left/middle/right places are fixed from the blocks' start positions.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

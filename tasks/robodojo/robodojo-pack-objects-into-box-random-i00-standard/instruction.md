@@ -13,13 +13,51 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Place all the objects into the box with their front sides facing left."*
 
 ## Success (RoboDojo's own check for this task)
-- All at the same action boundary:
-- Box: box local z within 15 deg of world up (is_axis_up default, repeated per item); box local +y OR -y axis within 40 deg of world +x (3-D angle).
-- For each of car, electric_toothbrush, hammer: (1) its origin xy lies inside the quadrilateral of the box's 4 passive 'box_bottom' functional points (is_pointA_in_B_functional_bbox; xy only, tol 1e-6 m); (2) the box's local +y OR -y axis is within 45 deg of the object's 'checkpoint' (active functional point) local +x axis, both projected onto the xy plane; (3) the object's 'checkpoint' local -x axis, projected onto xy, is within 60 deg of world +x.
-- For shoe: (1) shoe origin xy inside the box_bottom quadrilateral; (2) box local +y OR -y within 45 deg of the shoe's root local +x axis (xy projection); (3) shoe root local +x axis (xy projection) within 60 deg of world +x.
-- all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, at the same action boundary as all other conditions. Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the box: an open cardboard box with its flaps folded out, left of centre toward the back, 29 cm wide (left-right,
+  turned 17 deg so its left end is a little nearer to you), 17 cm deep and 18 cm tall [box];
+- the toy car: a red sports car, 13.5 cm long, right of centre in front, its nose pointing left and slightly toward
+  you [car];
+- the toothbrush: a red electric toothbrush with a white brush head, 17 cm long, at the right behind the right
+  gripper, its head pointing away from you and to the left [electric_toothbrush];
+- the hammer: a mallet with a dark rubber head and a wooden handle with a dark grip, 18 cm long, right of centre,
+  its head pointing away from you [hammer];
+- the shoe: a dark teal suede sneaker with a white stripe and a gum sole, 19 cm long, left of centre in front, its toe
+  pointing right and away from you [shoe].
 
-**When it is checked.** All listed conditions are checked together, in order, after every action (reward_manager.step runs once per action, after the action's whole control sequence has executed; nothing is checked between actions). They form a single stage: all must be true at the same action boundary (any list inside the conditions means 'at least one of'). Success is declared at the first action boundary where all hold; the episode then ends. No final_check list is used. Otherwise the episode ends as a failure after step_lim actions. No early-fail rule.
+An object's *centre* below is the point RoboDojo tests for it (its origin): for the car, toothbrush, hammer and shoe
+that is the middle of its bounding box. Each item's *front end* is: the car's nose, the toothbrush's brush head, the
+hammer's head and the shoe's toe. All of these must hold at the same action boundary:
+- **Each of the car, toothbrush, hammer and shoe** (each item separately):
+  - its centre, seen from above, inside the box's floor area: the box's full depth front to back, but only the
+    middle 19.5-20 cm of its 29 cm width, i.e. about 5 cm in from each short end wall (1e-6 m tolerance). Only the
+    horizontal position of the centre is tested, no height and no other part of the item
+    [is_pointA_in_B_functional_bbox; box passive 'box_bottom' points = the four corners of that floor area];
+  - lying lengthwise along the box's long side: seen from above (tilt ignored), its front-to-back line (nose to tail,
+    head to handle, toe to heel) within 45 deg of the box's long side, either way round [is_axis_aligned,
+    project_plane xy: box local +y or -y vs the item's 'checkpoint' local +x (car, toothbrush, hammer) or the shoe's
+    local +x];
+  - its front end pointing left: seen from above, the direction from its back end to its front end within 60 deg of
+    world -x (left) [car, toothbrush, hammer: 'checkpoint' local -x within 60 deg of world +x; shoe: local +x, which
+    points to the heel, within 60 deg of world +x; is_axis_aligned, project_plane xy]. At the start this already holds
+    for the car (nose about 21 deg off left) and, barely, for the toothbrush (head about 57 deg off left, but it is not
+    yet along the box: about 74 deg off); not for the hammer (head pointing away, about 101 deg off: turn it a quarter
+    turn so the head points left) or the shoe (toe pointing right and away, about 146 deg off: turn it about end for
+    end). The car also already lies along the box's long side (about 4 deg off): it only has to go into the box with
+    the same heading.
+- **Box** (tested together with every item): upright, within 15 deg of vertical, measured in 3-D [box local +z;
+  is_axis_up]; and its long side (29 cm) within 40 deg of the left-right direction, either way round, measured in 3-D
+  [box local +y or -y vs world +x; is_axis_aligned]. Both already true at the start (the long side is about
+  17 deg off left-right); keep the box upright and do not turn it further.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+All angle tests are strict (less than the threshold).
+
+**When it is checked.** After every action (never between actions), in the order car, toothbrush, hammer, shoe, box,
+arms, stopping at the first condition that fails; all must hold at the same action boundary (one stage). Success is
+declared at the first action boundary where everything holds, and the episode ends. No condition ends the episode
+early as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -28,11 +66,23 @@ RoboDojo's own evaluation gives a policy 1300 actions (52 s) for this task; no c
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**What you must read or remember.** The only orientation info is the instruction's 'front sides facing left'; in code this is world +x for the 'checkpoint -x' axis (car, toothbrush, hammer) or the root +x axis (shoe), each within 60 deg, so the asset 'front' convention is needed (checkpoint is an asset-defined functional point).
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**At the end.** all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, (part of the success condition). Grippers are NOT required to be open by the success test (only by partial-credit scoring).
-
-**Notes from RoboDojo's code.** Containment is only an xy test of the object's origin against the box_bottom polygon (no height test), so the object may even be lying on the box rim in principle; the box must remain nearly level (15 deg) and have its long axis within 40 deg of the world x axis (the box is sampled with only +-25 deg yaw so it normally satisfies this at start, but pushing the box can break it). The _random/non-random pair differ only in object model index sets (this one: car {1..5}, toothbrush {4..6}, hammer {6..8}, shoe {8..17}; the non-random task uses car {0,6,7}, toothbrush {0..3}, hammer {0..4}, shoe {0..7}). Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** "Front" is fixed by the code, not by the instruction alone: the car, toothbrush and
+hammer are tested through an asset-defined frame [active functional point 'checkpoint'] whose +x runs along the item's
+length toward the car's nose, the brush head and the hammer head; the shoe is tested through its own body frame, whose
++x points to the heel, so the code asks for the shoe's +x to point right while it asks for the others' 'checkpoint'
++x to point left. Physically all four come to the same thing: nose, brush head, hammer head and toe toward the left
+(confirmed on a successful run's end state: brush head, mallet head and shoe toe all on the left; the car's nose
+already points left at the start). Placement is tested only on each item's centre, seen
+from above, against the box's floor area, with no height test: an item may lean on the box wall or overhang, and in
+principle could rest on the rim as long as its centre is over that area. The heading tests ignore tilt (they are
+measured seen from above), so an item lying on its side counts; only the box itself must stay upright. The box is
+placed with at most 25 deg of yaw, so its tests hold at the start, but pushing or knocking it can break them. This
+_random variant differs from pack-objects-into-box only in the models of the four items (this one: car models 1-5,
+toothbrush 4-6, hammer 6-8, shoe 8-17; the other: car 0, 6, 7, toothbrush 0-3, hammer 0-4, shoe 0-7); the check is
+identical.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

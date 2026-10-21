@@ -13,10 +13,31 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Stack the three blocks with different textures."*
 
 ## Success (RoboDojo's own check for this task)
-- is_stacked, label_list=[block_0, block_1, block_2], in_order=False, xy_threshold chosen per episode from block_0's model index: 0.015 m for the small size group (indices 5,8,11,14,17), 0.0175 m for the medium group (6,9,12,15,18), 0.02 m for the large group (7,10,13,16,19), no z_threshold: the three block ROOT positions are sorted by height (z); for each vertically adjacent pair, horizontal (XY) root-to-root distance <= the xy threshold AND z gap (upper minus lower root z) >= 0.005 m (no upper bound). Any stacking order of the three blocks is accepted (the order is determined by their heights).
-- all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms).
+Three cubes of the same size, 3.5 cm on each edge, each with a different surface, all on the right half of
+the table near the right gripper:
+- a dark purple (plum) cube, the one nearest you, just left of the right gripper [block_0];
+- a white cube, at the far right, beside the right gripper's fingers [block_1];
+- a cream cube with a wood-grain surface, behind the other two (11-17 cm further away) [block_2].
 
-**When it is checked.** Success conditions form ONE stage: after every action (once all simulation sub-steps of that action are done) the reward manager evaluates all conditions; the episode succeeds as soon as ALL hold simultaneously at the same moment (reward 1 -> episode ends with success). Conditions are not latched or ordered. Otherwise the episode ends as a failure after step_lim=550 actions (the check made after the last action still counts). No early-fail rule exists apart from the environment being flagged invalid (e.g. a required label missing / physics broken).
+A cube's *centre* below is the point RoboDojo tests for it (its origin): the middle of the cube. All of these must hold
+at the same action boundary:
+- **The three cubes in one column** [is_stacked, in_order=False]: RoboDojo sorts the three cubes by the height of their
+  centres; then, for the bottom and middle cube and for the middle and top cube, the upper centre must be at most
+  0.0175 m from the lower centre horizontally (inclusive) and at least 0.005 m higher (no upper limit). Any order of the
+  three cubes counts, and their orientation is not tested. Resting on each other, the centres are 3.5 cm
+  apart in height, so it means a tower of the three cubes with each cube within 1.75 cm of centred on the one below.
+  Not true at the start (all three lie on the table). The horizontal limit is chosen by the size of the cubes [by
+  block_0's model: 0.015 m for the 3 cm cubes (models 5, 8, 11, 14, 17), 0.0175 m for the 3.5 cm cubes (6, 9, 12, 15,
+  18), 0.02 m for the 4 cm cubes (7, 10, 13, 16, 19); here model 9, so 0.0175 m], i.e. half the edge length.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions; once all simulation sub-steps of the action are
+done), both conditions are checked together: one stage, nothing latched or ordered. Success is declared at the first
+action boundary where both hold, and the episode ends. No condition ends the episode early as a failure (only a broken
+environment, e.g. a missing object or exploded physics, does). RoboDojo's own 550-action limit [step_lim] does not apply
+here (Episode length, below).
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -25,9 +46,14 @@ RoboDojo's own evaluation gives a policy 550 actions (22 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** All target (controlled) arms must be back near their start pose when success is evaluated (it is one of the success conditions, see success list): every target arm's end-effector position within 0.15 m on EACH of x, y, z (per-axis, not Euclidean) and orientation within 20 degrees of its pose at the start of the episode (pose recorded right after the robot is set to its initial state). Gripper opening is NOT checked by the success test.
+**At the end.** Both arms back near their start poses (above, start = the pose right after the robot is set to its
+initial state), as part of the success condition; the grippers need not be open.
 
-**Notes from RoboDojo's code.** The size group is hierarchical-random per episode, so block size (and, for stack_blocks, the xy tolerance 0.015/0.0175/0.02 m) varies per episode; all three blocks in an episode share the same size. Tolerance grows with block size: larger blocks are more forgiving. No gripper-open requirement in success. A process score (15 when gripper open (>=0.8 normalised) and at least one pair stacked; 100 for the full stack with gripper open) exists but does not decide success. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically.
+**Notes from RoboDojo's code.** RoboDojo draws one size group per episode and three cubes of that group with different
+surfaces, so all three cubes always have the same size (here 3.5 cm), and larger cubes get a larger horizontal limit.
+The test reads only the cubes' centres: it does not need the cubes to touch, to be turned alike, or to be released. A
+process score (15 for one stacked pair with both grippers open at least 0.8 of their range, 100 for the full tower
+with grippers open) exists but does not decide success.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

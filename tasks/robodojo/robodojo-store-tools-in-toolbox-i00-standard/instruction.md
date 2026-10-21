@@ -13,14 +13,56 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Place each tool into its matching position in the toolbox, then reset the robot arm."*
 
 ## Success (RoboDojo's own check for this task)
-- pliers: the pliers' ACTIVE functional point 'center' OR its 'center_flip' point is within 0.05 m (3D, strictly less; default threshold) of the toolbox's passive functional point 'pliers_slot' AND the orientation of those two point frames differs by less than 10 degrees (is_align_qpos=True, default align_qpos_threshold=10 deg). Either the normal or the flipped (180-degree symmetric) pose is accepted.
-- hammer: active functional point 'center' within 0.05 m of the toolbox passive point 'hammer_slot' and orientation within 10 degrees of the slot frame.
-- tape_measure: active point 'center' within 0.05 m of the toolbox passive point 'tape_measure_slot' and orientation within 10 degrees.
-- wrench: active point 'center' within 0.05 m of the toolbox passive point 'wrench_slot' and orientation within 10 degrees.
-- For each of hammer, tape_measure, wrench and pliers (is_A_cover_B with A=toolbox, B=tool): the tool's oriented-bbox footprint polygon (XY) is entirely contained in the toolbox's footprint polygon AND tool bbox z_max < toolbox bbox z_max AND tool bbox z_min > toolbox bbox z_min - 0.03 m. (The tool must be inside the box's footprint and not above its top.)
-- all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the toolbox: the open teal tray with moulded tool recesses in the middle of the table, 27.7 cm wide, 27.4 cm deep and
+  5 cm tall, a carrying-handle cut-out in its left wall; it is fixed in place [toolbox];
+- the hammer: silver claw hammer with a dark grip, lying flat on the far left, handle pointing toward you, head at the
+  far end, 24 cm long [hammer];
+- the wrench: black-handled adjustable wrench lying flat left of the toolbox, handle toward you, jaw at the far end,
+  17 cm long [wrench];
+- the tape measure: the small yellow tape measure (7 x 7 cm, 3 cm thick) lying flat on one of its round faces just right of the
+  toolbox
+  [tape_measure];
+- the pliers: yellow-and-black-handled pliers lying flat on the far right, handles toward you, jaws at the far end,
+  15.5 cm long [pliers].
 
-**When it is checked.** Success conditions form ONE stage: after every action (once all simulation sub-steps of that action are done) the reward manager evaluates all conditions; the episode succeeds as soon as ALL hold simultaneously at the same moment (reward 1 -> episode ends with success). Conditions are not latched or ordered. Otherwise the episode ends as a failure after step_lim=900 actions (the check made after the last action still counts). No early-fail rule exists apart from the environment being flagged invalid (e.g. a required label missing / physics broken).
+A tool's *centre* below is the point RoboDojo tests for it (its origin): for the pliers, tape measure and wrench the
+middle of the tool's bounding box; for the hammer a point about halfway along its length, near the line of the handle,
+level with the middle of its thickness. Each tool's *slot point* is a fixed point inside the toolbox defined by the
+toolbox's model, about 2 cm above the table and 3 cm below the rim; measured from the middle of the toolbox (seen from
+above) the slots are at:
+- hammer: 6 cm left of the middle, 1 cm farther away [hammer_slot];
+- wrench: at the middle, 1 cm nearer to you [wrench_slot];
+- pliers: 8 cm right of the middle, 2 cm nearer to you [pliers_slot];
+- tape measure: 7.5 cm right of the middle, 9.5 cm farther away (the far-right part of the tray) [tape_measure_slot].
+Each slot point lies in the recess moulded to that tool's shape: solved, the hammer, wrench and pliers lie side by
+side from left to right, handles toward you, with the tape measure in the far-right corner.
+Each slot also carries a required orientation, and for every tool it is the way the tool lies on the table at the
+start (long axis front-to-back with the handle toward you, lying flat on the same face): the start poses differ from it
+by only 0.4 deg (hammer), 3.7 deg (tape measure), 4.9 deg (wrench) and 5.5 deg (pliers).
+
+All of these must hold at the same action boundary:
+- **Pliers.** Their centre less than 0.05 m (3-D distance) from the pliers slot point AND their orientation within
+  10 deg (3-D angle) of the slot's [pliers 'center' to toolbox 'pliers_slot', is_align_qpos]: that is, moved into the
+  slot without turning (they start 5.5 deg off, so only a few degrees of extra twist or tilt are allowed). OR the same
+  with the pliers turned over [pliers 'center_flip']: rolled 180 deg about their long axis, the other face up, handles
+  still toward you. Either way passes.
+- **Hammer**, **tape measure**, **wrench.** Each one's centre less than 0.05 m (3-D) from its own slot point AND its
+  orientation within 10 deg of the slot's ['center' to '<tool>_slot', is_align_qpos]: moved into its slot lying the way
+  it lies now (hammer head and wrench jaw at the far end, the tape measure on the same round face and turned the same
+  way). No flipped alternative for these three: a hammer, tape measure or wrench turned over or turned around
+  fails.
+- **All four tools inside the box** [is_A_cover_B, A = toolbox, B = each tool]: seen from above, the tool's bounding
+  box (as it is turned) lies entirely within the toolbox's outline, AND the tool's highest point is below the toolbox's
+  top (the rim, 0.05 m above the table), AND its lowest point is above 0.03 m below the toolbox's underside (always true
+  for a tool resting on the table or in the box). No tool may stick out over a wall or stand up above the rim.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (once the action's whole control sequence has run; never between
+actions), all conditions are tested together as one stage; nothing is latched or ordered, so all four tools must be in
+place and the arms back at the same action boundary. Success is declared at the first such action boundary, and the
+episode ends. No condition ends the episode early as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -29,9 +71,15 @@ RoboDojo's own evaluation gives a policy 900 actions (36 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** All target (controlled) arms must be back near their start pose when success is evaluated (it is one of the success conditions, see success list): every target arm's end-effector position within 0.15 m on EACH of x, y, z (per-axis, not Euclidean) and orientation within 20 degrees of its pose at the start of the episode (pose recorded right after the robot is set to its initial state). Gripper opening is NOT checked by the success test.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** All four tools must be in place at the same moment (all conditions in one stage). Orientation tolerance (10 deg) is strict and applies to the full 3D frame of the tool's functional point relative to the slot; pliers get a flipped alternative. The toolbox is static (does not move). Slot locations are asset metadata and cannot be determined from the source. Tool start positions on the table are independent random draws; hammer/wrench share a region and pliers/tape_measure share a region (collision avoidance by the layout sampler). No gripper-open requirement in success. The process score is 'transition' mode: 25/50/75/100 for 1/2/3/4 tools correctly in slot (functional-point+cover checks) with gripper open >=0.8 normalised, but does not decide success. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically.
+**Notes from RoboDojo's code.** Every tool already lies in its slot's required orientation (within 0.4-5.5 deg) at the
+start, so the job is to carry each tool into the box without turning it; the 10 deg limit is a 3-D angle, so tipping
+counts as much as twisting. The slot test is on the tool's centre alone with a 5 cm tolerance, but the tool must also
+fit entirely inside the box's outline and below its rim, so a tool lying across a wall or sticking up above the rim fails
+the box test. Only the pliers may lie either face up. The toolbox does not move. Tools are tested at the same moment,
+so a tool knocked out of its slot while placing another undoes it.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

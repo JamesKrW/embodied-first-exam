@@ -13,9 +13,24 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Remember the first object on the conveyor, then pick the matching object when it appears again."*
 
 ## Success (RoboDojo's own check for this task)
-- target1's origin z is more than 0.1 m above its origin z at episode start (is_lift, z_threshold=0.1), evaluated on the current state at an action boundary.
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the first object: the one object already on the belt at the start, right of centre in front of the right arm
+  [target0]; nothing checks it;
+- the matching object: an identical copy of the first object (same model, same size and colours), which starts out of
+  view to the left, upstream on the belt, among three other objects that each look different [target1; the others are
+  other0, other1, other2].
 
-**When it is checked.** All listed conditions are checked together, in order, after every action (reward_manager.step runs once per action, after the action's whole control sequence has executed; nothing is checked between actions). They form a single stage: all must be true at the same action boundary (any list inside the conditions means 'at least one of'). Success is declared at the first action boundary where all hold; the episode then ends. No final_check list is used. Otherwise the episode ends as a failure after step_lim actions. No requirement to hold it, place it, release it or return the arms. No penalty exists for touching or lifting the other objects (no query, no early fail). Note the conveyor carries objects away: if target1 leaves reach/falls off, the episode just runs to step_lim and fails.
+The success condition:
+- **Matching copy lifted.** The matching copy's centre (the middle of its bounding box) more than 0.1 m higher than at
+  the start of the episode, i.e. lifted more than 10 cm above where it lies on the belt [is_lift on target1,
+  z_threshold 0.1]. Not true at the start. Only its height counts: where it is horizontally, whether it is held, and
+  how it is turned do not matter.
+
+**When it is checked.** After every action (never between actions), on the current state; one stage, one condition.
+Success is declared at the first action boundary where the matching copy is more than 10 cm up, and the episode ends.
+Nothing else is required: no placing, releasing or returning the arms. Touching or lifting any other object (the first
+object included) is neither penalised nor credited, and no condition ends the episode early as a failure; if the
+matching copy is carried away by the belt or falls off, the episode just runs on until it is stopped and fails.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -24,11 +39,17 @@ RoboDojo's own evaluation gives a policy 700 actions (28 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**What changes by itself.** Yes: the conveyor belt runs and moves the objects during the episode (belt speed/direction are defined inside the conveyor USD asset and cannot be determined statically). Target0 starts at the far end; the others start behind it, so objects arrive at the robot sequentially.
+**What changes by itself.** Yes: the belt runs from left to right (world +x) the whole episode, at about 0.1 m/s
+(estimated from a recorded episode). The first object leaves the cameras' view on the right after about 3 s; the
+other four objects come in from the left one after another and pass in front of the left arm roughly 8 to 15 s after
+the start, then move on to the right.
 
-**What you must read or remember.** Yes: remember the appearance of the first object (target0) and later identify the identical one (target1) among distractors. No language naming the object is given.
+**What you must read or remember.** Yes: remember what the first object looks like, then pick its identical copy among
+the objects that arrive later. No text names the object.
 
-**Notes from RoboDojo's code.** is_lift compares against the pose recorded at episode start (init_state), so if target1 is moved by the belt the z reference is still its starting z (belt is flat, so only lifting changes z). The success test does not verify that the chosen object matches target0 other than via the label 'target1'; picking the wrong one earns nothing. Belt speed and whether target0 passes before target1 arrive are not statically determinable. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** The height reference is the copy's height at the start of the episode; the belt is
+flat, so being carried along does not change it and only lifting counts. The check is tied to the matching copy itself
+[target1]: lifting the first object, or any other object, earns nothing.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

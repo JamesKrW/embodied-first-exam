@@ -14,20 +14,52 @@ RoboDojo's own instruction for this scene: *"Pick up the broom, hand it over to 
 The scene's labelled objects (RoboDojo's labels; `s.objects()` gives their poses and bounding boxes):
 - broom_shovel: rigid dustpan ('broom_shovel', model index chosen randomly from 0, 1, 4), 1 total, Table-relative x in [-0.35,0.0], y in [-0.20,0.10], yaw in [135,225] deg, margin 0.01 m (left half of table). In the instruction this is the 'dustpan'.
 - broom: rigid broom ('broom'), 1 total, x in [-0.35,0.0], y in [-0.20,0.10], yaw in [-90,30] deg (left half of table)
-- targets (labels with prefix 'target', i.e. target_1*, target_2*, target_3*): small objects to sweep, three DIFFERENT categories chosen at random from brick (indices 0-2), earbuds (0-2) and paper_ball (0-2) (all three used), with 1 to 2 instances per category (select_instance_nums [1,2], unique) -> roughly 3 to 6 objects in total; right-ish part of the table x in [0.04,0.35], y in [-0.15,0.05], yaw up to +-45 deg. The exact labels and count are only known at runtime.
+- targets (labels with prefix 'target', i.e. target_1*, target_2*, target_3*): small objects to sweep, three DIFFERENT categories chosen at random from brick (indices 0-2), earbuds (0-2) and paper_ball (0-2) (all three used), with 1 to 2 instances per category (select_instance_nums [1,2], unique) -> roughly 3 to 6 objects in total; right-ish part of the table x in [0.04,0.35], y in [-0.15,0.05], yaw up to +-45 deg. This frozen instance has 5: target_1_0 and target_1_1 (paper balls, models 2 and 0), target_2_0 (brick, model 2), target_3_0 and target_3_1 (earbuds, models 1 and 2).
 
 This is a *fixed scene instance*: one of RoboDojo's own evaluation layouts (`arx_x5/0/sweep_blocks_random_0.json`), frozen; the objects and the
 robot's start pose never change between resets. You may reset and retry as many times as you want. Your deliverable is
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- is_A_on_B_left(label_A=broom_shovel, label_B=broom, x_threshold=0.1): broom ROOT x minus dustpan ROOT x is greater than 0.1 m (i.e. the dustpan root is more than 0.1 m to the -x side of the broom root in the environment frame).
-- is_not_lift(broom_shovel, z_threshold=0.01): the dustpan root z is not more than 0.01 m above its initial z (the dustpan stays on the table).
-- is_axis_up(broom_shovel, axis [0,0,1], threshold 5): the dustpan's local +z axis is within 5 degrees (strictly less) of world up (not tipped over).
-- EITHER (OR, see notes) every target_1/target_2/target_3-prefixed objects has its root XY within the radius of one of the dustpan's passive support circle(s) ('broom_shovel/0' support tag; centre(s) and radius come from asset metadata, XY distance < radius), OR every such object has its root XY point inside the XY quadrilateral formed by the dustpan's passive functional points tagged 'handle' (4 points; point-in-polygon with tolerance 1e-6 m).
-- all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the dustpan: mustard-yellow, 18 cm wide and 28 cm long with its short handle, lying flat in the middle of the table,
+  a little away from you; its open front edge (the lip) faces right and a little away, its handle points left and a
+  little toward you [broom_shovel];
+- the broom: a small hand brush, 26 cm long, cream handle and yellow bristles, lying at the left near you, bristles
+  pointing away [broom];
+- the five small objects to sweep, all on the right half of the table: a yellow toy brick (4 cm), nearest you just
+  right of centre [target_2_0]; two crumpled paper balls (about 7 cm), a tan one right of the brick [target_1_1] and a
+  light-grey one further right, near you [target_1_0]; two earbuds, a black one farther away [target_3_0] and a white
+  one at the far right [target_3_1]. The check treats them alike (every object whose label starts with "target").
 
-**When it is checked.** Success conditions form ONE stage: after every action (once all simulation sub-steps of that action are done) the reward manager evaluates all conditions; the episode succeeds as soon as ALL hold simultaneously at the same moment (reward 1 -> episode ends with success). Conditions are not latched or ordered. Otherwise the episode ends as a failure after step_lim=1000 actions (the check made after the last action still counts). No early-fail rule exists apart from the environment being flagged invalid (e.g. a required label missing / physics broken).
+An object's *centre* below is the point RoboDojo tests for it (its origin). For the dustpan it is the middle of its
+bounding box: on its centre line 14 cm behind the front lip (in the back of the pan, just in front of where the handle
+starts) and 2.4 cm above its underside. For the broom it is the middle of its bounding box, about halfway along its
+26 cm. For each small object it is within 1 cm of the middle of its bounding box (the black earbud's is the most
+off-centre, about 6 mm). All of these must hold at the same action boundary:
+- **Broom right of the dustpan.** The broom's centre more than 0.1 m to the right (+x) of the dustpan's centre
+  (strict) [is_A_on_B_left(broom_shovel, broom)]. Not true at the start: the broom lies 25 cm to the left of the
+  dustpan, so it must end on the dustpan's right-hand side (the side of its open lip at the start).
+- **Dustpan on the table.** Its centre at most 0.01 m higher than at the start [is_not_lift]; sliding or turning it on
+  the table is allowed. True at the start.
+- **Dustpan flat.** Its up direction (the pan floor's normal, up at the start) within 5 deg of world up (strict)
+  [dustpan local +z; is_axis_up]: not tipped. True at the start.
+- **Every small object in the dustpan**, seen from above, by EITHER of two tests, and all five must pass the same one:
+  - (a) every object's centre strictly within 0.081 m horizontally of a point on the dustpan's centre line 8.7 cm
+    behind its front lip [support circle 'broom_shovel/0']. That circle is 16.2 cm across, nearly the whole floor of
+    the pan (18.4 cm wide): from 0.6 cm behind the lip back to about the pan's back wall; or
+  - (b) every object's centre inside the rectangle that runs across the pan 8.5 cm either side of its centre line,
+    from 1.6 cm to 9.0 cm behind the front lip: the front half of the pan floor, nearly its full width (boundary
+    included, 1e-6 m tolerance) [the dustpan's four 'handle' functional points; is_all_pointA_in_B_functional_bbox].
+    Despite its name this region is in the pan, not on the handle.
+  Both regions move with the dustpan; only the horizontal position of each object's centre is tested, not its height.
+  Not true at the start.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), all conditions together as one stage; none of them
+remembers earlier actions. Success is declared at the first action boundary where everything holds, and the episode
+ends. No condition ends the episode early as a failure.
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -35,9 +67,14 @@ simulated time). RoboDojo's own evaluation gives a policy 1000 actions (40 s) fo
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** All target (controlled) arms must be back near their start pose when success is evaluated (it is one of the success conditions, see success list): every target arm's end-effector position within 0.15 m on EACH of x, y, z (per-axis, not Euclidean) and orientation within 20 degrees of its pose at the start of the episode (pose recorded right after the robot is set to its initial state). Gripper opening is NOT checked by the success test.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** Bimanual hand-over is described in the instruction but not itself checked; only the final state is. The dustpan must stay (almost) in place and upright during the whole sweep at success time (z within 0.01 m of start, tilt < 5 deg) and end up more than 0.1 m left (-x) of the broom, so the broom must finish on the +x side of the dustpan. IMPORTANT oddity: the two region tests are written as a list [circle_test, bbox_test] in one check slot, which the reward manager evaluates as OR, not AND; the 'handle' functional quad of the dustpan is unusual and its exact location cannot be determined statically (the support circle likely marks the dustpan's collection pan). All swept objects must satisfy the same test (all-quantifier within each test). Objects that fell off the table or remain outside will make the test fail. No gripper-open requirement in success. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically.
+**Notes from RoboDojo's code.** The hand-over of the broom to the right arm is not checked; only the final state is.
+The dustpan may be slid or turned on the table but not lifted (more than 1 cm) or tipped (5 deg or more). The two
+in-the-pan tests are alternatives, but each one must hold for all five objects at once: one object near the lip corner
+(only in the rectangle) and one at the back of the pan (only in the circle) fails both. An object that stays outside
+the pan or falls off the table fails. The broom test compares only left-right (x) positions of the two centres.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

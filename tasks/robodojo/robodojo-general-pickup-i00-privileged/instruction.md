@@ -13,16 +13,27 @@ RoboDojo's own instruction for this scene: *"Pick up the mint green scissors by 
 
 The scene's labelled objects (RoboDojo's labels; `s.objects()` gives their poses and bounding boxes):
 - target: 1 object chosen at random (unique) from about 80 categories with one fixed model each (e.g. bell, pepper, bicycle, binoculars, bottle, bottle_opener, bread, cactus, can, car, cassette, chick, clock, cup, donut, glasses, scissor, stapler, teddy_bear, watch, wrench, ... see config), on the table at x in [-0.4,0.4], y in [-0.2,0.05] (m), random yaw within +/-20 deg.
-- Clutter: 10 distractor objects (category_unique) on the table, x in [-0.45,0.45], y in [-0.2,0.05], random yaw +/-30 deg, margin 0.02 m. They are not referenced by the reward and may be in the way.
+- Clutter: distractor objects (category_unique; the config asks for 10, this frozen instance has 8: mini_fan, piano, cutter, pen, jeans, garage figure, ball, racket) on the table, x in [-0.45,0.45], y in [-0.2,0.05], random yaw +/-30 deg, margin 0.02 m. They are not referenced by the reward and may be in the way.
 
 This is a *fixed scene instance*: one of RoboDojo's own evaluation layouts (`arx_x5/0/general_pickup_0.json`), frozen; the objects and the
 robot's start pose never change between resets. You may reset and retry as many times as you want. Your deliverable is
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- The object labelled target has its root-origin z more than 0.10 m (strictly >0.1) above its z at the start of the episode (is_lift z_threshold=0.1). Only z of the root position is checked; no hold time, no xy condition, no gripper or arm-home condition.
+The object the check reads (RoboDojo's label in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the target: the scissors with mint green handles, 24 cm long, lying flat on the table at the right, a little beyond the
+  right arm's gripper, blades pointing toward you [target].
+The other eight objects on the table (a pink desk fan, a toy keyboard, a yellow utility knife, a pen, a pair of jeans, a
+small red toy figure, a white ball and a table-tennis paddle) are clutter: the check ignores them.
 
-**When it is checked.** Checked after every action; the first step at which the target's root z exceeds its initial z by more than 0.10 m ends the episode with success (reward 1). There is no early-failure rule; the episode fails at step_lim=200 actions. The object only needs to reach that height at some step boundary (after an action finishes); it does not have to be held.
+The scissors' *centre* (the point RoboDojo tests) is about halfway along the scissors, near the pivot.
+- **Lifted.** That centre is more than 0.10 m higher than it was at the start (strictly) [is_lift, z_threshold 0.1].
+  Only its height counts: no horizontal place, hold time, gripper or arm pose is checked. Not true at the start.
+
+**When it is checked.** After every action (never between actions). Success is declared at the first action boundary
+where the scissors' centre is more than 10 cm above its start height, and the episode ends; the scissors need not be
+held after that. No condition ends the episode early as a failure; otherwise it runs on until the length cap (below)
+[step_lim].
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -30,9 +41,13 @@ simulated time). RoboDojo's own evaluation gives a policy 200 actions (8 s) for 
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**What you must read or remember.** Language: the instruction names the target object; at runtime '<target>' is replaced with a natural-language description of the target's label (a random description from that label's description list, e.g. an object name or description). The agent must read which object is meant and distinguish it from the 10 clutter objects. The template text itself in the code contains the literal '<target>' placeholder.
+**What you must read or remember.** Language: RoboDojo's instruction names the target ("the mint green scissors"; in
+RoboDojo a description drawn at random for the target's category replaces the placeholder in "Pick up the <target> by
+10 cm."). Pick that object out of the eight clutter objects on the table.
 
-**Notes from RoboDojo's code.** Lift is measured on the object's root origin z relative to its initial z (not on any grasp point), so any lift of 10 cm counts. Clutter objects can be mistaken for the target; the target identity is only given by the (substituted) instruction. Object categories vary a lot in shape and size (tools, toys, food), so grasp strategies must be generic.
+**Notes from RoboDojo's code.** The lift is measured on the scissors' centre relative to its own start height, not on
+any grasp point, so any grasp that raises the scissors by 10 cm counts. The clutter objects are not checked at all and
+may be pushed aside.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

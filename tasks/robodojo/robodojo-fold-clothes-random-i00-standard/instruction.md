@@ -13,14 +13,50 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Fold the clothes neatly."*
 
 ## Success (RoboDojo's own check for this task)
-- Garment geometry is read from tagged mesh vertices of the cloth 'target' (a long-sleeve top, category Top_Long): each tag (left_sleeve, right_sleeve, left_chest, right_chest, left_hem, right_hem, left_shoulder, right_shoulder) is the mean position of its tagged mesh vertices. Differences A-B are projected onto the garment's OWN local x axis and y axis (the root-orientation-rotated unit vectors, not fixed world axes), measured in metres. All range tests are strict (lower < diff < upper).
-- Sleeves folded in (both): left_sleeve minus right_chest has x-diff in (-0.125, 0.14) m and y-diff in (-0.125, 0.14) m; right_sleeve minus left_chest has x-diff in (-0.14, 0.125) m and y-diff in (-0.125, 0.14) m. (Each sleeve tip is brought to within about 13 to 14 cm of the opposite chest point.)
-- Bottom hem folded up to the shoulders (both sides): for side in {left,right}: {side}_hem minus {side}_shoulder has y-diff in (-0.095, 0.17) m and x-diff in (-0.12, 0.12) m (hem lies next to the shoulder).
-- Hem line direction vs shoulder line direction: the xy-projected vector left_hem->right_hem and the xy-projected vector left_shoulder->right_shoulder make an angle < 45 degrees (not folded sideways/flipped; vector direction matters, anti-parallel fails).
-- At the evaluation moment (see evaluation) all target grippers are open (opening fraction >= 0.7, normalised to the gripper scale) and all target arms are back at start pose (|dx|,|dy|,|dz| each <= 0.15 m, rotation <= 20 degrees, all_robot_back_to_origin defaults); these are the trigger condition, not additional geometry.
-- Order constraint (failure rule, aim 0): at any moment a single arm becomes 'back at origin' (rising edge of is_robot_back_to_origin for left_arm, and separately for right_arm; same 0.15 m per axis/20 degree tolerance), if the garment is already hem-folded (hem/shoulder tests and the 45 degree line test all true) while at least one of the four sleeve closeness tests (left x, left y, right x, right y) is NOT satisfied, the episode is marked failed. I.e. the sleeves must be folded in before the bottom is folded up.
+The object the check reads (RoboDojo's label in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the shirt: a white long-sleeve top lying flat in the middle of the table in front of you, about 50 cm
+  across the spread sleeves and 29 cm from hem to collar, collar away from you, hem toward you, the sleeves angled down
+  and out to both sides, turned about 4 deg anticlockwise (seen from above) [target, a Top_Long garment].
+The nineteen other objects around it (a cereal box, headphones, a pair of jeans, toys, a stapler, a pen and others) are
+clutter: the check ignores them.
 
-**When it is checked.** Event-triggered, not checked every step. A trigger_check is registered with trigger condition C = (all target grippers open >= 0.7) AND (all robots back at origin), trigger mode rising_edge, evaluated after every action. The garment checks (both sleeves folded AND hem folded AND hem/shoulder line angle < 45 deg) are evaluated only on a step where C is true and was false on the previous step (initial previous value is false, so it is also evaluated once on the first step when the arms are home with open grippers; the flat garment fails it). If the garment checks pass at such an edge the check is removed and reward becomes 1: success. If they fail, nothing more is checked until C becomes false (e.g. an arm leaves home or a gripper closes below 0.7) and true again. So a folded garment with the arms already sitting at home since before the fold is not detected: the arms must leave and return to the home pose (with open grippers) after the garment is folded. Two additional trigger_queries (aim 0) run independently on the rising edges of left_arm-home and right_arm-home; if at such an edge the hem is folded while the sleeves are not all folded in, the episode fails immediately (success=False). Otherwise the episode fails at step_lim=500 actions. Process score (partial only) 20 for sleeves folded with grippers open, 100 for fully folded.
+What RoboDojo measures on it: eight *garment points*, each a marked point of the cloth mesh that moves with the cloth:
+on each side a sleeve point, a chest point, a shoulder point (where the sleeve joins the body at the top) and a hem
+point (the bottom corner of the body) [left_/right_ sleeve, chest, shoulder, hem; the mean of the tagged mesh vertices].
+Which physical side RoboDojo calls "left" is not visible in the scene. Distances between two points are measured along
+two fixed table directions, the shirt's *across* direction (its left-right line at the start: world +x turned 4 deg
+anticlockwise) and its *along* direction (from hem toward collar at the start: away from you, turned the same 4 deg)
+[the garment root frame's local x and y: the root
+orientation, not the folded cloth]. All ranges are
+strict.
+
+The fold test (all must hold):
+- **Sleeves folded in.** Each sleeve point lies on the chest on the other side: the sleeve point the code calls left,
+  minus the right chest point, between -0.125 and +0.14 m across and between -0.125 and +0.14 m along; the other
+  sleeve point minus the left chest point between -0.14 and +0.125 m across and between -0.125 and +0.14 m along
+  [is_garment_pointA_close_to_pointB_by_x_range / _by_y_range]. So each sleeve is folded across the body to within
+  about 12.5-14 cm of the opposite chest point. Not true at the start.
+- **Hem folded up to the shoulders.** On each side, the hem point minus the shoulder point on the same side is between
+  -0.095 and +0.17 m along (the hem may end up to 17 cm beyond the shoulder, away from you, or up to 9.5 cm short of
+  it) and between -0.12 and +0.12 m across [same tests on left_hem / left_shoulder, right_hem / right_shoulder]. Not
+  true at the start (the hem lies a body length nearer to you than the shoulders).
+- **Hem parallel to the shoulders.** Seen from above, the line from one hem point to the other and the line between
+  the shoulder points on the same sides point the same way within 45 deg; a reversed line (180 deg) fails
+  [is_garment_line_intersection_angle_less_than_threshold, 45]. Already true at the start; folding the hem straight up
+  keeps it; folding it sideways or twisting the shirt round breaks it.
+
+**When it is checked.** Not after every action: the fold test runs only at the action where *both grippers are open*
+(at least 0.7 of their full opening) *and both arms are back* (each end-effector within 0.15 m of its start position on
+x, y and z separately, and within 20 deg of its start orientation) becomes true after being false at the previous
+action [trigger_check on is_all_gripper_open 0.7 AND all_robot_back_to_origin, rising edge]. It also runs at the very
+first action if the arms are home with open grippers then (the flat shirt fails it). If the fold test passes at such a
+moment the task succeeds and the episode ends; if it fails, it is not tried again until the arms leave home (or a
+gripper closes below 0.7) and come back. So after folding, open both grippers and bring both arms home from away.
+A failure test also runs at the action where one arm becomes back at its start pose (rising edge, each arm on its own,
+same 0.15 m / 20 deg limits) [trigger_query, aim 0]: if at that moment the hem is already folded up (the hem tests and
+the parallel test all hold) while either sleeve is not folded in (any of the four sleeve ranges fails), the episode
+fails at once. So fold both sleeves in before folding the hem up. Otherwise the episode runs on until the length cap
+(below) [step_lim].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -29,9 +65,18 @@ RoboDojo's own evaluation gives a policy 500 actions (20 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** At the moment the success check triggers: both grippers open (>= 0.7 of opening range) and both arms within 0.15 m per axis / 20 degrees of their start end-effector pose, reached via a rising edge (see evaluation).
+**At the end.** At the moment the fold test runs: both grippers open (at least 0.7 of their opening) and both arms back
+near their start poses, reached by bringing the arms home after they were away.
 
-**Notes from RoboDojo's code.** Dual-arm task (arm tags left_arm and right_arm must exist). Success is detected only at edges where both arms return home with open grippers, so the solver must explicitly (a) finish the folding, (b) open grippers, (c) return both arms to the home pose after the folding, having been away from home/gripper-closed before that step. Left/right labels (sleeve, chest, shoulder) are garment-side labels from asset metadata; which physical side they are cannot be determined statically. Distances are in the garment's local x/y axes, which rotate with the cloth's root orientation (a cloth root orientation that does not follow deformation could affect the measures; not determinable statically). Tolerances are fairly loose (about 12 to 17 cm) but the point sets are vertex means so a well flattened fold is needed. Compared with fold_clothes, this _random variant uses garment models 6, 7, 11 instead of 1, 4, 9 and adds clutter; the reward is identical.
+**Notes from RoboDojo's code.** Both arms are needed (the check reads the left and the right arm). Success is only
+detected when the arms come home with open grippers, so: finish the folds, open the grippers, move both arms home.
+The along/across directions come from the shirt's root pose, not from the cloth's vertices, so folding does not turn
+them (as far as the code shows, they stay as the shirt lay at the start). The tolerances are loose (12-17 cm) but each point is a mesh
+point of the cloth, so it must actually lie where the fold puts it. The two sleeve ranges differ only by 1.5 cm at
+their ends, so folding each sleeve onto the middle of the opposite chest passes whichever side RoboDojo calls left.
+This variant uses other garment models (one of models 6, 7 and 11; here 6) and clutter (the config asks for 20
+objects, this frozen instance has 19); the check is the same as in fold_clothes. Partial credit (20 for the sleeves
+folded with the grippers open, 100 for the full fold) is separate from success.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

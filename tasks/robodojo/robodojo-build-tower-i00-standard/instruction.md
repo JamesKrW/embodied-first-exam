@@ -8,19 +8,65 @@ Nothing is handed in, so the task must be completed before the time limit (`## T
 ends by itself when RoboDojo's check passes: `res.meta["done"]`). The time you wait for the service counts: its first
 start in a trial takes ~4-15 min (Client, below).
 
-**Task:** Stack the wooden blocks and boards into a three-level tower: two pillar blocks (one on the left, one on the right) with a long board across them, two more blocks standing on that board with a second board on top, and finally the two top pieces stacked on the second board; then send the arm home.
+**Task:** Stack the wooden blocks and boards into a three-level tower: two white pillar blocks (one of the two that start on the left, one of the two that start on the right) with the long board across them, the other two pillars standing on that board with the short board on top, then the thin plank on the short board and the green roof piece on the plank; then send both arms home.
 
 RoboDojo's own instruction for this scene: *"Build a tower using the wooden blocks and wooden boards."*
 
 ## Success (RoboDojo's own check for this task)
-- Eight pieces block0..block7 must all be 'upright': for block0,1,2,3,5,6,7 the local +z axis makes an angle < 5 degrees with world +z; for block4 the local +y axis (not z) must make an angle < 5 degrees with world +z (block4 is a different piece type, index 3, which stands on a different axis).
-- Layer 1 (base): block0 (board, index 0) sits above exactly one left-side and one right-side support chosen from the four identical blocks block1, block2, block5, block6: at least one of these pairs must hold: (block1 and block2), (block5 and block6), (block1 and block6), (block5 and block2), where 'X is above Y' means root z of block0 minus root z of Y is > 0.025 m (is_A_up_B z_threshold_min=0.025, no upper bound, no xy check), and both supports must be upright (< 5 degrees as above). Also block0 upright (< 5 degrees).
-- Layer 2 (middle): at least one of block1, block5 has root z more than 0.025 m above block0's root z; at least one of block2, block6 has root z more than 0.025 m above block0's root z (these are the two remaining supports sitting on the board); block7 (second board, index 4) has root z more than 0.025 m above at least one of block1/block5 AND more than 0.025 m above at least one of block2/block6; and block7's root xy lies within 0.043 m (horizontal distance, strict <) of block0's support point 'block/0' (the board's support-circle centre defined in its asset metadata; this is a placement-centre check, radius 0.043 m overriding the asset radius).
-- Layer 3 (top): block3 (index 1, the piece with place_tag up/0) root z is more than 0.012 m above block7's root z, and its root xy is within 0.023 m (strict <) of block7's support point 'block/0'; block4 (index 3) root z is more than 0.015 m above block3's root z, and its root xy is within 0.023 m of block3's support point 'block/0'.
-- Alignment: local +x axis of block3 is within 20 degrees (strict <) of block7's local +x or -x axis (either parallel or anti-parallel); local +x axis of block4 is within 20 degrees of block3's local +x or -x axis.
-- All target robots back at their start end-effector pose: |dx|,|dy|,|dz| each <= 0.15 m and rotation difference <= 20 degrees (all_robot_back_to_origin defaults).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the long board: the light-wood board, 37.5 cm long, 6.5 cm wide and 2 cm thick, lying flat across the middle of the
+  table, its long side left-right; the farther of the two boards [block0];
+- the short board: the same kind of board but 24.4 cm long, lying flat in front of the long one, nearer to you [block7];
+- the four pillars: identical white blocks, 3.8 x 6.2 x 3.8 cm, each lying on a 3.8 x 6.2 cm face (3.8 cm tall). Two
+  start on the left half of the table: the inner, farther one [block1] and the outer, nearer one [block5]; two start on
+  the right half: the inner one [block6] and the outer one [block2]. The check tells them apart only by these labels,
+  i.e. by the side each pillar starts on;
+- the plank: the thin tan plank, 9.7 x 5 cm and 1.4 cm thick, lying flat at the far right next to the right gripper,
+  its long side pointing away from you [block3];
+- the roof: the green triangular prism (a little house roof), 6.1 cm across its triangular face, 3.8 cm high and 4.6 cm
+  long, standing on its flat bottom at the far left next to the left gripper, apex up, its ridge running front to back
+  [block4].
 
-**When it is checked.** Checked after every action (the reward manager step runs after each action's control sequence completes). One single stage: all conditions above must hold at the same step (including the arm being back home); the first step at which all hold ends the episode with success. There is no early-fail rule apart from generic ones. Otherwise the episode fails at step_lim=1050 actions. Process score (partial credit only, not needed for success; transition mode, scores 10, 30, 100): stage 1 base structure with grippers open (open fraction >= 0.8) and block0 not moved more than 0.002 m since the last check; stage 2 plus block7 on the middle layer; stage 3 the whole tower with grippers open.
+A piece's *centre* below is the point RoboDojo tests for it (its origin): the middle of its bounding box for the boards,
+the pillars and the plank (half its thickness above its underside); for the roof, the middle of its bottom face
+lifted 1.25 cm (a third of its height). Heights below compare centres, not contact. All of these must hold at the
+same action boundary:
+- **Every piece upright, within 5 deg** [local +z, for the roof local +y; is_axis_up, threshold=5]: each board, pillar
+  and the plank still has up the face that is up at the start (not upside down); the roof stands on its flat bottom,
+  apex up. All of this is true at the start. A pillar's cross-section is square (3.8 x 3.8 cm), so rolling it a quarter
+  turn about its long side looks the same but fails: keep the start face up. Standing a pillar on its small end fails.
+- **Base layer.** The long board's centre more than 0.025 m higher than the centre of one pillar from the left-start
+  pair AND of one pillar from the right-start pair (any one of the four combinations) [is_A_up_B,
+  z_threshold_min=0.025; pairs (block1 or block5) with (block2 or block6)]. Resting on two pillars gives 0.029 m. So
+  under the long board stand one pillar that started on the left and one that started on the right; two pillars from
+  the same side fail, wherever they stand.
+- **Middle layer.** The other pillar of the left-start pair and the other of the right-start pair each have their
+  centre more than 0.025 m higher than the long board's centre (standing on the board gives 0.029 m). The short board's
+  centre more than 0.025 m higher than at least one left-start pillar and at least one right-start pillar (any pillar
+  counts, so the ones under the long board already satisfy this; resting on the upper pillars gives 0.087 m above the
+  lower ones). And the short board's centre, seen from above, within 0.043 m (strict) of the middle of the long
+  board's top face [is_A_in_B_support_circle; the long board's support point 'block/0', radius 0.043].
+- **Top layer.** The plank's centre more than 0.012 m higher than the short board's centre (lying flat on it gives
+  0.017 m) and, seen from above, within 0.023 m of the middle of the short board's top face. The roof's centre more
+  than 0.015 m higher than the plank's centre (standing on it gives 0.020 m) and within 0.023 m of the middle of the
+  plank's top face [support point 'block/0' of the short board and of the plank, radius 0.023]. So the plank goes
+  first on the short board, then the roof on the plank.
+- **Lined up, within 20 deg (either way)** [is_axis_aligned, align_threshold=20, local +x vs the other's +x or -x]:
+  the plank's long side parallel to the short board's long side; not true at the start (the plank's long side points
+  away from you): turn it a quarter turn. The roof's width across its triangular face (its bottom edge that crosses
+  the ridge; points right at the start) parallel to the plank's long side, i.e. the ridge runs across the plank: true
+  at the start once the plank lies left-right under it.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), in the order upright tests, line-up tests, base,
+middle and top layers, arms, stopping at the first condition that fails; all must hold at the same action boundary
+(one stage). Success is declared at the first action boundary where everything holds, and the episode ends. No
+condition ends the episode early as a failure. A separate partial-credit score (not part of success) climbs the tiers
+10, 30, 100: (1) base layer done, the long board at rest (moved less than 0.002 m since the previous time this was
+checked) and both grippers open (each at least 0.8 of its full opening); (2) also the middle layer, the short board at
+rest and the base pieces and short board upright; (3) the whole tower as above with the grippers open
+(the 100 tier counts only if the episode succeeds, otherwise the tier below) [process score, transition mode].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -29,9 +75,16 @@ RoboDojo's own evaluation gives a policy 1050 actions (42 s) for this task; no c
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** All target arms must be back within 0.15 m per axis and 20 degrees of their start end-effector pose at the moment of success. Gripper state is not part of the success check.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** Piece shapes/dimensions are not determinable from the source (asset geometry not in the source tree), so which block index is which shape is inferred from the checks only. Heights use root-origin z differences (>0.025 m, >0.012 m, >0.015 m), not bbox contact, and x-y centring tolerances are 0.043 m (block7 on block0) and 0.023 m (block3 on block7, block4 on block3). The check list uses OR-groups: for layer 1 any one of the four (left, right) support pairs works, and for layer 2 the supports above block0 must come from the remaining blocks, but the code does not enforce that the same blocks are used consistently (e.g. block1 below and block1 above block0 is geometrically impossible, so effectively two supports below and two above). block4's uprightness is judged on its local y axis. The arm has to be home at the same time as the tower stands, and with a 5 degree uprightness tolerance the stacks must be carefully levelled.
+**Notes from RoboDojo's code.** Heights compare centres, with small margins: a board on pillars sits 0.029 m above
+them against the required 0.025 m, so a pillar sunk, tilted or lying on its side breaks the layer; every piece must
+also stay within 5 deg of its start attitude, so the layers must sit level. The horizontal tolerances are 0.043 m
+(short board over the middle of the long board) and 0.023 m (plank over the middle of the short board, roof over the
+middle of the plank); where the pillars stand on the boards is not tested, nor whether the short board actually rests
+on the upper pillars. Which pillars go under the long board is tested by where they started (one from each side), not
+by where they stand. The arms have to be home while the tower stands.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

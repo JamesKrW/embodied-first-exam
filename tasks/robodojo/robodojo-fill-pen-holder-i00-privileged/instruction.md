@@ -21,13 +21,45 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- For each pen target0, target1 (category pen) and target2, target3 (category oil_pen): at least one of the pen's passive functional points tagged 'check' has horizontal distance < 0.035 m from the pen_holder's root origin, with the offset measured in the pen_holder's own frame (axis='object': delta rotated by the inverse of the holder's rotation, then xy norm). I.e. the pen's 'check' point must be within 3.5 cm of the holder's vertical axis.
-- For each pen: (top z of pen_holder's world bbox) - (bottom z of the pen's world bbox) > 0.035 m, i.e. the pen's lowest point must be more than 3.5 cm below the holder's rim/top.
-- For each pen: its 'check' passive functional point is at or below the pen's root origin in world z (point_z <= root_z + 1e-6, z_margin 0), i.e. the pen is inserted with the check end pointing down (not lying or upside down).
-- The pen_holder stands upright: its local +z axis within 15 degrees of world +z (is_axis_up default threshold=15).
-- All target robots back at start end-effector pose: |dx|,|dy|,|dz| each <= 0.15 m and rotation <= 20 degrees (all_robot_back_to_origin defaults).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the pen holder: the orange hexagonal cup, 8 cm across and 12 cm tall, open at the top, standing just right of
+  centre on the near half of the table [pen_holder]. It is loose (it can slide or tip over);
+- the four pens, all lying on the table left of the holder, each with a *bottom end* (the end that must go down,
+  RoboDojo's 'check' point, a few millimetres in from that end on the pen's axis):
+  - a black pen with gold trim, 18.6 cm long, at the far left, farthest from you, lying left-right; its bottom end is
+    its left end (the end without the clip) [target0];
+  - a white ballpoint pen, 14.5 cm, left of centre, pointing away from you; its bottom end is the near, tapered
+    writing tip [target1];
+  - a light-blue marker, 14 cm, just left of the holder, pointing away from you and a little to the right; its bottom
+    end is the near end (the capped end is the far one) [target2];
+  - a purple marker, 15 cm, left of centre and a little farther away, lying diagonally; its bottom end is its left,
+    nearer end (the capped end is the right, farther one) [target3].
 
-**When it is checked.** Checked after every action; all conditions (four pens in, holder upright within 15 degrees, arm(s) home) must hold at the same step; the first such step is success. Fails at step_lim=1100 actions. No early-fail rule. 'Hold the pen holder with one hand' and 'put it back down' are not explicitly checked, only the end configuration (holder upright within 15 degrees). Process score (partial only): 10/25/40/90 for 1-4 pens satisfied (xy within 0.035, check point lower than root, check axis (local z of the 'check' point frame) within 45 degrees of world z, depth > 0.035) with the holder within 45 degrees of upright and grippers open (>= 0.8).
+The holder's *centre* below is the point RoboDojo tests for it (its origin): the middle of its base, so its *axis* is
+the vertical line through the middle of the cup. A pen's *centre* is the middle of the pen. All of these must hold at
+the same action boundary, for each of the four pens:
+- **Bottom end inside the cup.** The pen's bottom-end point within 0.035 m of the holder's axis, measured across the
+  axis (in the holder's own frame) [is_AB_xy_distance_within_threshold, axis="object", threshold=0.035].
+- **Pen down in the cup.** The holder's rim (the top of its bounding box, 12 cm above its base when upright) more than
+  0.035 m higher than the pen's lowest point [is_A_depth_in_B, z_threshold=0.035].
+- **Bottom end down.** The bottom-end point not higher than the pen's centre (1e-6 m tolerance)
+  [is_functional_point_lower_than_root_point]: the pen stands bottom end down, at any lean; upside down fails.
+
+And, at the same time:
+- **Holder upright.** The holder standing on its base, within 15 deg of upright [holder local +z; is_axis_up,
+  threshold=15 (default)]: true at the start; if it tips over, stand it up again.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), in the order: bottom ends inside the cup (all
+four pens), pens down (all four), bottom ends down (all four), holder upright, arms, stopping at the first condition
+that fails; all must hold at the same action boundary (one stage). Success is declared at the first action boundary
+where everything holds, and the episode ends. No condition ends the episode early as a failure. Holding the holder
+with one hand and putting it back down, as RoboDojo's instruction says, are not checked; only this end state is. A
+separate partial-credit score (not part of success) climbs the tiers 10, 25, 40, 90 as 1, 2, 3, then 4 pens are
+inside, down and bottom end down, with each pen's bottom end-to-top direction within 45 deg of vertical, the holder
+within 45 deg of upright and both grippers open (each at least 0.8 of its full opening); there is no 100 tier [process
+score, transition mode].
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -35,9 +67,14 @@ simulated time). RoboDojo's own evaluation gives a policy 1100 actions (44 s) fo
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** Target arms back within 0.15 m per axis and 20 degrees of start end-effector pose at the moment of success, with the holder upright within 15 degrees.
+**At the end.** The holder upright and both arms back near their start poses, as part of the success condition; the
+grippers need not be open.
 
-**Notes from RoboDojo's code.** The holder can tip or be dragged around: it must be standing within 15 degrees of upright when success is checked. Holder-pen xy distance is measured in the holder frame from the holder's root origin (not rim centre), so the holder's root must be near its axis (assumed). The 'check' point is an asset functional point (probably the pen tip end); its exact meaning is metadata and not determinable statically. Pens are accepted in any order and any slot. The holding-with-one-hand requirement is a suggestion; it is not enforced, but a freely sliding holder is hard to fill.
+**Notes from RoboDojo's code.** The holder is loose: steadying it with one arm while the other inserts the pens keeps
+it from sliding or tipping, but only the final state counts, and the holder must then stand within 15 deg of upright.
+The 0.035 m distance is measured from the holder's axis (the middle of its base), so a bottom end almost anywhere inside
+the cup passes. Pens may go in in any order and lean against each other or the wall, as long as each bottom end is lower
+than the pen's middle.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed
