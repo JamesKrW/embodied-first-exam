@@ -104,7 +104,7 @@ verdict, and a failed, killed or GPU-less pass loses only the video. `tests/grad
   startup record (`startup_binding.json`) against its own copy of the binding.
 - **Infrastructure** (H.5): no, unreadable or unfinalized `final.json`, the end timed out, `instance_mismatch`, a give-up
   after crashes not all inside the agent's calls (`sim_crashed`, `resume_failed`, `call_watchdog`), `simulator_instability`
-  in the live episode, a simulator error (reason `error`). The agent's 0: the task's failure predicate,
+  in the live episode. The agent's 0: a simulator error (reason `error`, `sim_error`), the task's failure predicate,
   `forced_breakdown`, the wall clock, `step_guard`, `sim_crashed_on_call`. A video-pass error or a GPU lost after the
   episode never voids a trial.
 - **Re-scoring recorded standard trials.** The verdict is the recorded live fields of `final.json`: the `success` of
