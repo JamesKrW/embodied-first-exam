@@ -358,7 +358,7 @@ MUTATIONS = [
     ("... a standard sidecar's tooling edited (compared with the files image's)", OPEN, None,
      sidecar_drift(OPEN, "rcb_rfo.py"), IDENTITY, "embodied-olympics: 2 versions of rcb_rfo.py"),
     ("... a sidecar takes its shared files from an image other than the pinned files image", OPEN, "environment/sim/Dockerfile",
-     sub(r"(efe:embodied-olympics-fun-sim-files-\S+@sha256:)[0-9a-f]{64}", r"\g<1>" + "0" * 64), IDENTITY, "not the pinned"),
+     sub(r"(efe:embodied-olympics-fun-files-\S+@sha256:)[0-9a-f]{64}", r"\g<1>" + "0" * 64), IDENTITY, "not the pinned"),
     # ---- caps and minimums (PROTOCOL §2.10)
     ("a sidecar's memory cap below the verifier phase's declared minimum (the kernel would kill it at a cap the task itself says is too low)",
      HEAVY, None, {TOML: sub(r"^(sim = \{ cpus = [0-9.]+, memory_gb = )[0-9.]+", r"\g<1>20.0"),
