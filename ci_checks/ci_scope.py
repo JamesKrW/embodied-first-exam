@@ -45,7 +45,7 @@ def _own(d: str, *extra: str) -> list[str]:
 UNITS: dict[str, list[str]] = {
     "RoboTwin 2.0": _own("robotwin"),
     "DexToolBench": ["images/mujoco/"],   # serves server_mj.py
-    "MuJoCo Playground": _own("mujoco-playground", "images/mujoco/", "embodied_first_exam/benchmarks/dextoolbench/standard/"),   # ALOHA / Panda: DexToolBench's grader
+    "MuJoCo Playground": _own("mujoco-playground", "images/mujoco/", "embodied_first_exam/benchmarks/dextoolbench/standard/", "images/dextoolbench-files/"),   # ALOHA / Panda: DexToolBench's grader
     "KinDER": _own("kinder"),
     "HumanoidBench": _own("humanoidbench"),
     "MetaWorld+": _own("metaworldplus", "images/metaworld/"),
@@ -59,9 +59,9 @@ UNITS: dict[str, list[str]] = {
     "DexJoCo": _own("dexjoco"),
     "DexHand": _own("dexhand"),
     "VLABench": _own("vlabench"),
-    "RoboCasa-GR1": _own("robocasa-gr1", "images/robocasa/standard/", "embodied_first_exam/benchmarks/robocasa/"),   # RoboCasa's service, tooling, graders
+    "RoboCasa-GR1": _own("robocasa-gr1", "images/robocasa/standard/", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service, tooling, graders
     "RoboCasa": _own("robocasa"),
-    "RoboCasa365": _own("robocasa365", "images/robocasa/standard/", "embodied_first_exam/benchmarks/robocasa/"),   # RoboCasa's service and graders
+    "RoboCasa365": _own("robocasa365", "images/robocasa/standard/", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service and graders
     "LIBERO-MAX": _own("libero-max"),
     "RoboARC": _own("roboarc", "images/roboarc-files/"),
     "Embodied Olympics - Fun": _own("embodied-olympics-fun", "images/embodied-olympics-fun-files/"),
@@ -72,17 +72,18 @@ UNITS: dict[str, list[str]] = {
     "Panda Dynamic Scenes": _own("pandadyn"),
     "AM-Bench": _own("ambench"),
     "iSpatialGym": _own("ispatialgym"),
-    "IKEA MuJoCo": _own("ikea-mujoco", "images/ikea-mujoco-files/", "embodied_first_exam/benchmarks/roboarc/nyx_direct.py"),   # its standard tasks copy it
+    "IKEA MuJoCo": _own("ikea-mujoco", "images/ikea-mujoco-files/", "embodied_first_exam/benchmarks/roboarc/nyx_direct.py", "images/roboarc-files/"),   # its standard tasks copy it
     "roboEngineer": _own("roboengineer",
-                         "images/control-transfer/", "images/control-transfer-anycar-files/", "images/quadrotor-landing/",
+                         "images/control-transfer/", "images/quadrotor-landing/",
                          "images/roboengineer-files/"),
 }
 # the benchmark's shared task code, embodied_first_exam/benchmarks/<folder>/ (embodied_first_exam/README.md), its CI
-# hooks, ci_checks/benchmarks/<folder>/, and its sidecars' files-only image, images/<folder>-sim-files/: the folder of its
+# hooks, ci_checks/benchmarks/<folder>/, and its files-only image, images/<folder>-files/ (task images and sidecars): the folder of its
 # task dirs, tasks/<folder>/ (task_conventions.BENCHMARK_DIRS)
+FILES_IMAGE = {"behavior-1k": "behavior-files", "embodied-safety-exam": "ese-files"}   # folders whose files image has another name
 for _label, _folder in tc.BENCHMARK_DIRS.items():
     UNITS.setdefault(_label, []).extend([f"embodied_first_exam/benchmarks/{_folder}/", f"ci_checks/benchmarks/{_folder}/",
-                                         f"images/{_folder}-sim-files/"])   # its sidecars' files-only image
+                                         f"images/{FILES_IMAGE.get(_folder, _folder + '-files')}/"])   # its files-only image
 # changes that no check reads: they need only the repo-level checks (which always run). Everything not listed here and
 # not a benchmark's own path runs the full suite.
 NO_TASK_EFFECT = ("README.md", "CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md", "LICENSE", "SECURITY.md", "CODE_OF_CONDUCT.md", "docs/protocol/running.md",
