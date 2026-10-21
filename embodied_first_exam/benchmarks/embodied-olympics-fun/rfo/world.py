@@ -55,8 +55,8 @@ ROBOTS = {
                        source="MuJoCo Menagerie's unitree_g1 with Unitree's joint, speed and torque limits and motor "
                               "torque-speed curves"),
     "unitree_h1": dict(title="Unitree H1-2", height_m=1.78, run=False, walkers=False,
-                       source="Unitree's own h1_2 model with its joint, speed and torque limits; its motor "
-                              "torque-speed curves are estimates"),
+                       source="Unitree's own h1_2 model with its joint, speed and torque limits; Unitree's M107 "
+                              "torque-speed curves on the hips, torso and knees, estimates on the ankles and arms"),
 }
 BODY = load_body("unitree_g1")
 ROBOT_REVISION = BODY.revision
@@ -237,6 +237,56 @@ def _yaw(quat) -> float:
     return math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
 
 
+# The motors' rotor inertia, friction and (the H1-2's hips, torso and knees) torque-speed curves from Unitree's own
+# actuator data (owner 2026-10-21: adopt Unitree's data; no battery cap: Unitree publishes no discharge limit).
+# Source for every number in UNITREE_ACTUATORS: unitree_rl_lab, source/unitree_rl_lab/unitree_rl_lab/assets/robots/
+# unitree_actuators.py, commit 4960b84732b0c2ec593dccbfe963fda1bcd7b1e3 (S6 of the G1's body.toml, S8 of the H1-2's):
+# per actuator class `armature` (rotor inertia x gear ratio^2, kg m^2), `Fs` (static friction, N m: MuJoCo
+# frictionloss), `Fd` (dynamic friction, N m s/rad: MuJoCo damping) and the curve X1 / X2 (rad/s) / Y1 / Y2 (N m).
+# Before: the models' own armature 0.01 on every joint and frictionloss 0.3 (G1) / 0.1 (H1-2), and for the H1-2 the
+# library's estimated curves (Y1 = Y2 = the URDF effort, X1 = 0.6 X2).
+# The G1: each joint's class is its body.toml [motors.assign] (unitree_rl_lab unitree.py UNITREE_G1_29DOF_CFG); the
+# ankles and the waist roll / pitch are two N5020-16 in a parallel linkage: twice the inertia and the friction.
+# The H1-2: Unitree publishes no H1-2 actuator table. Its hips, torso and knees are M107 motors (unitree_rl_lab
+# unitree.py UNITREE_H1_CFG: actuator groups "M107-24-1" = the knees, "M107-24-2" = the hips and the torso), and the
+# h1_2.urdf velocity limits (23 rad/s hips and torso, 14 rad/s knees) are 0.90 / 0.88 of the no-load speeds X2 of
+# M107_15 (25.6) and M107_24 (16.0), the ratio of the G1's URDF velocities to its motors' X2 (0.88-0.92): the hips
+# and the torso get M107_15, the knees M107_24 (its Y1 240 / Y2 292.5 N m are below the URDF effort 300 N m, which
+# stays the hard cap). The H1-2's ankles and arms (no published class) keep the library's estimate and the model's
+# armature and friction.
+UNITREE_ACTUATORS = {
+    "N7520_14p3": dict(armature=0.01017752004, Fs=1.6, Fd=0.16),
+    "N7520_22p5": dict(armature=0.025101925, Fs=2.4, Fd=0.24),
+    "N5020_16": dict(armature=0.003609725, Fs=0.6, Fd=0.06),
+    "N5020_16_x2": dict(armature=2 * 0.003609725, Fs=2 * 0.6, Fd=2 * 0.06),
+    "W4010_25": dict(armature=0.00425, Fs=0.6, Fd=0.06),
+    "M107_15": dict(armature=0.063259741, Fs=0.0, Fd=0.0, X1=14.0, X2=25.6, Y1=150.0, Y2=182.8),
+    "M107_24": dict(armature=0.160478022, Fs=0.0, Fd=0.0, X1=8.8, X2=16.0, Y1=240.0, Y2=292.5),
+}
+H1_2_ACTUATORS = {"hip_yaw": "M107_15", "hip_pitch": "M107_15", "hip_roll": "M107_15", "torso": "M107_15",
+                  "knee": "M107_24"}
+
+
+def unitree_actuators(m, robot) -> None:
+    """Unitree's armature, friction and curves (UNITREE_ACTUATORS) on the robot's joints and its output stage."""
+    a = robot.arb
+    keys = [a.bm.short(j) for j in a.JOINTS]
+    X1, X2, Y1, Y2 = (np.array(e, float) for e in a._env)
+    for i, k in enumerate(keys):
+        cls = a.D["motors"]["assign"][k] if robot.name == "unitree_g1" else H1_2_ACTUATORS.get(k)
+        if cls is None:
+            continue
+        c = UNITREE_ACTUATORS[cls]
+        v = a.vadr[i]
+        m.dof_armature[v] = c["armature"]
+        if c["Fs"] or c["Fd"]:
+            m.dof_frictionloss[v], m.dof_damping[v] = c["Fs"], c["Fd"]
+        if "X1" in c:
+            X1[i], X2[i] = c["X1"], c["X2"]
+            Y1[i], Y2[i] = min(c["Y1"], a.tau_max[i]), min(c["Y2"], a.tau_max[i])
+    a._env = a.act.env = (X1, X2, Y1, Y2)
+
+
 class Robot:
     """The mounted G1: the library rig and arbiter, addresses, limits, the body parts' geoms."""
 
@@ -249,6 +299,7 @@ class Robot:
         self.arb = Arbiter(self.rig)
         a = self.arb
         self.L = Layout(list(a.JOINTS), len(a.GROUPS["waist"]))
+        unitree_actuators(m, self)                 # Unitree's rotor inertia, friction, H1-2 curves
         self.has_run = bool(self.info["run"])
         self.modes = {STAND, WALK, JOINT} | ({RUN, RUN_ARMS} if self.has_run else set())
         # The G1's two optional walking policies (bodies/unitree_g1/falcon.py, agile.py: numpy ports of the released
