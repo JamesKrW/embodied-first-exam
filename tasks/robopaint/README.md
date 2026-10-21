@@ -493,7 +493,7 @@ One reference execution therefore takes 10–15 minutes of the time limit, or ab
 `COPY --from=<image@digest>` (`scripts/files_image.py`), at the paths above: the privileged agent image `rcb_brush.py` at
 `/opt/tools/`, the privileged verifier image the four graders' files at `/tests/`, the standard verifier image `grade.py`
 at `/tests/`; no task dir carries them. The sidecars are built from `environment/scorer/` and `environment/sim/` (their
-`Dockerfile`: the directory at `/srv`) and take their shared files, these among them, from `images/robopaint-sim-files/`
+`Dockerfile`: the directory at `/srv`) and take their shared files, these among them, from the same `images/robopaint-files/`
 (`ci_checks/check-tooling-identity.sh` counts those copies). The 2.2 layer is byte-identical to `embodied_first_exam/standard/`
 (`ci_checks/check-tooling-identity.sh`).
 
