@@ -12,7 +12,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:robopaint-sim-files-0.1.1@sha256:41107bf4b312
      /rcb_brush_strict.py \
      /sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-sim-files-0.1.1@sha256:d9a4e130a67056d0fb47594562ac303b2f000c5f48fbe5ec235593bef0f3543f \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-sim-files-0.1.2@sha256:57c474cd8a011e77b8351e2d7aed463994fc4aa02ff1f465b80efb214ae4521a \
      /rcb1.py \
      /rcb_limited.py \
      /run.sh \
