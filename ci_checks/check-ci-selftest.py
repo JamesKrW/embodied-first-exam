@@ -41,6 +41,7 @@ MONITOR = [sys.executable, str(ROOT / "ci_checks/check-monitor.py"), "--tier", "
 DIGESTS = ["bash", str(ROOT / "ci_checks/check-dataset-manifest.sh")]
 DOCKERFILE = ["bash", str(ROOT / "ci_checks/check-dockerfile.sh")]
 FIELDS = ["bash", str(ROOT / "ci_checks/check-task-fields.sh")]
+INSTRUCTION = ["bash", str(ROOT / "ci_checks/check-instruction.sh")]
 RP_LEAK = ["bash", str(ROOT / "ci_checks/benchmarks/robopaint/invariant-leak.sh")]
 # the checks that enforce Appendix H (run_invariants.sh); every other check here is advisory
 INVARIANT_CMDS = (ISOLATION, POINTERS, TWINS, INSTANCE, STDIMG, MONITOR, DIGESTS, RP_LEAK)
@@ -227,6 +228,10 @@ MUTATIONS = [
     ("environment/Dockerfile copies itself into the image, with an upstream URL in it",
      STD, "environment/Dockerfile", append("# https://github.com/StanfordVL/BEHAVIOR-1K\nCOPY . /opt/ctx/\n"), POINTERS,
      "environment/Dockerfile:"),
+    # ---- PROTOCOL §5: a standard-mode success condition in terms the agent can observe (advisory)
+    ("the standard instruction states a condition in the checker's terms (an object-local axis, a predicate, an indexed label)",
+     STD, "instruction.md", append("\nAlso required: mug_0 local +y within 45 deg of world +x (is_axis_aligned).\n"), INSTRUCTION,
+     "an object-local axis 'local y'"),
     ("the instruction states the external-material rule in other words",
      STD, "instruction.md", sub(r"This is an honour rule; trials are reviewed\.", "Do as you like."), RESOURCES,
      "does not state `## External material`"),
