@@ -594,7 +594,7 @@ is the only GET this capability adds.
 | Item | Level |
 |---|---|
 | A call's budget is `min(max_call_wall_s, request_deadline_unix_s − now)`. The service checks it, and a client disconnect, at control-step boundaries | MUST |
-| A native step cannot be pre-empted safely, so the service also owns a hard watchdog. A call that has not finished 60 s past its budget ends the process. The restart then ends the episode as an infra error, `call_watchdog` (`infra_error = 1`), and does not replay into the call that hung | MUST |
+| A native step cannot be pre-empted safely, so the service also owns a hard watchdog. A call that has not finished 60 s past `max_call_wall_s` ends the process; the watchdog counts from the service's own cap, never from the request deadline, so a short deadline cannot get a slow step killed. The restart then ends the episode as an infra error, `call_watchdog` (`infra_error = 1`), and does not replay into the call that hung | MUST |
 | The restart ends the episode as `call_watchdog` only on evidence that the watchdog fired: the watchdog prints into its own file (`call-watchdog.trace`, emptied at every call), and its banner there is that evidence. `call-watchdog.json` alone, or its deadline having passed by the time the container is back, is not: any other crash during a call (a segfault, a CUDA error, an OOM kill) is handled like every crash (§13), and a resume removes both files | MUST |
 
 ### 23. Physics-tick ledger and durability
