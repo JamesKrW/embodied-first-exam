@@ -7,7 +7,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:standard-sim-files-0.1.1@sha256:d9a4e130a6705
      /rcb1.py \
      /realtime/rcb_realtime.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:pandadyn-sim-files-0.1.1@sha256:37ec3c93b816b464dc58c7daa1a22a72c22ca7a09687122124496358dabb9ef6 \
+COPY --from=ghcr.io/mll-lab-nu/efe:pandadyn-files-0.3.0@sha256:f41e31ef2583946d8b3e99144b2659cbcf443f888c3bbfd1c4868c1e13452033 \
      /privileged/environment/rcb_pandadyn.py \
      /sim/rcb_service.py \
      /sim/variants/727bef3b2d/server.py \
