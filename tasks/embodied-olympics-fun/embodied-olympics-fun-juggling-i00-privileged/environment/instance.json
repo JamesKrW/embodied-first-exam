@@ -6,6 +6,7 @@
   "rise_m": 0.22,
   "carry_s": 0.15,
   "touch_gap_s": 0.05,
+  "hold_gap_s": 0.03,
   "release_grace_s": 0.15,
   "touch_gain": 0.95,
   "fall_z_m": 0.35
@@ -30,12 +31,12 @@
   "A counter's eye is replaced by numbers: contacts less than 0.05 s apart are one touch, a touch may last at most 0.15 s, and it counts when the ball's centre has then risen at least 0.22 m (one ball diameter) above where it was when the touch began, before anything touches it again; a ball that rolls or rests on a leg is not a touch.",
   "A touch is a strike: so that a ball that merely bounces on a still limb or head is not juggling, every touch after the first must send the ball off with at least 0.95 of the speed it arrived with (a still limb returns about 0.85); a touch that does not is not counted, and is not a fault.",
   "Only the feet, the legs (shin and thigh) and the head count and may touch the ball; the chest and the shoulders, which a human juggler may use, are not allowed, because the robot's trunk is one rigid shell.",
-  "The ball starts in the robot's right hand, held by the simulator's grip (the robot has fists, no fingers); the drop is the opening of the grip. No wind."
+  "The ball starts pressed between the robot's two open palms in front of its hips (the robot has flat palm pads, no fingers and no grip): only the arms' squeeze and friction hold it, and it slips out when they press too little. The drop is the hands' own movement (the palms parting); a referee's eye for 'the ball has left the hand' is replaced by a number: the ball touches no part of the robot for 0.03 s, and the drop is the end of its last contact. Before the drop only the hands may touch the ball (a ball held against the body, an arm or a leg is not in the hand). The palm pads' contact with the ball is that of a ball on a human hand (a ball thrown at a still palm keeps 0.10 of its speed, as a volleyball dropped onto a supported, relaxed hand does: Ivanova, ISBS 2000); every other contact keeps the ball's rule-book rebound. No wind."
  ],
  "texts": {
-  "sentence": "Juggle the football: drop it from your hand and keep it in the air for ten touches in a row with your feet, legs or head, without it touching the ground or a hand again.",
-  "rules": "A size-5 football (0.22 m across, 0.43 kg, in air) starts gripped in your right hand. The drop is the moment no hand grips it any more; a hand or an arm may still be in contact with the ball for 0.15 s after that (the ball leaving the hand), and the ball cannot be gripped again. From the drop on, a touch is a contact of the ball with a foot, a shin, a thigh or your head (contacts less than 0.05 s apart are one touch); it counts when the ball's centre has then risen at least 0.22 m above the height it had when the touch began, before anything touches it again, and, for every touch after the first, when the ball leaves the touch with at least 0.95 of the speed it had when the touch began (both taken at the height where the touch began; a ball that only bounces on a still limb leaves slower: such a touch is not counted, and is not a fault). You succeed at the moment the tenth touch counts. You fail if the ball touches the ground, if a hand or an arm touches it later than 0.15 s after the drop, if your trunk (chest, shoulders, pelvis) touches it, if one touch lasts longer than 0.15 s (the ball resting or balanced on you), if the ball is touched again before it has risen 0.22 m, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground; standing on one foot is not a fall), or after 30 s.",
-  "venue": "You stand on level grass with the ball in your right fist, beyond its knuckles, the arm at rest. Opening the right grip (grip_right below 0.5) drops the ball where the hand is.",
+  "sentence": "Juggle the football: drop it from between your palms and keep it in the air for ten touches in a row with your feet, legs or head, without it touching the ground or a hand again.",
+  "rules": "A size-5 football (0.22 m across, 0.43 kg, in air) starts pressed between your two open palms; your hands have no fingers and no grip (the grip columns of the action rows do nothing in this task): only the squeeze of your arms and friction hold the ball, and it slips out when they press too little. Until the drop only your hands (the palm pads and the wrists) may touch the ball. The drop: the ball has touched no part of you for 0.03 s; it is the end of the ball's last contact with a hand. A hand or an arm may still be in contact with the ball for 0.15 s after the drop (the ball leaving the hand); after that a hand or an arm on the ball is a handball. From the drop on, a touch is a contact of the ball with a foot, a shin, a thigh or your head (contacts less than 0.05 s apart are one touch); it counts when the ball's centre has then risen at least 0.22 m above the height it had when the touch began, before anything touches it again, and, for every touch after the first, when the ball leaves the touch with at least 0.95 of the speed it had when the touch began (both taken at the height where the touch began; a ball that only bounces on a still limb leaves slower: such a touch is not counted, and is not a fault). You succeed at the moment the tenth touch counts. You fail if the ball touches the ground (before the drop too), if a part of you other than the hands touches it before the drop, if a hand or an arm touches it later than 0.15 s after the drop, if your trunk (chest, shoulders, pelvis) touches it, if one touch lasts longer than 0.15 s (the ball resting or balanced on you), if the ball is touched again before it has risen 0.22 m, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground; standing on one foot is not a fall), or after 30 s.",
+  "venue": "You stand on level grass. Your upper arms hang, your forearms point forward and are turned so that the palms face each other; the ball is pressed between them, its centre about 0.85 m above the ground and 0.33 m ahead of your pelvis. The start command keeps that squeeze (the joint table's start angles are where the arms stand with the ball between the palms; the command is a little further in: the difference is the squeeze).",
   "difficulty": "Each touch is an upward strike by a leg or the head, timed to a falling 0.43 kg ball and aimed so that the ball comes down within reach again, ten times in a row; the robot has to stand on one leg to use a foot or a thigh, which neither built-in gait does, and a ball that merely bounces on a still limb loses a quarter of its height each time and wanders off."
  },
  "robot": "unitree_g1",
@@ -44,7 +45,7 @@
   "mujoco": "3.3.7"
  },
  "t0": {
-  "state_sha": "835b515b4d1151b792c6df38e861aef426406dae673f3444201998cf8f4d13ae",
+  "state_sha": "de155c696a0c16bd9e87e9aa1f20ab6d58cecdcd5f8a229cbe6a9698ee3cef75",
   "control_dt": 0.01,
   "horizon_steps": 3000,
   "raw_dim": 151,
@@ -997,22 +998,22 @@
     0.0,
     0.0,
     0.0,
-    0.2,
-    0.2,
+    -0.0309,
+    -0.0352,
+    -0.0438,
+    0.2274,
+    -1.5483,
+    -0.0591,
+    -0.1964,
+    -0.0309,
+    0.0351,
+    0.0438,
+    0.2273,
+    1.5483,
+    -0.0591,
+    0.1964,
     0.0,
-    1.28,
-    0.0,
-    0.0,
-    0.0,
-    0.2,
-    -0.2,
-    0.0,
-    1.28,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    1.0
+    0.0
    ]
   },
   "proprio_layout": [
@@ -1165,48 +1166,48 @@
     "mounted": "head",
     "fovy_deg": 58.0,
     "position_m": [
-     0.076,
+     0.0902,
      0.025,
-     1.227
+     1.2167
     ],
     "forward": [
-     0.9394,
-     0.0,
-     -0.3429
+     0.9263,
+     -0.0023,
+     -0.3767
     ],
     "up": [
-     0.3429,
-     0.0,
-     0.9394
+     0.3767,
+     -0.0004,
+     0.9264
     ],
     "right": [
-     0.0,
+     -0.0023,
      -1.0,
-     0.0
+     0.0005
     ]
    },
    "head_right": {
     "mounted": "head",
     "fovy_deg": 58.0,
     "position_m": [
-     0.076,
+     0.0901,
      -0.025,
-     1.227
+     1.2167
     ],
     "forward": [
-     0.9394,
-     0.0,
-     -0.3429
+     0.9263,
+     -0.0023,
+     -0.3767
     ],
     "up": [
-     0.3429,
-     0.0,
-     0.9394
+     0.3767,
+     -0.0004,
+     0.9264
     ],
     "right": [
-     0.0,
+     -0.0023,
      -1.0,
-     0.0
+     0.0005
     ]
    },
    "venue": {
@@ -1640,14 +1641,12 @@
     "rule": "a closed grip holds the nearest grippable object whose surface is within reach_m of the palm (a point 4.5 cm beyond the wrist flange along the forearm) and that moves no faster than max_relative_speed_m_s relative to it; opening the grip lets it go"
    }
   },
-  "grippable": [
-   "ball"
-  ],
+  "grippable": [],
   "pelvis": [
    0.0,
    0.0,
-   0.793,
-   0.0
+   0.7858,
+   -0.0015
   ]
  }
 }

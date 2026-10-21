@@ -4,6 +4,13 @@ import numpy as np
 
 from rfo.referee import Flights
 from rfo.task import TaskBase
+# A rigid crossbar (fibreglass; the landing mat keeps its foam)'s contact with the robot, the venue's fixtures and the
+# other props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells
+# (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid
+# prop on the robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its
+# own bounce. With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 40 mm into the floor and 39
+# mm into the robot (stress test 2026-10-21).
+from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 SIDES = ("left", "right")
 STEEL = (0.3, 0.3, 0.33, 1)
@@ -25,11 +32,27 @@ def official_bar(sc, name, x, height, p):
     m_end = 0.10
     sc.geom(b, name, type="capsule", fromto=(0, -L / 2 + r, 0, 0, L / 2 - r, 0), size=(r,),
             mass=p["bar_mass_kg"] - 2 * m_end, rgba=(0.95, 0.2, 0.2, 1), friction=(0.6, 0.005, 0.0001),
-            contype="1", conaffinity="13")
+            contype="1", conaffinity="13", **RIGID)
     for s, tag in ((1, "L"), (-1, "R")):                 # the end pieces: flat undersides, so the bar does not roll
         sc.geom(b, f"{name}_end{tag}", type="box", pos=(0, s * (L / 2 - end), 0), size=(r, end, r), mass=m_end,
-                rgba=(0.95, 0.95, 0.95, 1), friction=(0.6, 0.005, 0.0001), contype="1", conaffinity="13")
+                rgba=(0.95, 0.95, 0.95, 1), friction=(0.6, 0.005, 0.0001), contype="1", conaffinity="13", **RIGID)
     return dict(x=x, height=height, rest_z=height - r, plane_x=x - r, half_gap=gap / 2)
+
+
+# The landing mat, from foam mechanics. A landing area is blocks of soft polyurethane foam under a cover. Such foam
+# carries about 4-6 kPa at 25 % compression (the lower layer of a sports landing mat: US patent 5,562,573, "Landing
+# mat for gymnasts", 1996: 0.040-0.060 kgf/cm^2) and, being a foam, keeps near that stress over a long plateau of strain
+# before it densifies, absorbing a landing with little rebound (Gibson and Ashby, Cellular Solids, 2nd ed. 1997,
+# ch. 5). For the H1-2 coming down on its back (about 0.4 m^2 in contact, 5 kPa carrying 2 kN, three times its weight)
+# at 4 m/s that is a sink of about 0.4 m, and lying still, below the plateau, about 1 cm. World Athletics (TR 27.10)
+# sets only the area's size (at least 6 m x 4 m x 0.7 m); the shock-absorption classes of EN 12503-2 were not
+# available. MuJoCo's contact is a spring-damper normalised by the bodies' masses, not a pressure law: fitted to those
+# numbers (the group's probe_soft.py on a rigid block, probe_mat.py on the robot), a time constant of 0.8 s, critically
+# damped, an impedance that falls from 0.4 at the surface to 0.05 at 8 cm (a firm skin, then the yielding plateau).
+# Measured on the test's injected jump (the H1-2 into the mat at 3.7 m/s): 0.46 m deep, no rebound (the box contact
+# it replaces: 0.20 m and 0.96 m/s back up); the body then rests about 0.28 m deep (no elastic recovery of the foam is
+# modelled). Friction 1.0 on the cover (not measured).
+MAT_CONTACT = dict(mat_timeconst_s=0.8, mat_dampratio=1.0, mat_imp0=0.4, mat_imp1=0.05, mat_give_m=0.08, mat_friction=1.0)
 
 
 class Task(TaskBase):
@@ -52,9 +75,12 @@ class Task(TaskBase):
         "beyond the plane",
         "TR 27.2(a): the bar is judged {bar_wait_s} s after the clearance and the landing; it is off its supports "
         "when its centre is more than {bar_drop_m} m below its resting height",
-        "TR 27.10 (the landing area): the mat is a box with a soft, overdamped contact (time constant "
-        "{mat_timeconst_s} s, full stiffness only {mat_give_m} m deep), not a foam body; it is {mat_gap_m} m "
-        "behind the bar's plane",
+        "TR 27.10 (the landing area): the mat is one box whose contact follows soft polyurethane foam (about 5 kPa "
+        "at 25 % compression, then a plateau: a body landing at 4 m/s sinks about 0.4 m and does not bounce back); "
+        "MuJoCo's contact fitted to it on this robot: a time constant of {mat_timeconst_s} s, damping ratio "
+        "{mat_dampratio}, an impedance falling from {mat_imp0} to {mat_imp1} over {mat_give_m} m, friction "
+        "{mat_friction}; the foam does not spring back after the landing, and its shock absorption is not a "
+        "certified one (the rule book sets only the size); it begins {mat_gap_m} m behind the bar's plane",
         "the bar is rigid (no sag); no wind; the athlete alone, one trial at one height, {bar_height_m} m "
         "(FAMILIES.md: a school competition's opening height; the men's world record is 2.45 m)",
         "TR 27 does not define a jump; here its flight lasts at least {min_air_s} s and raises the pelvis at least "
@@ -69,7 +95,7 @@ class Task(TaskBase):
     fall_rule = False                # no rule of the event says a fall is a failure; the contacts below judge it
     params = dict(bar_height_m=1.00, bar_length_m=4.00, bar_diameter_m=0.030, bar_mass_kg=2.0, upright_gap_m=4.02,
                   support_width_m=0.04, support_length_m=0.06, mat_length_m=4.0, mat_width_m=6.0, mat_height_m=0.70,
-                  mat_gap_m=0.10, mat_timeconst_s=0.08, mat_give_m=0.10, runway_m=15.0, single_support_s=0.05,
+                  mat_gap_m=0.10, **MAT_CONTACT, runway_m=15.0, single_support_s=0.05,
                   min_air_s=0.05, rise_min_m=0.05, bar_drop_m=0.05, bar_wait_s=2.0, bar_touch_max_s=0.3)
 
     sentence = ("Do a high jump: approach the bar, take off from one foot, go over the bar between the uprights "
@@ -116,8 +142,8 @@ class Task(TaskBase):
         hx, hy, hz = p["mat_length_m"] / 2, p["mat_width_m"] / 2, p["mat_height_m"] / 2
         x0 = self.bar["plane_x"] + p["mat_gap_m"]
         sc.box("mat", (x0 + hx, 0.0, hz), (hx, hy, hz), rgba=(0.15, 0.35, 0.75, 1), solid="stand",
-               friction=(1.0, 0.005, 0.0001), solref=(p["mat_timeconst_s"], 1.0),
-               solimp=(0.3, 0.9, p["mat_give_m"], 0.5, 2), priority=1)
+               friction=(p["mat_friction"], 0.005, 0.0001), solref=(p["mat_timeconst_s"], p["mat_dampratio"]),
+               solimp=(p["mat_imp0"], p["mat_imp1"], p["mat_give_m"], 0.5, 2), priority=1)
         sc.ground.append("mat")
         sc.camera("venue", (-12.0, -6.0, 3.2), (-2.5, 0.0, 0.7), fovy=50)
         sc.camera("bar", (-4.5, -6.5, 2.6), (0.3, 0.0, 0.7), fovy=58)

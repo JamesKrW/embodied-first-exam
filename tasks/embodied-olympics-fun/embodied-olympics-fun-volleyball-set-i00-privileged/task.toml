@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md ย
 instance_seed = 0
 expert_time_estimate_hours = 8.0
 oracle = "full"
-oracle_evidence = "Reference: raised fists driven up through the falling toss on the walking policy, from a technique found offline by CMA-ES (Embodied Olympics' method): 6.6 m/s in, 6.95 m/s out upward, up to 4.02 m, down 0.28 m from the target's centre. Open loop on the frozen start, not robust. Referee test negatives: still fists (the ball leaves slower), before the apex, leaving the front zone, not overhead, a forearm, too low, outside the target, a second touch, held Measured: success after 5.87 s of the 10 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "Reference: the fists driven up through the ball, found by a search plus local refinement. The pass comes from a volleyball machine in the back court (exit 8.8 m/s, 58 deg, no spin, at 0.9 m); the ball comes in at 6.6 m/s and leaves at 7.1 m/s upward, apex 3.92 m, landing 0.80 m from the target centre (radius 1 m); it is open loop and not robust. Negatives: still fists (0.72 of the speed back), before the apex, the front zone left, not overhead, a forearm, held, a second touch, the net, the centre line, touching the machine. Measured (make_oracles.py): success after 5.8 s of the 10 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md ยง2.9)

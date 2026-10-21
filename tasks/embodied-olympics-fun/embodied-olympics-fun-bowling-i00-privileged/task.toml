@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-bowling-i00-privileged"
-description = "Embodied Olympics bowling (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Bowl a strike: from behind the foul line, deliver the ball that hangs from your right hand down the lane so that all ten pins are knocked down. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics bowling (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Bowl a strike: from behind the foul line, deliver the ball you hold pressed between your two palms down the lane so that all ten pins are knocked down. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "bowling"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 8.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a real release, the ball laid 0.35 m past the line at 8 m/s into the pocket: a strike); negatives: over the foul line, a gutter ball, a head-pin hit that is no strike, touched after the release, a foul after the delivery. Strikes exist from 4 m/s on (2 of 17 entry lines 1 cm apart); a swing of the H1-2 gives 3.3 m/s and it falls during the swing; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_bowling.py: positive by injection (the 6 lb ball, held for real between the bare palms by friction only, with the palm contact of a supported human hand, rebound 0.10, taken from the hands and laid on the lane 0.35 m past the line at 8 m/s, 1.2 deg, entering 5 cm right of the head pin: a strike; entries 2-3 cm right give 8-9 pins); negatives: nop (held for the whole 40 s), arms opened (the ball drops), walking over the foul line, a gutter ball, a head-pin hit that is not a strike, touched after the release, a foul after the delivery, a fall. No controller delivers 4 m/s or more from a two-palm hold; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

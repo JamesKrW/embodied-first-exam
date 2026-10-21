@@ -4,17 +4,19 @@
  "params": {
   "platform_size_m": 4.0,
   "platform_height_m": 0.1,
-  "bar_mass_kg": 20.0,
-  "bar_length_m": 2.2,
-  "grip_diameter_m": 0.028,
+  "bar_mass_kg": 5.0,
+  "bar_length_m": 1.835,
+  "grip_diameter_m": 0.025,
   "grip_length_m": 1.31,
   "sleeve_diameter_m": 0.05,
-  "sleeve_length_m": 0.415,
-  "disc_mass_kg": 10.0,
+  "sleeve_length_m": 0.2325,
+  "shaft_mass_kg": 1.74,
+  "disc_mass_kg": 0.0,
   "disc_diameter_m": 0.45,
-  "collar_mass_kg": 2.5,
-  "total_mass_kg": 45.0,
-  "bar_ahead_m": 0.1,
+  "collar_mass_kg": 0.0,
+  "total_mass_kg": 5.0,
+  "min_load_kg": 21.0,
+  "bar_ahead_m": 0.2,
   "lift_tolerance_m": 0.03,
   "knee_height_m": 0.48,
   "clean_rack_m": 0.15,
@@ -28,7 +30,8 @@
   "upright_cos": 0.94,
   "bar_centre_m": 0.25,
   "bar_align_deg": 20.0,
-  "hold_s": 2.0
+  "hold_s": 2.0,
+  "off_bar_s": 0.05
  },
  "title": "Weightlifting: clean and jerk",
  "category": "parkour-apparatus-balance",
@@ -39,11 +42,11 @@
   "overhead",
   "down signal"
  ],
- "rulebook": "IWF Technical and Competition Rules & Regulations (International Weightlifting Federation; quoted from memory of the 2020s editions): 2.3 the clean and jerk, 2.5 incorrect movements, 3.1 the platform, 3.3 the barbell",
+ "rulebook": "IWF Technical and Competition Rules & Regulations (International Weightlifting Federation; 2020 edition, article numbers quoted from memory of the 2020s editions): 2.3 the clean and jerk, 2.5 incorrect movements, 3.1 the platform, 3.3 the barbell (the women's bar: 15 kg, 2.01 m, a 25 mm grip section 1.31 m long, sleeves 50 mm thick; collars 2.5 kg; the lightest barbell in competition, women: 21 kg = the bar, two collars and two 0.5 kg discs)",
  "deviations": [
-  "3.3 (the barbell's load): the barbell is the lightest one the men's equipment gives on full-size discs: the 20.0 kg bar, one 10.0 kg disc of 0.45 m (the lightest disc of the full diameter) and one 2.5 kg collar on each sleeve, 45.0 kg; there is no choice of weight and no progression of attempts, because the task is one attempt",
-  "3.3 (what the rule leaves open): the bar's 20.0 kg are split 7 kg for the shaft and 6.5 kg for each revolving sleeve, a disc is 0.034 m wide and a collar 0.07 m, and a disc keeps 0.4 of its speed when it bounces on the platform; these are estimates, the rule gives no numbers for them",
-  "3.3 (the grip): the robot's hands have no fingers; a closed grip holds the bar's grip section rigidly to the palm when the bar's surface is within 3.5 cm of the palm point, so the hook grip, chalk and the strength of the fingers are not simulated",
+  "3.3 (the barbell): the barbell is an aluminium technique bar, American Barbell's ATB-5-E (5 kg, 1.835 m, a 25 mm grip section 1.31 m long as the women's bar's, sleeves 50 mm thick), training equipment, not a competition barbell (the women's bar is 15 kg, the lightest competition barbell 21.0 kg), without collars or discs, lying on the platform on its inner collars, not on 0.45 m discs. The reason is the robot's arms and hands: with the women's 15 kg bar the turnover from the hang to the shoulders asks 1.08 to 1.17 times what the elbow and shoulder motors give, and the two-finger grippers let a bar slide at about 400 N, so neither a heavier bar nor a faster turnover is open. There is no choice of weight and no progression of attempts, because the task is one attempt",
+  "3.3 (what the maker does not give): the bar's 5.0 kg are split 1.74 kg for the shaft and the rest between the two revolving sleeves with their inner collars (0.08 m across, 0.03 m wide); these are estimates",
+  "3.3 (the grip): each hand is a two-finger gripper, Unitree's Dex1-1 (90 mm stroke, 80 mm jaws with rubber pads, at most 120 N; sold for the G1, not for this robot: here it sits where the H1-2's hand would), open at the start; it holds the bar by the jaws' friction alone (nothing is welded), so the hook grip, chalk and the fingers are not simulated, and the bar can slip, turn in the jaws and drop. A hand holds the bar while the grip section touches both of its jaws (a break of up to 0.05 s, the pads' contact flickering under a load, is not letting go). The Dex1-1's own rating is a 5 kg friction-grasp load; the model's pads hold some five times that",
   "2.3.1 (the clean): the referee judges the end of the clean, not the movement: the bar at the shoulders (its axis within 0.15 m of both shoulder joints; the robot's rigid chest stands 0.07 m ahead of them, so the bar cannot lie on the collarbones) with the legs extended, the feet on one line and everything motionless for 0.5 s (the rule says \"motionless\" and gives no time); that the bar came there in a single movement is not judged, because that needs a human reading of the pull",
   "the rules' \"at the shoulders\" and \"overhead\" assume a lifter who stands under the bar; so that neither position can be reached bent over or with the bar behind the back, in both the trunk must be upright (the cosine of its tilt at least 0.94), the bar's centre no more than 0.25 m (horizontally) from the point midway between the shoulder joints, and the bar within 20.0 degrees of the line through the shoulder joints (seen from above)",
   "2.5 (incorrect movements): judged here are the unfinished attempt above knee height, a part other than the feet on the platform, leaving the platform, the incomplete extension of the arms and legs at the finish and the feet not on one line; not judged, because they need a human judge's reading of the movement: the press-out and a pause while the arms extend, pulling from the hang, the bar touching the thighs, the elbows or upper arms touching the knees or thighs, an uneven extension of the arms, the oscillation of the bar before the jerk",
@@ -52,9 +55,9 @@
  ],
  "texts": {
   "sentence": "Clean and jerk the barbell: lift it from the platform to your shoulders, then to locked arms overhead, and hold it there motionless until the down signal.",
-  "rules": "The barbell is the IWF men's bar (20.0 kg, 2.2 m long; the grip section between the sleeves is 1.31 m long and 0.028 m thick; the sleeves are 0.415 m long and 0.05 m thick and revolve on the bar) with one 10.0 kg rubber disc of 0.45 m and one 2.5 kg collar on each sleeve: 45.0 kg. It lies on the competition platform (4.0 m by 4.0 m, 0.1 m high), on which you stand. A hand can grip the grip section anywhere along it. Lift-off: the bar may leave the platform only in both hands: you fail the moment the bar's axis is more than 0.03 m above where it lies at rest while fewer than two hands grip it. The attempt: once the bar's centre has been 0.48 m above the platform (knee height) the lift must be finished: from then on you fail if either hand lets go or if any part of the barbell touches the platform before the down signal. The clean: the bar must first rest at your shoulders: its axis within 0.15 m of both shoulder joints, both hands on it, both knees within 10.0 degrees of straight, both feet on the platform and on one line, the bar and your pelvis slower than 0.1 m/s, and you under the bar (your trunk upright: the cosine of its tilt at least 0.94; the bar's centre no more than 0.25 m, horizontally, from the point midway between your shoulder joints; the bar, seen from above, within 20.0 degrees of the line through them), with the attempt begun (the bar has been above knee height and touches nothing but you), all of it without a break for 0.5 s. You fail if the bar's axis is more than 0.25 m above the centre of your head before that (a lift from the platform to overhead in one movement is a snatch). The jerk and the finish: after the clean, bring the bar overhead. The final position is: the bar's axis at least 0.25 m above the centre of your head, both hands on it, both elbows within 10.0 degrees of straight (the angle between the upper arm's and the forearm's long axes), both knees within 10.0 degrees of straight (the angle hip, knee, ankle), both feet on the platform and on one line (their centres no more than 0.05 m apart along the horizontal direction square to the bar; under a bar tilted more than 60.0 degrees from level the feet never count as on one line), the bar and your pelvis slower than 0.1 m/s, and you under the bar as in the clean (trunk upright, the bar's centre over the middle of your shoulders, the bar along your shoulder line). Once it is held for 2.0 s without a break the down signal is given: that is success, and the attempt ends. At any time you fail if a part of you other than your feet touches the platform, if any part of you or of the barbell touches the floor beside the platform, or after 60 s. There is no other fall rule: you may squat as low as you like, and the bar may touch your body.",
-  "venue": "You stand upright in the middle of the platform, facing +x, your soles 0.1 m above the floor, in the rest pose (upper arms down, forearms forward). The barbell lies on the platform across your front, parallel to your shoulders and centred on you: its axis is 0.1 m ahead of your pelvis and 0.225 m above the platform (above your feet, just clear of your shins), the discs 0.69 m to each side of its middle. Your shoulder joints are 1.46 m above the platform when you stand, 0.30 m apart; the centre of your head is at 1.70 m, its top at 1.79 m; your knee joints are at 0.48 m. In the `stand` action's stance your knees are bent by about 21 degrees, and your elbows are at a right angle in the rest pose: neither is extended. Your elbow joints have no stop at the straight arm (they bend both ways from it). The platform's edges are 2 m away in every direction.",
-  "difficulty": "The barbell weighs two thirds of the robot: held at the shoulders it asks about twice the torque the elbow motors give (18 N m), so the arms cannot simply carry it there. Nothing balances the robot under a load, and no built-in action bends down to the bar or straightens the knees."
+  "rules": "The barbell is an aluminium technique bar (5.0 kg, 1.835 m long; the grip section between the inner collars is 1.31 m long and 0.025 m thick; the sleeves are 0.2325 m long and 0.05 m thick and revolve on the bar), without discs or collars: 5.0 kg. It lies on the competition platform (4.0 m by 4.0 m, 0.1 m high), on which you stand. Your hands are two-finger grippers, open at the start; a hand holds the bar while the bar's grip section touches both of that gripper's jaws (a break of up to 0.05 s is not letting go); they hold it by the friction of their jaws only, so it can slip, turn in the jaws and drop. Lift-off: the bar may leave the platform only in both hands: you fail the moment the bar's axis is more than 0.03 m above where it lies at rest while fewer than two hands grip it. The attempt: once the bar's centre has been 0.48 m above the platform (knee height) the lift must be finished: from then on you fail if either hand lets go or if any part of the barbell touches the platform before the down signal. The clean: the bar must first rest at your shoulders: its axis within 0.15 m of both shoulder joints, both hands on it, both knees within 10.0 degrees of straight, both feet on the platform and on one line, the bar and your pelvis slower than 0.1 m/s, and you under the bar (your trunk upright: the cosine of its tilt at least 0.94; the bar's centre no more than 0.25 m, horizontally, from the point midway between your shoulder joints; the bar, seen from above, within 20.0 degrees of the line through them), with the attempt begun (the bar has been above knee height and touches nothing but you), all of it without a break for 0.5 s. You fail if the bar's axis is more than 0.25 m above the centre of your head before that (a lift from the platform to overhead in one movement is a snatch). The jerk and the finish: after the clean, bring the bar overhead. The final position is: the bar's axis at least 0.25 m above the centre of your head, both hands on it, both elbows within 10.0 degrees of straight (the angle between the upper arm's and the forearm's long axes), both knees within 10.0 degrees of straight (the angle hip, knee, ankle), both feet on the platform and on one line (their centres no more than 0.05 m apart along the horizontal direction square to the bar; under a bar tilted more than 60.0 degrees from level the feet never count as on one line), the bar and your pelvis slower than 0.1 m/s, and you under the bar as in the clean (trunk upright, the bar's centre over the middle of your shoulders, the bar along your shoulder line). Once it is held for 2.0 s without a break the down signal is given: that is success, and the attempt ends. At any time you fail if a part of you other than your feet touches the platform, if any part of you or of the barbell touches the floor beside the platform, or after 60 s. There is no other fall rule: you may squat as low as you like, and the bar may touch your body.",
+  "venue": "You stand upright in the middle of the platform, facing +x, your soles 0.1 m above the floor, in the rest pose (upper arms down, forearms forward). The barbell lies on the platform across your front, parallel to your shoulders and centred on you, on its inner collars (0.08 m across, 0.655 m to each side of its middle): its axis is 0.2 m ahead of your pelvis and 0.04 m above the platform, just beyond your toes (they reach 0.164 m ahead of your pelvis). Your shoulder joints are 1.46 m above the platform when you stand, 0.30 m apart; the centre of your head is at 1.70 m, its top at 1.79 m; your knee joints are at 0.48 m. In the `stand` action's stance your knees are bent by about 21 degrees, and your elbows are at a right angle in the rest pose: neither is extended. Your elbow joints have no stop at the straight arm (they bend both ways from it). Both grippers are open (grip values 0): a grip value is that gripper's closure command (0 open, 90 mm between the pads; 1 closed); on the 25 mm grip section about 0.86 or more clamps at the full 120 N per jaw, less clamps more lightly (10 N per mm that the commanded opening, 90 mm times one less the value, is below 25 mm). The barbell is a free body: `held` in your state says which gripper touches it with both jaws. The platform's edges are 2 m away in every direction.",
+  "difficulty": "The bar is light but lies low, 0.04 m above the platform, and the hands are two-finger grippers that hold it by friction, near their tips at first. Turning it over from the hang to the shoulders, slowly, asks about half of what the elbow and shoulder motors give; too fast, and the bar slides out of the jaws. Nothing balances the robot under a load, and no built-in action bends down to the bar or straightens the knees."
  },
  "robot": "unitree_h1",
  "sim": {
@@ -62,7 +65,7 @@
   "mujoco": "3.3.7"
  },
  "t0": {
-  "state_sha": "54f82b1c1346ab63c74280d688295e261d0cb2d73b41972fcd9a5f088794791a",
+  "state_sha": "6d008674b0a173504adadc6880af55ffc5dd33bbacd8df827ad9dfd0025bd790",
   "control_dt": 0.01,
   "horizon_steps": 6000,
   "raw_dim": 141,
@@ -126,7 +129,7 @@
      1.0,
      1.0
     ],
-    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad)"
+    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad) (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "walk": {
     "dim": 20,
@@ -196,7 +199,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets"
+    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "joints": {
     "dim": 29,
@@ -293,7 +296,7 @@
      1.0,
      1.0
     ],
-    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward"
+    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "lowcmd": {
     "dim": 137,
@@ -714,7 +717,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz"
+    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    }
   },
   "hold": {
@@ -874,7 +877,13 @@
    "cmd_vx",
    "cmd_vy",
    "cmd_wz",
-   "time_s"
+   "time_s",
+   "jaw_opening_left",
+   "jaw_speed_left",
+   "jaw_force_left",
+   "jaw_opening_right",
+   "jaw_speed_right",
+   "jaw_force_right"
   ],
   "cameras": {
    "head_left": {
@@ -954,7 +963,7 @@
    "name": "unitree_h1",
    "title": "Unitree H1-2",
    "revision": "h1-4",
-   "model": "Unitree H1-2, 27 joints, 1.78 m, 67 kg (RoboOlympics robot library h1-4: Unitree's own h1_2 model with its joint, speed and torque limits; its motor torque-speed curves are estimates)",
+   "model": "Unitree H1-2, 27 joints, 1.78 m, 68 kg (RoboOlympics robot library h1-4: Unitree's own h1_2 model with its joint, speed and torque limits; its motor torque-speed curves are estimates)",
    "joints": [
     "left_hip_yaw",
     "left_hip_pitch",
@@ -1302,7 +1311,7 @@
     0.0,
     0.0
    ],
-   "mass_kg": 67.37,
+   "mass_kg": 68.37,
    "height_m": 1.78,
    "pelvis_height_standing_m": 1.035,
    "control_dt_s": 0.01,
@@ -1313,15 +1322,44 @@
     1.57
    ],
    "run_command_range": null,
-   "grip": {
-    "reach_m": 0.035,
-    "max_relative_speed_m_s": 6.0,
-    "rule": "a closed grip holds the nearest grippable object whose surface is within reach_m of the palm (a point 4.5 cm beyond the wrist flange along the forearm) and that moves no faster than max_relative_speed_m_s relative to it; opening the grip lets it go"
+   "real_hands": {
+    "kind": "dex1",
+    "model": "Unitree Dex1-1 two-finger parallel gripper (modelled: 0.55 kg, jaws 80 mm long, 90 mm stroke, rubber pads)",
+    "sides": [
+     "left",
+     "right"
+    ],
+    "stroke_m": 0.09,
+    "jaw_length_m": 0.08,
+    "force_limit_n": 120.0,
+    "setpoint_opening_speed_m_s": 0.375,
+    "jaw_speed_note": "the limit is the servo setpoint's; the jaws can move briefly up to about 0.45 m/s when a clamp springs open",
+    "servo": {
+     "kp_n_per_m": 20000.0,
+     "kd_n_s_per_m": 80.0,
+     "rule": "each jaw: a setpoint moves towards 45 mm x closure at most half setpoint_opening_speed_m_s (opening, it starts from the jaws' position); force = clip(kp (setpoint - q) - kd dq, -force_limit_n, force_limit_n); the clamp on an object is min(force_limit_n, 10 N per mm that the commanded opening 90 mm x (1 - closure) is below the object's width)"
+    },
+    "pad": {
+     "friction": [
+      1.0,
+      0.005,
+      0.0001
+     ],
+     "condim": 4
+    },
+    "start": {
+     "left": {
+      "closure": 0.0,
+      "holding": null
+     },
+     "right": {
+      "closure": 0.0,
+      "holding": null
+     }
+    }
    }
   },
-  "grippable": [
-   "bar"
-  ],
+  "grippable": [],
   "pelvis": [
    0.0,
    0.0,

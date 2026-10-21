@@ -5,6 +5,13 @@ import numpy as np
 from rfo.referee import Crossing
 from rfo.scene import OFFICIAL
 from rfo.task import TaskBase
+# A rigid cone (PVC; its shell's flex not modelled)'s contact with the robot, the venue's fixtures and the other props
+# (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
+# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
+# robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
+# With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 68 mm into the palm pad and 43 mm into
+# the floor (stress test 2026-10-21).
+from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 BALL = OFFICIAL["football"]
 GRASS = (0.16, 0.50, 0.20, 1)
@@ -99,6 +106,9 @@ class Task(TaskBase):
         for i, (x, s) in enumerate(c):
             sc.cone(f"cone{i + 1}", x, 0.0, radius=p["cone_base_radius_m"], height=p["cone_height_m"], mass=0.4)
             sc.zone(f"side{i + 1}", (x, s * 0.6), (0.04, 0.25), rgba=(0.95, 0.85, 0.2, 0.7))
+        for g in sc.wb.iter("geom"):                         # the cones: rigid PVC at a contact (RIGID)
+            if (g.get("name") or "").startswith("cone") and g.get("contype", "0") != "0":
+                g.attrib.update(RIGID)
         sc.ball("ball", "football", (p["ball_ahead_m"], 0.0, BALL["radius"]))
         sc.camera("venue", (L / 2, -9.5, 6.5), (L / 2, 0.0, 0.0), fovy=62)
 

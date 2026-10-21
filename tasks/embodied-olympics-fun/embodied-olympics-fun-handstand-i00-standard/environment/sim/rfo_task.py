@@ -1,0 +1,147 @@
+"""Handstand: the floor-exercise handstand held for 2 s (FIG MAG Code of Points 2025-2028, floor element I.19), from a
+stand and back to the feet.
+
+Robot: the G1. A handstand puts the whole body weight on the arms. The G1 weighs 33 kg (324 N, 162 N per arm); its
+shoulders give 25 N m each, so the body above them (27 kg, its centre about 0.45 m from the shoulder line) may lean at
+most 50 / (27 x 9.81 x 0.45) = 0.42 rad off the arms' line before the shoulders give way, and in a straight handstand
+the static shoulder torque is close to zero. Its wrists (pitch and yaw 5 N m) cannot hold a flat-hand handstand: with
+the wrist bent 90 degrees the pad lies 0.12 to 0.22 m beside the wrist axis, i.e. 160 N x 0.17 m = 27 N m, more than
+five times the motor, so the weight would rest on the wrist's mechanical stop and its housing; on the fist (the pad's
+end face, 4.4 x 8 cm, the forearm's line through it) the wrist torque is near zero and the pads' 8 cm give a support
+the balance can use. The H1-2 (67 kg: 330 N per arm, 40 N m shoulders) has half the G1's torque per kilogram, wrists
+that bend 0.47 rad at most and fixed Inspire fingers: the G1 is the robot that can do it."""
+import math
+
+import numpy as np
+
+from rfo.task import TaskBase
+
+
+class Task(TaskBase):
+    name = "handstand"
+    title = "Handstand"
+    category = "parkour-apparatus-balance"
+    robot = "unitree_g1"
+    rulebook = ("FIG Men's Artistic Gymnastics Code of Points 2025-2028: floor exercise, element I.19 'Handstand "
+                "(2 s.)' (EG I, non-acrobatic elements); Art. 9.2.15 (a hold element is held at least 2 s, measured "
+                "from the moment a complete stop has been reached; no stop is not recognised); Art. 9.2.13 (a "
+                "handstand deviating more than 45 degrees from the vertical is not recognised); Art. 10.1 (the floor "
+                "area, 12 m x 12 m); Art. 10.2.1.2a (the exercise inside the floor area, the lines included)")
+    deviations = [
+        "FIG Apparatus Norms, floor: the floor is rigid and level (friction 1.0), not the norm's sprung floor with "
+        "its elastic surface, because the simulator's ground is rigid and no sourced stiffness of the sprung floor "
+        "is used here (a sprung floor would give energy back at the jump into the handstand: this is not easier)",
+        "Art. 10.1 / I.19 (a handstand on the hands): the G1 has no fingers and no palm that opens; each hand is a "
+        "rigid rubber fist (a 4.4 x 8 x 10 cm pad on the wrist). Any part of the hand (the pad, the wrist's "
+        "housing) may bear the weight: a knuckle (fist) handstand counts as a handstand",
+        "Art. 9.2.13 (deviation from the perfect handstand): judged pass or fail with the Code's non-recognition "
+        "limit of {max_dev_deg} degrees, on two lines of the body: from the middle of the hands' support to the "
+        "pelvis and from the pelvis to the middle of the ankles; the 15 and 30 degree execution deductions are not "
+        "applied, as there is no E-Jury",
+        "Art. 9.2.15 (a complete stop): without judges a stop is the pelvis slower than {still_m_s} m/s",
+        "Art. 10.2.1.1 (the exercise begins from a still stand, legs together): the robot starts in its own stance, "
+        "feet 0.24 m apart, because that is how it stands; the task is one element and the way back to the feet, "
+        "not a 70 s exercise",
+    ]
+    time_limit_s = 30.0
+    start = (0.0, 0.0, 0.0)
+    fall_rule = True
+    legal_ground = ("left_foot", "right_foot", "left_hand", "right_hand")
+    stages = ["handstand", "held 2 s", "on the feet", "stand"]
+    params = dict(hold_s=2.0, max_dev_deg=45.0, min_leg_m=0.55, still_m_s=0.15, stand_s=1.0, stand_tilt_deg=20.0,
+                  stand_still_m_s=0.35, fall_pelvis_m=0.25, area_m=12.0)
+
+    sentence = ("Do a handstand: from your stance get up onto your hands, hold the handstand still for 2 s with only "
+                "your hands on the floor, then come back down onto your feet and stand.")
+    rules = ("A handstand is: only your hands on the floor (nothing else of you touches it), your pelvis above your "
+             "hands and your ankles above your pelvis, and both lines of your body, from the middle of where your "
+             "hands touch the floor to your pelvis and from your pelvis to the middle of your ankles, within "
+             "{max_dev_deg} degrees of vertical (the Code of Points does not recognise a handstand that deviates "
+             "more), and your legs extended, the middle of your ankles at least {min_leg_m} m from your pelvis (a "
+             "tucked or piked balance is not a handstand). Any part of your hand counts as the hand (you have fists, not fingers). The handstand is held "
+             "while you stay in it with your pelvis slower than {still_m_s} m/s (a complete stop); it counts once it "
+             "has been held without a break for {hold_s} s. After that you come back down so that only your feet "
+             "touch the floor (your hands off it), and then you stand for {stand_s} s without a break: only your feet "
+             "on the floor, your torso within {stand_tilt_deg} degrees of vertical, your pelvis slower than "
+             "{stand_still_m_s} m/s. You fail if any part of you other than your hands and feet touches the floor, "
+             "or your pelvis is lower than {fall_pelvis_m} m (a fall); if any part of you touches the floor outside "
+             "the {area_m} m x {area_m} m floor area (its lines are inside); or after {time_limit_s} s. Your feet "
+             "may leave the floor in a jump; nothing limits how you get onto your hands or back to your feet.")
+    venue = ("You stand in the middle of a gymnastics floor-exercise area, {area_m} m by {area_m} m, marked by white "
+             "lines, flat, level and rigid, with nothing on it; you face +x.")
+    difficulty = ("Your whole 33 kg rests on two small fists and arms whose shoulders give 25 N m: the body has to be "
+                  "balanced over a support a few centimetres long, actively, as an inverted pendulum, and no built-in "
+                  "action does that. Getting from standing onto the hands, and from the hands back onto the feet, are "
+                  "as hard as the hold.")
+
+    @property
+    def fall_z(self):
+        return self.p["fall_pelvis_m"]
+
+    def build(self, sc):
+        h = self.p["area_m"] / 2
+        sc.box("mat", (0.0, 0, 0.0003), (h, h, 0.0003), rgba=(0.25, 0.35, 0.65, 1))
+        for i, (a, b) in enumerate((((-h, -h), (h, -h)), ((h, -h), (h, h)), ((h, h), (-h, h)), ((-h, h), (-h, -h)))):
+            sc.line(f"area_line{i}", a, b)
+        sc.camera("venue", (0.3, -3.6, 1.2), (0.2, 0.0, 0.6), fovy=50)
+
+    def referee_reset(self, w, ref):
+        self.hands = ref.part("hands")
+        self.feet = ref.part("feet")
+        self.min_upright = math.cos(math.radians(self.p["stand_tilt_deg"]))
+        m = w.m
+        self.ankles = [m.body(f"{s}_ankle_roll_link").id for s in ("left", "right")]
+        self.trackers = {"best_hold_s": 0.0, "in_handstand": False, "hold_n": 0}
+
+    def geometry(self, w, ref):
+        """(in a handstand now, the two lines' deviations in degrees, the hands' support middle)."""
+        d = w.d
+        parts = ref.parts_touching(ref.ground)
+        pts = ref.contact_points(self.hands, ref.ground)
+        if not parts or not parts <= {"left_hand", "right_hand"} or not len(pts):
+            return False, None, None
+        h = pts.mean(axis=0)
+        pel = d.qpos[w.robot.fq:w.robot.fq + 3]
+        ank = 0.5 * (d.xpos[self.ankles[0]] + d.xpos[self.ankles[1]])
+        devs = []
+        for a, b in ((h, pel), (pel, ank)):
+            v = b - a
+            n = float(np.linalg.norm(v))
+            devs.append(180.0 if n < 1e-9 else math.degrees(math.acos(max(-1.0, min(1.0, v[2] / n)))))
+        ok = (max(devs) <= self.p["max_dev_deg"] and pel[2] > h[2] and ank[2] > pel[2]
+              and float(np.linalg.norm(ank - pel)) >= self.p["min_leg_m"])
+        return ok, devs, h
+
+    def step(self, w, ref):
+        p, tr = self.p, self.trackers
+        half = p["area_m"] / 2
+        pts = ref.contact_points(ref.robot_mask, ref.ground)
+        if len(pts) and (np.abs(pts[:, :2]) > half + 1e-9).any():
+            return ref.fail("outside the floor area")
+        if not ref.has("held 2 s"):
+            ok, devs, h = self.geometry(w, ref)
+            tr["in_handstand"] = bool(ok)
+            if ok:
+                ref.stage("handstand", dev_deg=[round(x, 1) for x in devs])
+            v = float(np.linalg.norm(w.d.qvel[w.robot.fv:w.robot.fv + 3]))
+            still = ok and v <= p["still_m_s"]
+            tr["hold_n"] = tr["hold_n"] + 1 if still else 0
+            if tr["hold_n"] * w.CONTROL_DT >= p["hold_s"] - 1e-9:
+                ref.stage("held 2 s")
+            tr["best_hold_s"] = round(max(tr["best_hold_s"], tr["hold_n"] * w.CONTROL_DT), 2)
+            ref.metrics["hold_s"] = tr["best_hold_s"]
+            return
+        parts = ref.parts_touching(ref.ground)
+        if parts and parts <= {"left_foot", "right_foot"}:
+            ref.stage("on the feet")
+        still = ref.standing(max_speed=p["stand_still_m_s"], min_upright=self.min_upright)
+        if ref.has("on the feet") and ref.hold("stand", still, p["stand_s"]):
+            if ref.stage("stand"):
+                ref.succeed()
+
+    def privileged(self, w):
+        ref = w.ref
+        ok, devs, h = self.geometry(w, ref)
+        return {"pelvis": w.pelvis().tolist(), "com": w.com().tolist(), "in_handstand": bool(ok),
+                "dev_deg": devs, "hands_support": None if h is None else h.tolist(),
+                "hold_s": self.trackers.get("best_hold_s", 0.0)}

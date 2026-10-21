@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-volleyball-serve-i00-privileged"
-description = "Embodied Olympics volleyball-serve (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Serve the volleyball: from behind the end line, toss it out of your left hand and hit it with one hand or arm over the net into the opponent's court. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics volleyball-serve (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Serve the volleyball: from behind the end line, toss it up off your open left palm and hit it with one hand or arm over the net into the opponent's court. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "volleyball-serve"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md ย
 instance_seed = 0
 expert_time_estimate_hours = 6.0
 oracle = "full"
-oracle_evidence = "Reference: an underarm serve (left fist tosses, straight right arm and the trunk's turn hit) from a technique found offline by CMA-ES over whole-body key poses (Embodied Olympics' method): 2.2 m/s in, 11.4 m/s out, over the net into the court 1.8 m beyond it. Referee test negatives: a throw brushing the fist, hit out of the hand, a still fist, the head, into the net, outside the antenna, long, a foot fault, a second touch, held Measured: success after 3.28 s of the 12 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "Reference: a toss off the open left palm by the arm's own movement (no pin, no launch), then an underarm hit, with the published palm contact model: 0.87 m/s in, 11.8 m/s out, lands 12.1 m ahead, success after 1.7 s; kp x0.97 and x1.01 also succeed, x0.99 lands wide, x1.03 short. Referee test negatives: nop (8 s on the palm), a tilted palm (it rolls off), the ball on the shoulder before the toss, a thrown ball meeting the fist, a ball falling on a still fist (absorbed: held), into the net, outside the antenna, long, a foot fault, a second touch. Measured (make_oracles.py): success after 1.72 s of the 12 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md ยง2.9)

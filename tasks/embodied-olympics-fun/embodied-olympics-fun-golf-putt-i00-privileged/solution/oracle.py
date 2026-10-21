@@ -1,4 +1,10 @@
-"""Reference solution of golf-putt (v2): a real one-armed putt in `stand` mode, side-on to the line as a golfer stands.
+"""Reference solution of golf-putt: golf-putt's solution (a real one-armed putt in `stand` mode, side-on to
+the line as a golfer stands), ported to a putter held by friction across the jaws of the right Dex1-1 gripper.
+
+What changed from golf-putt's: the club is not part of the hand, so the arm's kinematics takes where the putter is in
+the hand from the simulator (the putter's pose relative to the wrist mount, read again at every correction at the
+address: if the club turned in the jaws, the arm follows it); the club starts hanging from the hand out to the right
+(golf-putt's starts level), so the first move goes from there; the gripper's closure command stays 1 (120 N).
 
 The posture at impact comes from inverse kinematics on the simulator's model (privileged: the model and the joint
 angles): the putter's face square to the line of play behind the ball, the toe 10 degrees down (the shaft then is
@@ -18,17 +24,33 @@ class Arm:
     on the putter face's pose (centre, and the frame heel-to-toe / normal / sole normal)."""
 
     def __init__(self, w):
-        self.m, self.r = w.m, w.robot
+        self.w, self.m, self.r = w, w.m, w.robot
         self.d = mujoco.MjData(w.m)
         self.d.qpos[:] = w.d.qpos
         self.use = np.arange(w.L.NJ - 7, w.L.NJ)                # the right arm's joints
         self.adr, self.vadr = self.r.qadr[self.use], self.r.vadr[self.use]
         self.lo, self.hi = self.r.lo[self.use] + 0.03, self.r.hi[self.use] - 0.03
         self.face = w.m.geom("putter_face").id
-        self.body = int(w.m.geom_bodyid[self.face])
+        self.body = w.robot.mount["right"]                      # the club moves with the wrist mount (in the jaws)
+        self.club = w.m.body("putter").id
+        self.qa = w.free["putter"][0]
+        self.refresh()
+
+    def refresh(self):
+        """Where the putter is in the hand now (its pose in the wrist mount's frame, from the simulator)."""
+        d = self.w.d
+        Rm = d.xmat[self.body].reshape(3, 3)
+        self.rel_p = Rm.T @ (d.xpos[self.club] - d.xpos[self.body])
+        self.rel_R = Rm.T @ d.xmat[self.club].reshape(3, 3)
 
     def fk(self, q):
         self.d.qpos[self.adr] = q
+        mujoco.mj_kinematics(self.m, self.d)
+        Rm = self.d.xmat[self.body].reshape(3, 3)               # the putter carried by the hand
+        quat = np.zeros(4)
+        mujoco.mju_mat2Quat(quat, (Rm @ self.rel_R).ravel())
+        self.d.qpos[self.qa:self.qa + 3] = self.d.xpos[self.body] + Rm @ self.rel_p
+        self.d.qpos[self.qa + 3:self.qa + 7] = quat
         mujoco.mj_kinematics(self.m, self.d)
         mujoco.mj_comPos(self.m, self.d)
         return self.d.geom_xpos[self.face].copy(), self.d.geom_xmat[self.face].reshape(3, 3).copy()
@@ -63,7 +85,8 @@ class Arm:
         mujoco.mj_collision(self.m, self.d)
         for c in self.d.contact[:self.d.ncon]:
             names = {self.m.geom(int(g)).name for g in c.geom}
-            if c.dist < 0 and not any("ankle" in n for n in names) and "ball" not in names:
+            if c.dist < 0 and not any("ankle" in n for n in names) and "ball" not in names \
+                    and not ("putter_grip" in names and any("_hand_" in n for n in names)):   # (the grip in the jaws)
                 return True
         return False
 
@@ -101,10 +124,11 @@ def face_frame(line_yaw, loft_rad, toe_up_rad=0.0):
 # the head's inertia opens it by at impact. Both are calibrated on the simulator (the ball leaves within 0.2 degrees
 # of the line and reaches the hole at about 1 m/s); the putt is holed with each of them, and the take-back, the hover,
 # the strike point and the pauses, moved by a few per cent.
-SWING = dict(omega=3.4, back_rad=0.45, through_rad=0.30, face_deg=4.35, address_rad=0.05, park_rad=1.0, hover_m=0.006,
-             high_m=0.03, toe_down_deg=10.0, toe_side_m=0.025, aim_deg=0.0, clear_s=0.8, raise_s=2.5, lower_s=1.5,
+SWING = dict(omega=6.05, back_rad=0.60, through_rad=0.30, face_deg=6.4, address_rad=0.05, park_rad=0.15, hover_m=0.006,
+             high_m=0.03, toe_down_deg=10.0, toe_side_m=0.025, aim_deg=0.0, via_m=0.03, raise_s=3.0, lower_s=1.5,
              settle_s=1.0, takeback_s=1.0, pause_s=0.6, ki=0.03)
 ROLL = 4                                                    # the wrist's roll joint among the arm's seven
+CLOSED = 1.0                                                # the right gripper's closure command
 
 
 def _smooth(x):
@@ -130,7 +154,7 @@ def solve(s, **swing):
     # the face at impact: square to the line, its front on the ball's back, the ball toe_side_m towards the toe
     impact = (np.r_[ball[:2], z] - u * (R + 0.0015) - np.r_[Rt[:2, 0], 0.0] * k["toe_side_m"])
     up = np.array([0.0, 0.0, k["high_m"]])
-    sols = arm.search(impact + up, Rt, [rest[-7:], [0.3, -0.1, 0.0, 0.3, 1.2, 0.0, 0.75]])
+    sols = arm.search(impact + up, Rt, [np.array(w.d.qpos[w.robot.qadr[-7:]], float), [0.3, -0.1, 0.0, 0.3, 1.2, 0.0, 0.75]])
     if not sols:
         raise RuntimeError("the putter cannot reach the ball")
     q_imp = sols[0][1]
@@ -155,22 +179,45 @@ def solve(s, **swing):
             return
         if learn:
             bias[:] = np.clip(bias + k["ki"] * (q - w.d.qpos[qadr]), -0.15, 0.15)
-        s.step("stand", np.r_[rest[:-7], q + bias, 0.0, 0.0])
+        s.step("stand", np.r_[rest[:-7], q + bias, 0.0, CLOSED])
 
     def move(qa, qb, seconds, learn=False):
         steps = int(round(seconds / dt))
         for i in range(1, steps + 1):
             step(qa + (qb - qa) * _smooth(i / steps), learn)
 
-    clear = rest[-7:].copy()
-    clear[1] -= 0.6                                         # the arm out to the side first: the club's butt clear of the hip
-    move(rest[-7:], clear, k["clear_s"])
-    move(clear, pose(-k["park_rad"]), k["raise_s"])                    # the arm to its place, the club still out to the side
+    # the club from where it hangs to its place over the line, behind the ball: the face's pose moved in a straight line
+    # and turned evenly, the arm following by inverse kinematics at every step. The shaft stays within a few degrees
+    # of the vertical all the way: the grip lies across the jaws, which hold it firmly against the swing (that pushes
+    # it against the pads) but only by the pads' friction against a tilt of the shaft towards the toe (the club turns
+    # in the jaws by tens of degrees when it is carried level)
+    q_start = np.array(w.d.qpos[qadr], float)
+    p0, R0 = arm.fk(q_start)
+    p1, R1 = arm.fk(pose(-k["park_rad"]))
+    q0_, q1_ = np.zeros(4), np.zeros(4)
+    mujoco.mju_mat2Quat(q0_, R0.ravel())
+    mujoco.mju_mat2Quat(q1_, R1.ravel())
+    dq_ = np.zeros(3)
+    mujoco.mju_subQuat(dq_, q1_, q0_)
+    q_path = q_start.copy()
+    n = int(round(k["raise_s"] / dt))
+    for i in range(1, n + 1):
+        a_ = _smooth(i / n)
+        qa_ = q0_.copy()
+        mujoco.mju_quatIntegrate(qa_, dq_, a_)
+        Ra = np.zeros(9)
+        mujoco.mju_quat2Mat(Ra, qa_)
+        pa = p0 + (p1 - p0) * a_ + np.array([0.0, 0.0, k["via_m"] * math.sin(math.pi * a_)])
+        guess = q_start + (pose(-k["park_rad"]) - q_start) * a_      # (seeded on the joints' straight line: the
+        q_path, _, _ = arm.ik(guess, pa, Ra.reshape(3, 3), iters=30, free=(0, 1, 2, 3, 4, 5, 6))   # end is pose(-park))
+        step(q_path)
+    move(q_path, pose(-k["park_rad"]), 0.3)
     move(pose(-k["park_rad"]), pose(-k["address_rad"]), k["lower_s"])  # the club down behind the ball, a little high
     address = pose(-k["address_rad"])
     for target in (impact + up, impact, impact, impact):    # the address, corrected for how the body really stands
         move(address, address, k["settle_s"], learn=True)
         arm.d.qpos[:] = w.d.qpos
+        arm.refresh()                                       # (the club may have turned in the jaws)
         q_new, ep, er = arm.ik(q_imp, target, Rt, iters=60)
         if ep > 2e-3:
             raise RuntimeError(f"the putter cannot reach the ball (error {ep:.4f} m)")

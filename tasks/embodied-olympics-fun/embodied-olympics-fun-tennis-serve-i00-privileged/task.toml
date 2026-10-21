@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-tennis-serve-i00-privileged"
-description = "Embodied Olympics tennis-serve (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Serve: from behind your baseline, release the tennis ball in your left hand, strike it with the racket on your right hand before it reaches the ground, and send it over the net into the service box diagonally opposite. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics tennis-serve (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Serve: from behind your baseline, release the tennis ball from your left gripper, strike it with the racket held in your right gripper before it reaches the ground, and send it over the net into the service box diagonally opposite. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "tennis-serve"]
 
@@ -19,9 +19,9 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
-expert_time_estimate_hours = 8.0
-oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a real rest and release, a 0.3 m fall onto the level racket, the ball's velocity set at the contact: 20 m/s at 11 degrees, into the diagonal box; the let is played out with a real net cord); negatives: unstruck, no added speed, a ball thrown at the racket (faster than a toss), not at rest, a foot fault, struck before clear, a throw past the net, a double hit, carried, the own side, into the net, outside the box, a second let. The slowest legal serve needs 12 m/s; the H1-2 stays up to a head speed of about 9.6 m/s; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+expert_time_estimate_hours = 10.0
+oracle = "full"
+oracle_evidence = "Reference: an underarm serve with the friction-held racket: 13.27 m/s, over the net by 2.3 m into the diagonal box, success after 3.5 s. The net is a mechanism (cable beads under 1.89 kN, hanging mesh panels of a 6.4 kg net, a centre strap). Referee test (all physics but the injected ball states): balls into the net stop and drop on the server's side; a net cord at 10 m/s 2 cm over the band clips it and lands in the box (a let, replayed with the spare ball taken from its cup); negatives: a second let, the posts, the box lines, the tees, touching the net, a fall. Measured (make_oracles.py): success after 3.5 s of the 20 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = []
+oracle = [0]
 
 [verifier]
 timeout_sec = 900.0

@@ -5,6 +5,13 @@ import math
 import numpy as np
 
 from rfo.task import TaskBase
+# A rigid cone (PVC; its shell's flex not modelled)'s contact with the robot, the venue's fixtures and the other props
+# (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
+# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
+# robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
+# With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 74 mm into the robot's wrist and 39 mm
+# into the floor (stress test 2026-10-21).
+from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 G1_FOOT_FRONT = 0.114            # m: the front end of the standing G1's feet ahead of its pelvis (measured)
 # The prescribed path as the referee sees it: the crossings of the centre line (the line the four centre cones stand
@@ -105,6 +112,9 @@ class Task(TaskBase):
         sc.line("centre_line", (0, 0), (3 * p["cone_spacing_m"], 0), width=0.03, rgba=(0.9, 0.9, 0.9, 0.6), z=0.0009)
         for name, (x, y) in self.cones().items():
             sc.cone(f"cone_{name}", x, y, radius=p["cone_radius_m"], height=p["cone_height_m"], mass=p["cone_mass_kg"])
+        for g in sc.wb.iter("geom"):                         # the cones: rigid PVC at a contact (RIGID)
+            if (g.get("name") or "").startswith("cone") and g.get("contype", "0") != "0":
+                g.attrib.update(RIGID)
         sc.camera("venue", (L / 2, -10.5, 9.0), (L / 2, 0.0, 0.0), fovy=58)
 
     def reset(self, w):

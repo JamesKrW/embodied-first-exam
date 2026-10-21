@@ -17,7 +17,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-catch-and-shoot-i00-standard-realtime"
-description = "STANDARD-REALTIME MODE (robot as a service on a clock that does not stop, eai-standard/2.3, slowdown S = 1): Embodied Olympics catch-and-shoot on the same frozen instance as embodied-olympics-fun-catch-and-shoot-i00-privileged. Catch and shoot: catch the chest pass that comes to you from the left wing, then shoot from where you stand so that the ball enters the basket from above. Once an attempt starts the venue does not wait; the agent drives the robot from a program of its own through the client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 10 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records every executed control step and grades the last attempt live with the family's referee (no grading replay)."
+description = "STANDARD-REALTIME MODE (robot as a service on a clock that does not stop, eai-standard/2.3, slowdown S = 1): Embodied Olympics catch-and-shoot on the same frozen instance as embodied-olympics-fun-catch-and-shoot-i00-privileged. Catch and shoot: catch the chest pass that comes to you from the left wing between your two palms, then shoot from where you stand so that the ball enters the basket from above. Once an attempt starts the venue does not wait; the agent drives the robot from a program of its own through the client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 10 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records every executed control step and grades the last attempt live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-realtime-mode", "trajectory", "catch-and-shoot"]
 
@@ -35,9 +35,9 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 protocol = "eai-standard/2.3"
 instance_seed = 0
 reset_budget = 10
-expert_time_estimate_hours = 10.0
+expert_time_estimate_hours = 14.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: the catch is real (an open palm on the pass line takes the 7.2 m/s ball and the robot stays up); the shot is an injection (8.7 m/s at 52 degrees set at the release); negatives: not caught, touched before the pass, a leg, the pivot foot, a third step, touched again, the floor, from below, held, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_catch_and_shoot.py: catch by injection (the real pass flies to the robot; at 0.6 m to its left the ball is put at rest between the open palms, which really close and hold it by friction); no real two-palm catch of the 7.2 m/s pass was found (the arms give way, the ball slides off the first palm within 0.1 s, also when slowed to 30 %). Shot by injection as in free-throw (real swing and release, velocity set at the release). Negatives: nop (the pass knocks the resting right palm and drops), a tap shorter than the catch time, a too-weak squeeze, the squeeze eased after the catch, held against the chest, walking with the ball, the pivot foot dragged, a third step after a catch in the air, touched before the pass, a pass off the thigh, the shot short or wide, touched again, from below, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

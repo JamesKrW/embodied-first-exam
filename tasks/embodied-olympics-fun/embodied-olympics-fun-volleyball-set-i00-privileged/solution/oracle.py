@@ -4,17 +4,18 @@ just before the toss comes down, then four key poses of the trunk and the arms p
 test above the forehead, the elbows bent, then driven up and a little forward through the ball; their times
 searched). Searched by CMA-ES in the task's own frozen instance, each trial scored on how near a hand comes to the
 ball, then on the set's height and where it comes down (the referee's distance from the target).
-Measured: the toss comes down at 6.6 m/s and leaves the hands upward at 6.95 m/s (1.05 times; the rule asks 1.0),
-rises to 4.02 m (3.43 m asked) and lands 0.28 m from the target's centre (radius 1 m); success after 5.9 s. Open loop
-on the one frozen start, not robust (about 1 of 48 neighbouring techniques succeeded in the search's last
-generations)."""
+Measured (10-20, machines-feet: the toss now played by the physical two-wheel ball machine, ball_machine.py v4;
+re-searched: 60 + 25 generations of CMA-ES (24-32), then 50 single-process Gaussian refinements): the toss comes down
+at 6.6 m/s and leaves the hands upward at 7.1 m/s (1.07 times; the rule asks 1.0), rises to 3.92 m (3.43 m asked)
+and lands 0.80 m from the target's centre (radius 1 m); success after 5.8 s. Open loop on the one frozen start: not
+robust (1 of about 50 neighbouring techniques in the refinement succeeded)."""
 import numpy as np
 
-TECHNIQUE = {"times": [0.7415, 1.2183, 1.3142, 1.9458], "release_s": 0.05, "hand": None, "legs": 'walk', "prelude": [[0.0, 0.0, 0.0, 3.0]], "keys": [
-        [0, -0.16, 0, 0.36, -0.2, -0, 0, -0.16, 0, 0.36, -0.2, -0, 0.0394, -2.5671, 0.1796, -0.0124, 0.6982, 0, 0, 0, -2.8688, -0.4008, -0.3008, 0.5722, 0, 0, 0],
-        [0, -0.16, 0, 0.36, -0.2, -0, 0, -0.16, 0, 0.36, -0.2, -0, -0.0408, -2.6841, 0.2033, -0.3914, 0.5752, 0, 0, 0, -2.7033, -0.9686, -0.1258, 0.2902, 0, 0, 0],
-        [0, -0.16, 0, 0.36, -0.2, -0, 0, -0.16, 0, 0.36, -0.2, -0, -0.2389, -2.5332, 0.1479, 0.0436, 1.4957, 0, 0, 0, -2.5412, -0.3005, -0.0307, 1.5255, 0, 0, 0],
-        [0, -0.16, 0, 0.36, -0.2, -0, 0, -0.16, 0, 0.36, -0.2, -0, 0.0827, 0.1141, -0.2138, -0.0658, 0.045, 0, 0, 0, 0.0995, -0.0714, 0.0502, -0.1331, 0, 0, 0]]}
+TECHNIQUE = {"times": [0.7395, 1.1957, 1.3245, 2.4073], "release_s": 0.05, "hand": None, "legs": 'walk', "prelude": [[0.0, 0.0, 0.0, 3.0]], "keys": [
+        [0, -0.16, 0, 0.36, -0.2, -0, 0, -0.16, 0, 0.36, -0.2, -0, 0.3529, -2.6067, 0.0303, -0.1988, 0.3911, 0, 0, 0, -2.641, -0.0862, -0.1515, 0.4977, 0, 0, 0],
+        [0, -0.16, 0, 0.36, -0.2, -0, 0, -0.16, 0, 0.36, -0.2, -0, -0.1395, -2.7461, -0.0167, 0.0839, 0.7714, 0, 0, 0, -2.7483, -0.7764, -0.23, 0.8168, 0, 0, 0],
+        [0, -0.16, 0, 0.36, -0.2, -0, 0, -0.16, 0, 0.36, -0.2, -0, 0.1623, -2.8325, 0.2371, -0.2617, 1.2398, 0, 0, 0, -2.5413, -0.2543, 0.0041, 1.3925, 0, 0, 0],
+        [0, -0.16, 0, 0.36, -0.2, -0, 0, -0.16, 0, 0.36, -0.2, -0, -0.012, 0.2662, 0.1313, -0.2601, -0.0031, 0, 0, 0, -0.1103, 0.0422, 0.4565, -0.0252, 0, 0, 0]]}
 
 
 def curve(q0, keys, times, dt):

@@ -17,13 +17,13 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 name = "embodied-first-exam/embodied-olympics-fun-pole-vault-i00-standard"
 description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics pole-vault on the same frozen instance as embodied-olympics-fun-pole-vault-i00-privileged. Vault over the bar with the pole you carry: plant its tip in the box, leave the ground hanging on it, go over the bar between the uprights and come down on the mat, with the bar still on its pegs. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
-keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "pole-vault"]
+keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "pole-vault"]
 
 [metadata]
 author_name = "Kangrui Wang"
 task_type = "trajectory"
 simulator = "mujoco"
-robot = "unitree-h1-2"
+robot = "unitree-g1"
 family = "pole_vault"
 category = "track-and-jumps"
 mode = "standard"
@@ -34,7 +34,7 @@ instance_seed = 0
 reset_budget = 50
 expert_time_estimate_hours = 12.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (the run-up, the plant and the swing-up are injected: the robot is put on the planted pole 20 degrees short of vertical; from there it really hangs, passes 4 cm over the 2.00 m bar, lets go and lands on the mat); negatives: the bar off its pegs, the ground beyond the zero line before the clearance, a hand moved up the pole, a clearance without the planted pole, round or under the bar, a hand steadying the bar; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_pole_vault.py: positive by a declared referee-only injection (the G1, a 2.35 m junior pole rated 90 lb, the bar at 1.00 m, declared: a lower bar would lie on the 0.8 m pit; the take-off must load the pole with at least half the weight). Infeasible at any bar height or pole length: hanging from a pole tilted 0/20/40/60/80 deg needs 0.65/1.47/2.45/4.46/5.83x the arm motors (the parallel gripper holds the pole square to the forearm); an injected 3-4 m/s plant loses the pole; energy caps the centre of mass at about 1.06 m. Referee test negatives: the pole not loaded (a jump with the pole in hand), the bar off its pegs, an early release, climbing, a jump without the pole, round or under the bar, walking on, a hand on the bar.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-table-tennis-return-i00-privileged"
-description = "Embodied Olympics table-tennis-return (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Return the service: after the table tennis ball has bounced once on your court, strike it with the paddle on your right hand so that it touches the opponent's court. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics table-tennis-return (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Return the service: after the table tennis ball has bounced once on your court, strike it with the paddle held in your right hand's gripper so that it touches the opponent's court, without letting go of the paddle. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "table-tennis-return"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 8.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a real waist-turn stroke with the robot put at the end line in its pre-stroke pose; the contact, the flight and the landing are real); negatives: two bounces, the return on the own court (a real still-blade block), obstruction, another part, struck twice, the table's side, the floor, the net, the free hand on the table. The drawn serve is short: the ball is in reach for 0.14 s, and the stroke returns it in 11 of 25 nearby variants; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_table_tennis_return.py: positive by injection around a real contact (a still blade over the end line; the ball put onto it after the machine service's real bounce; the return velocity set at the contact); the machine service reproduces a recorded reference service's bounces within 3 cm; negatives: a double bounce (nop), touched before the service, obstruction, the trunk, a block onto the own court, the floor, a second strike, the racket on the net, a fall. An IK stroke from the end line does not reach the ball's path (the blade meets the table edge); human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
