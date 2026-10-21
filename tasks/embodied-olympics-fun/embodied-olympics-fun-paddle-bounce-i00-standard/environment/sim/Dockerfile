@@ -4,7 +4,7 @@
 FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1
 COPY . /srv/
 COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-sim-files-0.1.1@sha256:3fab0cd1d2a2d68d199cffca21fd53cf1801368b913e359ee3dbd19e99c8b69d /rfo/tasks/paddle_bounce.py /srv/rfo_task.py
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-sim-files-0.1.2@sha256:57c474cd8a011e77b8351e2d7aed463994fc4aa02ff1f465b80efb214ae4521a /rcb1.py /srv/rcb1.py
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-sim-files-0.1.3@sha256:48ed026a31b72a54269db520e3172bace45552d08887a5776d72f531834144f5 /rcb1.py /srv/rcb1.py
 COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-sim-files-0.1.1@sha256:3fab0cd1d2a2d68d199cffca21fd53cf1801368b913e359ee3dbd19e99c8b69d \
      /rcb_rfo.py \
      /standard/rcb_service.py \
