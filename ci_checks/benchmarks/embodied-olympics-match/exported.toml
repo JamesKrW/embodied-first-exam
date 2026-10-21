@@ -16,6 +16,8 @@
 # now efe:embodied-olympics-match-* tags of the same digests (Dockerfiles, sport.toml / toolkit.toml image fields,
 # test docstrings, README, the bundle hashes of those files), and the files-only image pins
 # (embodied-olympics-match-files 0.1.4, embodied-olympics-match-sim-files 0.1.2).
+# Every task: 2026-10-21, the files-only image pins only: embodied-olympics-match-files 0.3.0, one image that
+# also carries the former embodied-olympics-match-sim-files (same paths and bytes).
 
 # The protocol each mode of these tasks serves (PROTOCOL §4c): ci_checks/check-protocol.py accepts it for the
 # directories listed below only.
