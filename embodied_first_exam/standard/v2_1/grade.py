@@ -81,7 +81,7 @@ def main() -> None:
         unfinished = not d.get("finalized")
         mismatch = bool(d.get("instance_mismatch")) or str(d.get("reason") or "").startswith("instance_mismatch")
         infra = bool(d.get("infra_error")) or failed_finalize or unfinished or mismatch
-        ok = bool(d.get("success")) and live and graded and not infra
+        ok = bool(d.get("success")) and live and graded and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
         out = {**BASE, "success": int(ok), "live_success": int(live), "graded_by_live": 1, "replays": 0,
                "live_rule": int(bool(d.get("live_rule", True))),
                "live_verdict_error": int(bool(d.get("live_verdict_error"))),
