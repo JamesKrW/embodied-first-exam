@@ -2,7 +2,7 @@
 # frozen instance; only the declared artifacts (/app/output/) arrive from the agent.
 FROM ghcr.io/mll-lab-nu/efe:mujoco-0.1.2
 COPY instance.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:mujoco-playground-files-0.2.1@sha256:d74cb2033ffafc6bdeacbbcf5637b65de44a62c54ebbf42e025fc2535869776d /privileged/environment/rcb_panda.py /privileged/tests/variants/c5bde2d42e/grade.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:mujoco-playground-files-0.4.0@sha256:ca0ded53a4fa2e2bf5716929ef2588b7e8351c1be0760de2d12485ef48d0dc83 /privileged/environment/rcb_panda.py /privileged/tests/variants/c5bde2d42e/grade.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests
