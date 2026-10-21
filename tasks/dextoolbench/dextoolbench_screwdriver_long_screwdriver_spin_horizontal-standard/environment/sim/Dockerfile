@@ -4,7 +4,7 @@
 FROM ghcr.io/mll-lab-nu/efe:mujoco-0.1.2
 COPY . /srv/
 COPY --from=ghcr.io/mll-lab-nu/efe:standard-sim-files-0.1.3@sha256:48ed026a31b72a54269db520e3172bace45552d08887a5776d72f531834144f5 /rcb1.py /srv/rcb1.py
-COPY --from=ghcr.io/mll-lab-nu/efe:dextoolbench-sim-files-0.1.1@sha256:ebc574bacb4303980f67ab72f04a7df170066292e0f0b5bc21e54860054c3a9d \
+COPY --from=ghcr.io/mll-lab-nu/efe:dextoolbench-files-0.3.0@sha256:e15e01e5c682e09c96b9c6e2d48def61a483a1ff8d2df74b813c4d3d845847a9 \
      /privileged/environment/rcb_dtb.py \
      /sim/server_mj.py \
      /srv/
