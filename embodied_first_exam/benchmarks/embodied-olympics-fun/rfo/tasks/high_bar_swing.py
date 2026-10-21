@@ -206,6 +206,10 @@ class Task(BarGrip, TaskBase):
                   "bottom of a giant swing pulls about four times your weight through the fingers and the arms, and "
                   "the hands slide round the fixed bar against their own friction.")
 
+    def configure(self, params):
+        super().configure(params)
+        self.start = (self.p["block_x_m"] + 0.075, 0.0, 0.0)     # standing near the block's front edge
+
     def build(self, sc):
         p = self.p
         build_bar(sc, p["bar_height_m"], p["bar_length_m"], p["bar_diameter_m"], float(p["grip_scale"]))
