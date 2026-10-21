@@ -158,7 +158,7 @@ def walker_cmd(pol, cmd_max) -> tuple[np.ndarray, np.ndarray]:
     return np.maximum(np.asarray(lo, float)[:3], -cmd_max), np.minimum(np.asarray(pol.cmd_max, float)[:3], cmd_max)
 
 
-def _shells(root: ET.Element, ground: set) -> None:
+def _shells(root: ET.Element, ground: set, skip: set = frozenset()) -> None:
     """The robot's shells (SHELL_BIT, above): one on every visual mesh of the robot that no collision geom of its own
     body covers (the same mesh), named <body>_shell<i>; SHELL_BIT on the contype of every collidable geom outside the
     robot but the ground (sc.ground, planes, height fields)."""
@@ -187,7 +187,7 @@ def _shells(root: ET.Element, ground: set) -> None:
         vis = [g for g in gs if g.get("mesh") and ((g.get("class") or "").endswith("_visual")
                                                    or (g.get("contype") == "0" and g.get("conaffinity") == "0"))]
         covered = {g.get("mesh") for g in gs if g.get("mesh") and g not in vis}
-        if not any(k in name for k in SHELL_SKIP_BODY):
+        if not any(k in name for k in SHELL_SKIP_BODY) and name not in skip:     # (skip: a real hand's fingers)
             for i, g in enumerate(x for x in vis if x.get("mesh") not in covered
                                   and not any(k in x.get("mesh") for k in SHELL_SKIP_MESH)):
                 sh = ET.SubElement(b, "geom", name=f"{name}_shell{i}", type="mesh", mesh=g.get("mesh"), contype="0",
@@ -490,6 +490,10 @@ class World:
             opt = root.find("option")
             opt.set("cone", opt.get("cone", "elliptic"))
             opt.set("impratio", opt.get("impratio", f"{realhand.IMPRATIO:g}"))
+            if set(sc.real_hands.values()) & set(realhand.FINGER_KINDS):
+                # the finger hands take the robot past 60 degrees of freedom, where MuJoCo's "auto" switches to its
+                # sparse Jacobians: on these trees (about 70 DoF) the dense ones step faster (the same equations)
+                opt.set("jacobian", opt.get("jacobian", "dense"))
         for side in SIDES:                          # the hands: a palm pad (or the task's tool) on each wrist mount
             mount = next(b for b in root.iter("body") if b.get("name") == f"{side}_mount")
             real = side in sc.real_hands
@@ -527,7 +531,8 @@ class World:
                               friction="1.2 0.005 0.0001")
             for name in sc.grippables:
                 sc.grip_weld(side, name)
-        _shells(root, set(sc.ground))
+        _shells(root, set(sc.ground), {b for s in SIDES if sc.real_hands.get(s) == "inspire"
+                                       for b in realhand.inspire_bodies(s)})
         # A tool is part of the robot (contype 4, conaffinity 0), so like the body hulls it would pass through the
         # robot itself: explicit pairs make it collide with every hull but those of the arm that carries it (the
         # robot library's self-collision does the same for the bare hands).
