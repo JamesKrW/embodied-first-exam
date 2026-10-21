@@ -103,7 +103,7 @@ WORKDIR /app
 # images/ambench/; BUILD_ONLY). Everything task-specific is copied here; no reference solution is in the image.
 FROM ambench-base
 COPY instance.json /app/instance.json
-COPY --from=ghcr.io/mll-lab-nu/efe:ambench-files-0.2.2@sha256:e3afc13743a57255aa2e6cf7c1f153923c6e0c43e22b825ab4faff87627c20db /privileged/environment/rcb_ambench.py /opt/tools/rcb_ambench.py
+COPY --from=ghcr.io/mll-lab-nu/efe:ambench-files-0.4.0@sha256:fde55867978ee9a2d379aa02c46df1d6adf404938bab0ffd0728d2b9772debbf /privileged/environment/rcb_ambench.py /opt/tools/rcb_ambench.py
 ENV PYTHONPATH=/opt/tools
 RUN mkdir -p /app/output
 WORKDIR /app

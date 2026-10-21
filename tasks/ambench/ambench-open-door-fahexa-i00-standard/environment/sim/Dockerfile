@@ -105,7 +105,7 @@ WORKDIR /app
 # their paths under /srv the files it shares with other tasks, from pinned files-only images (images/<name>/
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:ambench-sim-files-0.1.2@sha256:cb3d73fc7c3e2e8f59237008e765cceeee275224a7578e5bddc7960af1c9909f \
+COPY --from=ghcr.io/mll-lab-nu/efe:ambench-files-0.4.0@sha256:fde55867978ee9a2d379aa02c46df1d6adf404938bab0ffd0728d2b9772debbf \
      /sim/finalize.sh \
      /privileged/environment/rcb_ambench.py \
      /sim/server.py \
