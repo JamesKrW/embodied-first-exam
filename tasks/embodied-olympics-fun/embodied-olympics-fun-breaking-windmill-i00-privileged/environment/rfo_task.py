@@ -3,10 +3,14 @@ down to the floor and do consecutive windmills, the body rolling over the upper 
 while the legs, held apart, circle round above the floor.
 
 A windmill revolution is judged on the torso: its long axis (pelvis to neck) turns once round the vertical, and the
-torso rolls once about that axis (back, shoulder, chest, shoulder, back on the floor), both the same way round;
-during the set only the torso, the arms and the hands may touch the floor (the shoulders and the upper back are the
-torso and the upper arms); the hips and the legs may not. The G1's head is fixed to its torso (no neck joint) and
-its back face lies 7 mm inside the torso's: on the upper back the head brushes the floor, so it counts with the torso.
+torso rolls once about that axis (back, shoulder, chest, shoulder, back on the floor), both the same way round; the
+turning is counted only while the body lies on the floor: the long axis near horizontal and the pelvis low (a
+heading of a near-vertical axis is ill-defined: a small wobble in a headstand or handstand would sweep through 360
+degrees of it). During the set only the torso, the arms and the hands may touch the floor (the shoulders and the
+upper back are the torso and the upper arms); the hips and the legs may not; in each half revolution the back, chest
+or shoulders (the torso or an upper arm) must touch the floor. The G1's head is fixed to its torso (no neck joint)
+and its back face lies 7 mm inside the torso's: on the upper back the head brushes the floor, so a head touch is
+allowed, but it is not the back's touch (a head spin is not a windmill).
 
 Robot: the G1 (33 kg, 1.32 m), the lighter and shorter body: a windmill is driven by the swing of the legs (88 N m
 hips) round a body lying on its shoulders; the H1-2 has twice the mass and a waist of one joint."""
@@ -16,7 +20,7 @@ import numpy as np
 
 from rfo.task import TaskBase
 
-BACK = ("torso", "head", "left_upper_arm", "right_upper_arm")      # the back, chest and shoulders (the upper arms)
+BACK = ("torso", "left_upper_arm", "right_upper_arm")      # the back, chest and shoulders (the upper arms); not the head
 ALLOWED = ("torso", "head", "left_upper_arm", "right_upper_arm", "left_forearm", "right_forearm", "left_hand", "right_hand")
 
 
@@ -43,14 +47,18 @@ class Task(TaskBase):
         "revolutions, {n_windmills} is this benchmark's choice (a short set)",
         "BRRM 2.2 (a windmill): the BRRM names the move but does not define it; here a revolution is the torso's "
         "long axis turning once round the vertical and the torso rolling once about that axis, both the same way, "
-        "with only the torso (the head included), the arms and the hands on the floor (no hips or legs) and the back, chest or shoulders touching "
-        "the floor during it",
+        "counted only while the body lies on the floor (the long axis within {axis_max_deg} degrees of horizontal, "
+        "the pelvis at most {pelvis_max_m} m up: a windmill is done on the upper back, not on the head or the "
+        "hands), with only the torso (the head included), the arms and the hands on the floor (no hips or legs) and "
+        "the back, chest or shoulders (the torso or an upper arm, not the head) touching the floor in each half "
+        "revolution",
         "BRRM 7.1 (the laminate floor): the floor is rigid and level; the contact between the robot's shell and the "
         "floor uses the robot model's friction coefficient of 1.0 (no sourced figure for a robot's shell on "
         "laminate exists; breakers wear slippery clothes, the robot wears none: this makes sliding on the back "
         "harder, not easier)",
         "the head: a breaker's chin is tucked and the head stays off the floor in a windmill; the G1 has no neck "
-        "joint and its head's back face lies 7 mm inside the torso's, so a head touch counts as the upper back's",
+        "joint and its head's back face lies 7 mm inside the torso's, so a head touch is allowed, but only the "
+        "torso's or an upper arm's touch counts as the back's, chest's or shoulders'",
         "BRRM crash (a fall in a set is a deduction, not an end): a set is any {n_windmills} consecutive "
         "revolutions; a forbidden contact only ends the current set (the count starts again), and only the time "
         "limit ends the attempt",
@@ -60,16 +68,18 @@ class Task(TaskBase):
     fall_rule = False                        # the family's own rules: the floor is where the move happens
     legal_ground = ALLOWED
     stages = ["down", "1 windmill", "2 windmills", "3 windmills"]
-    params = dict(n_windmills=3, fop_m=8.0, roll_frac=0.85, torso_touch=True)
+    params = dict(n_windmills=3, fop_m=8.0, roll_frac=0.85, torso_touch=True, axis_max_deg=30.0, pelvis_max_m=0.45)
 
     sentence = ("Breaking: go down to the floor and do three consecutive windmills, rolling over your upper back, "
                 "shoulders and chest while your legs circle round above the floor.")
     rules = ("A windmill revolution is counted on your torso. Its long axis (from your pelvis up to your neck) must "
              "turn once round the vertical (360 degrees of heading) and in the same time your torso must roll once "
              "about that axis (back, shoulder, chest, shoulder, back towards the floor: at least {roll_frac} of a "
-             "full roll per revolution), both the same way round; your back, chest or shoulders (your torso, head or "
-             "upper arms) must touch the floor during each "
-             "revolution. While you are doing windmills only your torso (back, chest, shoulders; your head, which is "
+             "full roll per revolution), both the same way round. The turning and the rolling are counted only "
+             "while you lie on the floor: your torso's long axis within {axis_max_deg} degrees of horizontal and "
+             "your pelvis at most {pelvis_max_m} m above the floor (on your head or your hands, upside down, nothing "
+             "is counted). Your back, chest or shoulders (your torso or upper arms; your head does not count for "
+             "this) must touch the floor in each half of each revolution. While you are doing windmills only your torso (back, chest, shoulders; your head, which is "
              "fixed to it, counts with it), your upper arms, forearms and hands may touch the floor: your hips and "
              "your legs (thighs, shins, feet) may not. The count starts when you are down (your back, chest or shoulders touching the "
              "floor with no foot on it) and goes back to zero whenever your hips or a leg touch the floor or the rotation reverses. You succeed "
@@ -92,8 +102,8 @@ class Task(TaskBase):
     def referee_reset(self, w, ref):
         self.allowed = ref.part(*ALLOWED)
         self.tb = w.robot.torso
-        self.trackers = {"spin": 0.0, "roll": 0.0, "count": 0, "best": 0, "touched": False, "down": False,
-                         "phi": None, "psi": None, "rev_spin0": 0.0, "rev_roll0": 0.0}
+        self.trackers = {"spin": 0.0, "roll": 0.0, "count": 0, "best": 0, "touched": [False, False], "down": False,
+                         "phi": None, "psi": None, "lying": False, "rev_spin0": 0.0, "rev_roll0": 0.0}
 
     def angles(self, w):
         R = w.d.xmat[self.tb].reshape(3, 3)
@@ -111,7 +121,7 @@ class Task(TaskBase):
         tr["count"] = 0
         tr["spin"] = tr["roll"] = 0.0
         tr["rev_spin0"] = tr["rev_roll0"] = 0.0
-        tr["touched"] = False
+        tr["touched"] = [False, False]
 
     def step(self, w, ref):
         p, tr = self.p, self.trackers
@@ -122,10 +132,13 @@ class Task(TaskBase):
         parts = ref.parts_touching(ref.ground)
         bad = parts - set(ALLOWED)
         phi, psi = self.angles(w)
-        if tr["phi"] is not None and psi is not None and tr["psi"] is not None:
-            tr["spin"] += _unwrap(tr["phi"], phi)
+        uz = float(w.d.xmat[self.tb].reshape(3, 3)[2, 2])     # the long axis' vertical component
+        lying = (abs(uz) < math.sin(math.radians(p["axis_max_deg"]))
+                 and float(w.d.xpos[w.robot.pelvis][2]) <= p["pelvis_max_m"])
+        if tr["phi"] is not None and psi is not None and tr["psi"] is not None and lying and tr["lying"]:
+            tr["spin"] += _unwrap(tr["phi"], phi)    # counted only from one lying step to the next
             tr["roll"] += _unwrap(tr["psi"], psi)
-        tr["phi"], tr["psi"] = phi, psi
+        tr["phi"], tr["psi"], tr["lying"] = phi, psi, lying
         if not tr["down"]:
             if parts & set(BACK) and not bad:
                 tr["down"] = True
@@ -137,14 +150,14 @@ class Task(TaskBase):
                 ref.event("set broken", parts=sorted(bad), revolutions=tr["count"])
             self._reset_set(tr)
             return
-        if parts & set(BACK):
-            tr["touched"] = True
         ds, dr = tr["spin"] - tr["rev_spin0"], tr["roll"] - tr["rev_roll0"]
+        if parts & set(BACK):                         # the back, chest or shoulders down, in this half revolution
+            tr["touched"][0 if abs(ds) < math.pi else 1] = True
         if ds * dr < 0 and abs(ds) > math.pi / 2 and abs(dr) > math.pi / 2:
             self._reset_set(tr)                       # spinning one way and rolling the other: not a windmill
             return
         if abs(ds) >= 2 * math.pi:
-            if abs(dr) >= p["roll_frac"] * 2 * math.pi and ds * dr > 0 and (tr["touched"] or not p["torso_touch"]):
+            if abs(dr) >= p["roll_frac"] * 2 * math.pi and ds * dr > 0 and (all(tr["touched"]) or not p["torso_touch"]):
                 if tr["count"] and math.copysign(1, ds) != tr.get("dir", math.copysign(1, ds)):
                     self._reset_set(tr)
                     return
@@ -161,7 +174,7 @@ class Task(TaskBase):
                 self._reset_set(tr)
                 return
             tr["rev_spin0"], tr["rev_roll0"] = tr["spin"], tr["roll"]
-            tr["touched"] = False
+            tr["touched"] = [False, False]
 
     def privileged(self, w):
         tr = self.trackers

@@ -5,7 +5,9 @@
   "n_windmills": 3,
   "fop_m": 8.0,
   "roll_frac": 0.85,
-  "torso_touch": true
+  "torso_touch": true,
+  "axis_max_deg": 30.0,
+  "pelvis_max_m": 0.45
  },
  "title": "Breaking: windmills",
  "category": "parkour-apparatus-balance",
@@ -19,14 +21,14 @@
  "rulebook": "WDSF Breaking Rules and Regulations Manual (BRRM, version 4, January 2023, the rules of the Paris 2024 qualification): 2.2 'The elements of Breaking' (power moves: spinning moves driven by centrifugal force, the windmill family among the most frequent; in a pure power move set the feet seldom touch the ground); 4.6.4 (judging, the values affecting all domains): 'Crash' (slip, crash, wipe-out: non-intentional loss of physical control); 7.1 Field of Play: a 'Fast Break System Laminate' floor, at least 6.5 m x 6.5 m, advised 8.00 m x 8.00 m, a red line on the right side and a blue line on the left side",
  "deviations": [
   "BRRM judging (Technique, Vocabulary, Originality, Execution, Musicality, compared head to head in a battle): a single power move is judged pass or fail: 3 consecutive windmill revolutions, because the task is one element without a judging panel or an opponent; the BRRM sets no number of revolutions, 3 is this benchmark's choice (a short set)",
-  "BRRM 2.2 (a windmill): the BRRM names the move but does not define it; here a revolution is the torso's long axis turning once round the vertical and the torso rolling once about that axis, both the same way, with only the torso (the head included), the arms and the hands on the floor (no hips or legs) and the back, chest or shoulders touching the floor during it",
+  "BRRM 2.2 (a windmill): the BRRM names the move but does not define it; here a revolution is the torso's long axis turning once round the vertical and the torso rolling once about that axis, both the same way, counted only while the body lies on the floor (the long axis within 30.0 degrees of horizontal, the pelvis at most 0.45 m up: a windmill is done on the upper back, not on the head or the hands), with only the torso (the head included), the arms and the hands on the floor (no hips or legs) and the back, chest or shoulders (the torso or an upper arm, not the head) touching the floor in each half revolution",
   "BRRM 7.1 (the laminate floor): the floor is rigid and level; the contact between the robot's shell and the floor uses the robot model's friction coefficient of 1.0 (no sourced figure for a robot's shell on laminate exists; breakers wear slippery clothes, the robot wears none: this makes sliding on the back harder, not easier)",
-  "the head: a breaker's chin is tucked and the head stays off the floor in a windmill; the G1 has no neck joint and its head's back face lies 7 mm inside the torso's, so a head touch counts as the upper back's",
+  "the head: a breaker's chin is tucked and the head stays off the floor in a windmill; the G1 has no neck joint and its head's back face lies 7 mm inside the torso's, so a head touch is allowed, but only the torso's or an upper arm's touch counts as the back's, chest's or shoulders'",
   "BRRM crash (a fall in a set is a deduction, not an end): a set is any 3 consecutive revolutions; a forbidden contact only ends the current set (the count starts again), and only the time limit ends the attempt"
  ],
  "texts": {
   "sentence": "Breaking: go down to the floor and do three consecutive windmills, rolling over your upper back, shoulders and chest while your legs circle round above the floor.",
-  "rules": "A windmill revolution is counted on your torso. Its long axis (from your pelvis up to your neck) must turn once round the vertical (360 degrees of heading) and in the same time your torso must roll once about that axis (back, shoulder, chest, shoulder, back towards the floor: at least 0.85 of a full roll per revolution), both the same way round; your back, chest or shoulders (your torso, head or upper arms) must touch the floor during each revolution. While you are doing windmills only your torso (back, chest, shoulders; your head, which is fixed to it, counts with it), your upper arms, forearms and hands may touch the floor: your hips and your legs (thighs, shins, feet) may not. The count starts when you are down (your back, chest or shoulders touching the floor with no foot on it) and goes back to zero whenever your hips or a leg touch the floor or the rotation reverses. You succeed when 3 revolutions are counted without such a reset. How you get down from standing is free (any part may touch the floor then). You fail if any part of you touches the floor outside the 8.0 m x 8.0 m field of play, or after 30 s.",
+  "rules": "A windmill revolution is counted on your torso. Its long axis (from your pelvis up to your neck) must turn once round the vertical (360 degrees of heading) and in the same time your torso must roll once about that axis (back, shoulder, chest, shoulder, back towards the floor: at least 0.85 of a full roll per revolution), both the same way round. The turning and the rolling are counted only while you lie on the floor: your torso's long axis within 30.0 degrees of horizontal and your pelvis at most 0.45 m above the floor (on your head or your hands, upside down, nothing is counted). Your back, chest or shoulders (your torso or upper arms; your head does not count for this) must touch the floor in each half of each revolution. While you are doing windmills only your torso (back, chest, shoulders; your head, which is fixed to it, counts with it), your upper arms, forearms and hands may touch the floor: your hips and your legs (thighs, shins, feet) may not. The count starts when you are down (your back, chest or shoulders touching the floor with no foot on it) and goes back to zero whenever your hips or a leg touch the floor or the rotation reverses. You succeed when 3 revolutions are counted without such a reset. How you get down from standing is free (any part may touch the floor then). You fail if any part of you touches the floor outside the 8.0 m x 8.0 m field of play, or after 30 s.",
   "venue": "You stand in the middle of a breaking stage, a 8.0 m by 8.0 m laminate floor, flat, level and rigid, with a red line on its right side and a blue line on its left; you face +x.",
   "difficulty": "A windmill is a continuous rolling and spinning motion on the shoulders with nothing built in for any of it, and every revolution loses energy to the floor that has to be put back. You also have to get down to the floor from standing first."
  },
@@ -36,7 +38,7 @@
   "mujoco": "3.3.7"
  },
  "t0": {
-  "state_sha": "d55abe8f3e454ac27f0da8c581bda8a8e77967b7112edb75174305fa30c74f34",
+  "state_sha": "98d6ff4d086340ee2d18f364a771ac1f977d717e68e6f708b73b395ed8a42632",
   "control_dt": 0.01,
   "horizon_steps": 3000,
   "raw_dim": 151,

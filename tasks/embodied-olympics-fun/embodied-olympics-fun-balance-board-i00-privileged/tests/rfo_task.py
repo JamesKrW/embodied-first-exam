@@ -3,6 +3,7 @@ without a deck end or the robot ever touching the floor."""
 import math
 import xml.etree.ElementTree as ET
 
+import mujoco
 import numpy as np
 
 from rfo.scene import STANDABLE, VISUAL
@@ -31,8 +32,12 @@ class Task(TaskBase):
         "the board: deck and roller are rigid bodies (a {deck_mass_kg} kg box and a {roller_mass_kg} kg hollow "
         "cylinder) with a friction coefficient of {friction} between deck, roller and floor, without grip tape or a "
         "rubber-lined roller, because the simulator has rigid bodies only",
-        "the mount: the robot starts standing on the level deck, centred over the roller (an unstable equilibrium), "
-        "instead of stepping onto a deck that rests on one end, because the task is the ride, a single action",
+        "the mount: a rider steps onto a deck that rests on one end and rolls it up to level; the robot does not "
+        "step on: it starts standing square on the deck just after that mount, the deck {start_tilt_deg} degrees "
+        "from level with its left end low, resting on the roller under its middle, the robot tilted with it (feet "
+        "flat on the deck), its centre of mass about 4 cm left of the roller's line of contact and everything at "
+        "rest; it has to bring the board level itself. The start is the same in every trial (no random "
+        "perturbation), because a trial is one frozen instance",
     ]
     time_limit_s = 30.5
     start = (0.0, 0.0, 0.0)
@@ -40,7 +45,7 @@ class Task(TaskBase):
     stages = ["10 s", "20 s", "30 s"]
     params = dict(duration_s=30.0, deck_length_m=0.76, deck_width_m=0.38, deck_thickness_m=0.018,
                   roller_radius_m=0.085, roller_length_m=0.46, deck_mass_kg=DECK_MASS, roller_mass_kg=ROLLER_MASS,
-                  friction=1.0, stop_height_m=0.02, stop_length_m=0.03, off_board_s=1.0)
+                  friction=1.0, stop_height_m=0.02, stop_length_m=0.03, off_board_s=1.0, start_tilt_deg=3.0)
 
     sentence = ("Stay balanced on the roller board for {duration_s} s: neither end of the deck nor any part of you "
                 "may touch the floor.")
@@ -56,10 +61,12 @@ class Task(TaskBase):
              "the deck for more than {off_board_s} s (you have left the board). With the roller in the middle, an end of the "
              "deck meets the floor at a tilt of about 24 degrees.")
     venue = ("You face +x, standing upright in the rest pose with your feet side by side on the middle of the deck, "
-             "0.24 m apart, one on each side of the roller, whose axis runs fore-aft under you; at t = 0 the deck is "
-             "level, its top 0.188 m above the floor, with the roller under its middle and your centre of mass over "
-             "the roller's line of contact. That is an equilibrium, and an unstable one: left alone, the robot's "
-             "stance does not correct it and the board runs out from under you within a few seconds. The floor is "
+             "0.24 m apart, one on each side of the roller, whose axis runs fore-aft under you. At t = 0 the board "
+             "is not level: as just after a mount, the deck is tilted {start_tilt_deg} degrees with its left end "
+             "low (its top about 0.188 m above the floor at the middle), resting on the roller under its middle, "
+             "and you stand square on it, tilted with it, your centre of mass about 4 cm to the left of the "
+             "roller's line of contact; everything is at rest. Left alone, the board tips further to the left and "
+             "runs out from under you within a second; the robot's stance does not correct it. The floor is "
              "all around.")
     difficulty = ("Two unstable motions are coupled: the deck tilts on the roller and the roller rolls away under "
                   "the deck. Neither the platform's stance nor the walking policy corrects them; the legs have to "
@@ -98,11 +105,23 @@ class Task(TaskBase):
         sc.camera("venue", (2.3, -0.9, 0.9), (0.0, 0.0, 0.60), fovy=50)
 
     def reset(self, w):
-        p = self.p
+        """The start just after a mount: deck and robot, as one rigid piece, turned about the roller's axis by the
+        start tilt (left end low) from the level stance over the roller; the deck stays tangent to the roller at the
+        middle of its underside, the robot's soles flat on the deck."""
+        p, d, fq = self.p, w.d, w.robot.fq
         R, T = p["roller_radius_m"], p["deck_thickness_m"]
+        th = -math.radians(p["start_tilt_deg"])          # about +x: a positive angle lifts the left (+y) end
+        c, s = math.cos(th), math.sin(th)
+        rot = np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]])
+        q = np.array([math.cos(th / 2), math.sin(th / 2), 0.0, 0.0])
+        axis = np.array([self.cx, 0.0, R])               # the roller's axis (along x)
         w.put("roller", (self.cx, 0.0, R))
-        w.put("deck", (self.cx, 0.0, 2 * R + T / 2))
-        w.d.qpos[w.robot.fq + 2] += self.top             # the robot stands on the deck, not on the floor
+        w.put("deck", axis + rot @ np.array([0.0, 0.0, R + T / 2]), quat=q)
+        d.qpos[fq + 2] += self.top                       # the robot stands on the deck, not on the floor ...
+        d.qpos[fq:fq + 3] = axis + rot @ (d.qpos[fq:fq + 3] - axis)     # ... and is turned with it
+        out = np.zeros(4)
+        mujoco.mju_mulQuat(out, q, d.qpos[fq + 3:fq + 7].copy())
+        d.qpos[fq + 3:fq + 7] = out
 
     def board(self, w) -> dict:
         """The deck's tilt (rad, positive lifts its left end), where the roller is under it (m, positive towards the
