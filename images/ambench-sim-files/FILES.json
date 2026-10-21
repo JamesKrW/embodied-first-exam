@@ -1,9 +1,0 @@
-{
- "image": "ghcr.io/mll-lab-nu/efe:ambench-sim-files-0.1.2@sha256:cb3d73fc7c3e2e8f59237008e765cceeee275224a7578e5bddc7960af1c9909f",
- "source": "embodied_first_exam/benchmarks/ambench",
- "files": {
-  "privileged/environment/rcb_ambench.py": "53a7523ae39fb33344407c8c3ef910e7fc51a8a36b34bff7f4ee5e0aee8046c3",
-  "sim/finalize.sh": "df8a40151457fbe75f97767d60809d39a8b9322fad8e8bfa18c3139133867f5a",
-  "sim/server.py": "7f2b4237cf6341dd3db92cbcf9d0d20ec39ae1aaf74bd19b67c3765120022c6a"
- }
-}
