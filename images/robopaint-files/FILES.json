@@ -1,11 +1,11 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:robopaint-files-0.1.1@sha256:09f9ccd61a130b651b6eeb7475be7bd9d31cc46f6f41e7a09bf4fae9a184a3b5",
+ "image": "ghcr.io/mll-lab-nu/efe:robopaint-files-0.1.2@sha256:896a240146687ac719dd506a84acf004f3a77abbfcd8f7a23e03c575f91f9fcb",
  "source": "embodied_first_exam/benchmarks/robopaint",
  "files": {
   "privileged/grade.py": "d7919a39a4e480619aa8512838cab445482f720a7361b567c428f4c03d6515ed",
   "rcb_brush.py": "0daaec6b6af784eb24154c8dce32b9a24aacff61af777a953d7f646fe613e338",
   "rcb_brush_score.py": "89211e30ceb054d8257a4b0409a88fc10d4a695d824be40a497fdba98b96e31e",
   "rcb_brush_strict.py": "faf0973dbd9b8354368b2f1586fba68575de4179f43ba650f6455e7c0d27eebd",
-  "standard/grade.py": "3451d22a1738876c52d2e8a5799ae722aa422346496917e115dfa09e4b90efb0"
+  "standard/grade.py": "257ca478ad12de23d8936aabce8906eeab3eac2200dc9a14463815d86e44235e"
  }
 }

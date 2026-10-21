@@ -7,7 +7,8 @@
 #      the service is ready again), signals only the newest service process, resends every 30 s, and exits 2 when
 #      final.json already holds the verdict (the service gave up: after crashes, or because the frozen instance did not
 #      rebuild to its recorded hash at the episode's start, `instance_mismatch`): that verdict stays.
-#   2. final.json = the live record (episode.json) + `graded_by` "live", `replays` 0, `finalized`: written whole (a
+#   2. final.json = the live record (episode.json, only when the newest service process wrote it: a dump from before a
+#      crash and resume is stale, no verdict, infra_error) + `graded_by` "live", `replays` 0, `finalized`: written whole (a
 #      temporary file + rename) BEFORE the video, with `video_pending` true. The live episode's own GPU faults (PhysX
 #      kernels that failed to launch, CUDA out of memory: rcb_ambench.GPU_FAULT, counted in the service's output) make it
 #      no verdict on the agent (`infra_error` = 1): its physics ran without some of its kernels.
@@ -38,6 +39,16 @@ def read(name):
         return v if isinstance(v, dict) else {}
     except Exception:
         return {}
+def fresh(ep):
+    """episode.json is the newest service process's: its sim_startups is the number of lines in startups.jsonl. A dump
+    from an earlier process (it ended the episode, then crashed; the resumed one did not dump again) is stale: the
+    resume rolled back to the last checkpoint and the episode went on, so it is no verdict on the episode that ran."""
+    try:
+        with open(os.path.join(d, "startups.jsonl")) as f:
+            n = sum(1 for line in f if line.strip())
+    except OSError:
+        return True                  # no startup record: nothing to compare with
+    return "sim_startups" not in ep or int(ep.get("sim_startups") or 0) == n
 live = {"graded_by": "live", "replays": 0, "video": False, "video_pending": True, "video_source": "render"}
 if rc == "2":
     # the service's own verdict (a give-up: after crashes, or instance_mismatch at the start): kept as it is
@@ -49,10 +60,11 @@ elif rc == "0" or os.path.isfile(os.path.join(d, "episode.json")):
     try:
         ep = json.load(open(os.path.join(d, "episode.json")))
         if not isinstance(ep, dict): raise ValueError("not an object")
+        if not fresh(ep): raise ValueError(f"stale: written by service start {ep.get('sim_startups')}, before a crash and resume")
         out.update(ep)
     except Exception as exc:
-        # the service's record of the live episode is missing: no verdict either way
-        out.update({"success": False, "infra_error": 1, "error": f"infrastructure: no episode.json ({exc!r})"})
+        # the service's record of the live episode is missing or stale: no verdict either way
+        out.update({"success": False, "infra_error": 1, "error": f"infrastructure: no current episode.json ({exc!r})"})
     try:   # the live episode's own GPU faults (the service's output; the render worker logs elsewhere: RCB_RENDER_LOG)
         spec = importlib.util.spec_from_file_location("rcb_ambench", os.environ["RCB_TOOL"]); M = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(M)
