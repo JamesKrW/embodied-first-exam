@@ -387,7 +387,7 @@ class RealHands:
 # others are direct (F-1515-108). The model is MuJoCo Menagerie's unitree_g1/g1_with_hands.xml (BSD-3-Clause, from
 # Unitree's g1 URDF): its link frames, joint axes and ranges, link masses and inertias; its meshes (decimated to about
 # 250 faces a link, 1100 the palm: DEX3_MESH at the end of this file; the right hand's are the left's mirrored) are the
-# visual shapes; the collision shapes are primitives fitted to them (FINGER_SHAPES; Menagerie collides the meshes).
+# visual and the collision shapes (each a convex hull, as Menagerie collides them; thumb 1 a box, as Menagerie's).
 # The palm takes the rest of the 0.71 kg (0.386 kg, a box's inertia). Written in Menagerie's wrist_yaw_link frame (the
 # G1's here: x along the hand, the left palm facing -y, the right +y), placed under the wrist mount by the inverse of
 # the mount's pose; the rubber fist it replaces goes (its mass stays in the wrist link: about 0.1 kg, not separable).
@@ -399,8 +399,8 @@ class RealHands:
 # h1_2.xml, commit 276801e, and unitree_ros h1_2.urdf: their frames, meshes, masses, inertias), fixed there: here they
 # get Unitree's own joints (axes, ranges) and the URDF's couplings (the mimic joints: each finger's intermediate =
 # 1.0 x its proximal; the thumb's intermediate = 1.6 x, its distal = 2.4 x its pitch), the couplings as joint
-# equalities; each finger link collides as a capsule fitted to its mesh (FINGER_SHAPES), the palm as the hand base's
-# hull (the robot model's own collision geom). The thumb's pitch drive is held to 0..0.5 rad (0.5 x 1.6 and x 2.4 are its two couplings' limits).
+# equalities; each finger link collides as its mesh's convex hull, the palm as the hand base's (the robot model's own
+# collision geom). The thumb's pitch drive is held to 0..0.5 rad (0.5 x 1.6 and x 2.4 are its two couplings' limits).
 #
 # THE DRIVE (both). Each drive is a joint servo on a setpoint (the motor's position): the setpoint moves towards its
 # target at the drive's speed limit, but closing it stops where the servo would push harder than the drive's ACTIVE
@@ -490,60 +490,10 @@ INSPIRE_GRASP = (0.160, -0.046, -0.006)         # (left, wrist frame) a 34 mm ha
 INSPIRE_MASS = 0.54                             # the maker's; the model keeps Unitree's link masses (see facts)
 
 
-# Collision shapes (FINGER_SHAPES "primitive", the default): the meshes are the looks; each link collides as a
-# primitive fitted to its mesh (offline, tools: a link's bounding box, or a capsule along its principal axis), which
-# costs a fraction of a mesh hull per contact (the realtime twins' speed): the Dex3-1's palm, thumb base and thumb 1
-# boxes (thumb 1 is Menagerie's own box), its proximal finger links capsules, its distal links boxes; the Inspire's
-# finger links capsules (its palm keeps the robot model's own hull). "mesh": every link collides as its mesh's
-# convex hull (Menagerie's choice for the Dex3-1).
-FINGER_SHAPES = "primitive"
-DEX3_PRIM = {   # left, the link's frame (the palm: the wrist link's); the right mirrors y
-    "palm": ("box", (0.08622, 0.00253, -0.00024), (0.04472, 0.0202, 0.04418)),
-    "thumb_0": ("box", (-0.0007, -0.01415, 0.0), (0.0108, 0.01415, 0.0095)),
-    "thumb_1": ("box", (-0.001, -0.032, 0.0), (0.01, 0.015, 0.01)),
-    "thumb_2": ("box", (-0.00032, -0.02269, -0.00035), (0.00838, 0.02932, 0.01274)),
-    "middle_0": ("capsule", (0.01349, -0.00085, 0.00005), (0.04195, -0.00085, 0.00005), 0.01285),
-    "middle_1": ("box", (0.02269, 0.00032, 0.00035), (0.02932, 0.00838, 0.01274)),
-    "index_0": ("capsule", (0.01349, -0.00085, 0.00005), (0.04195, -0.00085, 0.00005), 0.01285),
-    "index_1": ("box", (0.02269, 0.00032, 0.00035), (0.02932, 0.00838, 0.01274)),
-}
-INSPIRE_CAPSULES = {   # link: ((from), (to), radius) in the link's frame, left / right (PCA fits to Unitree's meshes)
-    "thumb_proximal_base": (((-0.0003, -0.0025, -0.0086), (0.0070, 0.0017, -0.0051), 0.0081),
-                            ((0.0001, -0.0025, -0.0087), (-0.0068, 0.0022, -0.0051), 0.0078)),
-    "thumb_proximal": (((0.0426, -0.0253, -0.0080), (0.0080, -0.0070, -0.0081), 0.0146),
-                       ((0.0425, 0.0256, -0.0069), (0.0079, 0.0072, -0.0070), 0.0146)),
-    "thumb_intermediate": (((0.0152, -0.0008, -0.0053), (0.0006, 0.0096, -0.0066), 0.0118),
-                           ((0.0019, -0.0094, -0.0065), (0.0142, 0.0001, -0.0067), 0.0123)),
-    "thumb_distal": (((0.0031, 0.0003, -0.0060), (0.0141, -0.0091, -0.0059), 0.0082),
-                     ((0.0143, 0.0097, -0.0061), (0.0022, 0.0000, -0.0057), 0.0076)),
-    "index_proximal": (((0.0055, 0.0005, -0.0060), (0.0013, -0.0278, -0.0061), 0.0086),
-                       ((0.0053, -0.0002, -0.0062), (0.0021, 0.0274, -0.0062), 0.0088)),
-    "index_intermediate": (((-0.0021, -0.0377, -0.0050), (0.0058, -0.0001, -0.0051), 0.0074),
-                           ((0.0060, -0.0003, -0.0049), (-0.0026, 0.0373, -0.0050), 0.0076)),
-    "middle_proximal": (((0.0055, 0.0005, -0.0060), (0.0013, -0.0278, -0.0061), 0.0086),
-                        ((0.0053, -0.0002, -0.0062), (0.0022, 0.0274, -0.0062), 0.0088)),
-    "middle_intermediate": (((-0.0000, -0.0408, -0.0050), (0.0004, -0.0017, -0.0049), 0.0079),
-                            ((-0.0013, 0.0415, -0.0046), (-0.0001, 0.0001, -0.0052), 0.0075)),
-    "ring_proximal": (((0.0055, 0.0005, -0.0060), (0.0013, -0.0278, -0.0061), 0.0086),
-                      ((0.0053, -0.0002, -0.0062), (0.0022, 0.0274, -0.0062), 0.0088)),
-    "ring_intermediate": (((-0.0018, -0.0369, -0.0047), (0.0056, -0.0008, -0.0050), 0.0081),
-                          ((0.0060, 0.0004, -0.0048), (-0.0009, 0.0375, -0.0049), 0.0080)),
-    "pinky_proximal": (((0.0055, 0.0005, -0.0060), (0.0013, -0.0278, -0.0061), 0.0086),
-                       ((0.0053, -0.0002, -0.0062), (0.0022, 0.0274, -0.0062), 0.0088)),
-    "pinky_intermediate": (((0.0059, -0.0303, -0.0039), (0.0035, 0.0009, -0.0044), 0.0072),
-                           ((0.0022, -0.0001, -0.0051), (0.0059, 0.0305, -0.0056), 0.0065)),
-}
-
-
-def _prim(parent: ET.Element, name: str, spec, side: str, col: dict) -> None:
-    """A collision primitive of DEX3_PRIM's form (left numbers; the right mirrors y)."""
-    sg = 1.0 if side == "left" else -1.0
-    m = lambda v: (v[0], sg * v[1], v[2])  # noqa: E731
-    if spec[0] == "box":
-        ET.SubElement(parent, "geom", name=name, type="box", pos=_f(m(spec[1])), size=_f(spec[2]), **col)
-    else:
-        ET.SubElement(parent, "geom", name=name, type="capsule", fromto=_f(m(spec[1])) + " " + _f(m(spec[2])),
-                      size=f"{spec[3]:g}", **col)
+# Collision shapes: each link collides as its mesh's convex hull (Menagerie's choice for the Dex3-1; the Inspire's palm
+# is the robot model's own hull). Primitives fitted to the meshes (boxes, capsules) were measured and saved nothing:
+# a finger-hand world's extra cost is its degrees of freedom (the H1-2 with two Inspire hands: 67 instead of 47), not
+# its contacts (tests/hands variants.py, 2026-10-21).
 
 
 def _wrist_frame_site(parent: ET.Element, name: str, pos, side: str, mount: ET.Element | None) -> None:
@@ -614,14 +564,9 @@ def build_dex3(root: ET.Element, mount: ET.Element, side: str, robot: str, opts:
     ET.SubElement(base, "inertial", pos=_f(pp), mass=f"{m_palm:.6g}",
                   diaginertia=_f((m_palm * (b * b + c * c) / 12, m_palm * (a * a + c * c) / 12,
                                   m_palm * (a * a + b * b) / 12)))
-    prim = FINGER_SHAPES == "primitive"
     look = dict(contype="0", conaffinity="0", group="2", rgba=col["rgba"], mass="0")
-    pcol = dict(col, group="3")
-    ET.SubElement(base, "geom", name=f"{pre}_palm_look" if prim else f"{pre}_palm", type="mesh",
-                  mesh=f"{pre}_palm_mesh", pos=_f((DEX3_PALM_POS[0], sg * DEX3_PALM_POS[1], 0.0)),
-                  **(look if prim else col))
-    if prim:
-        _prim(base, f"{pre}_palm", DEX3_PRIM["palm"], side, pcol)
+    ET.SubElement(base, "geom", name=f"{pre}_palm", type="mesh", mesh=f"{pre}_palm_mesh",
+                  pos=_f((DEX3_PALM_POS[0], sg * DEX3_PALM_POS[1], 0.0)), **col)
     out = [f"{pre}_palm"]
     bodies = {None: base}
     for (j, parent, pos, ik, axis, rl, rr, _cl, _cr) in DEX3_LINKS:
@@ -633,14 +578,11 @@ def build_dex3(root: ET.Element, mount: ET.Element, side: str, robot: str, opts:
         lo, hi = rl if side == "left" else rr
         ET.SubElement(b_, "joint", name=f"{pre}_{j}", type="hinge", axis=axis, range=f"{lo:.6g} {hi:.6g}",
                       limited="true", armature=f"{DEX3_ARMATURE:g}", damping=f"{DEX3_DAMPING:g}")
-        if prim:                                       # the mesh a look, a primitive collides
-            ET.SubElement(b_, "geom", name=f"{pre}_{j}_look", type="mesh", mesh=f"{pre}_{j}_mesh", **look)
-            _prim(b_, f"{pre}_{j}", DEX3_PRIM[j], side, pcol)
-        elif j == "thumb_1":                           # Menagerie collides thumb 1 as a box; its mesh is a look
+        if j == "thumb_1":                             # Menagerie collides thumb 1 as a box; its mesh is a look
             bp, bs = DEX3_THUMB1_BOX
             ET.SubElement(b_, "geom", name=f"{pre}_{j}_look", type="mesh", mesh=f"{pre}_{j}_mesh", **look)
             ET.SubElement(b_, "geom", name=f"{pre}_{j}", type="box", pos=_f((bp[0], sg * bp[1], bp[2])), size=_f(bs),
-                          **pcol)
+                          **dict(col, group="3"))
         else:
             ET.SubElement(b_, "geom", name=f"{pre}_{j}", type="mesh", mesh=f"{pre}_{j}_mesh", **col)
         out.append(f"{pre}_{j}")
@@ -671,8 +613,8 @@ def _scale(opts: dict) -> float:
 
 def build_inspire(root: ET.Element, mount: ET.Element, side: str, robot: str, opts: dict) -> tuple[list[str], list]:
     """Give the H1-2's Inspire fingers (the model's L_ / R_ bodies under the wrist link) Unitree's joints, the URDF's
-    couplings, collision shapes (FINGER_SHAPES) and six drives. Returns (the collision geoms, the thumb-finger
-    pairs). The finger bodies are listed in `INSPIRE_BODIES` (no look-only shells on them: world.py)."""
+    couplings, collision hulls and six drives. Returns (the collision geoms, the thumb-finger
+    pairs). The finger bodies: inspire_bodies() (no look-only shells on them: world.py)."""
     if robot != "unitree_h1":
         raise ValueError("the Inspire hand is the H1-2's (sc.real_hands = 'inspire' needs robot unitree_h1)")
     pre, tag = f"{side}_hand", ("L_" if side == "left" else "R_")
@@ -689,15 +631,10 @@ def build_inspire(root: ET.Element, mount: ET.Element, side: str, robot: str, op
                         range=f"{rng[0]:g} {rng[1]:g}", limited="true", armature=f"{INSPIRE_ARMATURE:g}",
                         damping=f"{INSPIRE_DAMPING:g}")
         b.insert(1 if b.find("inertial") is not None else 0, jt)
-        if FINGER_SHAPES == "primitive":
-            fa, fb, r = INSPIRE_CAPSULES[bn][0 if side == "left" else 1]
-            ET.SubElement(b, "geom", name=f"{pre}_{bn}", type="capsule", fromto=_f(fa) + " " + _f(fb), size=f"{r:g}",
-                          **col)
-        else:
-            g = ET.SubElement(b, "geom", name=f"{pre}_{bn}", type="mesh", mesh=vis.get("mesh"), **col)
-            for a in ("pos", "quat"):
-                if vis.get(a) is not None:
-                    g.set(a, vis.get(a))
+        g = ET.SubElement(b, "geom", name=f"{pre}_{bn}", type="mesh", mesh=vis.get("mesh"), **col)
+        for a in ("pos", "quat"):
+            if vis.get(a) is not None:
+                g.set(a, vis.get(a))
         out.append(f"{pre}_{bn}")
     eq = root.find("equality")
     act = root.find("actuator")
