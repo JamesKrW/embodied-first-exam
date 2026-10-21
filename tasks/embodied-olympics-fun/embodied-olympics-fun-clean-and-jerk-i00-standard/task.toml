@@ -33,8 +33,8 @@ protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 50
 expert_time_estimate_hours = 10.0
-oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a crane force on the 45 kg barbell and a balance force on the trunk; the final 2 s are carried by the robot's own locked arms and legs); negatives: the bar off the platform without both hands, let go, down before the signal, overhead without a clean, bent elbows or knees, split feet, another part on the platform. At the shoulders the elbows need 34 of their 18 N m; overhead with straight arms the robot holds the bar about 1 s; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle = "full"
+oracle_evidence = "Reference: a 5 kg aluminium technique bar (declared: below the IWF 21 kg minimum) lifted by a quasi-static whole-body plan (lowcmd rows): squat, grip near the jaw tips, stand, clean to the rack (11.3 s), press overhead (17.4 s), the down signal at 19.5 s; 10 of 10 timing variations succeed (19.2-22.3 s). With the 15 kg women's bar the turnover needs 1.08-1.17x the elbow and shoulder torques; with 5 kg 0.54 (0.78 at most along the path). The friction hold keeps 49 N and lets 449 N slide out. Referee test negatives: one hand (a real run), let go, down before the signal, put down below the knee (no fault), no clean, bent elbows or knees, split feet, another part on the platform, off the platform. The privileged twin's reference rows (1959 control steps, success after 19.59 s) streamed through the client."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -74,7 +74,7 @@ sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = []
+oracle = [0]
 
 [verifier]
 timeout_sec = 900.0

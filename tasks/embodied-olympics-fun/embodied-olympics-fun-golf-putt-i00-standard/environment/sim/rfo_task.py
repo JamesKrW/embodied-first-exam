@@ -1,7 +1,34 @@
-"""Golf putt (v2, official setting): a 3 m putt on a flat green at stimp 10, into a real hole (108 mm across, 101.6 mm
-deep, cut into the green: the ball physically drops in), with one stroke of a real putter (0.86 m, 0.5 kg, 3 degrees of
-loft, 70 degrees of lie) that is fixed in the Unitree G1's right hand. The robot stands side-on to the putt, as a
-golfer does: the ball in front of it, the hole to its left.
+"""Golf putt (the Rules of Golf): a 3 m putt on a flat green at stimp 10, into a real hole (108 mm across, 101.6 mm
+deep), with one stroke of a putter (0.86 m, 0.5 kg, 3 degrees of loft, 70 degrees of lie). The putter is not part of
+the hand. It is a free body held only by the friction of the right hand's two-finger gripper (Unitree Dex1-1): it
+can slip, turn in the jaws and be dropped. The robot stands side-on to the putt, as a golfer does: the ball in front
+of it, the hole to its left.
+
+The putter, the hold and the start:
+* the putter (PUTTER, free_putter()): a grip, shaft, head and face plate as one free body; the grip a 24 mm round
+  capsule 0.26 m long;
+* the hold: the grip lies across the gripper's jaws (along the jaws' width, square to the fingers), closed at 120 N
+  (closure 1), the grip at right angles to the forearm, as a fist holds a hammer, 0.05 m from the butt;
+* the start: a two-finger gripper cannot carry a level putter across its jaws: the club's weight then turns it about
+  the closing axis, which only the pads' friction resists (measured: 25 degrees in the first second, still turning),
+  and it is no longer at right angles to the forearm. So here the right arm starts in a set pose (START_RIGHT_ARM,
+  positions and targets: still at t = 0) with the forearm level and pointing ahead, and the club hangs from the hand
+  out to the right of the robot (the jaws' centre 0.25 m ahead, 0.40 m to the right, 0.87 m up), its shaft vertical,
+  the face towards the hole, the head about 4 cm over the green and 0.28 m to the right of the ball. Measured: it
+  turns 0.3 degree in the jaws in 3 s, and with the jaws eased to no clamp it still wedges in them (the head's offset
+  from the shaft presses the grip on the pads); 1 mm wider than the grip, it slides out.
+  Whoever moves the club must keep its shaft near the vertical (across the jaws the club is held by the pads' normal
+  force against a swing along the line, by their friction alone against a tilt towards the toe);
+* why one hand, not two (the alternatives were both grippers on the grip, or one gripper and the other hand's pad):
+  the Rules of Golf allow a stroke with one hand, and measured on the model, the G1 cannot put two hands on this
+  putter at the address: with the club soled behind the ball, inverse kinematics from 40 starts finds no
+  collision-free posture with both grippers on the grip (across the jaws, or one along them at the butt: the misses
+  are 5 cm and more, or the arms pass through the trunk), the 1.32 m robot's hands being 0.4 m below its shoulders
+  there. A grip along the jaws (the club an extension of the forearm, as in arm-lock putting) holds a level club, but
+  at the address it needs the arm raised above the shoulder, and the robot fell moving it there. The left hand (the
+  G1's rubber fist) may still hold the grip (not required); the club may touch nothing else of the robot (Rule 10.1b,
+  anchoring);
+* "in the hand" = the grip touches both jaws; a break of at most out_of_hand_s (0.05 s) is not a release.
 
 How the venue is built. The scene's floor plane cannot have a hole, so this module lowers it by the hole's depth (it is
 then the bottom of the hole and the ground around the green) and lays the green on it as boxes whose tops are at
@@ -17,20 +44,29 @@ Measured in the simulator (tests/test_golf_putt.py asserts the first two):
   1.1 m/s, 40 mm off only below 0.7 m/s; faster or wider balls lip out or jump it;
 - a ball struck by the putter leaves without spin, skids, and rolls on at about 5/7 of its launch speed (as on a real
   green): a putt that dies at the hole needs a launch of about 2.6 m/s, a head speed of about 1.7 m/s;
-- the G1 can address this ball with the unscaled putter (the reference solution does): the forearm forwards and down,
-  the wrist's roll joint about 1.6 rad, the shaft about 5 degrees from vertical (the toe 10 degrees down); with the
-  sole flat (the shaft 20 degrees from vertical) the hand would have to be where the arm does not reach.
+- the G1 can address this ball with the unscaled putter in the gripper (the reference solution does): the forearm
+  forwards and down, the wrist's roll joint about 1.6 rad, the shaft about 5 degrees from vertical (the toe 10
+  degrees down); with the sole flat the hand would have to be where the arm does not reach.
 
 The world uses elliptic friction cones (set in build): with MuJoCo's default pyramids a ball rolling at an angle to
-the world's axes drifted off its line (by a quarter of the angle over 3 m).
+the world's axes drifted off its line (by a quarter of the angle over 3 m); the real hand adds impratio 100
+(realhand.IMPRATIO), which applies to the ball's roll too: the test measures the stimp again (10 ft from 1.83 m/s).
 """
 import math
 
+import mujoco
 import numpy as np
 
 from rfo.referee import Touch
-from rfo.scene import OFFICIAL, fmt, quat_z
+from rfo.scene import HITTABLE, OFFICIAL, fmt, quat_z
 from rfo.task import TaskBase
+# A rigid putter (steel head and shaft, rubber grip)'s contact with the robot, the venue's fixtures and the other
+# props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
+# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
+# robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
+# With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 62 mm into the green and 26 mm into the
+# robot (stress test 2026-10-21).
+from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 BALL = OFFICIAL["golf"]                 # R&A / USGA: at least 42.67 mm, at most 45.93 g
 GREEN_ROLL_M = 0.00166                  # the ball's rolling resistance on the green (m): stimp 10, see the calibration
@@ -68,30 +104,56 @@ def putter_frame(lie_deg: float, loft_deg: float) -> dict:
     return dict(s=s, h=h, n=n, f=f, f_loft=math.cos(l) * f + math.sin(l) * n, n_loft=-math.sin(l) * f + math.cos(l) * n)
 
 
-def putter(length: float, loft_deg: float, mass: float) -> str:
-    """The putter as MJCF in the wrist mount's frame: grip, shaft, head and a face plate that carries the loft. Its
-    length is measured as the Rules do, along the shaft's axis from the butt to the sole."""
+def free_putter(sc, length: float, loft_deg: float, mass: float, pos=(0.0, 0.0, 0.2), name="putter"):
+    """The putter as a free body (in the body's frame): the origin is the point of the grip that sits in the middle
+    of the jaws, 0.05 m from the butt; the grip and shaft run along -y; the face looks
+    along +x (tilted up by the loft); the head's toe towards +z. Geoms <name>_grip, _shaft, _head, _face, colliding
+    like a prop (HITTABLE): with the jaws, the robot, the green, the ball. Its length is measured as the Rules do,
+    along the shaft's axis from the butt to the sole."""
     P, F = PUTTER, putter_frame(PUTTER["lie_deg"], loft_deg)
     k = mass / (P["grip_kg"] + P["shaft_kg"] + P["head_kg"])      # the three parts in their proportions
     hh = P["head_height_m"] / 2
-    fist = np.array([0.0, 0.0, 0.05])                        # the middle of the fist
-    butt = fist - F["s"] * P["butt_above_fist_m"]
+    held = np.zeros(3)                                       # the grip's point in the middle of the jaws
+    butt = held - F["s"] * BUTT_FROM_JAW_CENTRE_M
     grip_end = butt + F["s"] * P["grip_length_m"]
     hosel = butt + F["s"] * (length - hh / math.sin(math.radians(P["lie_deg"])))     # the axis meets the head's mid-plane
     head = hosel + F["h"] * (P["head_heel_toe_m"] / 2 - P["hosel_from_heel_m"])
     face = head + F["f"] * (P["head_face_back_m"] / 2 + 0.002)
-    col = 'contype="4" conaffinity="0"'
-    return (
-        f'<geom name="putter_grip" type="capsule" fromto="{fmt(butt)} {fmt(grip_end)}" size="{P["grip_radius_m"]}" '
-        f'mass="{k * P["grip_kg"]:.6g}" rgba="0.1 0.1 0.1 1" {col}/>'
-        f'<geom name="putter_shaft" type="capsule" fromto="{fmt(grip_end)} {fmt(hosel)}" size="{P["shaft_radius_m"]}" '
-        f'mass="{k * P["shaft_kg"]:.6g}" rgba="0.75 0.75 0.78 1" {col}/>'
-        f'<geom name="putter_head" type="box" pos="{fmt(head)}" quat="{fmt(_quat([F["h"], F["f"], F["n"]]))}" '
-        f'size="{P["head_heel_toe_m"] / 2} {P["head_face_back_m"] / 2} {hh}" mass="{k * (P["head_kg"] - 0.02):.6g}" '
-        f'rgba="0.15 0.15 0.18 1" {col}/>'
-        f'<geom name="putter_face" type="box" pos="{fmt(face)}" '
-        f'quat="{fmt(_quat([F["h"], F["f_loft"], F["n_loft"]]))}" size="{P["head_heel_toe_m"] / 2} 0.0015 {hh}" '
-        f'mass="{k * 0.02:.6g}" rgba="0.8 0.8 0.82 1" {col}/>')
+    butt, grip_end, hosel, head, face = (tuple(float(x) for x in v) for v in (butt, grip_end, hosel, head, face))
+    b = sc.body(name, pos, free=True)
+    sc.geom(b, f"{name}_grip", type="capsule", fromto=(*butt, *grip_end), size=(P["grip_radius_m"],),
+            mass=k * P["grip_kg"], rgba=(0.1, 0.1, 0.1, 1), friction=(0.9, 0.005, 0.0001), **HITTABLE, **RIGID)
+    sc.geom(b, f"{name}_shaft", type="capsule", fromto=(*grip_end, *hosel), size=(P["shaft_radius_m"],),
+            mass=k * P["shaft_kg"], rgba=(0.75, 0.75, 0.78, 1), **HITTABLE, **RIGID)
+    sc.geom(b, f"{name}_head", type="box", pos=head, quat=_quat([F["h"], F["f"], F["n"]]),
+            size=(P["head_heel_toe_m"] / 2, P["head_face_back_m"] / 2, hh), mass=k * (P["head_kg"] - 0.02),
+            rgba=(0.15, 0.15, 0.18, 1), **HITTABLE, **RIGID)
+    sc.geom(b, f"{name}_face", type="box", pos=face, quat=_quat([F["h"], F["f_loft"], F["n_loft"]]),
+            size=(P["head_heel_toe_m"] / 2, 0.0015, hh), mass=k * 0.02, rgba=(0.8, 0.8, 0.82, 1), **HITTABLE, **RIGID)
+    return b
+
+
+SIDE = "right"
+BUTT_FROM_JAW_CENTRE_M = 0.05       # the grip across the jaws, its butt 0.05 m beyond the middle of the jaws
+# The start: the right arm's joints (shoulder pitch, roll, yaw, elbow, wrist roll, pitch, yaw) that hold the club out
+# to the right, level, along the forearm, the jaws closing up and down (found by inverse kinematics on the model:
+# tests/test_golf_putt.py checks the pose); these are also the arm's targets at t = 0
+START_RIGHT_ARM = (0.0757, -0.7339, -0.8934, 0.9495, 1.3695, 1.0942, 0.7873)
+EARLY_GRIP = "the putter left your hand"
+ANCHOR = "the putter touched a part of you other than your hands"
+
+
+def set_arm(w, side: str, q7) -> None:
+    """An arm's seven joints (shoulder pitch, roll, yaw, elbow, wrist roll, pitch, yaw) set and held: positions and the
+    start command's targets (as dunk sets its hold)."""
+    r = w.robot
+    names = [j[:-6] for j in w.L.JOINTS]
+    for k, jn in enumerate(("shoulder_pitch", "shoulder_roll", "shoulder_yaw", "elbow", "wrist_roll", "wrist_pitch",
+                            "wrist_yaw")):
+        i = names.index(f"{side}_{jn}")
+        w.d.qpos[r.qadr[i]] = q7[k]
+        r.arb.q_a[i] = r.arb.q_b[i] = q7[k]
+    mujoco.mj_kinematics(w.m, w.d)
 
 
 class Task(TaskBase):
@@ -100,16 +162,24 @@ class Task(TaskBase):
     category = "basketball-and-rackets"
     robot = "unitree_g1"
     rulebook = ("The Rules of Golf (R&A / USGA, 2023): Definitions \"Hole\", \"Holed\", \"Stroke\", \"Line of Play\"; "
-                "Rules 8.1b, 9.4, 10.1a, 10.1c, 11.1, 13.2, 13.3a; the Equipment Rules (2023), Part 2 (clubs) and Part 4 (the ball); "
+                "Rules 8.1b, 9.4, 10.1a, 10.1b, 10.1c, 11.1, 13.2, 13.3a; the Equipment Rules (2023), Part 2 (clubs) and Part 4 (the ball); "
                 "the USGA Stimpmeter instructions for the green's speed")
     deviations = [
         "Definition \"Hole\": the opening is a regular {hole_sides}-sided polygon inscribed in the {hole_diameter_m} m "
         "circle (flats 0.5 mm inside it, never wider than the official hole) with rigid vertical walls (the liner is "
         "only drawn), because the simulator has no cylindrical cavity",
         "Rule 13.2: there is no flagstick (as when the player has it removed)",
-        "Rule 10.1 and the Equipment Rules on the grip: the putter is fixed rigidly to the right wrist of a robot "
-        "that has no fingers, its grip at right angles to the forearm (as a fist holds a hammer), and is played with "
-        "one arm; the club itself is not scaled to the 1.32 m robot",
+        "Rule 10.1 and the Equipment Rules on the grip: the hand is a two-finger gripper, Unitree's Dex1-1 (90 mm "
+        "stroke, 80 mm jaws, at most 120 N), on the right wrist; the grip lies across its jaws, at right angles to the "
+        "forearm (as a fist holds a hammer), and the putter is held by their friction alone; \"in the hand\" is "
+        "defined by contact: the grip touches both jaws, and a break of up to {out_of_hand_s} s is not a release. "
+        "The stroke is made with that hand (a one-handed stroke is legal); the left hand may hold the grip too. The "
+        "club itself is not scaled to the 1.32 m robot",
+        "Rule 10.1b (anchoring): the club may touch nothing of the player but the hands (stricter than the Rule, "
+        "which allows the club against a forearm)",
+        "the start: the club is not level at your right side but hangs from your right hand held out ahead (a "
+        "two-finger gripper cannot carry a level putter across its jaws: it turns in them under its own weight); one "
+        "hand, not two: on this model the robot cannot put both hands on the grip at the address",
         "Rule 10.1a (a fair strike; an accidental double hit is one stroke): the referee needs numbers: every contact "
         "of the head with the ball must fall within {stroke_window_s} s of the first, and the contacts together may "
         "last at most {max_contact_s} s (the simulated impact of a clean putt lasts 0.012 s, a real one "
@@ -123,12 +193,14 @@ class Task(TaskBase):
     time_limit_s = 30.0
     start = (0.0, 0.0, 0.0)
     stages = ["stroke", "holed"]
-    legal_ground = ("left_foot", "right_foot", "right_tool")        # the putter may be grounded (Rule 8.1b)
+    legal_ground = ("left_foot", "right_foot")                      # (the putter is a prop: it may be grounded, 8.1b)
     params = dict(hole_diameter_m=0.108, hole_depth_m=0.1016, hole_sides=HOLE_SIDES, putt_distance_m=3.0, stimp_ft=10,
                   roll_resistance_m=GREEN_ROLL_M,
                   ball_x_m=0.44, ball_y_m=-0.12, putter_length_m=0.86, putter_mass_kg=0.50, putter_loft_deg=3.0,
                   green_behind_m=1.5, green_beyond_m=3.0, green_half_width_m=2.0,
-                  max_contact_s=0.03, stroke_window_s=0.2, rest_move_m=0.001, rest_s=1.0, fall_height_m=0.35)
+                  max_contact_s=0.03, stroke_window_s=0.2, rest_move_m=0.001, rest_s=1.0, fall_height_m=0.35,
+                  grip_diameter_m=2 * PUTTER["grip_radius_m"], grip_length_m=PUTTER["grip_length_m"],
+                  out_of_hand_s=0.05, start_hand_x_m=0.25, start_hand_y_m=-0.40, start_hand_z_m=0.87)
 
     def __init__(self):
         super().__init__()
@@ -138,41 +210,56 @@ class Task(TaskBase):
         super().configure(params)
         self.fall_z = self.p["fall_height_m"]
 
-    sentence = ("Hole the {putt_distance_m} m putt: with one stroke of the putter in your right hand, roll the golf "
-                "ball that lies on the green into the hole.")
+    sentence = ("Hole the {putt_distance_m} m putt: with one stroke of the putter held in your right hand's gripper, "
+                "roll the golf ball that lies on the green into the hole, without letting go of the putter.")
     rules = ("The ball (42.67 mm, 45.9 g) lies at rest on a flat green of stimp {stimp_ft} (a ball that starts rolling "
              "at 1.83 m/s stops after 3.05 m). The hole is cut into the green {putt_distance_m} m from the ball: "
              "{hole_diameter_m} m across and {hole_depth_m} m deep, with no flagstick in it. A putter ("
-             "{putter_length_m} m long, {putter_mass_kg} kg, {putter_loft_deg} degrees of loft) is fixed in your right "
-             "hand. You succeed when the ball is holed with one stroke: after the stroke it comes to rest (its "
+             "{putter_length_m} m long, {putter_mass_kg} kg, {putter_loft_deg} degrees of loft, a round grip "
+             "{grip_diameter_m} m thick and {grip_length_m} m long) is a separate body; at the start its grip is closed "
+             "across the jaws of your right hand's two-finger gripper, which holds it by friction only: it can slip, "
+             "turn in the gripper and fall. The putter is in your hand while its grip touches both of the gripper's "
+             "jaws; it has left your hand when for more than {out_of_hand_s} s the grip has not touched both jaws. "
+             "Your left hand may hold the grip too; the putter may touch nothing of you but your two hands. You "
+             "succeed when the ball is holed with one stroke: after the stroke it comes to rest (its "
              "centre moves less than {rest_move_m} m in {rest_s} s) inside the hole with the whole ball below the "
              "surface of the green. A stroke is a fair strike of the ball with the putter's head (any side of the head): the first "
              "contact of the head with the ball starts it, every further contact must come within {stroke_window_s} s "
              "of the first (an accidental double hit is still one stroke), and all the contacts together may last at "
-             "most {max_contact_s} s. You fail if the contacts last longer (the ball was pushed, scraped or scooped), "
+             "most {max_contact_s} s. You fail if the putter leaves your right hand at any time (dropped, thrown or "
+             "slipped out of the gripper); if the putter touches any part of you other than your hands; if the "
+             "contacts last longer (the ball was pushed, scraped or scooped), "
              "if the head touches the ball again later (a second stroke), if anything else of you ever touches the "
              "ball (the putter's shaft or grip, a foot, a leg, a hand), if at the moment of the stroke your feet touch "
              "the green on both sides of the line of play (the straight line through the ball's spot and the hole's "
              "centre, extended behind the ball) or on that line, if the ball comes to rest anywhere but in the hole "
              "(on the lip and on the green beyond the hole included), if the ball leaves the green, if you fall (your "
              "pelvis lower than {fall_height_m} m above the green, or any part of you other than your feet touching "
-             "the ground; the putter may touch the green), or after {time_limit_s} s.")
+             "the ground; the putter may touch the green as long as it stays in your hand), or after "
+             "{time_limit_s} s.")
     venue = ("You stand on the green facing +x, side-on to the putt as a golfer does. The ball lies {ball_x_m} m ahead "
              "of your pelvis and {ball_y_m} m to your left (negative: to your right); the hole's centre is "
              "{putt_distance_m} m from the ball in the +y direction (to your left), so the line of play runs across "
              "in front of your feet. The green is level and extends {green_behind_m} m behind the ball (to your "
              "right), {green_beyond_m} m beyond the hole and {green_half_width_m} m to each side of the line of play; "
-             "around it the ground is {hole_depth_m} m lower. The putter is a blade putter: its grip is held in your "
-             "right fist at right angles to the forearm, the butt 0.05 m above the fist and the shaft leaving the fist "
-             "on the other side, so with your arm at rest it points away from your right side, about level with your "
-             "hand. The head (0.110 m from heel to toe, 0.025 m from face to back, 0.025 m high, 0.35 kg) sits at "
+             "around it the ground is {hole_depth_m} m lower. The putter is a blade putter: its grip is closed across "
+             "the two fingers of your right gripper, at right angles to the forearm, the butt 0.05 m beyond the middle "
+             "of the jaws on one side and the shaft leaving them on the other. You start holding it out to your "
+             "right: your right forearm level and pointing ahead, the middle of the jaws {start_hand_x_m} m ahead of "
+             "your pelvis, {start_hand_y_m} m to your left (negative: to your right) and {start_hand_z_m} m up, the "
+             "club hanging from it, its shaft vertical and its head a few centimetres over the green, to your right "
+             "of the ball. The head (0.110 m from heel to toe, 0.025 m from face to back, 0.025 m high, 0.35 kg) sits at "
              "the shaft's end at a lie of 70 degrees, its toe on the side your forearm points to; its face looks at "
-             "right angles to both the shaft and the forearm: to your left when the forearm points forwards and the "
-             "shaft down. There is no wind.")
+             "right angles to both the shaft and the forearm (the way the jaws close: towards your palm's side): to "
+             "your left when the forearm points forwards and the shaft down. There is no wind.")
     difficulty = ("The hole is two and a half ball widths across and three metres away: the ball must start within "
                   "about one degree of the line and at a speed between the one that just reaches the hole and the one "
                   "that jumps it, and there is no second stroke. The club is an adult's, long and heavy for this "
-                  "robot's wrist, and it has to be brought from where it starts to an address beside the ball first.")
+                  "robot's wrist, and it has to be brought from where it starts to an address beside the ball first. It is "
+                  "held across a two-finger gripper's jaws by friction: tilted towards its toe it turns in the jaws, "
+                  "so it has to be carried with the shaft near the vertical, and the swing rocks it in the jaws, so the "
+                  "face at impact is "
+                  "not quite where the arm put it.")
 
     # ------------------------------------------------------------------ the venue
     def hole(self) -> np.ndarray:
@@ -214,34 +301,65 @@ class Task(TaskBase):
             sc.box(f"hole_liner{i}", (hx + (a - 0.0004) * math.cos(th), hy + (a - 0.0004) * math.sin(th), -(D + 0.025) / 2),
                    (0.0003, a * math.tan(math.pi / N), (D - 0.025) / 2), rgba=(0.93, 0.93, 0.93, 1), quat=quat_z(th))
         sc.disc("hole_bottom", (hx, hy), R, rgba=(0.05, 0.05, 0.05, 1), z=-D + 0.0006)
-        sc.hand_tools["right"] = putter(p["putter_length_m"], p["putter_loft_deg"], p["putter_mass_kg"])
+        free_putter(sc, p["putter_length_m"], p["putter_loft_deg"], p["putter_mass_kg"],
+                    pos=(p["ball_x_m"] - 1.0, p["ball_y_m"] - 1.0, 0.3))
+        sc.real_hands[SIDE] = "dex1"
         sc.ball("ball", "golf", (p["ball_x_m"], p["ball_y_m"], BALL["radius"]), roll=p["roll_resistance_m"])
         sc.camera("venue", (3.0, -2.2, 1.9), (0.3, 1.1, 0.3), fovy=55)
         sc.camera("hole", (hx + 0.45, hy - 0.55, 0.40), (hx, hy, -0.03), fovy=40)
 
     def reset(self, w):
+        """The right arm in START_RIGHT_ARM (positions and targets: still at t = 0); the putter's grip along the right
+        gripper's jaws (its axis the fingers' axis, the head beyond the fingertips, the face looking the way the jaws
+        close: towards the palm's side), the butt BUTT_FROM_JAW_CENTRE_M before the jaws' centre; then the jaws close
+        on it (the full command: 120 N) and the grasp settles."""
         w.put("ball", (self.p["ball_x_m"], self.p["ball_y_m"], BALL["radius"]))
+        if START_RIGHT_ARM is not None:
+            set_arm(w, SIDE, START_RIGHT_ARM)
+        c, R = w.jaw_frame(SIDE)
+        q = np.zeros(4)
+        mujoco.mju_mat2Quat(q, R.ravel())
+        w.put("putter", c, quat=q)
+        self.grasp = w.close_on(SIDE, "putter")
 
     # ------------------------------------------------------------------ the referee
     def referee_reset(self, w, ref):
         self.ball = ref.geoms(body="ball")
         self.head = ref.geoms(names=["putter_head", "putter_face"])
-        self.other = ref.part("robot") & ~self.head
+        self.grip = ref.geoms(names=["putter_grip"])
+        self.club = ref.geoms(body="putter")
+        self.other = ref.part("robot") | (self.club & ~self.head)
+        self.hands = ref.part("hands")
+        self.jaws = (ref.geoms(body=f"{SIDE}_hand_jaw_a"), ref.geoms(body=f"{SIDE}_hand_jaw_b"))
         self.floor = ref.geoms(names=["floor"])
         self.feet = ref.part("feet")
         # first / last: the stroke's first and latest contact (s); contact_s: how long the head has been on the ball
         # still_at / still_since: where and since when the ball has not moved (the rest condition)
         self.trackers = {"first": None, "last": None, "contact_s": 0.0, "hits": Touch(ref, self.ball, self.head, gap=0.005),
-                         "still_at": None, "still_since": None}
+                         "still_at": None, "still_since": None, "both_jaws_t": 0.0}
 
     def _off_hole(self, b) -> float:
         return float(np.hypot(*(np.asarray(b[:2]) - self.hole())))
 
+    def in_hand(self, ref) -> bool:
+        return ref.touching(self.grip, self.jaws[0]) and ref.touching(self.grip, self.jaws[1])
+
     def substep(self, w, ref):
         tr, p = self.trackers, self.p
+        if self.in_hand(ref):
+            tr["both_jaws_t"] = round(ref.time, 4)
+        else:
+            gap = round(ref.time - tr["both_jaws_t"], 4)
+            if gap > ref.metrics.get("grip_break_max_s", 0.0):
+                ref.metrics["grip_break_max_s"] = gap       # (reported: the longest break of the two-jaw contact)
+            if gap > p["out_of_hand_s"] + 1e-9:
+                return ref.fail(EARLY_GRIP, out_s=gap)
+        if ref.touching(self.club, ref.robot_mask & ~self.hands):
+            return ref.fail(ANCHOR, parts=sorted(ref.parts_touching(self.club) - {"left_hand", "right_hand"}))
         if ref.touching(self.ball, self.other):
             return ref.fail("the ball was touched by something other than the putter's head",
-                            parts=sorted(ref.parts_touching(self.ball)))
+                            parts=sorted(ref.parts_touching(self.ball)),
+                            club=ref.touching(self.ball, self.club & ~self.head))
         tr["hits"].update()
         if ref.touching(self.ball, self.head):
             if tr["first"] is None:
@@ -289,4 +407,6 @@ class Task(TaskBase):
         return {"ball": w.pos("ball").tolist(), "ball_velocity": w.vel("ball").tolist(), "hole": self.hole().tolist(),
                 "hole_depth_m": self.p["hole_depth_m"], "putter_face": d.geom_xpos[g].tolist(),
                 "putter_face_normal": Rf[:, 1].tolist(), "putter_heel_to_toe": Rf[:, 0].tolist(),
-                "putter_sole_normal": Rf[:, 2].tolist(), "stroke_made": self.trackers["first"] is not None}
+                "putter_sole_normal": Rf[:, 2].tolist(), "stroke_made": self.trackers["first"] is not None,
+                "putter_pos": w.pos("putter").tolist(), "putter_quat": d.xquat[m.body("putter").id].tolist(),
+                "putter_in_hand_t": self.trackers["both_jaws_t"]}

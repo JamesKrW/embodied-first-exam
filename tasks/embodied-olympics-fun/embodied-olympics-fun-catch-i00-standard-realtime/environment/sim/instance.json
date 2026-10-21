@@ -10,7 +10,14 @@
   "launch_azimuth_deg": 1.18,
   "land_within_m": 3.0,
   "hold_s": 1.0,
-  "fall_pelvis_m": 0.5
+  "catch_window_s": 0.5,
+  "hold_gap_s": 0.02,
+  "max_contact_angle_deg": 45.0,
+  "fall_pelvis_m": 0.5,
+  "machine_speed_m_s": 21.17,
+  "machine_elevation_deg": 45.0,
+  "machine_azimuth_deg": 1.2,
+  "feed_lead_s": 0.106
  },
  "title": "Baseball: catch a fly ball",
  "category": "throwing-catching-striking",
@@ -21,15 +28,16 @@
  ],
  "rulebook": "Official Baseball Rules (MLB, 2024 edition): 3.01 (the ball), Definitions of Terms: \"catch\" (secure possession in the hand before the ball touches the ground, held long enough to show control), \"in flight\"",
  "deviations": [
-  "Definitions (catch): no glove; the hand catches by a grip that closes on a ball whose surface is within 3.5 cm of the palm and that moves no faster than 6 m/s relative to it (the platform's grip). \"Held long enough\" is 1.0 s without letting go and without falling. A ball that touches the body (any part other than the hands and forearms) before it is gripped is not a catch here (the rule would allow it).",
-  "The fly ball is not batted: a launcher 40.0 m away sends it at 21.35 m/s, 45.0 degrees above the horizon, 1.0 s after the start, without spin; where it comes down (within 3.0 m of where you stand) is this instance's draw.",
+  "Definitions (catch): no glove; both hands are Unitree's Dex1-1 two-jaw grippers (sold for the G1, the H2 and the R1, not for the H1-2; mounted on the wrist where the H1-2's palm ends): 90 mm stroke, jaws 80 mm long and 34 mm wide with rubber pads, at most 120 N of grip, opening and closing at most 375 mm/s. A catch is the pads of both jaws of one gripper pressing on the ball from its two sides at the same time (each with a contact whose direction is within 45.0 degrees of the jaws' closing direction: the jaws closed on it, not a ball lying on their tips or edges), at the latest 0.5 s after the ball first touched you; \"held long enough\" is 1.0 s in which the ball stays between the pads of that gripper (breaks of at most 0.02 s) and touches nothing else, without falling. Nothing is welded: the ball is held only by the pads' friction and can slip out.",
+  "Definitions (catch): a ball that touches the body (any part other than the grippers and the forearms) before it is caught is not a catch here (the rule would allow trapping it against the body), and neither is a ball held at the end by anything but the jaws of the gripper that caught it (the other hand, a forearm, the body).",
+  "The fly ball is not batted: a two-wheel pitching machine 40.0 m away throws it at about 21.35 m/s, about 45.0 degrees above the horizon, about 1.0 s after the start, with the little spin its wheels give it; where it comes down (within 3.0 m of where you stand) is this instance's draw.",
   "Flight: quasi-steady aerodynamics (MuJoCo's ellipsoid fluid model: drag and Magnus lift), still air."
  ],
  "texts": {
-  "sentence": "Catch the fly ball: grip the baseball with a hand before it touches the ground or your body, and keep hold of it.",
-  "rules": "A baseball (0.073 m across, 0.145 kg, it flies in air with drag) rests on a launcher 40.0 m in front of you, 1.0 m above the ground, and is launched at t = 1.0 s at 21.35 m/s, 45.0 degrees above the horizon, 1.18 degrees to the left of the line from the launcher to you, so that untouched it would come down within 3.0 m of where you stand at the start. A catch is a hand's grip closing on the ball in flight after it has passed the top of its arc: the grip holds a ball whose surface is within 3.5 cm of the palm and that moves no faster than 6 m/s relative to it. Before the grip the ball may touch only your hands and forearms. You succeed when a hand has gripped the ball and kept it for 1.0 s without a break. You fail if the ball touches the ground, or any part of you other than a hand or a forearm, before it is gripped; if you let go of it after the catch; if you fall (your pelvis lower than 0.5 m above the ground, or any part of you other than your feet on the ground) before the end; or after 9 s.",
-  "venue": "You stand on a level field facing the launcher (+x), 40.0 m away. The ball rises to about 11 m and comes down steeply, about three seconds after the launch, somewhere within 3.0 m of you. Nothing can be gripped before the launch. Still air.",
-  "difficulty": "The ball is in the air for three seconds and comes down at about 17 m/s more than a metre away: the body has to walk there at 0.6 m/s and put a palm on the ball's line to within a few centimetres, facing it, with the grip closing in the few milliseconds in which the ball is against the palm."
+  "sentence": "Catch the fly ball: close the jaws of one of your grippers on the baseball before it touches the ground or your body, and keep it there.",
+  "rules": "A baseball (0.073 m across, 0.145 kg, it flies in air with drag) is thrown by a two-wheel pitching machine 40.0 m in front of you: it leaves the machine's wheels 1.0 m above the ground at about t = 1.0 s, at about 21.35 m/s, about 45.0 degrees above the horizon and 1.18 degrees to the left of the line from the machine to you (it is launched when it has left the wheels), so that untouched it would come down within 3.0 m of where you stand at the start. Both your hands are two-jaw grippers (90 mm stroke, jaws 80 mm long with rubber pads on their inner faces, at most 120 N of grip) that hold things only by friction; they start open. A catch: the pads of both jaws of one gripper touch the ball at the same time from its two sides, each with a contact whose direction is within 45.0 degrees of the jaws' closing direction (a ball lying on the jaws' tips or edges, or on closed jaws, is not caught), after the ball has passed the top of its arc and at the latest 0.5 s after it first touched you. Before the catch the ball may touch only your grippers and forearms. You succeed when, from the catch, the ball has stayed between the pads of that gripper for 1.0 s (both pads touching it in that way, apart from breaks of at most 0.02 s) touching nothing but that gripper. You fail if the ball touches the ground, or any part of you other than a gripper or a forearm, before the catch; if it is touched before it has passed the top of its arc; if it is not caught within 0.5 s of first touching you; if after the catch it is out of the jaws for longer than 0.02 s (dropped, slipped out or let go: a ball caught again does not count) or touches anything but the gripper that caught it (your other gripper, a forearm, your body, the ground); if you fall (your pelvis lower than 0.5 m above the ground, or any part of you other than your feet on the ground) before the end; or after 9 s.",
+  "venue": "You stand on a level field facing the pitching machine (+x), 40.0 m away, its head tilted up towards you. The ball rises to about 11 m and comes down steeply, about three seconds after the launch, somewhere within 3.0 m of you. Your grippers are open, their jaws pointing forwards along your forearms. Still air.",
+  "difficulty": "The ball is in the air for three seconds and comes down at about 17 m/s more than a metre away: the body has to walk there at 0.6 m/s and bring a gripper whose open jaws leave 8 mm on each side of the ball onto its line, and the jaws need about 40 ms to close on it, while a ball that meets the gripper at that speed bounces off it in a few milliseconds."
  },
  "robot": "unitree_h1",
  "sim": {
@@ -37,7 +45,7 @@
   "mujoco": "3.3.7"
  },
  "t0": {
-  "state_sha": "0180a9c95dcc1568d8a495934e62add95fd9186eb549d851f7a43d93c472cf5f",
+  "state_sha": "21a3b12bce4e906e3adf2242e102b085438e4c2d43fc92bf0941948ebd2b8fd5",
   "control_dt": 0.01,
   "horizon_steps": 900,
   "raw_dim": 141,
@@ -101,7 +109,7 @@
      1.0,
      1.0
     ],
-    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad)"
+    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad) (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "walk": {
     "dim": 20,
@@ -171,7 +179,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets"
+    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "joints": {
     "dim": 29,
@@ -268,7 +276,7 @@
      1.0,
      1.0
     ],
-    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward"
+    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "lowcmd": {
     "dim": 137,
@@ -689,7 +697,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz"
+    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    }
   },
   "hold": {
@@ -849,7 +857,13 @@
    "cmd_vx",
    "cmd_vy",
    "cmd_wz",
-   "time_s"
+   "time_s",
+   "jaw_opening_left",
+   "jaw_speed_left",
+   "jaw_force_left",
+   "jaw_opening_right",
+   "jaw_speed_right",
+   "jaw_force_right"
   ],
   "cameras": {
    "head_left": {
@@ -929,7 +943,7 @@
    "name": "unitree_h1",
    "title": "Unitree H1-2",
    "revision": "h1-4",
-   "model": "Unitree H1-2, 27 joints, 1.78 m, 67 kg (RoboOlympics robot library h1-4: Unitree's own h1_2 model with its joint, speed and torque limits; its motor torque-speed curves are estimates)",
+   "model": "Unitree H1-2, 27 joints, 1.78 m, 68 kg (RoboOlympics robot library h1-4: Unitree's own h1_2 model with its joint, speed and torque limits; its motor torque-speed curves are estimates)",
    "joints": [
     "left_hip_yaw",
     "left_hip_pitch",
@@ -1277,7 +1291,7 @@
     0.0,
     0.0
    ],
-   "mass_kg": 67.37,
+   "mass_kg": 68.37,
    "height_m": 1.78,
    "pelvis_height_standing_m": 1.035,
    "control_dt_s": 0.01,
@@ -1288,15 +1302,44 @@
     1.57
    ],
    "run_command_range": null,
-   "grip": {
-    "reach_m": 0.035,
-    "max_relative_speed_m_s": 6.0,
-    "rule": "a closed grip holds the nearest grippable object whose surface is within reach_m of the palm (a point 4.5 cm beyond the wrist flange along the forearm) and that moves no faster than max_relative_speed_m_s relative to it; opening the grip lets it go"
+   "real_hands": {
+    "kind": "dex1",
+    "model": "Unitree Dex1-1 two-finger parallel gripper (modelled: 0.55 kg, jaws 80 mm long, 90 mm stroke, rubber pads)",
+    "sides": [
+     "left",
+     "right"
+    ],
+    "stroke_m": 0.09,
+    "jaw_length_m": 0.08,
+    "force_limit_n": 120.0,
+    "setpoint_opening_speed_m_s": 0.375,
+    "jaw_speed_note": "the limit is the servo setpoint's; the jaws can move briefly up to about 0.45 m/s when a clamp springs open",
+    "servo": {
+     "kp_n_per_m": 20000.0,
+     "kd_n_s_per_m": 80.0,
+     "rule": "each jaw: a setpoint moves towards 45 mm x closure at most half setpoint_opening_speed_m_s (opening, it starts from the jaws' position); force = clip(kp (setpoint - q) - kd dq, -force_limit_n, force_limit_n); the clamp on an object is min(force_limit_n, 10 N per mm that the commanded opening 90 mm x (1 - closure) is below the object's width)"
+    },
+    "pad": {
+     "friction": [
+      1.0,
+      0.005,
+      0.0001
+     ],
+     "condim": 4
+    },
+    "start": {
+     "left": {
+      "closure": 0.0,
+      "holding": null
+     },
+     "right": {
+      "closure": 0.0,
+      "holding": null
+     }
+    }
    }
   },
-  "grippable": [
-   "ball"
-  ],
+  "grippable": [],
   "pelvis": [
    0.0,
    0.0,

@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-catch-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics catch on the same frozen instance as embodied-olympics-fun-catch-i00-privileged. Catch the fly ball: grip the baseball with a hand before it touches the ground or your body, and keep hold of it. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics catch on the same frozen instance as embodied-olympics-fun-catch-i00-privileged. Catch the fly ball: close the jaws of one of your grippers on the baseball before it touches the ground or your body, and keep it there. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "catch"]
 
@@ -34,7 +34,7 @@ instance_seed = 0
 reset_budget = 50
 expert_time_estimate_hours = 10.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (the real launch and flight; below 3 m the ball is put 0.12 m above the upturned palm at 3 m/s and really gripped); negatives: onto the trunk, touched while rising, dropped after the catch, a fall. The ball comes down 1.25 m from the robot after 3 s at 16.6 m/s: the walk and a palm placed within centimetres are the task; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_catch.py: positive by injection (the pitching machine's real fly ball, once past its apex and below 3 m, put at the open jaws' centre, then the real clamp and a 1 s hold), with both hands; the machine's ball leaves at 21.27 m/s and lands 1.32 m from the start; negatives: lands (nop), onto the trunk, touched while rising, dropped after the catch, resting in open jaws, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

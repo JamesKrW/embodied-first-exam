@@ -7,10 +7,19 @@
   "catches": 10,
   "min_rise_m": 0.3,
   "launch_time_s": 2.0,
-  "first_throw_rise_m": 0.5,
-  "waiting_above_palm_m": 0.14,
+  "machine_x_m": 1.0,
+  "machine_y_m": 0.185,
+  "machine_z_m": 0.55,
+  "machine_speed_m_s": 4.5454,
+  "machine_elevation_deg": 76.0,
+  "machine_azimuth_deg": 0.1024,
+  "feed_lead_s": 0.13,
+  "lob_apex_m": 0.4,
   "retouch_grace_s": 0.1,
   "catch_window_s": 0.15,
+  "clamp_s": 0.05,
+  "release_s": 0.02,
+  "max_contact_angle_deg": 45.0,
   "fall_pelvis_m": 0.35
  },
  "title": "Juggling: a three-ball cascade",
@@ -23,15 +32,16 @@
  ],
  "rulebook": "No rule book: the three-ball cascade as jugglers define and count it (siteswap 3; the International Jugglers' Association counts a run in catches): each ball is thrown from one hand and caught by the other, the hands throw in turn, the balls follow one another in a fixed order; a run ends with a drop",
  "deviations": [
-  "A hand holds one ball at a time by a grip switched on and off (it closes on a ball whose surface is within 3.5 cm of the palm and that moves no faster than 6 m/s relative to it), so \"two balls in one hand at the start\" is modelled: the first of the two (the red ball) waits 0.14 m above the right palm and is thrown by the venue at t = 2.0 s, on an arc that rises 0.5 m and comes down on where the left palm is at the start. Until then it may not be touched.",
-  "A throw is a release after which the ball, touching nothing, rises at least 0.3 m above where it was let go; a hand-to-hand pass is not a throw. So that a ball laid on the other hand and lifted is not one, the rise counts only until the ball first touches you again, and from that first touch the other hand has 0.15 s to grip it.",
+  "The hands are Unitree's Dex1-1 two-jaw grippers (90 mm stroke, jaws 80 mm long and 34 mm wide with rubber pads, at most 120 N of grip, opening and closing at most 375 mm/s); nothing is welded. A gripper holds one ball between its jaws, so \"two balls in one hand at the start\" is modelled: the third ball (the red one) is thrown into the left gripper by a small two-wheel ball machine on the ground 1.0 m in front of you at about t = 2.0 s, on a lob about 0.4 m above the jaws that comes down on where the left gripper's jaw centre is at the start; its first catch counts as a catch of a ball thrown by the right hand. Until it is thrown it may not be touched.",
+  "A catch is the pads of both jaws of the catching gripper pressing on the ball from its two sides (each with a contact within 45.0 degrees of the jaws' closing direction) for 0.05 s without a break, the clamp beginning at the latest 0.15 s after the ball first touched you again; a ball is in a hand from its catch until it has touched nothing of that gripper for 0.02 s (released, at its last contact: a ball that rattles in the jaws is not released), and it may touch nothing of you but that gripper.",
+  "A throw is a release after which the ball, touching nothing, rises at least 0.3 m above where it left the gripper; a hand-to-hand pass is not a throw. So that a ball laid on the other hand and lifted is not one, the rise counts only until the ball first touches you again.",
   "The balls are spheres of a juggling ball's size and mass with a soft bounce; they fly in air (MuJoCo's ellipsoid fluid model: drag, a quasi-steady model), still air."
  ],
  "texts": {
-  "sentence": "Juggle three balls in a cascade: throw each ball from one hand in an arc to the other, the hands in turn, until 10 catches have been made in a row.",
-  "rules": "Three balls (0.07 m across, 0.13 kg). At the start your forearms are level, the palms up; the blue ball is gripped on your left palm, the yellow ball on your right palm, and the red ball waits 0.14 m above your right palm: it stands for the second ball of the right hand and is thrown for you at t = 2.0 s, on an arc that rises 0.5 m and comes down on where your left palm is at the start. Before that it may not be touched (by you or by a ball you hold). A hand grips one ball at a time: its grip closes on a ball whose surface is within 3.5 cm of the palm and that moves no faster than 6 m/s relative to it. A throw: a hand lets go of its ball and the ball, touching nothing but air, rises at least 0.3 m above the point where it was let go; only the rise before the ball first touches you again counts. A catch: a hand grips a ball that has been thrown by the other hand (the red ball's first throw counts as the right hand's), at the latest 0.15 s after the ball first touched you again. The cascade's order: the catches alternate between the hands, the left hand first, and take the balls in the order red, blue, yellow, red, ... You succeed at the 10th catch. You fail if a ball touches the ground; if a ball in flight touches any part of you other than a hand, or still touches the hand that threw it later than 0.1 s after the release; if a ball is gripped by the hand that let go of it, or before it has risen 0.3 m; if a ball that has touched a hand again is not gripped within 0.15 s (it rests on the hand or bounces off it); if a catch is out of the cascade's order (the wrong hand or the wrong ball); if the waiting ball is touched before its launch; if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than your feet on the ground); or after 20 s.",
-  "venue": "You stand on level ground, nothing around you. Your forearms point forwards, level, the palms up, about 0.38 m apart; a ball lies gripped on each, and the red ball hangs above the yellow one over your right palm until it is thrown towards your left hand. A ball is released when its hand's grip is switched off.",
-  "difficulty": "Each throw has to land on a palm a few centimetres wide 0.4 m away, about 0.6 s later, and the catching hand must have thrown its own ball before: three balls, two hands, never two in one. Errors add up from throw to throw, because a ball is thrown from wherever it was caught."
+  "sentence": "Juggle three balls in a cascade: throw each ball from one gripper in an arc to the other, the hands in turn, catching each between the jaws, until 10 catches have been made in a row.",
+  "rules": "Three balls (0.07 m across, 0.13 kg). Both your hands are two-jaw grippers (90 mm stroke, jaws 80 mm long with rubber pads on their inner faces, at most 120 N of grip) that hold things only by friction. At the start your forearms point forwards and your grippers' jaws point up; the blue ball is held between the jaws of your left gripper, the yellow ball between those of your right gripper, and the red ball rests in a small ball machine on the ground 1.0 m in front of you: it stands for the second ball of the right hand and is thrown for you at about t = 2.0 s (it is thrown when it has left the machine's wheels), on a lob about 0.4 m above your jaws that comes down on where the centre of your left gripper's jaws is at the start. Before that it may not be touched (by you or by a ball you hold). A catch: the pads of both jaws of a gripper press on a ball from its two sides (each with a contact whose direction is within 45.0 degrees of the jaws' closing direction: a ball lying on the jaws' tips or edges is not caught) for 0.05 s without a break, on a ball that has been thrown by the other hand (the red ball's first throw counts as the right hand's), the clamp beginning at the latest 0.15 s after the ball first touched you again. A ball is in a hand from its catch (the blue and the yellow ball from the start) until it has touched nothing of that gripper for 0.02 s: its release, at its last contact with the gripper; a ball in a hand may touch nothing of you but that gripper. A throw: after the release the ball, touching nothing but air, rises at least 0.3 m above the point where it left the gripper; only the rise before the ball first touches you again counts. The cascade's order: the catches alternate between the hands, the left hand first, and take the balls in the order red, blue, yellow, red, ... You succeed at the 10th catch. You fail if a ball touches the ground; if a ball in a hand touches any part of you other than that gripper (the other gripper included); if a ball in flight touches any part of you other than a gripper, or still touches the gripper that released it later than 0.1 s after the release; if a ball is caught by the gripper that released it, or before it has risen 0.3 m; if a ball that has touched a gripper again is not clamped within 0.15 s (it rests on the gripper or bounces off it); if a catch is out of the cascade's order (the wrong hand or the wrong ball); if the waiting ball is touched before its launch; if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than your feet on the ground); or after 20 s.",
+  "venue": "You stand on level ground, nothing around you. Your forearms point forwards, the grippers' jaws point up and close across your body (left-right), their centres about 0.37 m apart and 1.1 m above the ground; a ball is held between the jaws of each, and the red ball waits in a small two-wheel ball machine on the ground 1.0 m in front of you, which lobs it onto your left gripper. A gripper's closure command closes its jaws; with them open, a ball rests on the gripper's housing between the jaws.",
+  "difficulty": "Each throw has to come down between jaws that leave 10 mm on each side of the ball, 0.4 m away, about 0.6 s later, the jaws must close on it within a few hundredths of a second before it bounces off, and the catching gripper must have thrown its own ball before: three balls, two hands, never two in one. A throw is the gripper opening while the arm moves, and errors add up from throw to throw, because a ball is thrown from wherever it was caught."
  },
  "robot": "unitree_g1",
  "sim": {
@@ -39,7 +49,7 @@
   "mujoco": "3.3.7"
  },
  "t0": {
-  "state_sha": "6934a0c6194300754df89d76f8d91a3f3b65c7f68882490471597f6f2a87de91",
+  "state_sha": "7a2a5832cb79f3c805259f7b53f9e00e22b0fa823348b0e37525d770af5d3616",
   "control_dt": 0.01,
   "horizon_steps": 2000,
   "raw_dim": 151,
@@ -109,7 +119,7 @@
      1.0,
      1.0
     ],
-    "meaning": "the platform holds the legs in the stance; you give the waist's 3 and the arms' 14 joint targets (rad)"
+    "meaning": "the platform holds the legs in the stance; you give the waist's 3 and the arms' 14 joint targets (rad) (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "walk": {
     "dim": 22,
@@ -185,7 +195,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets"
+    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "run": {
     "dim": 5,
@@ -210,7 +220,7 @@
      1.0,
      1.0
     ],
-    "meaning": "the running policy drives all 29 joints from the velocity command (it swings the arms)"
+    "meaning": "the running policy drives all 29 joints from the velocity command (it swings the arms) (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "run_arms": {
     "dim": 19,
@@ -277,7 +287,7 @@
      1.0,
      1.0
     ],
-    "meaning": "the running policy drives the legs and the waist; you give the 14 arm joint targets"
+    "meaning": "the running policy drives the legs and the waist; you give the 14 arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "joints": {
     "dim": 31,
@@ -380,7 +390,7 @@
      1.0,
      1.0
     ],
-    "meaning": "you give all 29 joint targets (rad); the default PD gains, no feed-forward"
+    "meaning": "you give all 29 joint targets (rad); the default PD gains, no feed-forward (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "lowcmd": {
     "dim": 147,
@@ -831,7 +841,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's LowCmd for all 29 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz"
+    "meaning": "Unitree's LowCmd for all 29 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "walk_falcon": {
     "dim": 22,
@@ -907,7 +917,7 @@
      1.0,
      1.0
     ],
-    "meaning": "FALCON's walking policy (LeCAR-Lab, trained with arm motions and forces on the hands; it also nudges the wrists) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets"
+    "meaning": "FALCON's walking policy (LeCAR-Lab, trained with arm motions and forces on the hands; it also nudges the wrists) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    },
    "walk_agile": {
     "dim": 22,
@@ -983,7 +993,7 @@
      1.0,
      1.0
     ],
-    "meaning": "AGILE's velocity-height walking policy (NVIDIA WBC-AGILE, trained while the arms and the waist moved) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets"
+    "meaning": "AGILE's velocity-height walking policy (NVIDIA WBC-AGILE, trained while the arms and the waist moved) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
    }
   },
   "hold": {
@@ -992,20 +1002,20 @@
     0.0,
     0.0,
     0.0,
-    0.2,
-    0.2,
-    0.0,
-    -0.29,
-    0.0,
-    0.0,
-    0.0,
-    0.2,
-    -0.2,
-    0.0,
-    -0.29,
-    0.0,
-    0.0,
-    0.0,
+    -0.228,
+    -0.056,
+    0.39,
+    0.181,
+    -1.45,
+    0.309,
+    -1.534,
+    -0.207,
+    -0.04,
+    -0.218,
+    0.198,
+    -1.565,
+    -0.163,
+    -1.534,
     1.0,
     1.0
    ]
@@ -1153,7 +1163,13 @@
    "cmd_vx",
    "cmd_vy",
    "cmd_wz",
-   "time_s"
+   "time_s",
+   "jaw_opening_left",
+   "jaw_speed_left",
+   "jaw_force_left",
+   "jaw_opening_right",
+   "jaw_speed_right",
+   "jaw_force_right"
   ],
   "cameras": {
    "head_left": {
@@ -1233,7 +1249,7 @@
    "name": "unitree_g1",
    "title": "Unitree G1",
    "revision": "g1-4",
-   "model": "Unitree G1, 29 joints, 1.32 m, 33 kg (RoboOlympics robot library g1-4: MuJoCo Menagerie's unitree_g1 with Unitree's joint, speed and torque limits and motor torque-speed curves)",
+   "model": "Unitree G1, 29 joints, 1.32 m, 34 kg (RoboOlympics robot library g1-4: MuJoCo Menagerie's unitree_g1 with Unitree's joint, speed and torque limits and motor torque-speed curves)",
    "joints": [
     "left_hip_pitch",
     "left_hip_roll",
@@ -1605,7 +1621,7 @@
     0.0,
     0.0
    ],
-   "mass_kg": 33.34,
+   "mass_kg": 34.44,
    "height_m": 1.32,
    "pelvis_height_standing_m": 0.793,
    "control_dt_s": 0.01,
@@ -1629,17 +1645,44 @@
      0.5
     ]
    ],
-   "grip": {
-    "reach_m": 0.035,
-    "max_relative_speed_m_s": 6.0,
-    "rule": "a closed grip holds the nearest grippable object whose surface is within reach_m of the palm (a point 4.5 cm beyond the wrist flange along the forearm) and that moves no faster than max_relative_speed_m_s relative to it; opening the grip lets it go"
+   "real_hands": {
+    "kind": "dex1",
+    "model": "Unitree Dex1-1 two-finger parallel gripper (modelled: 0.55 kg, jaws 80 mm long, 90 mm stroke, rubber pads)",
+    "sides": [
+     "left",
+     "right"
+    ],
+    "stroke_m": 0.09,
+    "jaw_length_m": 0.08,
+    "force_limit_n": 120.0,
+    "setpoint_opening_speed_m_s": 0.375,
+    "jaw_speed_note": "the limit is the servo setpoint's; the jaws can move briefly up to about 0.45 m/s when a clamp springs open",
+    "servo": {
+     "kp_n_per_m": 20000.0,
+     "kd_n_s_per_m": 80.0,
+     "rule": "each jaw: a setpoint moves towards 45 mm x closure at most half setpoint_opening_speed_m_s (opening, it starts from the jaws' position); force = clip(kp (setpoint - q) - kd dq, -force_limit_n, force_limit_n); the clamp on an object is min(force_limit_n, 10 N per mm that the commanded opening 90 mm x (1 - closure) is below the object's width)"
+    },
+    "pad": {
+     "friction": [
+      1.0,
+      0.005,
+      0.0001
+     ],
+     "condim": 4
+    },
+    "start": {
+     "left": {
+      "closure": 1.0,
+      "holding": "ball_b"
+     },
+     "right": {
+      "closure": 1.0,
+      "holding": "ball_c"
+     }
+    }
    }
   },
-  "grippable": [
-   "ball_a",
-   "ball_b",
-   "ball_c"
-  ],
+  "grippable": [],
   "pelvis": [
    0.0,
    0.0,

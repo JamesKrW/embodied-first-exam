@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-toes-to-bar-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics toes-to-bar on the same frozen instance as embodied-olympics-fun-toes-to-bar-i00-privileged. Hanging from the high bar by both hands, do five toes-to-bar: bring both feet up to touch the bar between your hands, and come back to the full hang each time, without letting go. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics toes-to-bar on the same frozen instance as embodied-olympics-fun-toes-to-bar-i00-privileged. Hanging from the high bar by the two grippers that are your hands, do five toes-to-bar: bring both feet up to touch the bar between your hands, and come back to the full hang each time, without letting go. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "toes-to-bar"]
 
@@ -34,7 +34,7 @@ instance_seed = 0
 reset_budget = 50
 expert_time_estimate_hours = 5.0
 oracle = "full"
-oracle_evidence = "Reference: a knee-tuck snap with bent elbows, timed on the back-swing: 5 repetitions in 7.8 s; 12 of 12 variants when it was written. The privileged twin's reference rows (778 control steps, success after 7.78 s) streamed through the client."
+oracle_evidence = "Reference: five slow strict toes-to-bar on the fixed bar with two Dex1-1 friction grips and limp wrists (lowcmd rows): 43.0 s of 60, the bar sliding from 19 to 56 mm along the 80 mm jaws; 10 of 10 variations of its own parameters succeed (40-45 s). With default wrist gains the bar leaves the jaws on rep 3; a kipped snap tears it out in 0.15 s. The privileged twin's reference rows (4298 control steps, success after 42.98 s) streamed through the client."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

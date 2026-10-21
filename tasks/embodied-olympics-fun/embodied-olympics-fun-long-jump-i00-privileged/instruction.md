@@ -17,7 +17,7 @@ to your left, +z is up; the floor is z = 0.
 
 - TR 30.1.3 (somersaulting) and TR 30.1.6 / 30.2 (how the athlete leaves the landing area) are not judged; the landing is judged for 2.0 s from the first contact with the sand
 - TR 29.3 (the plasticine indicator board): no imprint; the take-off line is judged geometrically: a foot on the ground with any part of it (also a part in the air) on or over the line's plane is a failure
-- TR 29.6 (the sand): the pit is a box with a soft, overdamped, high-friction contact (time constant 0.05 s, full stiffness only 0.04 m deep, friction 1.5); it gives under the feet but keeps no imprint, so the mark is the contact with the sand nearest the take-off line
+- TR 29.6 (the sand): the pit is a box whose contact follows the sinking of a plate into dry silica sand (a resistance growing in proportion to depth, Agarwal et al. 2019; friction 0.67, the sand's internal friction; MuJoCo's contact fitted to that law on this robot: a time constant of 0.15 s, damping ratio 2.0, an impedance falling from 0.95 to 0.4 over 0.05 m): it gives 7 mm under the standing robot and about 7 cm under a landing at 2.5 m/s and does not push back; it is not loose damp sand that flows, it is not raked, and it keeps no imprint, so the mark is the contact with the sand nearest the take-off line
 - TR 30 does not define a jump; here the flight into the pit must raise the pelvis at least 0.05 m above its height at lift-off (pulling the feet up and falling into the pit is no jump)
 - the rule book's wind gauge: there is no wind; the athlete alone, one trial
 

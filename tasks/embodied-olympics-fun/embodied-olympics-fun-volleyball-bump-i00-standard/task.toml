@@ -34,7 +34,7 @@ instance_seed = 0
 reset_budget = 50
 expert_time_estimate_hours = 8.0
 oracle = "full"
-oracle_evidence = "Reference: a walk to where the serve comes down, then a forearm platform on the walking policy, from a technique found offline by CMA-ES (Embodied Olympics' method): 11.4 m/s in, 7.3 m/s out, up to 3.08 m, down 0.13 m from the target's centre. Open loop on the frozen start, not robust. Referee test negatives: the passive rebound, below net height, the body, a second touch, held, under the net, a net touch, over the centre line The privileged twin's reference rows (581 control steps, success after 5.81 s) streamed through the client."
+oracle_evidence = "Reference: a walk forward and to the left, then a forearm platform (the forearms parallel, wrists down, held still through the contact), the pose from a forward-kinematics search and the walk, timing and offsets from CMA-ES. The serve comes from a volleyball machine on a stand behind the far end line (exit 13.8 m/s, 25 deg, no spin, at 2.6 m); the ball touches only the right forearm (not the wrist housing), comes in at 11.3 m/s, leaves at 7.2 m/s, rises to 3.22 m and lands 0.42 m from the target centre; it is open loop on the one serve: 18 of 32 perturbations succeed (arm gains x0.97-1.03 6 of 6, arm timing +-0.05 s 6 of 8, key durations x0.97-1.03 4 of 6; a serve aimed 0.05 deg off arrives 0.6-1.1 m away and fails). Negatives: a passive rebound, below net height, the body, a second touch, held, under the net, a net touch, the centre line, touching the machine. The privileged twin's reference rows (580 control steps, success after 5.8 s) streamed through the client."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

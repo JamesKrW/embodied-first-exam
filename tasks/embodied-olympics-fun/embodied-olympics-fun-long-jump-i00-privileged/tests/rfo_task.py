@@ -23,12 +23,26 @@ def span(w, ids, axis):
     return float(np.min(p - half)), float(np.max(p + half))
 
 
+# The sand, from granular physics. A plate pushed into dry silica sand (Quikrete medium sand: 0.3-0.8 mm grains,
+# packing 0.6) meets a pressure that grows in proportion to its depth, 2.02 N/cm^2 per cm (the resistive-force constant
+# measured by plate penetration: Agarwal, Senatore, Zhang, Kingsbury, Iagnemma, Goldman and Kamrin, "Modeling of the
+# interaction of rigid wheels with dry granular media", Journal of Terramechanics 85, 1-14 (2019), Table 1), and its
+# angle of internal friction is 34 degrees (friction tan 34 deg = 0.67, the same table). For the G1's two soles (each
+# 0.18 m x 0.07 m: the feet's sole spheres) that law sinks the standing robot (33.3 kg) 6.4 mm and stops it 71 mm deep
+# when it lands feet first at 2.5 m/s; sand is plastic and does not push back. MuJoCo's contact is a spring-damper
+# normalised by the bodies' masses, not a pressure law, so its numbers are fitted to those two depths on the G1 itself
+# (the group's probe_sand.py): time constant 0.15 s, damping ratio 2 (overdamped: no bounce), an impedance that falls
+# from 0.95 at the surface to 0.40 at 5 cm (stiff at first, then yielding, as sand ahead of a sinking foot does);
+# measured: 7.4 mm standing, 75 mm for the 2.5 m/s landing, 0.10 m/s of rebound. Sand keeps no imprint here.
+SAND_CONTACT = dict(sand_timeconst_s=0.15, sand_dampratio=2.0, sand_imp0=0.95, sand_imp1=0.40, sand_give_m=0.05,
+            sand_friction=0.67)
+
+
 def sand_venue(sc, p, x_back=-45.0, x_front_margin=6.0, half_y=8.0):
     """The level ground with a sand pit let into it. The core's floor plane cannot have a hole, so it is lowered out
     of the way and the ground is built of slabs whose tops are z = 0, around a box of sand whose top is z = 0 too
-    (TR 29.6: the sand level with the take-off board). The sand's contact is soft and overdamped (a time constant
-    of sand_timeconst_s, an impedance that rises from 0.5 to 0.9 over sand_give_m of penetration: it gives a centimetre
-    or two under a standing G1 and does not bounce) with high friction, and wins every contact it is in."""
+    (TR 29.6: the sand level with the take-off board). The sand's contact (SAND_CONTACT above) wins every
+    contact it is in."""
     floor = next(g for g in sc.wb.iter("geom") if g.get("name") == "floor")
     floor.set("pos", "0 0 -1")
     x0, x1, hw = p["board_to_pit_m"], p["board_to_pit_m"] + p["pit_length_m"], p["pit_width_m"] / 2
@@ -39,8 +53,8 @@ def sand_venue(sc, p, x_back=-45.0, x_front_margin=6.0, half_y=8.0):
         sc.box(name, ((a + b) / 2, (c + d) / 2, -SLAB / 2), ((b - a) / 2, (d - c) / 2, SLAB / 2), rgba=GRASS,
                solid="stand", friction=(1.0, 0.005, 0.0001))
     sc.box("sand", ((x0 + x1) / 2, 0.0, -SLAB / 2), ((x1 - x0) / 2, hw, SLAB / 2), rgba=SAND, solid="stand",
-           friction=(p["sand_friction"], 0.02, 0.002), solref=(p["sand_timeconst_s"], 1.0),
-           solimp=(0.5, 0.9, p["sand_give_m"], 0.5, 2), priority=1, condim=4)
+           friction=(p["sand_friction"], 0.02, 0.002), solref=(p["sand_timeconst_s"], p["sand_dampratio"]),
+           solimp=(p["sand_imp0"], p["sand_imp1"], p["sand_give_m"], 0.5, 2), priority=1, condim=4)
     sc.ground += list(slabs) + ["sand"]
     rw = p["runway_width_m"] / 2
     sc.box("runway", ((x0 - p["runway_m"]) / 2, 0, 0.0003), ((x0 + p["runway_m"]) / 2, rw, 0.0003), rgba=TRACK)
@@ -66,9 +80,13 @@ class Task(TaskBase):
         "the landing is judged for {mark_window_s} s from the first contact with the sand",
         "TR 29.3 (the plasticine indicator board): no imprint; the take-off line is judged geometrically: a foot on "
         "the ground with any part of it (also a part in the air) on or over the line's plane is a failure",
-        "TR 29.6 (the sand): the pit is a box with a soft, overdamped, high-friction contact (time constant "
-        "{sand_timeconst_s} s, full stiffness only {sand_give_m} m deep, friction {sand_friction}); it gives under "
-        "the feet but keeps no imprint, so the mark is the contact with the sand nearest the take-off line",
+        "TR 29.6 (the sand): the pit is a box whose contact follows the sinking of a plate into dry silica sand (a "
+        "resistance growing in proportion to depth, Agarwal et al. 2019; friction {sand_friction}, the sand's internal "
+        "friction; MuJoCo's contact fitted to that law on this robot: a time constant of {sand_timeconst_s} s, damping "
+        "ratio {sand_dampratio}, an impedance falling from {sand_imp0} to {sand_imp1} over {sand_give_m} m): it gives "
+        "7 mm under the standing robot and about 7 cm under a landing at 2.5 m/s and does not push back; it is not "
+        "loose damp sand that flows, it is not raked, and it keeps no imprint, so the mark is the contact with the "
+        "sand nearest the take-off line",
         "TR 30 does not define a jump; here the flight into the pit must raise the pelvis at least {rise_min_m} m "
         "above its height at lift-off (pulling the feet up and falling into the pit is no jump)",
         "the rule book's wind gauge: there is no wind; the athlete alone, one trial",
@@ -78,7 +96,7 @@ class Task(TaskBase):
     stages = ["take-off", "landing"]
     fall_rule = False                # no rule of the event says a fall is a failure; the contacts below judge it
     params = dict(runway_m=40.0, runway_width_m=1.22, board_length_m=0.20, board_to_pit_m=1.0, pit_length_m=9.0,
-                  pit_width_m=2.75, sand_timeconst_s=0.05, sand_give_m=0.04, sand_friction=1.5, min_air_s=0.05, rise_min_m=0.05,
+                  pit_width_m=2.75, **SAND_CONTACT, min_air_s=0.05, rise_min_m=0.05,
                   mark_window_s=2.0)
 
     sentence = ("Do a long jump: run up, take off behind the take-off line, fly over the metre of runway beyond it "

@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-juggling-i00-privileged"
-description = "Embodied Olympics juggling (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Juggle the football: drop it from your hand and keep it in the air for ten touches in a row with your feet, legs or head, without it touching the ground or a hand again. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics juggling (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Juggle the football: drop it from between your palms and keep it in the air for ten touches in a row with your feet, legs or head, without it touching the ground or a hand again. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "juggling"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 8.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a real release, then ten real head contacts with the ball sent up again at 2.6 m/s each time); negatives: passive bouncing (one counted touch), nine then the ground, rises too small, a handball, the trunk, carried, a re-grip. Nothing built in stands on one leg; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_juggling.py: positive by injection (the drop: the ball, held for real between the palms, taken to 0.35 m above the head; ten real head contacts, the ball sent up at 2.6 m/s each time); negatives: nop (the ball stays between the palms 30 s), arms opened (it drops to the ground), passive bouncing, rises too small, the real drop to the ground, a hand after the drop, the trunk, the head before the drop (only hands may hold), a carry, a fall. Nothing built in stands on one leg; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

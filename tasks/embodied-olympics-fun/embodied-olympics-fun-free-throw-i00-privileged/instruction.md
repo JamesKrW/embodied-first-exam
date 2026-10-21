@@ -1,25 +1,27 @@
 # embodied-olympics free-throw — instance i00
 
 You control a simulated Unitree H1-2 humanoid robot (27 joints, 1.78 m tall, 67 kg; the Embodied Olympics simulator on MuJoCo)
-via Python. **Task:** Shoot a free throw: from behind the free-throw line, throw the basketball in your right hand so that it enters the basket from above.
+via Python. **Task:** Shoot a free throw: from behind the free-throw line, shoot the basketball you hold pressed between your two palms so that it enters the basket from above.
 
 This is a *fixed instance*: the same venue and start every time. You may reset and retry as many times as you want.
 Your deliverable is **one replayable trajectory**, not a general policy.
 
 ## The venue
-A FIBA court. You stand inside the free-throw semi-circle facing the basket (+x), your pelvis 0.35 m behind the free-throw line's near edge and on the line through the ring's centre; the point under the ring's centre is 4.225 m beyond that edge. Painted on the floor: the restricted area, the free-throw line and circle, the three-point line, the no-charge semi-circle. The ball is against the end of your right fist. A ball is released when the hand's grip is switched off.
+A FIBA court. You stand inside the free-throw semi-circle facing the basket (+x), your pelvis 0.35 m behind the free-throw line's near edge and on the line through the ring's centre; the point under the ring's centre is 4.225 m beyond that edge. Painted on the floor: the restricted area, the free-throw line and circle, the three-point line, the no-charge semi-circle. The ball is pressed between your two palms in front of your chest, its centre about 1.3 m above the floor and 0.45 m ahead of your pelvis: your upper arms are a little forward, your forearms a little raised and turned in so that the palms squeeze it; the start command keeps that squeeze (the joint table's start angles are a little further in than the arms stand: the difference is the squeeze). Your hands have no grip: the grip columns of the action rows do nothing in this task.
 
 Frame: metres; the origin is on the floor under your pelvis at the start, +x is the way you face at the start, +y is
 to your left, +z is up; the floor is z = 0. 
 
 ## The rules
-**Rule book:** FIBA Official Basketball Rules 2024: Art. 2 (court), Art. 3 and the Basketball Equipment appendix (backboard, ring, size-7 ball), Art. 16 (goal), Art. 43 (free throws). Where this task departs from it:
+**Rule book:** FIBA Official Basketball Rules 2024: Art. 2 (court), Art. 3 and the Basketball Equipment appendix (backboard, ring, size-7 ball), Art. 13 (how the ball is played: with the hands), Art. 14 (control: a player holds a live ball), Art. 16 (goal; a ball that passes through the basket from below is a violation), Art. 43 (free throws). Where this task departs from it:
 
-- Art. 3 (equipment): the hand holds the ball by a grip switched on and off, not by fingers; the ball is released when the grip is switched off.
+- Art. 3 (equipment): the hands are flat rubber palm pads without fingers; the ball is held only by pressing it between the two palms (friction), and it slips or drops when the arms do not press hard enough. Any shooting style is allowed (a two-handed set or push shot, an underhand two-handed shot); the ball is released when no hand touches it any more.
+- Art. 3 (equipment, the hand): the palm is modelled as the soft part of a hand: it absorbs the ball (a ball thrown at a still palm keeps 0.12 of its speed) instead of bouncing it like the floor (0.85); with the ball's own floor rebound on the palms a squeezed ball rattles out of them within about a second. The floor, the ring and the backboard keep the ball's rule-book rebound.
+- Art. 13.1.2 (the ball is played with the hands only) is read strictly: until the shot is through, the ball may touch no part of you but your hands (palm pads and wrists); holding it against the trunk, the arms or a leg is not a hold of this task.
 - Basketball Equipment (basket): the ring is rigid (no pressure release) and the net is only drawn: it does not slow the ball. A goal is judged at the ring: the ball's centre down through the ring's plane and on to one ball diameter below it.
 - Art. 43.2.3: the ball is at your disposal at the start of the episode; there is no referee, no opponent and no rebound: one throw, and touching the ball after the release ends the attempt.
 
-The official basket: a rigid ring of 0.45 m inner diameter (0.018 m metal), its top edge 3.05 m above the floor, its centre 0.375 m in front of a backboard 1.8 m wide and 1.05 m high whose lower edge is 2.9 m above the floor. The ball is a size-7 basketball (0.239 m across, 0.62 kg, it keeps 0.85 of its speed in a bounce on the floor); it flies in air (drag and spin lift). It starts gripped in your right hand and is at your disposal at the start. The free-throw line's edge nearest to you is 4.225 m from the point under the ring's centre; the free-throw semi-circle has a radius of 1.8 m round the middle of that edge. You succeed when, after you have let go of the ball, its centre goes down through the ring's plane inside the ring and on down to one ball diameter below it. You fail if you have not let go of the ball within 5.0 s; if, before the ball has touched the ring or entered the basket, any part of you touches the floor on or beyond the free-throw line's near edge or outside the semi-circle; if any part of you touches the ball more than 0.05 s after you let go of it (it cannot be gripped again); if the ball touches the floor before it is through the ring; if the ball's centre comes up through the ring from below; if you fall before the ball is through (a fall: your pelvis lower than 0.35 m above the floor, or any part of you other than your feet on the floor); or after 12 s.
+The official basket: a rigid ring of 0.45 m inner diameter (0.018 m metal), its top edge 3.05 m above the floor, its centre 0.375 m in front of a backboard 1.8 m wide and 1.05 m high whose lower edge is 2.9 m above the floor. The ball is a size-7 basketball (0.239 m across, 0.62 kg, it keeps 0.85 of its speed in a bounce on the floor); it flies in air (drag and spin lift). Your hands have no fingers and no grip: the ball starts pressed between your two flat palms and is at your disposal at the start; only the force of your arms and friction hold it, and it can slip out. A hand is the palm pad and the wrist; a hand is on the ball while it touches the ball, gaps shorter than 0.03 s included; the ball is in your hands while at least one hand is on it. The release is the moment the ball is no longer in your hands (no hand on it); the ball can be released only once: a ball that slips or drops out of your hands is released too. The free-throw line's edge nearest to you is 4.225 m from the point under the ring's centre; the free-throw semi-circle has a radius of 1.8 m round the middle of that edge. You succeed when, after the release, the ball's centre goes down through the ring's plane inside the ring and on down to one ball diameter below it. You fail if the ball has not been released within 5.0 s; if, before the release, the ball touches any part of you other than your hands; if, before the ball has touched the ring or entered the basket, any part of you touches the floor on or beyond the free-throw line's near edge or outside the semi-circle; if any part of you touches the ball more than 0.05 s after the release (it cannot be taken again); if the ball touches the floor before it is through the ring; if the ball's centre comes up through the ring from below; if you fall before the ball is through (a fall: your pelvis lower than 0.35 m above the floor, or any part of you other than your feet on the floor); or after 12 s.
 
 A referee decides this from the simulator's state after every physics step (1 ms): the events that must happen, in
 order, are **release → through the ring**. The attempt ends at the success (that moment is the success), at the first rule violation,
@@ -79,7 +81,7 @@ One row is one control step (10 ms; the physics runs at 1 kHz). Every row ends w
 | `joints` | all 27 joint targets | 29 | you give all 27 joint targets (rad); the default PD gains, no feed-forward |
 | `lowcmd` | all 27 joints × (`q`, `dq`, `tau`, `kp`, `kd`): 27 targets, then 27 velocities, 27 torques, 27 kp, 27 kd | 137 | Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz |
 
-Velocity commands are in the robot's own frame (`vx` forward, `vy` to its left, m/s; `wz` turning left, rad/s). Bounds: `walk` |vx| ≤ 0.8, |vy| ≤ 0.5, |wz| ≤ 1.57. Joint targets are absolute angles (rad). Values outside the bounds are clipped. `grip_left`, `grip_right`: ≥ 0.5 closes the hand's grip, < 0.5 opens it. At the start the robot is in `stand` mode, but not with the arms at rest (the venue text says how it starts): the joint table's last column has the angles in force. The right grip is closed at the start. The `stand` row that keeps the start as it is: `[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]` (`s.hold()` returns it); a `stand` row with other angles or grips moves the arms or lets go.
+Velocity commands are in the robot's own frame (`vx` forward, `vy` to its left, m/s; `wz` turning left, rad/s). Bounds: `walk` |vx| ≤ 0.8, |vy| ≤ 0.5, |wz| ≤ 1.57. Joint targets are absolute angles (rad). Values outside the bounds are clipped. `grip_left`, `grip_right`: ≥ 0.5 closes the hand's grip, < 0.5 opens it. At the start the robot is in `stand` mode, but not with the arms at rest (the venue text says how it starts): the joint table's last column has the angles in force. The `stand` row that keeps the start as it is: `[0, -0.2, -0.05, -0.074, -0.3, -0, 0, -0, -0.2, 0.05, 0.074, -0.3, 0, 0, 0, 0, 0]` (`s.hold()` returns it); a `stand` row with other angles or grips moves the arms or lets go.
 
 Joint order everywhere (Unitree's SDK order), with each joint's range, speed limit, torque limit and default gains:
 
@@ -98,17 +100,17 @@ Joint order everywhere (Unitree's SDK order), with each joint's range, speed lim
 | 10 | `right_ankle_pitch` | [-0.8973, 0.5236] | 9 | 60 | 160 | 8 | -0.2 |
 | 11 | `right_ankle_roll` | [-0.2618, 0.2618] | 9 | 40 | 160 | 8 | 0 |
 | 12 | `torso` | [-2.35, 2.35] | 23 | 200 | 600 | 15 | 0 |
-| 13 | `left_shoulder_pitch` | [-3.14, 1.57] | 9 | 40 | 300 | 6 | 0 |
-| 14 | `left_shoulder_roll` | [-0.38, 3.4] | 9 | 40 | 300 | 6 | 0 |
-| 15 | `left_shoulder_yaw` | [-2.66, 3.01] | 20 | 18 | 200 | 4 | 0 |
-| 16 | `left_elbow_pitch` | [-0.95, 3.18] | 20 | 18 | 200 | 4 | 0 |
-| 17 | `left_elbow_roll` | [-3.01, 2.75] | 31.4 | 19 | 80 | 1.5 | 0 |
+| 13 | `left_shoulder_pitch` | [-3.14, 1.57] | 9 | 40 | 300 | 6 | -0.2 |
+| 14 | `left_shoulder_roll` | [-0.38, 3.4] | 9 | 40 | 300 | 6 | -0.05 |
+| 15 | `left_shoulder_yaw` | [-2.66, 3.01] | 20 | 18 | 200 | 4 | -0.074 |
+| 16 | `left_elbow_pitch` | [-0.95, 3.18] | 20 | 18 | 200 | 4 | -0.3 |
+| 17 | `left_elbow_roll` | [-3.01, 2.75] | 31.4 | 19 | 80 | 1.5 | -0 |
 | 18 | `left_wrist_pitch` | [-0.47, 0.47] | 31.4 | 19 | 60 | 1 | 0 |
-| 19 | `left_wrist_yaw` | [-1.27, 1.27] | 31.4 | 19 | 60 | 1 | 0 |
-| 20 | `right_shoulder_pitch` | [-3.14, 1.57] | 9 | 40 | 300 | 6 | 0 |
-| 21 | `right_shoulder_roll` | [-3.4, 0.38] | 9 | 40 | 300 | 6 | 0 |
-| 22 | `right_shoulder_yaw` | [-3.01, 2.66] | 20 | 18 | 200 | 4 | 0 |
-| 23 | `right_elbow_pitch` | [-0.95, 3.18] | 20 | 18 | 200 | 4 | 0 |
+| 19 | `left_wrist_yaw` | [-1.27, 1.27] | 31.4 | 19 | 60 | 1 | -0 |
+| 20 | `right_shoulder_pitch` | [-3.14, 1.57] | 9 | 40 | 300 | 6 | -0.2 |
+| 21 | `right_shoulder_roll` | [-3.4, 0.38] | 9 | 40 | 300 | 6 | 0.05 |
+| 22 | `right_shoulder_yaw` | [-3.01, 2.66] | 20 | 18 | 200 | 4 | 0.074 |
+| 23 | `right_elbow_pitch` | [-0.95, 3.18] | 20 | 18 | 200 | 4 | -0.3 |
 | 24 | `right_elbow_roll` | [-2.75, 3.01] | 31.4 | 19 | 80 | 1.5 | 0 |
 | 25 | `right_wrist_pitch` | [-0.47, 0.47] | 31.4 | 19 | 60 | 1 | 0 |
 | 26 | `right_wrist_yaw` | [-1.27, 1.27] | 31.4 | 19 | 60 | 1 | 0 |

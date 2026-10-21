@@ -1,8 +1,9 @@
-"""Basketball catch and shoot (FIBA): a chest pass comes to you at the top of the key; catch it and shoot from there:
-the ball enters the basket from above. Official court, backboard, ring and size-7 ball; the Unitree H1-2."""
+"""Basketball catch and shoot (FIBA): a chest pass comes to you at the top of the key; catch it
+between your two bare palms (no grip: squeeze and friction alone) and shoot from there: the ball enters the basket from
+above. Official court, backboard, ring and size-7 ball; the Unitree H1-2."""
 import math
+import xml.etree.ElementTree as ET
 
-import mujoco
 import numpy as np
 
 from rfo.referee import Crossing, HoopPass
@@ -10,7 +11,6 @@ from rfo.scene import HITTABLE, OFFICIAL, VISUAL, bounce_solref
 from rfo.task import TaskBase
 
 BALL = OFFICIAL["basketball"]            # size 7: 0.1195 m radius, 0.62 kg, rebound 0.85, drag and Magnus lift in air
-FALL_Z = 0.35
 
 # ---- the FIBA court (this block is the same in every basketball family; a task directory holds one module) ----
 # FIBA Official Basketball Rules 2024, Art. 2 (the court: distances from the inner edge of the end line, lines 5 cm
@@ -101,14 +101,6 @@ def build_court(sc, hx: float, hy: float, p: dict, flip: bool = False) -> dict:
     return dict(x=hx, y=hy, z=p["ring_height_m"], inner_radius=p["ring_inner_diameter_m"] / 2, end_line_x=X(de),
                 free_throw_line_x=X(df), board_face_x=X(bx))
 
-
-def ball_in_hand(w, side: str = "right") -> None:
-    """The ball against the end of the fist, gripped."""
-    m, d = w.m, w.d
-    mujoco.mj_kinematics(m, d)
-    b = w.robot.mount[side]
-    w.put("ball", d.xpos[b] + d.xmat[b].reshape(3, 3) @ np.array([0.0, 0.0, 0.105 + BALL["radius"]]))
-    w.grab(side, "ball", event=False)
 # ---- end of the court block ----
 
 
@@ -221,6 +213,27 @@ class Travel:
                 [self.feet[s].state() for s in ("left", "right")]]
 # ---- end of the travelling block ----
 
+# ---- the two-palm hold (from dunk's hold block: the pads and the palm-ball contact, byte-identical;
+# here the hands start empty, at rest, and the ball is caught between them) ----
+PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness and its centre along the forearm
+# The palm-ball contact. With the ball's own contact (its rule-book rebound, 0.85, a lightly damped spring) a ball
+# squeezed between two palms rattles and walks out of them in about a second, with pyramidal or elliptic friction
+# cones alike; a palm rebound of 0.42 drops it in 6 s, 0.27 lets it creep 5 mm/s. The palm is the soft part of a hand
+# and absorbs the ball: a critically damped contact (palm rebound 0.12, measured head-on at 3 m/s), with elliptic
+# friction cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py), holds a
+# still ball to 0.1 mm in 9 s. The floor, the ring and the backboard keep the ball's own contact (rebound 0.85).
+PALM_SOLREF, PALM_SOLIMP, PALM_MU, PALM_REBOUND = "0.005 1", "0.99 0.999 0.001", 0.7, 0.12
+CONE, IMPRATIO = "elliptic", 100.0
+
+
+def pad_face(w, side: str) -> tuple[np.ndarray, np.ndarray]:
+    """The centre of the pad's inner face (the mount's +x face) and its outward normal, in the world."""
+    d, b = w.d, w.robot.mount[side]
+    R = d.xmat[b].reshape(3, 3)
+    return d.xpos[b] + R @ np.array([PAD_HALF, 0.0, PAD_Z]), R[:, 0].copy()
+
+# ---- end of the hold ----
+
 
 class Task(TaskBase):
     name = "catch-and-shoot"
@@ -228,18 +241,29 @@ class Task(TaskBase):
     category = "basketball-and-rackets"
     robot = "unitree_h1"
     rulebook = ("FIBA Official Basketball Rules 2024: Art. 2 (court), Art. 3 and the Basketball Equipment appendix "
-                "(backboard, ring, size-7 ball), Art. 13 (how the ball is played), Art. 16 (goal), Art. 25 "
-                "(travelling)")
+                "(backboard, ring, size-7 ball), Art. 13 (how the ball is played: with the hands), Art. 14 (control: "
+                "a player holds a live ball), Art. 16 (goal; a ball that passes through the basket from below is a "
+                "violation), Art. 25 (travelling)")
     deviations = [
-        "Art. 3 (equipment): the hand holds the ball by a grip switched on and off, not by fingers: the grip takes "
-        "the ball when its surface is within 3.5 cm of the palm and it moves at most 6 m/s relative to the hand; the "
-        "ball is released when the grip is switched off.",
+        "Art. 3 (equipment): the hands are flat rubber palm pads without fingers and have no grip; the ball is caught "
+        "and held only by pressing it between the two palms (friction), and it slips or drops when the arms do not "
+        "press hard enough. Any shooting style is allowed (a two-handed set or push shot, an underhand two-handed "
+        "shot); the ball is released when no hand touches it any more.",
+        "Art. 3 (equipment, the hand): the palm is modelled as the soft part of a hand: it absorbs the ball (a ball "
+        "thrown at a still palm keeps "
+        f"{PALM_REBOUND:.2f} of its speed) instead of bouncing it like the floor ({BALL['bounce']:.2f}); with the "
+        "ball's own floor rebound on the palms a squeezed ball rattles out of them within about a second. The floor, "
+        "the ring and the backboard keep the ball's rule-book rebound.",
+        "Art. 14 (control) has no duration: here the ball is caught when both your hands have been on it together "
+        "for {catch_hold_s} s without a break (a two-palm hold that lasts, not a tap that passes it on).",
+        "Art. 13.1.2 (the ball is played with the hands only) is read strictly: from the pass until the shot is "
+        "through, the ball may touch no part of you but your hands (palm pads and wrists); trapping it against the "
+        "trunk, the arms or a leg is not a catch of this task, and a touch by a leg or a foot (always taken as "
+        "deliberate: intent cannot be judged) is a violation.",
         "Basketball Equipment (basket): the ring is rigid (no pressure release) and the net is only drawn: it does not "
         "slow the ball. A goal is judged at the ring: the ball's centre down through the ring's plane and on to one "
         "ball diameter below it.",
         "The pass is thrown by a machine, not a team-mate: always the same chest pass, at a fixed time.",
-        "Art. 13: a touch of the ball by a leg or a foot is always taken as deliberate (a violation); intent cannot "
-        "be judged.",
         "Art. 25.2.1: a ball caught with a foot off the floor is judged by the two-step rule without the pivoting "
         "it allows after a stop: after two steps no foot may touch the floor again while the ball is held.",
         "One attempt, no opponent, no rebound: a pass that is not caught on the fly, and touching the ball after the "
@@ -248,7 +272,10 @@ class Task(TaskBase):
     time_limit_s = 15.0
     start = (0.0, 0.0, 0.0)
     stages = ["catch", "release", "through the ring"]
-    fall_z = FALL_Z
+
+    @property
+    def fall_z(self) -> float:                    # (the referee's fall line: the parameter)
+        return float(self.p["fall_z_m"])
     # The pass: a chest pass of pass_speed_m_s from pass_distance_m away (the left wing, on the three-point line),
     # released pass_from_z_m high at pass_time_s and aimed at the point pass_to_x_m ahead of the robot's pelvis,
     # pass_to_z_m high: (pass_vx, pass_vy, pass_vz) is that pass (found by shooting it in this air; the test checks
@@ -257,54 +284,71 @@ class Task(TaskBase):
                   board_width_m=1.80, board_height_m=1.05, board_bottom_m=2.90, spot_to_ring_m=5.8,
                   pass_time_s=2.0, pass_speed_m_s=8.0, pass_distance_m=5.0, pass_from_x_m=1.05, pass_from_y_m=4.96,
                   pass_from_z_m=1.25, pass_to_x_m=0.40, pass_to_z_m=1.25, pass_vx=-0.9143, pass_vy=-6.9768, pass_vz=3.8063,
-                  max_steps=2, step_gap_s=0.03, pivot_slide_m=0.20, retouch_grace_s=0.05)
+                  max_steps=2, step_gap_s=0.03, pivot_slide_m=0.20, retouch_grace_s=0.05, touch_gap_s=0.03,
+                  catch_hold_s=0.10, fall_z_m=0.35)
 
-    sentence = ("Catch and shoot: catch the chest pass that comes to you from the left wing, then shoot from where "
-                "you stand so that the ball enters the basket from above.")
+    sentence = ("Catch and shoot: catch the chest pass that comes to you from the left wing between your two palms, "
+                "then shoot from where you stand so that the ball enters the basket from above.")
     rules = ("The official basket: a rigid ring of {ring_inner_diameter_m} m inner diameter ({ring_metal_m} m metal), "
              "its top edge {ring_height_m} m above the floor, its centre {ring_centre_to_board_m} m in front of a "
              "backboard {board_width_m} m wide and {board_height_m} m high whose lower edge is {board_bottom_m} m "
              "above the floor. The ball is a size-7 basketball (" + f"{2 * BALL['radius']:.3f} m across, "
              f"{BALL['mass']:.2f} kg, it keeps {BALL['bounce']:.2f} of its speed in a bounce on the floor" + "); it "
              "flies in air (drag and spin lift). It is passed to you {pass_time_s} s after the start: a chest pass "
-             "of {pass_speed_m_s} m/s from {pass_distance_m} m away. In order: you catch the ball (a hand's grip "
-             "takes it) before it has touched the floor; you let go of it (the shot); its centre goes down through "
-             "the ring's plane inside the ring and on down to one ball diameter below it, which is the success. "
-             "Travelling, from the catch to the shot's release: if both your feet are on the floor at the catch, the "
-             "first foot you lift makes the other your pivot foot; the pivot foot, and before a foot is lifted "
-             "either foot, may not slide more than {pivot_slide_m} m along the floor (in the steps case below: any "
-             "foot that is on the floor, from where it stood or was put down), and once it has left the floor no foot may touch the floor again before the ball "
-             "has left your hand. If a foot is off the floor at the catch, you may take at most {max_steps} steps "
-             "(a step: a foot touching the floor after it has been off it for at least {step_gap_s} s; both feet "
-             "landing within {step_gap_s} s of each other are one step; not the same foot twice in a row), and after "
-             "them no foot may touch the floor again before the release. You fail if anything of you touches the "
-             "ball before it is passed; if the passed ball touches the floor, or one of your legs or feet, before "
-             "you have caught it; if you travel; if any part of you touches the ball more than {retouch_grace_s} s "
-             "after the shot's release (it cannot be gripped again); if the ball touches the floor before it is "
-             "through the ring; if the ball's centre comes up through the ring from below; if you fall before the "
-             f"ball is through (a fall: your pelvis lower than {FALL_Z} m above the floor, or any part of you other "
-             "than your feet on the floor)" + "; or after {time_limit_s} s.")
-    venue = ("A FIBA court. You stand at the top of the key facing the basket (+x): the point under the ring's "
-             "centre is {spot_to_ring_m} m ahead of your pelvis (inside the three-point line; the free-throw line is "
-             "1.575 m ahead of you). The passer stands on the left wing: the ball waits {pass_from_x_m} m ahead of "
-             "you and {pass_from_y_m} m to your left, {pass_from_z_m} m above the floor. The pass is aimed at the "
-             "point {pass_to_x_m} m straight ahead of where your pelvis starts, {pass_to_z_m} m above the floor: it "
-             "leaves on an upward arc (28 degrees) and is there 0.76 s later, moving at about 7.2 m/s to your right "
-             "and downwards. A hand's closed grip takes the ball when the ball's surface comes within 3.5 cm of "
-             "the palm and the ball moves at most 6 m/s relative to the hand; a ball is released when the grip is "
-             "switched off.")
-    difficulty = ("The pass arrives faster than the grip can take it: the hand has to be on the ball's path and "
-                  "moving with it. Then a 0.62 kg ball must leave that hand at about 9 m/s on a steep arc towards a "
-                  "ring 5.8 m away, from a body that may not take a step."
-                  " The built-in walking gait steps on the spot even at a zero command, so while the ball is in your hand its steps are counted like any others.")
+             "of {pass_speed_m_s} m/s from {pass_distance_m} m away. Your hands have no fingers and no grip: you can "
+             "hold the ball only by pressing it between your two flat palms, and only the force of your arms and "
+             "friction hold it; it can slip out. A hand is the palm pad and the wrist; a hand is on the ball while it "
+             "touches the ball, gaps shorter than {touch_gap_s} s included; the ball is in your hands while at least "
+             "one hand is on it. In order: you catch the ball before it has touched the floor (the catch: both your "
+             "hands have been on the ball together for {catch_hold_s} s without a break; touches before that, of one "
+             "hand or both, are allowed); from the catch the ball stays in your hands until you let go of it (the "
+             "shot's release: the moment no hand is on it; a ball that slips or drops out of your hands is released "
+             "too); its centre goes down through the ring's plane inside the ring and on down to one ball diameter "
+             "below it, which is the success. Travelling, from the catch to the shot's release: if both your feet "
+             "are on the floor at the catch, the first foot you lift makes the other your pivot foot; the pivot foot, "
+             "and before a foot is lifted either foot, may not slide more than {pivot_slide_m} m along the floor (in "
+             "the steps case below: any foot that is on the floor, from where it stood or was put down), and once it "
+             "has left the floor no foot may touch the floor again before the ball has left your hands. If a foot is "
+             "off the floor at the catch, you may take at most {max_steps} steps (a step: a foot touching the floor "
+             "after it has been off it for at least {step_gap_s} s; both feet landing within {step_gap_s} s of each "
+             "other are one step; not the same foot twice in a row), and after them no foot may touch the floor "
+             "again before the release. You fail if anything of you touches the ball before it is passed; if, from "
+             "the pass until the release, the ball touches any part of you other than your hands; if the passed ball "
+             "touches the floor before you have caught it; if you travel; if any part of you touches the ball more "
+             "than {retouch_grace_s} s after the shot's release (it cannot be taken again); if the ball touches the "
+             "floor before it is through the ring; if the ball's centre comes up through the ring from below; if you "
+             "fall before the ball is through (a fall: your pelvis lower than {fall_z_m} m above the floor, or any "
+             "part of you other than your feet on the floor); or after {time_limit_s} s.")
+    venue = ("A FIBA court. You stand at the top of the key facing the basket (+x), your arms at rest and your hands "
+             "empty: the point under the ring's centre is {spot_to_ring_m} m ahead of your pelvis (inside the "
+             "three-point line; the free-throw line is 1.575 m ahead of you). The passer stands on the left wing: "
+             "the ball waits {pass_from_x_m} m ahead of you and {pass_from_y_m} m to your left, {pass_from_z_m} m "
+             "above the floor. The pass is aimed at the point {pass_to_x_m} m straight ahead of where your pelvis "
+             "starts, {pass_to_z_m} m above the floor: it leaves on an upward arc (28 degrees) and is there 0.76 s "
+             "later, moving at about 7.2 m/s to your right and downwards. Your hands have no grip: the grip columns "
+             "of the action rows do nothing in this task.")
+    difficulty = ("The pass arrives at 7 m/s and flat palms cannot close around it: the two palms have to meet the "
+                  "ball from opposite sides as it arrives and squeeze it to a stop with nothing but friction, before "
+                  "it bounces out or touches the body. Then a 0.62 kg ball must leave the two palms at about 9 m/s on "
+                  "a steep arc towards a ring 5.8 m away, from a body that may not take a step. The built-in walking "
+                  "gait steps on the spot even at a zero command, so while the ball is in your hands its steps are "
+                  "counted like any others.")
 
     def build(self, sc):
         p = self.p
         hx = p["spot_to_ring_m"]
         self.hoop = build_court(sc, hx, 0.0, p)
-        sc.ball("ball", "basketball", self._from(), grippable=True)
+        sc.ball("ball", "basketball", self._from())             # no grip: the ball is not grippable
         sc.box("passer", (p["pass_from_x_m"] + 0.05, p["pass_from_y_m"] + 0.30, 0.85), (0.12, 0.10, 0.85),
                rgba=(0.25, 0.3, 0.55, 1))
+        opt = sc.root.find("option")
+        opt.set("cone", CONE)
+        opt.set("impratio", f"{IMPRATIO:g}")
+        for side in ("left", "right"):
+            ET.SubElement(sc.root.find("contact"), "pair", name=f"palm_ball_{side}", geom1="ball",
+                          geom2=f"{side}_palm_pad", condim="6",
+                          friction=f"{PALM_MU} {PALM_MU} 0.003 {BALL['roll']} {BALL['roll']}", solref=PALM_SOLREF,
+                          solimp=PALM_SOLIMP)
         sc.camera("venue", (-3.4, -4.2, 2.8), (2.4, 0.8, 1.6), fovy=58)
 
     def _from(self):
@@ -317,12 +361,19 @@ class Task(TaskBase):
     def referee_reset(self, w, ref):
         p, h = self.p, self.hoop
         self.ball = ref.geoms(body="ball")
+        self.hands = {s: ref.part(f"{s}_hand") for s in ("left", "right")}
         self.robot = ref.part("robot")
-        self.legs = ref.part("legs")
+        self.body = self.robot & ~ref.part("hands")
         self.trackers = {"hoop": HoopPass((h["x"], h["y"], h["z"]), h["inner_radius"], BALL["radius"]),
                          "up": Crossing((0, 0, 1), h["z"], direction=1),
                          "travel": Travel(w, ref, p["step_gap_s"], int(p["max_steps"]), p["pivot_slide_m"]),
+                         "touch": {"left": None, "right": None}, "both_since": None,
                          "passed": False, "caught": None, "released": None}
+
+    def on_ball(self, ref) -> dict:
+        """Which hands are on the ball now (touching it, gaps shorter than touch_gap_s included)."""
+        t = self.trackers["touch"]
+        return {s: t[s] is not None and ref.time - t[s] <= self.p["touch_gap_s"] + 1e-9 for s in ("left", "right")}
 
     def before_step(self, w):
         p, tr = self.p, self.trackers
@@ -331,10 +382,6 @@ class Task(TaskBase):
             w.launch("ball", self._from(), (p["pass_vx"], p["pass_vy"], p["pass_vz"]))
             w.ref.event("pass")
 
-    def may_grip(self, w, side, name):
-        tr = self.trackers
-        return bool(tr.get("passed")) and tr.get("caught") is None      # the pass, once; no second grip
-
     def substep(self, w, ref):
         tr, p, h = self.trackers, self.p, self.hoop
         bad = tr["travel"].update()
@@ -342,17 +389,28 @@ class Task(TaskBase):
             if ref.touching(self.ball, self.robot):
                 ref.fail("the ball was touched before the pass", parts=sorted(ref.parts_touching(self.ball)))
             return
-        held = bool(w.holder("ball"))
+        if tr["released"] is None:
+            for s in ("left", "right"):
+                if ref.touching(self.hands[s], self.ball):
+                    tr["touch"][s] = round(ref.time, 4)
+            if ref.touching(self.ball, self.body):
+                return ref.fail("the ball touched a part of you other than your hands",
+                                parts=sorted(ref.parts_touching(self.ball) - {"left_hand", "right_hand"}))
+        on = self.on_ball(ref)
         b = w.pos("ball")
         if tr["caught"] is None:
-            if held:
-                tr["caught"] = ref.time
-                tr["travel"].start()
-                ref.stage("catch", feet=tr["travel"].mode)
-            elif ref.touching(self.ball, ref.ground):
+            if on["left"] and on["right"]:
+                if tr["both_since"] is None:
+                    tr["both_since"] = round(ref.time, 4)
+                if ref.time - tr["both_since"] >= p["catch_hold_s"] - 1e-9:
+                    tr["caught"] = round(ref.time, 4)
+                    tr["travel"].start()
+                    ref.stage("catch", feet=tr["travel"].mode)
+                    return
+            else:
+                tr["both_since"] = None
+            if ref.touching(self.ball, ref.ground):
                 ref.fail("the pass was not caught: the ball touched the floor")
-            elif ref.touching(self.ball, self.legs):
-                ref.fail("the ball touched a leg or a foot", parts=sorted(ref.parts_touching(self.ball)))
             return
         was_in = tr["hoop"].entered
         ev = tr["hoop"].update(b)
@@ -362,9 +420,11 @@ class Task(TaskBase):
         if tr["released"] is None:
             if bad:
                 return ref.fail(bad)
-            if held:
+            if on["left"] or on["right"]:
+                if ref.touching(self.ball, ref.ground):
+                    return ref.fail("the ball touched the floor")
                 return
-            tr["released"] = ref.time
+            tr["released"] = round(ref.time, 4)
             bad = tr["travel"].stop()
             if bad:
                 return ref.fail(bad)
@@ -384,4 +444,5 @@ class Task(TaskBase):
     def privileged(self, w):
         tr = self.trackers
         return {"ball": w.pos("ball").tolist(), "ball_velocity": w.vel("ball").tolist(), "hoop": self.hoop,
-                "passed": bool(tr["passed"]), "pass_time_s": self.p["pass_time_s"], "caught": tr["caught"] is not None}
+                "passed": bool(tr["passed"]), "pass_time_s": self.p["pass_time_s"], "caught": tr["caught"] is not None,
+                "hands_on_ball": self.on_ball(w.ref), "released": tr["released"] is not None}
