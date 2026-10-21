@@ -1,9 +1,9 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:standard-files-0.2.0@sha256:f8ebfef83b723e4a1cc2ab7b7aa5bc1edbcefcc09d44b0506c070460854be064",
+ "image": "ghcr.io/mll-lab-nu/efe:standard-files-0.2.1@sha256:192c971a2bb1fa15cf1b3057a7be354a12495f53c1ec9ccc6318177cd880d603",
  "source": "embodied_first_exam/standard",
  "files": {
   "rcb1.py": "a930d8eb6619b669908aff12a33c7dea19b0eb33c5b73138f0b5371bf3fe5040",
-  "rcb_client.py": "236d2ac02dd145cdc91f421a2f2dce5557243f04256b9bf615baea990f9049cc",
+  "rcb_client.py": "33930dfc208b7639dc09618804dff191a9d9b5fdc8606b6fd6b24d7a7bc8fc96",
   "realtime/rcb_client.py": "b6c08ca8d2b196dd44ed660d1f30b3181f419d38faa728b4fb72b25b15cce8f2",
   "v2_1/grade.py": "605bb1492c21639dfcbc0fb98a40501961600e6441d83065e5a9896594450003",
   "v2_1/rcb_client.py": "4a3097258fe55cdd58961f63967ce93a4568ce23a50d7d0b5b0b3763f4e59064",

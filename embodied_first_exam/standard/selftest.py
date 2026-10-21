@@ -622,6 +622,30 @@ def kinematics_wrong_types_are_400():
         srv.shutdown()
 
 
+@case
+def client_read_timeout_outlasts_the_service_cap():
+    """The client's read timeout of /submit and /observe is at least the service's per-call cap (spec max_call_wall_s,
+    900 s by default) + 120 s: a long watch comes back stopped instead of timing out while the service still runs it."""
+    seen = []
+
+    class Resp:
+        status_code, headers = 200, {"Content-Type": "application/x-rcb1"}
+        content = rcb_client.rcb1.encode({"ok": True}, [])
+    real = rcb_client.requests.post
+    rcb_client.requests.post = lambda url, **kw: (seen.append((url.rsplit("/", 1)[1], kw["timeout"][1])), Resp())[1]
+    try:
+        for cap in (None, 900, 3000):
+            r = object.__new__(rcb_client.Robot); r.base = "http://sim:8000"
+            r._spec = {"default_cameras": ["c"], **({} if cap is None else {"max_call_wall_s": cap})}
+            seen.clear()
+            r.get_obs(seconds=1.0); r.submit("joint_position", np.zeros((1, 2)))
+            want = (cap or 900) + 120
+            expect(all(t >= want for _, t in seen) and [p for p, _ in seen] == ["observe", "submit"],
+                   f"max_call_wall_s {cap}: read timeouts {seen}, want >= {want}")
+    finally:
+        rcb_client.requests.post = real
+
+
 def main() -> int:
     sel = sys.argv[1:]
     todo = [f for f in CASES if not sel or any(s in f.__name__ for s in sel)]
