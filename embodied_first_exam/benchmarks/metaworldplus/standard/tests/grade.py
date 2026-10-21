@@ -68,7 +68,7 @@ def main() -> None:
     unfinished = not d.get("finalized")  # the service never reached a verdict
     failed_finalize = bool(d.get("finalize_error"))
     infra = bool(d.get("infra_error")) or failed_finalize or unfinished
-    ok = bool(d.get("success")) and live and not infra
+    ok = bool(d.get("success")) and live and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
     reason = str(d.get("reason") or "")
     out = {
         "success": int(ok),

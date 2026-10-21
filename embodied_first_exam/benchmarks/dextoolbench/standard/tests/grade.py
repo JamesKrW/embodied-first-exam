@@ -31,7 +31,7 @@ live = d.get("graded_by") == "live"
 # ran), or wrote neither the live verdict nor a give-up. A verdict on disk is graded whether or not the video was rendered.
 no_verdict = not d.get("finalized") or not (live or d.get("gave_up"))
 infra = bool(d.get("infra_error") or d.get("finalize_error") or d.get("instance_mismatch") or no_verdict)
-ok = bool(d.get("success")) and live and not infra
+ok = bool(d.get("success")) and live and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
 out = {"success": int(ok), "live_success": int(bool(d.get("live_success", d.get("success")))), "finalized": int(bool(d.get("finalized"))),
        "control_steps": int(d.get("control_steps") or 0), "calls": int(d.get("calls") or 0), "elapsed_s": float(d.get("elapsed_s") or 0),
        "video_rendered": int(bool(d.get("video"))), "infra_error": int(infra), "no_verdict": int(no_verdict),

@@ -54,7 +54,7 @@ live = d.get("graded_by") == "live"
 no_verdict = not d.get("finalized") or not (live or d.get("gave_up"))
 mismatch = bool(d.get("instance_mismatch")) or reason.startswith("instance_mismatch")
 infra = bool(d.get("infra_error")) or no_verdict or mismatch
-ok = live and bool(d.get("success")) and bool(d.get("live_success", d.get("success"))) and not infra
+ok = live and bool(d.get("success")) and bool(d.get("live_success", d.get("success"))) and not infra and reason != "error"   # PROTOCOL §4: a simulator error is the agent's 0
 num = lambda k: float(d.get(k) or 0)  # noqa: E731
 write(
     ok,
