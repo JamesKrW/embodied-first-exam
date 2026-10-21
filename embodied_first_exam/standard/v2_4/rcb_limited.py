@@ -424,7 +424,7 @@ def check_spec(spec: dict) -> None:
 MAX_RESUMES = int(os.environ.get("RCB_MAX_RESUMES", "2"))
 STARTUP_TIMEOUT_S = float(os.environ.get("RCB_STARTUP_TIMEOUT_S", "900"))     # a task with a slower scene build sets more
 MAX_CALL_WALL_S = float(os.environ.get("RCB_MAX_CALL_WALL_S", "900"))         # < the client's 1800 s /submit read timeout
-CALL_WATCHDOG_GRACE_S = float(os.environ.get("RCB_CALL_WATCHDOG_GRACE_S", "60"))   # the hard watchdog: this long past a call's budget
+CALL_WATCHDOG_GRACE_S = float(os.environ.get("RCB_CALL_WATCHDOG_GRACE_S", "60"))   # the hard watchdog: this long past max_call_wall_s
 RESUME_MAX_DEV_M = float(os.environ.get("RCB_RESUME_MAX_DEV_M", "0.05"))      # approx resumes: the gross-divergence guard
 ON_SERVICE_ERROR = ("a connection error means the service crashed: it restarts and resumes the SAME episode (never a reset) "
                     "in the state after the last call it completed, which you may not have received. Wait until GET /status "
@@ -518,7 +518,8 @@ class Episode:
       max_call_wall_s, or whose client has hung up, stops at the next control step and returns what it executed
       (journal() returns True; meta.stopped says why). Neither bounds the episode: the wall clock is its only budget.
     - The call watchdog (faulthandler, a C thread) ends the process when a call is still running
-      RCB_CALL_WATCHDOG_GRACE_S (60) seconds past its budget: a native step hung. It prints into call-watchdog.trace, and
+      RCB_CALL_WATCHDOG_GRACE_S (60) seconds past max_call_wall_s (the service's own cap; a shorter request deadline
+      never shortens it): a native step hung. It prints into call-watchdog.trace, and
       only that banner makes the next start end the episode as `call_watchdog` (infra_error = 1). Any other crash during a
       call is an ordinary crash, resumed like every other, however late the container comes back; a resume removes
       call-watchdog.json and the trace."""
@@ -629,7 +630,10 @@ class Episode:
         if path != "/kinematics":
             budget = self.max_call_wall_s if deadline is None else min(self.max_call_wall_s, max(0, deadline - time.time()))
             self._call = {"id": self._ids, "t0": time.monotonic() - (self.max_call_wall_s - budget), "sock": sock, "polled": 0.0, "stopped": None}
-            grace = max(1, budget + CALL_WATCHDOG_GRACE_S)
+            # The hard watchdog counts from the service's own cap, never from the agent's deadline: a short deadline stops
+            # the call at its next control step (poll_stop), but it must not let the agent have a slow native step killed
+            # (call_watchdog is infra_error, a voided trial and a free rerun).
+            grace = max(1, self.max_call_wall_s + CALL_WATCHDOG_GRACE_S)
             # The watchdog writes to its own file, emptied for every call: faulthandler's "Timeout (h:mm:ss)!" banner and the
             # tracebacks are there if, and only if, the watchdog ended this process. A crash of any other kind during a
             # call (a segfault, a CUDA error, an OOM kill) leaves call-watchdog.json behind too, so that file alone, or its
