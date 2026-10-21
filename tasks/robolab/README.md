@@ -210,7 +210,7 @@ The privileged tasks carry no copy of the tooling: their `environment/Dockerfile
 `scripts/files_image.py`; FILES.json pins its digest and the file's sha256; public), built
 from its one source `embodied_first_exam/benchmarks/robolab/rcb_robolab.py`. The verifier's image gets its own copy from that image when
 it is built; nothing from the agent's container reaches it. The standard sidecar's image, built from `environment/sim/` (its
-`Dockerfile`), takes it at `/srv` from `images/robolab-sim-files/` (the sidecar's shared files); no task dir carries a copy. After a change to `rcb_robolab.py`: bump `images/robolab-files/VERSION`, `python3 scripts/files_image.py build
+`Dockerfile`), takes it at `/srv` from the same `images/robolab-files/` (which also carries the sidecar's shared files); no task dir carries a copy. After a change to `rcb_robolab.py`: bump `images/robolab-files/VERSION`, `python3 scripts/files_image.py build
 robolab-files`, push it, `python3 scripts/files_image.py pin robolab-files <digest>`.
 
 The tooling records (T, 8) actions (7 joint targets + the binary gripper command) at 15 Hz. Every copy of the tooling and
