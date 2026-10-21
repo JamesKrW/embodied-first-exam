@@ -12,7 +12,10 @@ FEASIBILITY (measured and computed in the simulator image; tests/test_pole_vault
 tests/pv_plant.py, tests/pv_carry.py): no reference solution; this robot with these hands cannot vault, at any bar
 height or pole length.
 - The hang (the vault's take-off, TR 28: the athlete hangs on the planted pole; the referee also asks the pole to carry
-  at least half the robot's weight then, or a jump with a pole in the hands would pass): two grippers would hold about
+  at least half the robot's weight then, or a jump with a pole in the hands would pass; and, so that a standing jump
+  that pushes down on the top of a near-vertical pole does not pass either, a run-up of at least 2.5 m/s over the
+  last 0.5 s before the take-off, the pole at least 20 degrees from vertical at the take-off, and a hand above the
+  pelvis while the pole carries the robot): two grippers would hold about
   500 N along a pole (one lets it slide at 250 N, measured), 1.5 times the robot's 338 N. But a parallel gripper holds a
   pole only across its jaws, square to the forearm, so on a pole tilted up from the horizontal the hanging robot's
   weight comes on the arms' joints with a lever: over all arm poses of both arms (a search, the trunk upright, both
@@ -167,10 +170,16 @@ class Task(TaskBase):
         "mats beyond the zero line before the bar is cleared; a hand that holds the pole more than {climb_m} m "
         "farther from its tip than the upper hand's grip was at lift-off; a hand on the bar for more than "
         "{bar_hand_s} s in all",
-        "a vault is told from a jump by numbers: in the flight that clears the bar the robot must hang on the pole "
-        "(a hand gripping it, its tip in the box pressed into it with at least {min_pole_load} of the robot's "
-        "weight, nothing of the robot on the ground) for at least {min_support_s} s; the pelvis and the feet (the ankle joints) must pass the bar's plane between the pegs "
-        "and above the bar; the bar is cleared when every part of the robot is beyond its plane",
+        "a vault is told from a jump by numbers (TR 28 does not define one): the take-off (the robot's last ground "
+        "contact before the flight that clears the bar) must end a run-up, the pelvis' forward speed averaged over "
+        "the last {runup_window_s} s before it at least {runup_min_m_s} m/s (a novice's short run-up is some 4 to "
+        "6 m/s), with the pole at least {pole_min_deg} degrees from vertical then (a planted pole leans some 25 to "
+        "35 degrees at a vault's take-off); in that flight the robot must hang on the pole for at least "
+        "{min_support_s} s: a hand gripping it higher than the pelvis, its tip in the box pressed into it with at "
+        "least {min_pole_load} of the robot's weight, nothing of the robot on the ground; pushing down on the top "
+        "of a pole (the pelvis above the hands) is not a hang; the pelvis and the feet (the ankle joints) must pass "
+        "the bar's plane between the pegs and above the bar; the bar is cleared when every part of the robot is "
+        "beyond its plane",
         "TR 28.2(a): the bar is judged {bar_wait_s} s after the landing; it is off its pegs when its centre is more "
         "than {bar_drop_m} m below its resting height; the pegs are square in section, the bar rigid",
         "TR 28.12 (the landing area): the mats are rigid boxes with a soft contact set from a pit's urethane foam (23 "
@@ -195,7 +204,7 @@ class Task(TaskBase):
                   pole_diameter_m=0.032, pole_rating_kg=40.8, runway_m=40.0, runway_width_m=1.22, mat_length_m=5.0,
                   mat_width_m=5.0,
                   mat_height_m=0.80, mat_gap_m=0.15, front_piece_m=2.0, mat_timeconst_s=0.069,
-                  min_support_s=0.15, min_pole_load=0.5, climb_m=0.05, bar_hand_s=0.10, bar_drop_m=0.05, bar_wait_s=2.0)
+                  min_support_s=0.15, min_pole_load=0.5, runup_min_m_s=2.5, runup_window_s=0.5, pole_min_deg=20.0, climb_m=0.05, bar_hand_s=0.10, bar_drop_m=0.05, bar_wait_s=2.0)
 
     sentence = ("Vault over the bar with the pole you carry: plant its tip in the box, leave the ground hanging on "
                 "it, go over the bar between the uprights and come down on the mat, with the bar still on its pegs.")
@@ -218,9 +227,13 @@ class Task(TaskBase):
              "begins {mat_gap_m} m beyond the zero line (behind the box its face slopes away at 45 degrees, so the "
              "pole can lean on over it); two front pieces of the same height flank the box for {front_piece_m} m "
              "before it. The vault: (1) plant: the pole's tip is in the box while a hand grips "
-             "the pole. (2) take-off: you hang on the planted pole: for at least {min_support_s} s in one flight "
-             "nothing of you touches anything but the pole and the bar while a hand grips the pole and its tip rests "
-             "in the box, pressed into it with at least {min_pole_load} of your weight (the pole carries you). (3) clearance: in that same flight your pelvis and both feet (the ankle joints) cross the plane "
+             "the pole. (2) take-off: you leave the ground from a run-up, your pelvis' forward (+x) speed averaged "
+             "over the last {runup_window_s} s before the lift-off at least {runup_min_m_s} m/s, with the pole at "
+             "least {pole_min_deg} degrees from vertical at the lift-off; then you hang on the planted pole: for at "
+             "least {min_support_s} s in that flight nothing of you touches anything but the pole and the bar while "
+             "a hand grips the pole higher than your pelvis and the pole's tip rests in the box, pressed into it "
+             "with at least {min_pole_load} of your weight (the pole carries you: pushing down on its top with your "
+             "pelvis above your hands is not a hang). (3) clearance: in that same flight your pelvis and both feet (the ankle joints) cross the plane "
              "of the bar's nearer edge between the pegs and higher than the bar's upper side (one that comes back "
              "over the plane has not passed it), and every part of "
              "you gets beyond that plane; you may touch the bar. (4) You come down, on any part of your body, with "
@@ -228,8 +241,8 @@ class Task(TaskBase):
              "pegs. A fall is not a failure by itself. You fail if the bar drops more than {bar_drop_m} m at any "
              "time, whether you or the pole knocked it; if, before you have cleared the bar, anything of you or the "
              "pole touches the ground or the mats beyond the zero line; if your pelvis or a foot passes the bar's "
-             "plane outside the pegs or not higher than the bar; if you clear the bar without the "
-             "{min_support_s} s on the planted pole (a jump without the pole); if, in the flight of the vault, a "
+             "plane outside the pegs or not higher than the bar; if you clear the bar without such a "
+             "take-off and hang (a jump without the pole, a standing jump on it, or a push on its top); if, in the flight of the vault, a "
              "hand holds the pole more than {climb_m} m farther from its tip than your upper hand did at lift-off "
              "(climbing); if your hands touch the bar for more than {bar_hand_s} s in all (steadying it); or after "
              "{time_limit_s} s (the time allowed for a trial).")
@@ -314,9 +327,19 @@ class Task(TaskBase):
         # support_s: time on the planted pole in the current flight; grip0: the upper hand's place on the pole at
         # lift-off (m from the tip); hand_bar_s: the hands' time on the bar; crossed: who has passed the bar's plane
         # grip: where each hand holds the pole now (m from the tip; None: not holding)
+        # vx: the pelvis' forward speed at each physics step of the last runup_window_s (the run-up); lift_off: the
+        # current flight's take-off (that run-up's mean speed, the pole's angle from vertical); load_s: time on the
+        # loaded pole in the flight, hanging or not
+        n = int(round(self.p["runup_window_s"] / m.opt.timestep))
         self.trackers = {"flights": Flights(ref, also_allowed=self.bar_mask | self.pole_mask),
-                         "support_s": 0.0, "grip0": None, "grip": {"left": None, "right": None}, "hand_bar_s": 0.0,
+                         "support_s": 0.0, "load_s": 0.0, "grip0": None, "grip": {"left": None, "right": None},
+                         "hand_bar_s": 0.0, "vx": np.zeros(n), "vx_i": 0, "lift_off": None,
                          "crossed": [], "prev": None, "t_clear": None, "t_land": None, "bar_z0": None}
+
+    def pole_angle_deg(self, w) -> float:
+        """The pole's angle from vertical (degrees)."""
+        ax = w.d.xmat[self.pole_id].reshape(3, 3)[:, 0]
+        return math.degrees(math.acos(min(1.0, abs(float(ax[2])))))
 
     def tip(self, w) -> np.ndarray:
         """The pole's tip (the centre of its +x end)."""
@@ -370,7 +393,13 @@ class Task(TaskBase):
                 ref.event("landing", parts=sorted(ref.parts_touching(ref.ground)), pole_in_hand=w.holder("pole"),
                           on_the_mat=bool(ref.touching(self.robot, ref.geoms(names=self.mats))))
             return
+        was_air = fl.air
         fl.update()
+        if fl.air and not was_air:                       # lift-off: the run-up's speed and the pole's angle
+            tr["lift_off"] = {"lift_off_s": round(ref.time, 4), "pole_deg": round(self.pole_angle_deg(w), 1),
+                              "run_up_m_s": round(float(tr["vx"].mean()), 3)}
+        tr["vx"][tr["vx_i"] % len(tr["vx"])] = float(w.d.qvel[w.robot.fv])    # (the free base's velocity: world
+        tr["vx_i"] += 1                                                         # frame; a ring of the last steps)
         for s in SIDES:                                  # where each gripper is on the pole now (a gripper that slides
             tr["grip"][s] = (round(self.grip_from_tip(w, s), 4)      # up it climbs as one that lets go and closes
                              if w.held[s] == "pole" else None)        # higher: TR 28.2(c))
@@ -379,14 +408,19 @@ class Task(TaskBase):
         if planted:
             ref.stage("plant", grip_from_tip_m=grips)
         if not fl.air:
-            tr["support_s"], tr["grip0"] = 0.0, None
+            tr["support_s"], tr["load_s"], tr["grip0"] = 0.0, 0.0, None
         else:
             if tr["grip0"] is None and grips:                # lift-off: where the upper hand is on the pole
                 tr["grip0"] = max(grips)
             if planted and self.pole_load(w) >= p["min_pole_load"] * self.weight:
-                tr["support_s"] = round(tr["support_s"] + dt, 6)
-                if tr["support_s"] >= p["min_support_s"]:
-                    ref.stage("take-off", support_s=tr["support_s"])
+                tr["load_s"] = round(tr["load_s"] + dt, 6)
+                lo = tr["lift_off"] or {"run_up_m_s": 0.0, "pole_deg": 0.0}
+                palm = max([float(w.d.site_xpos[w.robot.palm[s]][2]) for s in SIDES if w.held[s] == "pole"] or [-9.0])
+                if (palm > float(w.d.xpos[w.robot.pelvis][2]) and lo["run_up_m_s"] >= p["runup_min_m_s"]
+                        and lo["pole_deg"] >= p["pole_min_deg"]):    # a hang, after a run-up, on a leaning pole
+                    tr["support_s"] = round(tr["support_s"] + dt, 6)
+                    if tr["support_s"] >= p["min_support_s"]:
+                        ref.stage("take-off", support_s=tr["support_s"], **lo)
             if grips and max(grips) > tr["grip0"] + p["climb_m"]:        # TR 28.2(c)
                 return ref.fail("moved a hand up the pole after leaving the ground", from_tip_m=round(max(grips), 3),
                                 at_lift_off_m=round(tr["grip0"], 3))
@@ -420,7 +454,15 @@ class Task(TaskBase):
         if len(tr["crossed"]) == 3 and ref.robot_span((1.0, 0.0, 0.0))[0] > plane:
             ref.metrics["support_s"] = round(tr["support_s"], 3)
             if not fl.air or tr["support_s"] < p["min_support_s"]:
-                return ref.fail("cleared the bar without the pole planted in the box", support_s=tr["support_s"])
+                lo = tr["lift_off"] or {}
+                why = dict(support_s=tr["support_s"], loaded_s=tr["load_s"], **lo)
+                if not fl.air or tr["load_s"] < p["min_support_s"]:
+                    return ref.fail("cleared the bar without the pole planted in the box", **why)
+                if lo.get("run_up_m_s", 0.0) < p["runup_min_m_s"]:
+                    return ref.fail("cleared the bar without a run-up to the take-off", **why)
+                if lo.get("pole_deg", 0.0) < p["pole_min_deg"]:
+                    return ref.fail("cleared the bar from a pole near vertical at the take-off", **why)
+                return ref.fail("cleared the bar pushing down on the pole, not hanging from it", **why)
             tr["t_clear"] = ref.time
             ref.stage("clearance", support_s=tr["support_s"])
 
