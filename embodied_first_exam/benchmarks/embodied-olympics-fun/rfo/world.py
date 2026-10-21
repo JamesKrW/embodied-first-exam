@@ -101,6 +101,48 @@ GRIP_SPEED = 6.0                               # m/s: ... and that moves no fast
 FALL_Z = 0.35                                  # m: the pelvis below this is down (tasks that allow it say so)
 UNSTABLE = "the simulation became unstable"    # the referee's reason when the physics diverges (an attempt's failure)
 MAX_SPEED = 150.0                              # m/s: the robot or a prop faster than this is a divergence too
+# The robot's visible body where its collision model has no geometry: the H1-2's thighs and shins are four rods 4 cm
+# thick and 20 cm long plus two 1 cm discs (up to 0.44 m of visible thigh outside any collision geom), its knees, hips
+# and wrist motor housings have none; the G1's waist (yaw and roll links) and its shoulders' outer housings have none;
+# the hands (the G1's rubber fist, the H1-2's Inspire fingers: up to 77 mm outside the palm pad) are looks only.
+# A prop (a bar, a rope, a ball, a hurdle, an opponent) went through them. Each such visual mesh gets a shell: its
+# convex hull, massless, that touches only the props (contype 0, conaffinity SHELL_BIT; every prop but the ground gets
+# SHELL_BIT in its contype): not the floor or the ground, not the robot itself (self-collision, the feet on the ground
+# and the walking policies unchanged). The hands' shells too (the fist, the fingers: props only); the palm pad stays
+# the hand's model for holding.
+# The feet keep their own (the sole and the strike box), the hand mounts theirs (the palm pad, the task's tool or the
+# real hand, which replaces the fist / fingers); the torso's logo plate lies inside the torso's hull. A shell's contact
+# is stiff, a rigid prop on the robot's aluminium shell: solref 0.004 s (4 physics steps; MuJoCo keeps timeconst >= 2
+# timesteps stable), solimp 0.99 0.999 0.0005 (MuJoCo's default soft contact let a heavy bar sink 12-44 mm), and a
+# solmix that makes them win against a prop of default priority; a prop with a priority of its own (a ball: its bounce,
+# scene.py) keeps its own parameters.
+# Source: roboolympics-all-80's weightlifting fix (CHIGUI0/roboolympics PR #179 at f54e26a8, sports/weightlifting/
+# venue.py `_shells` and BAR_CONTACT, MIT, same owner; library issue CHIGUI0/roboolympics #268): <= 3.2 mm at 190 kg.
+# The robot's own collision geoms (the body hulls, the palm pads, the feet's strike boxes, a real hand's housing and
+# fingers) get the same stiff contact (ROBOT_CONTACT) against props, mechanisms and fixtures (not the ground:
+# GROUND_SOLMIX): with MuJoCo's default (solref 0.02 1, solimp 0.9 0.95 0.001) a rigid prop or a machine's part sank
+# 20-75 mm into them (stress test, 2026-10-21). Not the soles (contype 1: the G1's four sole
+# spheres, the H1-2's sole hulls; SOLE_CONTACT, below) nor a geom with a priority of its own (the real hand's pads).
+SHELL_BIT = 128                                 # a bit no family uses (they use 1-64)
+SHELL_CONTACT = dict(solref="0.004 1", solimp="0.99 0.999 0.0005 0.5 2", solmix="1e+06")
+ROBOT_CONTACT = SHELL_CONTACT
+# The soles (SOLE_CONTACT) keep the robot model's own contact (MuJoCo's default; the G1's sole spheres priority 1):
+# they sink 6 mm walking, 15 mm under FALCON, 54 mm stamping (random leg torques), the H1-2's 14 / 37 mm (114 mm in
+# the stress test). Stiffer soles were measured (stress test tests/soles.py, 2026-10-21; solref 0.01 / 0.005 / 0.004,
+# solimp 0.95-0.99 / 0.99-0.999, priority 1): every policy still does its job at every setting (G1: walk, FALCON and
+# AGILE 10 m, turn 360 deg, run 50 m; H1-2: walk 10 m, turn 360 deg) and at 0.004 / 0.99-0.999 the soles sink 0.4 mm
+# standing, 1.3 walking, 4.0 stamping, but 9 of the 27 reference solutions (open-loop throws, kicks, serves, sets
+# tuned on these soles) then fail; kept until they are re-tuned (an owner's decision).
+SOLE_CONTACT: dict | None = None
+# The ground keeps its own contact with everything (owner, 2026-10-21): the ground and the fixed surfaces one stands
+# on (sc.ground, planes, height fields, fixed STANDABLE geoms: a beam, a platform, a vaulting table) of no priority
+# get GROUND_SOLMIX, so that in a contact with any geom of no priority (the robot's stiffened geoms, a family's rigid
+# prop) their own parameters (MuJoCo's default, or a mat's) win, as before the stiffening; a geom with a priority
+# (a ball, a sole, a mat of priority 1) keeps winning as before.
+GROUND_SOLMIX = "1e+12"
+SHELL_SKIP_BODY = ("ankle_roll_link", "_mount")         # no shell: the feet and the hand mounts (pads, tools, real hands)
+SHELL_SKIP_MESH = ("logo",)                             # the logo plate (mesh name); the hands (the G1's fist, the
+#                                                         H1-2's fingers) get shells like the rest (props only)
 GRIPS = ["grip_left", "grip_right"]
 VEL = ["vx", "vy", "wz"]
 
@@ -111,6 +153,83 @@ def walker_cmd(pol, cmd_max) -> tuple[np.ndarray, np.ndarray]:
     cmd_max = np.asarray(cmd_max, float)
     lo = getattr(pol, "cmd_min", -pol.cmd_max)
     return np.maximum(np.asarray(lo, float)[:3], -cmd_max), np.minimum(np.asarray(pol.cmd_max, float)[:3], cmd_max)
+
+
+def _shells(root: ET.Element, ground: set) -> None:
+    """The robot's shells (SHELL_BIT, above): one on every visual mesh of the robot that no collision geom of its own
+    body covers (the same mesh), named <body>_shell<i>; SHELL_BIT on the contype of every collidable geom outside the
+    robot but the ground (sc.ground, planes, height fields)."""
+    defaults: dict[str, dict] = {}                  # class -> its geom defaults (MuJoCo's inheritance)
+
+    def scan(el, name, inherited):
+        own = dict(inherited)
+        for g in el.findall("geom"):
+            own.update(g.attrib)
+        defaults[name] = own
+        for c in el.findall("default"):
+            scan(c, c.get("class"), own)
+
+    top = root.find("default")
+    if top is not None:
+        scan(top, "main", {})
+
+    def resolved(g, cls, key, dflt="1"):
+        return g.get(key, defaults.get(g.get("class") or cls, {}).get(key, dflt))
+
+    def robot(b):                                    # the robot's links (not the hand mounts: pads, tools, real hands)
+        name = b.get("name") or ""
+        if name.endswith("_mount"):
+            return
+        gs = b.findall("geom")
+        vis = [g for g in gs if g.get("mesh") and ((g.get("class") or "").endswith("_visual")
+                                                   or (g.get("contype") == "0" and g.get("conaffinity") == "0"))]
+        covered = {g.get("mesh") for g in gs if g.get("mesh") and g not in vis}
+        if not any(k in name for k in SHELL_SKIP_BODY):
+            for i, g in enumerate(x for x in vis if x.get("mesh") not in covered
+                                  and not any(k in x.get("mesh") for k in SHELL_SKIP_MESH)):
+                sh = ET.SubElement(b, "geom", name=f"{name}_shell{i}", type="mesh", mesh=g.get("mesh"), contype="0",
+                                   conaffinity=str(SHELL_BIT), group="3", mass="0", rgba="0.3 0.6 0.9 0.35",
+                                   **SHELL_CONTACT)
+                for a in ("pos", "quat", "euler", "axisangle", "xyaxes", "zaxis"):
+                    if g.get(a) is not None:
+                        sh.set(a, g.get(a))
+        for c in b.findall("body"):
+            robot(c)
+
+    def props(el, cls, fixed=True):
+        for g in el.findall("geom"):
+            ct, ca = int(resolved(g, cls, "contype")), int(resolved(g, cls, "conaffinity"))
+            if (fixed and (ct or ca) and not int(resolved(g, cls, "priority", "0"))
+                    and (g.get("name") in ground or resolved(g, cls, "type") in ("plane", "hfield")
+                         or (ct & 1 and ca & 4 and not ca & 8))):
+                g.set("solmix", GROUND_SOLMIX)       # the ground and the fixed surfaces one stands on (GROUND_SOLMIX)
+            if g.get("name") in ground or resolved(g, cls, "type") in ("plane", "hfield"):
+                continue
+            if ct or ca:
+                g.set("contype", str(ct | SHELL_BIT))
+        for c in el.findall("body"):
+            if c.get("name") != "pelvis":
+                moves = c.find("joint") is not None or c.find("freejoint") is not None
+                props(c, c.get("childclass") or cls, fixed and not moves)
+
+    def stiff(b, cls):                               # the robot's own collision geoms (ROBOT_CONTACT, SOLE_CONTACT)
+        cls = b.get("childclass") or cls
+        for g in b.findall("geom"):
+            ct = int(resolved(g, cls, "contype"))
+            if ct == 1:                              # a sole
+                for k, v in (SOLE_CONTACT or {}).items():
+                    g.set(k, v)
+            elif ct and not int(resolved(g, cls, "priority", "0")) and "_shell" not in (g.get("name") or ""):
+                for k, v in ROBOT_CONTACT.items():   # (not look-only, shells, geoms with a priority of their own)
+                    g.set(k, v)
+        for c in b.findall("body"):
+            stiff(c, cls)
+
+    wb = root.find("worldbody")
+    pelvis = next(b for b in wb.findall("body") if b.get("name") == "pelvis")
+    robot(pelvis)
+    props(wb, "main")
+    stiff(pelvis, pelvis.get("childclass") or "main")
 
 
 def _yaw(quat) -> float:
@@ -267,6 +386,7 @@ class World:
                               friction="1.2 0.005 0.0001")
             for name in sc.grippables:
                 sc.grip_weld(side, name)
+        _shells(root, set(sc.ground))
         # A tool is part of the robot (contype 4, conaffinity 0), so like the body hulls it would pass through the
         # robot itself: explicit pairs make it collide with every hull but those of the arm that carries it (the
         # robot library's self-collision does the same for the bare hands).

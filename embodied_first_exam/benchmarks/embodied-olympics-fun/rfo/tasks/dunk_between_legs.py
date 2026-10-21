@@ -1,4 +1,4 @@
-"""Basketball: a dribble between the legs, then a dunk (FIBA), with a real hold. From the top of the key the ball,
+"""Basketball: a dribble between the legs, then a dunk (FIBA). From the top of the key the ball,
 held only by pressing it between the two bare palms, is dribbled; one bounce of the dribble passes between the legs;
 the dribble ends with the ball gathered in both hands; at most two steps; the ball is forced down through the ring
 from above with the hands on it; land on the feet. Official court, backboard, ring and size-7 ball; the Unitree H1-2."""
@@ -223,10 +223,10 @@ class Travel:
 # arms a little forward, forearms a little raised, upper arms turned in until both pads touch the ball in front of the
 # chest (HOLD, the right arm; the left one mirrored); the hold targets (the start command) are SQUEEZE further in, so
 # the shoulder servos press the ball: nothing else holds it. The arms have no gravity feed-forward, so under that
-# command they sag to SETTLED (measured: tests/test_dunk_realgrasp.py, 3 s of the start command): the robot starts
+# command they sag to SETTLED (measured: tests/test_dunk.py, 3 s of the start command): the robot starts
 # there, at rest, the ball where it then sits (BALL_OFFSET from the middle between the two pads). Rolling the upper
 # arms in does not work near the body: their hulls meet the torso's at shoulder roll 0.15 rad.
-# Measured (tests/test_dunk_realgrasp.py): the start command presses about 20 N on each palm (shoulder yaw 8 N m,
+# Measured (tests/test_dunk.py): the start command presses about 20 N on each palm (shoulder yaw 8 N m,
 # roll 5 N m) and holds the ball for the whole episode and under an extra 3.6 g; with both arms up and the shoulder
 # roll 0.12 rad (25 N m) past the touching pose the palms press about 40 N and hold an extra 1.1 g (1.6 g at the
 # roll's 40 N m); one palm alone loses the ball within about 0.1 s.
@@ -325,7 +325,7 @@ def in_triangle(x, L, R, C) -> bool:
 
 class Task(TaskBase):
     name = "dunk-between-legs"
-    title = "Basketball: between-the-legs dribble and dunk, real hold"
+    title = "Basketball: between-the-legs dribble and dunk"
     category = "basketball-and-rackets"
     robot = "unitree_h1"
     rulebook = ("FIBA Official Basketball Rules 2024: Art. 2 (court), Art. 3 and the Basketball Equipment appendix "
