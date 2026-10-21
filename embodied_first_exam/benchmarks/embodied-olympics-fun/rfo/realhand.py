@@ -485,7 +485,8 @@ INSPIRE_PASSIVE_N = 8.0 * 9.81                  # the passive load per finger (8
 INSPIRE_LEVER = {"thumb_yaw": 0.053, "thumb_pitch": 0.224, "index": 0.117, "middle": 0.122, "ring": 0.116, "pinky": 0.101}
 INSPIRE_KP, INSPIRE_KD, INSPIRE_ARMATURE, INSPIRE_DAMPING = 200.0, 0.5, 0.001, 0.01
 INSPIRE_COUPLE_SOLREF, INSPIRE_COUPLE_SOLIMP = "0.002 1", "0.95 0.99 0.001"
-INSPIRE_GRASP = (0.205, -0.046, -0.006)         # (left, wrist frame) a handle's axis in the closed hand
+INSPIRE_GRASP = (0.160, -0.046, -0.006)         # (left, wrist frame) a 34 mm handle's axis on the palm, under the
+#                                                 fingers (the best hold of a search, tests/hands inspire_grasp.py)
 INSPIRE_MASS = 0.54                             # the maker's; the model keeps Unitree's link masses (see facts)
 
 

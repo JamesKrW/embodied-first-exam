@@ -1,9 +1,10 @@
-"""Tennis, the serve (ITF Rules of Tennis, Rules 4, 16-19, 22 and 24). Both hands are Unitree Dex1-1 two-jaw grippers:
-the racket is a free body held in the right gripper by the friction of its jaws on the handle, the ball starts held in
-the left gripper the same way. The toss is the left gripper opening (while the arm moves up); the racket can slip, turn
-in the jaws, be dropped or thrown.
+"""Tennis, the serve (ITF Rules of Tennis, Rules 4, 16-19, 22 and 24). Both hands are the H1-2's own Inspire five-finger
+hands (rfo.realhand, "inspire": six self-locking drives, the fingers moving): the racket is a free body held in the
+right hand by its fingers, thumb and palm round the handle (contact and friction only), the ball starts held in the
+left hand the same way. The toss is the left hand opening (while the arm moves up); the racket can slip, turn in the
+hand, be dropped or thrown.
 
-From behind your baseline, release the ball from your left gripper, strike it with the racket before it reaches the
+From behind your baseline, release the ball from your left hand, strike it with the racket before it reaches the
 ground, over the net into the service box diagonally opposite. A serve that touches the net and is otherwise good is
 a let and is served again, once.
 
@@ -23,7 +24,9 @@ Where the numbers come from:
   33.5 mm across the flats), 0.19 m long; the ball-string contact is an explicit pair, a spring-damper of 3.1 ms
   dwell on a 40 mm collision slab whose restitution on a racket fixed in space is 0.85 from 5 to 50 m/s (measured,
   the table in the racket block), friction 0.4 (tn.py's; tn.py's RACKET_GAIN = 5 is not used); the frame is solid;
-* the hands: Unitree's Dex1-1 gripper (rfo.world, real_hands = "dex1");
+* the hands: the H1-2's Inspire RH56DFX hands (rfo.realhand, real_hands = "inspire"), at the device's forces
+  (fingertip 10 N, the thumb 15 N; self-locking to 8 kg per finger): the racket's handle lies across the right
+  palm (its axis along the hand's grasp frame), the butt just beyond the little finger;
 * the service rules: Rule 16 (at rest behind the baseline, release by hand, strike before the ball lands), Rule 17
   (from the right half into the diagonally opposite box), Rule 18 (foot faults), Rule 19 (faults), Rule 22 (the let),
   Rule 24 h / i (the ball touching the player, or the racket when the player does not hold it). The spare ball for a
@@ -253,7 +256,7 @@ def build_free_racket(sc, pos, quat=(1, 0, 0, 0), balls=("ball",), name="racket"
     """The racket as a free body at pos/quat (its butt). Geoms: <name>_handle (a regular octagonal prism, the grip),
     <name>_throat{L,R}, <name>_frame{i} (24 capsules round the head) and <name>_strings (the strung ellipse's
     collision slab, invisible, whose contact with each ball is an explicit pair; <name>_strings_look is drawn). All
-    collide like a prop (HITTABLE): with the jaws, the robot, the ground, the net."""
+    collide like a prop (HITTABLE): with the hands, the robot, the ground, the net."""
     R = FREE_RACKET
     asset = sc.root.find("asset")
     a = R["handle_across_flats_m"] / 2
@@ -301,7 +304,11 @@ def build_free_racket(sc, pos, quat=(1, 0, 0, 0), balls=("ball",), name="racket"
 SPARE = "ball2"
 
 
-BUTT_IN_JAWS_M = 0.037                          # the butt this far behind the jaws' centre (3 mm clear of the housing)
+BUTT_OUT_M = 0.060                              # the butt this far from the grasp centre, beyond the little finger
+GRIP_TURN_DEG = 0.0                             # the handle turned in the palm from straight across it towards the
+#                                                 fingers (a tennis grip runs from the heel of the hand to the index)
+BALL_IN_HAND_M = (0.016, 0.030)                 # the ball's centre from the left grasp centre: out of the palm, along
+#                                                 the fingers: it rests on the palm, the fingers round it (a search)
 
 
 class Task(TaskBase):
@@ -327,7 +334,7 @@ class Task(TaskBase):
         "Rule 19 Case 1 (a toss that the server does not try to hit may be caught or let drop and tossed again): the "
         "intention cannot be judged: one toss per serve; a tossed ball that reaches the ground unstruck is a fault, "
         "and so is a tossed ball caught again (touching you for more than {max_touch_s} s)",
-        "Rule 16 (release 'by hand'): the hand is a two-jaw gripper; the ball is released when it has touched "
+        "Rule 16 (release 'by hand'): the ball is released when it has touched "
         "nothing at all for {release_s} s (a ball resting on a tee is not released), and the tossed ball may touch "
         "nothing but you and the racket; so that a ball struck out of the hand is not a serve, it must have touched "
         "nothing of you for {toss_free_s} s when the racket strikes it",
@@ -335,11 +342,12 @@ class Task(TaskBase):
         "must add speed: {retouch_gap_s} s after its last contact with the racket the ball must be faster than it "
         "was when it reached the racket; and the ball may move at most {toss_max_speed_m_s} m/s when it reaches the "
         "racket (the speed of a ball that has fallen about 1.3 m: a toss, not a throw)",
-        "the player's hands: the H1-2's hands are Unitree's Dex1-1 two-jaw grippers (sold for the G1, the H2 and "
-        "the R1, not for the H1-2; mounted on the wrist where the H1-2's palm ends): 90 mm stroke, 80 mm jaws, at "
-        "most 120 N of grip, opening at most 375 mm/s; they hold the racket and the ball by friction only",
-        "Rule 24 i (the racket held): made measurable: the racket is held while both jaws of your right gripper "
-        "touch its handle; it must not go unheld for more than {racket_gap_s} s at any time of the attempt",
+        "the player's hands: the H1-2's own Inspire five-finger hands (six drives: four fingers, the thumb's "
+        "flexion and rotation; fingertip forces 10 N, the thumb 15 N), closed by one command per hand; they hold "
+        "the racket and the ball by contact and friction only",
+        "Rule 24 i (the racket held): made measurable: the racket is held while its handle touches your right "
+        "hand's fingers and its thumb or palm; it must not go unheld for more than {racket_gap_s} s at any time of "
+        "the attempt",
         "Rule 12 (a ball touching a line is in): the ball's footprint is one point, the point under its centre at "
         "its first contact with the ground (a real ball's footprint is about 5 cm across)",
         "Rule 24 f (deliberately touching the ball twice, carrying it): intention cannot be judged: racket contacts "
@@ -365,8 +373,8 @@ class Task(TaskBase):
         max_touch_s=0.05, retouch_gap_s=0.05, racket_gap_s=0.05,
         bounce_gap_s=0.02, lets_replayed=1, spare_x_m=0.25, spare_y_m=0.60, spare_z_m=1.05, fall_z_m=0.35)
 
-    sentence = ("Serve: from behind your baseline, release the tennis ball from your left gripper, strike it with the "
-                "racket held in your right gripper before it reaches the ground, and send it over the net into the "
+    sentence = ("Serve: from behind your baseline, release the tennis ball from your left hand, strike it with the "
+                "racket held in your right hand before it reaches the ground, and send it over the net into the "
                 "service box diagonally opposite.")
     rules = (
         "The court is the ITF singles court: {court_length_m} m long and {court_width_m} m wide, measured to the "
@@ -374,11 +382,12 @@ class Task(TaskBase):
         "service line that divides the space between the net and each service line into two service boxes. The net "
         "stands across the middle, {net_centre_m} m high at its centre and rising in a straight line to "
         "{net_post_m} m at the posts, which stand {post_outside_m} m outside the sidelines. The ball is the ITF "
-        "ball (radius 0.0335 m, 0.0577 kg, with air drag and spin lift). Both your hands are two-jaw grippers that "
-        "hold things only by the friction of their jaws: the ball starts held in your left gripper, the racket "
+        "ball (radius 0.0335 m, 0.0577 kg, with air drag and spin lift). Both your hands are five-finger hands "
+        "that hold things only by contact and friction: the ball starts held in your left hand, the racket "
         "(0.685 m long, 0.30 kg, its balance 0.33 m from the butt, strung surface 0.33 m by 0.25 m, an octagonal "
-        "handle 33.5 mm across) starts held by its handle in your right gripper; either can slip or fall. The "
-        "racket is held while both jaws of your right gripper touch its handle; it must never go unheld for more "
+        "handle 33.5 mm across) starts held by its handle in your right hand; either can slip or fall. The "
+        "racket is held while its handle touches your right hand's fingers and its thumb or palm; it must never go "
+        "unheld for more "
         "than {racket_gap_s} s, from the start to the end of the attempt. You serve from the right of the centre "
         "mark into the far service box on the left of the centre line. In order: "
         "(1) the toss: the ball is released when it has touched nothing at all for {release_s} s (a ball resting on "
@@ -397,17 +406,17 @@ class Task(TaskBase):
         "beyond the sideline's extension or the centre mark's extension, nor the ground more than {foot_move_m} m "
         "from where each stood at the release (a foot fault); after the strike you may step anywhere on your side. "
         "A serve that touches the net and still lands in the box is a let: it does not count, and you serve again, "
-        "under the same rules, with the spare ball, which you take from its cup with your left gripper (before a "
+        "under the same rules, with the spare ball, which you take from its cup with your left hand (before a "
         "let you may not touch it); this happens at most {lets_replayed} time(s), a further let fails. You fail on "
         "any fault: releasing the ball when not at rest in the server's position, a foot fault, the tossed ball "
         "touching you for more than {max_touch_s} s (caught again: one toss per serve), touching anything but you "
         "and the racket (the spare ball, its cup or stand, the net), reaching the ground or passing the net unstruck, the racket striking the ball before it is clear of you, a ball that reaches the "
         "racket faster than {toss_max_speed_m_s} m/s, a hit that does not speed it up, the racket touching the "
         "struck ball again (contacts less than {retouch_gap_s} s apart are one hit) or staying on it longer than "
-        "{max_touch_s} s, the served ball touching you (your grippers included), a net post, the ground on your "
+        "{max_touch_s} s, the served ball touching you (your hands included), a net post, the ground on your "
         "side or the ground outside the service box, or passing the net's plane anywhere but over the net. You "
-        "also fail if the racket goes unheld (dropped, thrown, or slipped until the jaws no longer touch the "
-        "handle), if any part of you or the racket touches the net or a post, if you touch the spare ball before a "
+        "also fail if the racket goes unheld (dropped, thrown, or slipped out of the "
+        "hand), if any part of you or the racket touches the net or a post, if you touch the spare ball before a "
         "let, if you fall, or after {time_limit_s} s. A fall is: your pelvis lower than {fall_z_m} m above the "
         "ground, or any part of you other than your feet touching the ground; the racket may touch the ground.")
     venue = (
@@ -417,12 +426,12 @@ class Task(TaskBase):
         "service lines, the centre service line between them and a 0.10 m centre mark on each baseline; there are "
         "no doubles lines. Your target, the far service box on the left of the centre line, begins at the net and "
         "ends {service_line_m} m beyond it, and reaches from the centre service line 4.115 m to the left. The ball "
-        "is held between the jaws of your left gripper; the spare ball rests in a cup on a thin stand, its centre "
+        "is held in your left hand; the spare ball rests in a cup on a thin stand, its centre "
         "{spare_x_m} m ahead of your pelvis, {spare_y_m} m to your left and {spare_z_m} m above the ground. The "
-        "racket's handle is held between the jaws of your right gripper near its butt, the racket pointing along "
+        "racket's handle lies across your right palm near its butt, held by the closed fingers and thumb, the racket pointing along "
         "your forearm, its strings facing the way your palm faces.")
     difficulty = ("Nothing is fixed to the hands: the swing that gives a ball well over 10 m/s through a free 0.30 kg "
-                  "racket must not twist it out of two jaws that hold it by friction, the left gripper has to let go "
+                  "racket must not twist it out of fingers that hold it by friction, the left hand has to let go "
                   "of the ball cleanly while the arm rises, and the strings must meet the falling ball within a few "
                   "tenths of a second, aimed into a box 6.4 m deep beyond a net 11.9 m away. All of it on a body that "
                   "stands without a balance controller and may not move its feet.")
@@ -440,7 +449,7 @@ class Task(TaskBase):
     def build(self, sc):
         p = self.p
         nx, cy = p["net_x_m"], p["centre_y_m"]
-        sc.real_hands["left"] = sc.real_hands["right"] = "dex1"
+        sc.real_hands["left"] = sc.real_hands["right"] = "inspire"
         build_court(sc, nx, cy, balls=("ball", SPARE))
         x0, x1, y0, y1 = self.box()
         sc.zone("service_box", ((x0 + x1) / 2, (y0 + y1) / 2), ((x1 - x0) / 2 - LINE, (y1 - y0) / 2 - LINE),
@@ -464,15 +473,18 @@ class Task(TaskBase):
     def reset(self, w):
         p = self.p
         w.put(SPARE, (p["spare_x_m"], p["spare_y_m"], p["spare_z_m"]))
-        # the racket's handle between the right jaws, along the fingers, the butt towards the wrist; its axes the jaw
-        # frame's (x: the closing axis = the strings' normal = the palm's normal)
-        c, R = w.jaw_frame("right")
+        # the racket's handle across the right palm along the grasp frame's y (from the little finger towards the
+        # index), the butt BUTT_OUT_M beyond the little finger's side; the strings' normal = the palm's normal (x)
+        c, R = w.grasp_frame("right")
+        phi = math.radians(GRIP_TURN_DEG)
+        ax = math.cos(phi) * R[:, 1] + math.sin(phi) * R[:, 2]     # the handle's axis
+        Rr = np.c_[R[:, 0], np.cross(ax, R[:, 0]), ax]  # racket x = palm normal (the strings' normal), z = the handle
         q = np.zeros(4)
-        mujoco.mju_mat2Quat(q, R.ravel())
-        w.put("racket", c - R[:, 2] * BUTT_IN_JAWS_M, quat=q)
+        mujoco.mju_mat2Quat(q, Rr.ravel())
+        w.put("racket", c - ax * BUTT_OUT_M, quat=q)
         w.close_on("right", "racket")
-        c, R = w.jaw_frame("left")                     # the ball between the left jaws
-        w.put("ball", c)
+        c, R = w.grasp_frame("left")                   # the ball in the left hand, against the palm
+        w.put("ball", c + R[:, 0] * BALL_IN_HAND_M[0] + R[:, 2] * BALL_IN_HAND_M[1])
         w.close_on("left", "ball")
 
     # ------------------------------------------------------------------ the referee
@@ -500,18 +512,20 @@ class Task(TaskBase):
         self.ballg = {n: ref.geoms(body=n) for n in ("ball", SPARE)}
         self.other = {n: ~(g | ref.robot_mask | self.racket | ref.ground) for n, g in self.ballg.items()}
         self.anything = {n: ~g for n, g in self.ballg.items()}
-        self.jaws = {s: [ref.geoms(body=f"{s}_hand_jaw_{j}") for j in ("a", "b")] for s in ("left", "right")}
+        ng = w.m.ngeom
+        self.grips = {s: [np.isin(np.arange(ng), w.hands.group_geoms(w, s, g)) for g in ("fingers", "thumb_palm")]
+                      for s in ("left", "right")}
         # feet: where the feet were at the end of each of the last control steps (rest_s of them); feet_up: the last
-        # time a foot was off the ground; held: the last time both right jaws touched the racket's handle
+        # time a foot was off the ground; held: the last time the right hand held the racket's handle
         self.trackers = {"serve": 1, "phase": "hold", "feet": [self._feet_xy(w)], "feet_up": None,
                          "held": 0.0 if self._held(ref) else None}
         self._new_serve(ref, "ball")
 
     def _held(self, ref) -> bool:
-        return all(ref.touching(j, self.handle) for j in self.jaws["right"])
+        return all(ref.touching(g, self.handle) for g in self.grips["right"])
 
     def _in_left(self, ref, ball) -> bool:
-        return all(ref.touching(j, ball) for j in self.jaws["left"])
+        return all(ref.touching(g, ball) for g in self.grips["left"])
 
     def _not_at_rest(self, w, ref):
         """Rule 16 at the release: None, or what was not at rest during the last rest_s seconds."""
@@ -546,7 +560,7 @@ class Task(TaskBase):
         if ref.touching(ref.robot_mask | self.racket, self.netg):
             what = sorted(ref.parts_touching(self.netg)) + (["racket"] if ref.touching(self.racket, self.netg) else [])
             return ref.fail("you or the racket touched the net", parts=what)
-        if self._held(ref):                            # Rule 24 i: the racket in the right gripper
+        if self._held(ref):                            # Rule 24 i: the racket in the right hand
             tr["held"] = round(ref.time, 4)
         elif tr["held"] is None or ref.time - tr["held"] > p["racket_gap_s"]:
             return ref.fail("the racket left your right hand",
@@ -555,7 +569,7 @@ class Task(TaskBase):
         ball = self.ballg[name]
         if tr["serve"] == 1 and ref.touching(self.ballg[SPARE], self.body | self.racket):
             return ref.fail("you touched the spare ball before a let")
-        if tr["phase"] == "await":                     # after a let: the spare ball must be taken into the left gripper
+        if tr["phase"] == "await":                     # after a let: the spare ball must be taken into the left hand
             if self._in_left(ref, ball) and not ref.touching(ball, self.cup):
                 tr["phase"] = "hold"
             return

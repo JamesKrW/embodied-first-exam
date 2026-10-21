@@ -118,7 +118,8 @@ class BarGrip:
 CATCH_ARM = np.array([-2.81, 0.72, 0.3583, 1.3808, 1.8, -0.2208, 0.1125])
 MIRROR = np.array([1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0])
 ARMS = slice(15, 29)
-GRIP_SCALE = 5.0              # the Dex3-1 drives x this (declared): the measured need, tests/hands (see deviations)
+GRIP_SCALE = 5.0              # the Dex3-1 drives x this (declared): the measured need (4.5 lets go, 5 holds; see
+#                               deviations); an owner-approved exception to the families' 2 x cap
 
 
 class Task(BarGrip, TaskBase):
@@ -136,10 +137,11 @@ class Task(BarGrip, TaskBase):
         "friction alone, nothing is welded, and the bar can be torn out of the hand; the bar is fixed, as the norm's "
         "is, and a hand turns on it only by sliding round it or by the wrist's joints",
         "the grip force: the hands' drives are {grip_scale} times the Dex3-1's (closing 0.49 N m, back-driven 1.37 N m "
-        "per finger joint; the thumb's rotation 0.86 / 3.1 N m), because with the device's torques a closed hand is "
-        "torn open by about 1.3 body weights on the bar (both hands, measured) while the bottom of a giant swing pulls "
-        "about four or more (gymnasts 3.5 to 3.7, Kopp & Reid 1980); in this venue's magic-action giant swing "
-        "4 times the device's lets go and {grip_scale} times holds (measured). No Unitree hand is this strong",
+        "per finger joint; the thumb's rotation 0.86 / 3.1 N m), because with the device's torques the two hands hold "
+        "about one body weight on the bar (measured: torn off by the catch itself; 1.5 times: 1.55, 2 times: 2.05 body "
+        "weights) while the bottom of a giant swing pulls about four or more (4.6 to 5.0 measured here; gymnasts 3.5 "
+        "to 3.7, Kopp & Reid 1980); in this venue's magic-action giant swing 4.5 times the device's lets go and "
+        "{grip_scale} times holds, forwards and backwards (measured). No Unitree hand is this strong",
         "the grip (the hands stay on the bar): defined by contact: the catch is both hands grasping the bar (the bar "
         "touching each hand's index or middle finger and its thumb or palm); after it a hand is on the bar while the "
         "bar touches any part of it (a hook grip counts), and a break of up to {off_bar_s} s (contacts flickering "
