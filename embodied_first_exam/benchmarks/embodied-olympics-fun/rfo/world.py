@@ -429,7 +429,7 @@ class World:
         self.robot = Robot(m, self.robot_name)
         self.L = self.robot.L
         self.runp = RP.RunPolicy()
-        self.real_hands = dict(sc.real_hands)       # side -> "dex1": a gripper holding by friction, no weld (realhand.py)
+        self.real_hands = dict(sc.real_hands)       # side -> "dex1" / "dex3" / "inspire": a real hand, no weld (realhand.py)
         self.robot.real_hands = self.real_hands
         self.grippables = {n: dict(v, body=m.body(n).id) for n, v in sc.grippables.items()}
         self.welds = {(s, n): m.equality(f"grip_{s}_{n}").id for s in SIDES if s not in self.real_hands
@@ -444,7 +444,8 @@ class World:
         self._eq_data0 = m.eq_data.copy()           # a grip writes its weld's pose into the model: reset restores it
         self.tool_hands = set(sc.hand_tools)        # a hand that carries a tool has no fist to grip with
         self._renderers: dict = {}
-        self.hands = realhand.RealHands(self, self.real_hands) if self.real_hands else None
+        self.hands = (realhand.make_hands(self, self.real_hands, getattr(sc, "real_hand_options", {}))
+                      if self.real_hands else None)
         self.ref = Referee(self)
         self.reset()
 
@@ -475,6 +476,15 @@ class World:
         for side, kind in sc.real_hands.items():
             if side not in SIDES or kind not in realhand.KINDS or side in sc.hand_tools:
                 raise ValueError(f"real_hands[{side!r}] = {kind!r}: a side, one of {realhand.KINDS}, and no hand tool there")
+            if realhand.HAND_ROBOT.get(kind, self.robot_name) != self.robot_name:
+                raise ValueError(f"real_hands[{side!r}] = {kind!r} is the {realhand.HAND_ROBOT[kind]}'s hand, not the "
+                                 f"{self.robot_name}'s")
+        hand_opts = dict(getattr(sc, "real_hand_options", {}) or {})
+        for side in hand_opts:
+            if sc.real_hands.get(side) not in realhand.FINGER_KINDS:
+                raise ValueError(f"real_hand_options[{side!r}]: only a finger hand (dex3, inspire) takes options")
+        self._inspire_palm: dict[str, str] = {}
+        hand_pairs: list[tuple[str, str]] = []
         grippers: list[str] = []
         if sc.real_hands:                           # friction that holds: elliptic cones, stiff friction (realhand.py)
             opt = root.find("option")
@@ -483,12 +493,24 @@ class World:
         for side in SIDES:                          # the hands: a palm pad (or the task's tool) on each wrist mount
             mount = next(b for b in root.iter("body") if b.get("name") == f"{side}_mount")
             real = side in sc.real_hands
-            ET.SubElement(mount, "site", name=f"{side}_palm", pos=f"0 0 {realhand.CENTRE_Z:g}" if real else "0 0 0.045",
+            kind = sc.real_hands.get(side)
+            ET.SubElement(mount, "site", name=f"{side}_palm", pos=(realhand.grasp_point_in_mount(mount, side, kind)
+                          if kind in realhand.FINGER_KINDS else f"0 0 {realhand.CENTRE_Z:g}" if real else "0 0 0.045"),
                           size="0.008", group="4")
             frag = sc.hand_tools.get(side)
             if real:                                # the real hand (realhand.py): no pad, no weld
-                realhand.strip_hand(root, side, self.robot_name)
-                for g in realhand.build(root, mount, side, self.robot_name):
+                if kind == "dex1":
+                    realhand.strip_hand(root, side, self.robot_name)
+                    geoms = realhand.build(root, mount, side, self.robot_name)
+                else:                               # a finger hand: the G1's fist goes; the H1-2's fingers get joints
+                    if kind == "dex3":
+                        realhand.strip_hand(root, side, self.robot_name)
+                    build = realhand.build_dex3 if kind == "dex3" else realhand.build_inspire
+                    geoms, pairs = build(root, mount, side, self.robot_name, hand_opts.get(side, {}))
+                    hand_pairs += pairs
+                    if kind == "inspire":
+                        self._inspire_palm[side] = realhand.inspire_palm_geom(root, side)
+                for g in geoms:
                     tools.append((side, g))
                     grippers.append(g)
                 continue
@@ -517,6 +539,8 @@ class World:
             for body, hull in hulls:
                 if not body.startswith(own):
                     ET.SubElement(contact, "pair", name=f"toolcol_{tool}_{hull}", geom1=tool, geom2=hull, condim="3")
+        for g1, g2 in hand_pairs:                   # a finger hand's thumb and its fingers
+            ET.SubElement(contact, "pair", name=f"handcol_{g1}_{g2}", geom1=g1, geom2=g2, condim="3")
         for g1 in grippers:                         # a gripper touches the other hand: its gripper, pad or tool
             side = g1.split("_", 1)[0]
             other = "right" if side == "left" else "left"
@@ -804,8 +828,13 @@ class World:
 
     def jaw_frame(self, side: str) -> tuple[np.ndarray, np.ndarray]:
         """(position, rotation) of a real hand's jaw centre: columns x closing axis (towards jaw a, the palm side), y
-        across the jaws, z along the fingers."""
+        across the jaws, z along the fingers. A finger hand: its grasp frame (grasp_frame)."""
         return self.hands.jaw_frame(side)
+
+    def grasp_frame(self, side: str) -> tuple[np.ndarray, np.ndarray]:
+        """(position, rotation) of a finger hand's grasp site (realhand.FingerHands.grasp_frame): where a handle's axis
+        sits in the closed hand; columns x out of the palm, y = z x x, z along the fingers."""
+        return self.hands.grasp_frame(side)
 
     def grip_cmd(self, side: str) -> float:
         """The grip value in force on a side: a real hand's closure command, else 1.0 / 0.0 for the weld grip."""
@@ -993,6 +1022,9 @@ class Actions:
         self.real = dict(getattr(r, "real_hands", {}) or {})     # the sides with a real hand (realhand.py)
         if self.real:
             note = "; ".join(f"grip_{s}: the {s} gripper's closure command, 0 (open, 90 mm) to 1 (closed)"
+                             if self.real[s] == "dex1" else
+                             f"grip_{s}: the {s} hand's closure command, 0 (open, the fingers straight) to 1 (every "
+                             "drive closing towards its closed position; fingers stop on what they touch)"
                              for s in SIDES if s in self.real)
             for t in self.types.values():
                 t["meaning"] += f" ({note})"
