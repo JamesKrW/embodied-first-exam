@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-rugby-conversion-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `rugby_conversion` / seed 0 |
-| Oracle | `full` — Reference: a standing power kick through lowcmd; the ball passes the goal plane at 4.5 m (the bar is at 3.0 m); 12 of 13 gain and tee-offset perturbations score. The robot falls after the kick, which is allowed (Law 8 judges the ball). The privileged twin's reference rows (433 control steps, success after 4.33 s) streamed through the client. |
+| Oracle | `full` — Reference: a standing power kick through lowcmd; the foot meets the ball above the rigid tee's cup and sends it through the goal plane at 3.9 m (the bar is at 3.0 m); 12 of 16 perturbations score (9 of 12 offsets of the wind-up pose, hip roll, crouch and ankle; 3 of 4 tee offsets of 1 cm). The kick is sensitive: the swinging foot brushes the grass before the ball, and nearby settings send the ball under the bar. A fall after the kick would be allowed (Law 8 judges the ball). The privileged twin's reference rows (401 control steps, success after 4.01 s) streamed through the client. |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -18,7 +18,7 @@ Kick a conversion: with one place kick of a foot, send the rugby ball standing o
 To clear a 3 m bar 5 m away the ball must leave the foot at about 10 m/s or more, rising at 45 to 60 degrees: a hard, steep kick under the ball's lower end. The robot has no kicking skill; a hard swing on one leg throws the 33 kg body round, and the robot must stay on its feet until the ball has scored. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
 
 ## Reference solution
-`solution/oracle_replay.py` streams the privileged twin's reference solution, row by row, through the client (`solution/rows.npz`, recorded by scripts/embodied-olympics/make_oracles.py). Reference: a standing power kick through lowcmd; the ball passes the goal plane at 4.5 m (the bar is at 3.0 m); 12 of 13 gain and tee-offset perturbations score. The robot falls after the kick, which is allowed (Law 8 judges the ball). The privileged twin's reference rows (433 control steps, success after 4.33 s) streamed through the client.
+`solution/oracle_replay.py` streams the privileged twin's reference solution, row by row, through the client (`solution/rows.npz`, recorded by scripts/embodied-olympics/make_oracles.py). Reference: a standing power kick through lowcmd; the foot meets the ball above the rigid tee's cup and sends it through the goal plane at 3.9 m (the bar is at 3.0 m); 12 of 16 perturbations score (9 of 12 offsets of the wind-up pose, hip roll, crouch and ankle; 3 of 4 tee offsets of 1 cm). The kick is sensitive: the swinging foot brushes the grass before the ball, and nearby settings send the ball under the bar. A fall after the kick would be allowed (Law 8 judges the ball). The privileged twin's reference rows (401 control steps, success after 4.01 s) streamed through the client.
 
 ## Verification
 The sim sidecar's referee judges the live attempt, and that is the verdict (`final.json`: `graded_by` live, `replays` 0;
