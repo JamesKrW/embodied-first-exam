@@ -1,9 +1,11 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:ambench-files-0.2.1@sha256:0e73d1d0e615c2d6dd0e039c36d8c69217c7a8fabd7eadef48de514505045d7b",
+ "image": "ghcr.io/mll-lab-nu/efe:ambench-files-0.3.0@sha256:7afcca7d8bf508366ff10d462935142413918023d49e781b3eace3c8199f3500",
  "source": "embodied_first_exam/benchmarks/ambench",
  "files": {
   "privileged/environment/rcb_ambench.py": "53a7523ae39fb33344407c8c3ef910e7fc51a8a36b34bff7f4ee5e0aee8046c3",
   "privileged/tests/grade.py": "ceffdbeafd525914e98b2c04fbc3769ec0bf12e2aa0dbab8a5fc8789b33988b6",
+  "sim/finalize.sh": "0b39faf758a63ea02fec825561323df5253eadf8491143656d4269e9a86f3e69",
+  "sim/server.py": "7f2b4237cf6341dd3db92cbcf9d0d20ec39ae1aaf74bd19b67c3765120022c6a",
   "standard/tests/grade.py": "c121fbd18e10ead34b0bdbc652ea353c588532778a489dd15e8d0b19efaacbaf"
  }
 }
