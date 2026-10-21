@@ -13,11 +13,36 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Put car objects into the left basket, watch objects into the middle basket, and wooden_toy objects into the right basket, then reset the robot arm."*
 
 ## Success (RoboDojo's own check for this task)
-- A label is 'in' a basket when the object's root origin xy lies inside the basket's bbox footprint (convex hull of the oriented 3D bbox projected to xy) and its root z is strictly above the bbox's lowest z. All objects of category cat0 (the category named first in the instruction) are inside basket0 (the 'left' basket, x=-0.28); all objects of cat1 (named second) are inside basket1 (middle, x=0.0); all objects of cat2 (named third) are inside basket2 (right, x=+0.28).
-- Settled: for each i in 0..2, every object of cat_i has root z - (top z of the world-frame bbox of basket_i) < 0.01 m (objects not held high above the rim).
-- All target robots back at start end-effector pose: |dx|,|dy|,|dz| each <= 0.15 m and rotation <= 20 degrees (all_robot_back_to_origin defaults).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the three baskets: open-top plastic bins, 25.2 x 16.8 cm and 7.7 cm high, in a row across the far half of the
+  table: white on the left [basket0], blue in the middle [basket1], red on the right [basket2];
+- the objects, three kinds, named in RoboDojo's instruction in this order [one label group per kind]:
+  - "car": two toy cars [cat0]: a yellow SUV at the front left, near the left gripper [cat0_0], and a green sports car
+    in front, right of centre [cat0_1];
+  - "watch": two wristwatches [cat1]: a black band in front, left of centre [cat1_0], and a light, silver-coloured one with a
+    small square face just left of centre, a little farther away [cat1_1];
+  - "wooden_toy": two identical small tan lion figurines (8 cm tall) [cat2]: one on the left, just in front of the white
+    basket [cat2_1], one at the far right near the right gripper [cat2_0].
 
-**When it is checked.** Checked after every action (the reward manager step runs after each action's control sequence completes). One stage: all conditions simultaneously; first such step is success. Otherwise failure at step_lim=1100 actions. Process score (partial only): stages need grippers open (>= 0.8) and 1 / 2 / 3 categories correctly placed (scores 10, 40, 100), also requiring other categories not in that basket.
+An object's *centre* below is the point RoboDojo tests for it (its origin); for every object here that is the middle
+of its bounding box. All of these must hold at the same action boundary:
+- **Each kind in its named basket.** Both cars in the left (white) basket, both watches in the middle (blue) basket,
+  both lions in the right (red) basket [is_all_A_in_B]. An object is *in* a basket when its centre, seen from above,
+  lies inside the basket's outline and is higher than the basket's underside [is_A_in_B]. Objects of another kind in
+  a basket do not fail this check (but each object can be in only one basket).
+- **Released.** Every object's centre less than 0.01 m above its basket's rim (7.7 cm above the table)
+  [is_all_A_z_lower_than_B_bbox_zmax, z_threshold=0.01]: an object resting in the basket passes, one still held up in
+  a gripper fails.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), in the order cars, watches, lions in their
+baskets, released, arms, stopping at the first condition that fails; all must hold at the same action boundary (one
+stage). Success is declared at the first action boundary where everything holds, and the episode ends. No condition
+ends the episode early as a failure. A separate partial-credit score (not part of success) climbs the tiers 10, 40,
+100 as 1, 2, then 3 kinds are complete in their named baskets, released below the rim, with nothing of another kind in
+those baskets, while both grippers are open (each at least 0.8 of its full opening)
+(the 100 tier counts only if the episode succeeds, otherwise the tier below) [process score, transition mode].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -26,11 +51,16 @@ RoboDojo's own evaluation gives a policy 1100 actions (44 s) for this task; no c
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**What you must read or remember.** Yes. The agent must read the instruction: it names three categories (the category names come from the objects' model_name, e.g. 'watch', 'car', 'wooden_toy', 'pepper', 'chocolate_bar'), in order left, middle, right basket. The instruction template is filled at runtime with cat0, cat1, cat2 category names, so the mapping must come from the text.
+**What you must read or remember.** RoboDojo's instruction (quoted above) names the three kinds in the order left,
+middle, right basket: "car" -> left (white), "watch" -> middle (blue), "wooden_toy" (the lion figurines) -> right
+(red). The kind names are RoboDojo's category names; match them to the objects by sight.
 
-**At the end.** All target arms back within 0.15 m per axis and 20 degrees of start pose at the moment of success.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** Instruction categories map to baskets in order: first named -> basket0 (left, lowest x), second -> middle, third -> right (highest x). 'left' here is defined by basket label/x order; if the camera view is mirrored the instruction's 'left' still corresponds to basket0 at x=-0.28. gen_instruction returns an empty string if any category has no object. Exact category name strings come from asset metadata (model_name), not determinable statically.
+**Notes from RoboDojo's code.** Left, middle and right are the baskets' places on the table as seen from the arms
+(left = world -x). Being in a basket is judged by the object's centre alone, so an object leaning over the rim counts
+if its centre is inside the outline. The baskets are fixed in place.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

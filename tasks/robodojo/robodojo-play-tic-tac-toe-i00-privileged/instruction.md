@@ -22,11 +22,36 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- All 9 pieces (player_piece0..player_piece4 and opponent_piece0..opponent_piece3) must at the same moment each have their root position within 0.015 m (strict, XY distance) of the centre ('cell/k' support point) of SOME cell k of 'checkerboard' (k=0..8). The check does not require different pieces to be in different cells and does not require a particular winner; with 9 pieces and 0.015 m radius this means every cell is filled.
-- At the same moment each of those 9 pieces has (piece root z - checkerboard root z) strictly between 0.0 and 0.02 m (i.e. resting on the board, not lifted/tilted onto another piece or off the board).
-- (Query constraint, must hold at EVERY step of the episode, counter must stay 0): there must be no step at which BOTH (a) the left arm OR the right arm is 'not back to origin' (end-effector more than 0.3 m away on any axis from its start pose, or more than 30 deg rotated from it) AND (b) the support arm (support_arm0, the opponent) is not back to its origin (more than 0.3 m on any axis or more than 40 deg). I.e. your arms must stay within 0.3 m / 30 deg of their start pose whenever the opponent arm is out of its own home zone. A single violating step fails the episode immediately.
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the board: the black square board (22.3 cm, 1.6 cm thick) with a yellow 3 x 3 grid, in the middle of the table just
+  in front of the centre [checkerboard]. Its nine cells are squares 7.4 cm apart; a cell's *centre* is the middle of
+  its square [support points cell/0..cell/8: cell/0 is the near-left cell, numbered left to right, then row by row
+  away from you];
+- your five pieces: the gold rings ("O", 5.6 cm across, 1 cm thick) in a row in front of the board, nearest to you
+  [player_piece0 .. player_piece4, from left to right];
+- the opponent's four pieces: the gold crosses ("X", 5 cm across, 1 cm thick) in a row on the far side of the board,
+  in front of the third (white) arm [opponent_piece0 .. opponent_piece3, from left to right];
+- the opponent arm: the white arm on the far side of the table, not under your control [support_arm0].
 
-**When it is checked.** Evaluated after every action. The 9-piece placement condition is ONE single stage (all 9 XY conditions and all 9 z conditions must hold at once after the same action). The reward manager is evaluated only once per action (after the sim sub-steps of that action are finished), never between sub-steps. In each evaluation the FIRST pending stage of the check list is tested (every condition in it, all at that same moment; a condition that is a nested list is an OR); when it passes it is removed permanently (never re-verified later) and the next stage becomes pending; at most one stage is removed per action. Reward is 1.0 only when the check list is empty (and no query/trigger counter is violated); the episode is declared a success as soon as reward >= 0.999 after an action, and ends as a failure if the action counter reaches step_lim without that, or earlier if the environment is flagged failed (query counter exceeded, see below). No final_check list is registered by this task, so the final-check logic at step_lim adds nothing. The query constraint is evaluated after every action; as soon as it has counted >= 1 violating step (aim is 0) the environment is flagged failed and the episode ends as a failure (reward 0). There is no end-of-episode-only check.
+A piece's *centre* below is the point RoboDojo tests for it (its origin): the middle of its underside (for a ring, the
+middle of the hole at table level).
+- **Board full.** Every one of the nine pieces (your five rings and the opponent's four crosses), at the same action
+  boundary: its centre, seen from above, less than 0.015 m from the centre of some cell [is_A_xy_close_to_B_support_point,
+  any of cell/0..8], and its centre more than 0.0 m and less than 0.02 m higher than the board's underside
+  [is_A_point_above_B_point_by_z_range], i.e. lying flat on the board's top (1.6 cm up), not on the table and not on
+  another piece. Different pieces are not required to be in different cells, but two pieces cannot both lie flat
+  within 1.5 cm of one cell centre, so this means every cell holds one piece. No winner is required. Not true at the
+  start.
+- **Stay home while the opponent moves** (must hold after EVERY action of the episode) [query, aim 0]: there must be no
+  action boundary at which both (a) your left or right arm is away from home: its end-effector more than 0.3 m from its
+  start position on any one of x, y, z, or more than 30 deg turned from its start orientation [is_robot_not_back_to_origin],
+  and (b) the opponent arm is away from its home: more than 0.3 m on any axis or more than 40 deg. A single such action
+  boundary fails the episode at once.
+
+**When it is checked.** After every action (never between actions). The board-full condition is one stage: all nine
+position tests and all nine height tests at the same action boundary. Success is declared at the first action
+boundary where it holds, and the episode ends. The stay-home rule is counted after every action; the first violation
+ends the episode as a failure.
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -34,9 +59,28 @@ simulated time). RoboDojo's own evaluation gives a policy 1100 actions (44 s) fo
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**What changes by itself.** Interactive opponent (self.interact = True). After each agent action the env checks the board: when the number of cells occupied (a cell counts as occupied by a piece if a piece, any of the 9 labels, is within 0.018 m XY of the cell centre and 0.0 < z diff < 0.02 m above the board) equals 2*n+1 (n = opponent moves made so far, i.e. 1, 3, 5, 7 occupied cells), there is at least one empty cell (empty = no piece within 0.05 m XY of its centre at board height), no opponent move is currently executing, and BOTH of your arms are back near home (0.3 m per axis, 30 deg) then the opponent plays: it picks uniformly at random (seeded per episode) one empty cell and replays a pre-recorded support-arm trajectory that places opponent_piece{n} (in order 0,1,2,3) on that cell. At most 4 opponent moves. The opponent trajectory is consumed in parallel with your actions, a few control sub-steps per action, so it runs while you keep acting (and you must stay near home meanwhile, see success). It does not wait for you. If the opponent fails to place its piece within 0.018 m of the target cell, the episode is flagged 'unstable' and dropped from the evaluation (not the agent's fault).
+**What changes by itself.** The opponent arm plays the crosses. After each of your actions RoboDojo counts the
+*occupied* cells: cells with a piece of either side whose centre is less than 0.018 m (seen from above) from the cell
+centre and more than 0 and less than 0.02 m above the board's underside. The opponent plays its next move when all of
+these hold: that count equals 2n+1, where n is the number of moves the opponent has made so far (so 1, 3, 5 or 7
+occupied cells, your pieces and its pieces together); at least one cell is *empty* (no piece within 0.05 m of its
+centre, lying on the board); it is not already moving; and both of your arms are home (within 0.3 m of their start
+positions on each axis and 30 deg of their start orientations) [all_robot_back_to_origin, 0.3 m / 30 deg]. It then
+picks one of the empty cells at random (RoboDojo re-applies the episode's seed before each pick, so in this frozen scene
+the pick depends only on which cells are empty) and replays a recorded motion that puts its next cross there, crosses
+in order from left to right [opponent_piece0, 1, 2, 3]. At most 4 moves. Its motion advances only while your actions
+run (one action's worth of its motion per action of yours), so keep sending actions (for example holding still at
+home) until it has finished and gone back. If its cross ends more than 0.018 m from the chosen cell, RoboDojo marks the
+episode unstable and drops it from its evaluation (not the agent's fault).
 
-**Notes from RoboDojo's code.** The board must be completely full for success, so the 5th player piece must go on the last free cell; mistakes cannot be undone cheaply. The opponent only moves after the player has exactly 1, 3, 5 or 7 occupied cells and the arms are home: if you place two pieces before it replies, the count is 2, 4, ... and the opponent never moves again, so the board can never fill (timeout fail). The trigger uses 0.018 m placement tolerance, but the final success needs 0.015 m, so place each piece within 1.5 cm of the cell centre. Moving a player arm beyond 0.3 m / 30 deg from home while the opponent arm is away (>0.3 m / 40 deg from its home) is an immediate failure; wait (e.g. send hold actions) until the opponent has finished and gone back. The 0.3 m is per axis (not Euclidean). Process score (get_score, not success): 10/30/50/75/100 for 1..5 player pieces on cells with grippers open (>=0.8).
+**Notes from RoboDojo's code.** The board must be completely full, so your fifth ring goes on the last free cell.
+Take turns: place exactly one ring, bring both arms home, and wait for the cross. The count includes the opponent's
+crosses: it is 1 after your first ring, 3 after your second (two rings, one cross), then 5 and 7. If you place two rings
+before it replies, or leave a piece between 1.8 and 5 cm from a cell centre (neither occupied nor empty), the count is
+off and the opponent waits until it is exactly 2n+1 again; without its four crosses the board never fills. The turn
+trigger accepts 1.8 cm, but success needs every piece within 1.5 cm of its cell centre. Moving an arm out of its home
+zone (0.3 m per axis, not straight-line distance, or 30 deg) while the opponent arm is out of its own (0.3 m / 40 deg)
+fails at once.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

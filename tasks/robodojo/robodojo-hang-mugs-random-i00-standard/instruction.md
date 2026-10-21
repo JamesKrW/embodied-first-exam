@@ -13,14 +13,56 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Hang all the mugs on the mug rack."*
 
 ## Success (RoboDojo's own check for this task)
-- For each of mug0, mug1, mug2: root z is more than 0.045 m above the mug's initial root z (is_lift z_threshold=0.045, strict), i.e. the mug has been lifted at least 4.5 cm from where it started.
-- For each mug: at least one of its active functional points tagged 'handle' has world z > 0.9 m (is_A_functional_point_higher_than_z, absolute z in the simulation world frame; the exact reference frame/table height is not determinable statically, so this is an absolute height).
-- For each mug: the handle point's local +z axis is within 60 degrees (strict <60) of the rack's passive functional point 'handle_support_point' local +z axis (is_axis_aligned with functional_point_A='handle' (active), functional_point_B='handle_support_point' (passive)). Both frames are the FIRST point of that tag (element [0] of each list): the mug's first 'handle' point and the rack's first 'handle_support_point', whichever hook the mug actually hangs on.
-- For each mug: the handle point's local +x axis is within 60 degrees of either the support point's local +x or its local -x axis (parallel or anti-parallel; again the first handle point and the rack's first support point).
-- For each mug: the handle point (active) is within 0.045 m (3D Euclidean distance, strict <) of at least one 'handle_support_point' (passive) of cup_holder (is_A_functional_point_close_to_B_functional_point threshold=0.045, no orientation check on that one). Each mug is tested against any support point of the rack independently; the code does not require different mugs to use different hooks.
-- All target robots back at start end-effector pose: |dx|,|dy|,|dz| each <= 0.15 m and rotation <= 20 degrees (all_robot_back_to_origin defaults).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the three mugs [mug0, mug1, mug2], all standing upright on the table: a red mug with a white inside in the middle
+  of the table, handle pointing left [mug0]; two identical pink pumpkin-shaped mugs, one at the front left near the
+  left gripper with its handle pointing away from you [mug1], one at the right near the right gripper with its handle
+  pointing right and away [mug2];
+- the mug rack: the wooden mug tree left of centre, at the back: a round base and a pole about 30 cm tall with six
+  arms (hooks) at three heights, about 15, 22 and 29 cm above the table. At the lowest and the top level one arm points
+  left and one right; at the middle level one points toward you and one away. The arms rise about 22 deg (the lower
+  right one 28 deg) [cup_holder].
+The twenty other objects on the table (a cake, a table-tennis paddle, a tissue box, toys, a stapler, a pen, a comb and
+others) are clutter: the check ignores them.
 
-**When it is checked.** Checked after every action; all conditions for all three mugs plus the arm-home condition must hold at the same step; the first such step is success. Fails at step_lim=800 actions. No early-fail rule. Because success requires arms back home and handles within 4.5 cm of the support points with no release condition, the mugs must be resting on the hooks (they will fall otherwise) when the arm is home. Process score (partial only, scores 15/40/100) tracks mugs hung with grippers open (>=0.8), also requiring each previously hung mug's handle point not to move more than 0.005 m since the last check.
+Points RoboDojo tests: a mug's *centre* is the middle of the mug [its origin]. Its *handle point* is inside the handle,
+about 1 cm in from the handle's outer edge, at about the mug's mid-height [the mug's 'handle' point]. A *hook point*
+is on an arm, 3.5-4 cm out from the pole's axis [the rack's 'handle_support_point' points, one per arm]. The *first
+hook* is the lower arm pointing right [handle_support_point [0]]: it points right, slightly toward you, rising 28 deg,
+and its *up direction* leans 28 deg from vertical toward the pole (to the left). The direction tests below compare
+every mug with that arm, whichever arm the mug hangs on, and they read different mug directions for the two models
+[red mug: handle frame z = local +x, x = local +y;
+pumpkin mugs: handle frame = mug frame].
+
+All of these must hold at the same action boundary, for each of the three mugs:
+- **Lifted.** Its centre is more than 0.045 m higher than at the start [is_lift, z_threshold 0.045]; the current
+  height counts, not the highest reached.
+- **Handle high.** Its handle point is higher than z = 0.9 m in the world frame, which is 0.135 m above the table top
+  [is_A_functional_point_higher_than_z]. Every hook point is above that height.
+- **First direction test** [handle frame z vs first hook frame z; is_axis_aligned, threshold 60]. Red mug: the
+  direction from its axis out through its handle within 60 deg of the first hook's up direction, i.e. it hangs from its
+  handle, handle above its centre. Pumpkin mugs: the direction from the mug's bottom to its opening within 60 deg of
+  that up direction, i.e. the opening looks up, or to the left and at least a little up: an opening facing left along
+  a left arm (rising 22 deg) is about 40 deg off and passes; facing left exactly level is 62 deg off and fails; facing
+  right fails. Not true at the start for the red mug; the pumpkin mugs stand opening-up at the start (28 deg off).
+- **Second direction test** [handle frame x vs first hook frame +x OR -x; is_axis_aligned, threshold 60]. Red mug:
+  the direction across its handle (the way a hook passes through it, horizontal at the start) within 60 deg of the
+  first hook's arm direction, either way round: it hangs through its handle on an arm that points left or right; on
+  the middle arms (toward or away from you) it is about 80 deg off and fails. Pumpkin mugs: the direction from the
+  mug's axis out through its handle within 60 deg of that arm direction, either way round: with the handle above the
+  mug's centre it must lean toward the right (handle straight up is 62 deg off and fails; leaning 22 deg right, as on a
+  left arm with the opening along the arm, is about 40 deg off and passes).
+- **On a hook.** Its handle point is less than 0.045 m (3-D distance) from some hook point
+  [is_A_functional_point_close_to_B_functional_point, threshold 0.045]. Any arm may be used; the test does not need
+  different arms for different mugs (physically one arm holds one mug).
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), all conditions for all three mugs and the arms
+together (one stage). Success is declared at the first action boundary where everything holds, and the episode ends;
+nothing needs to hold for longer. Since the arms must be back, the mugs must be hanging on the rack by themselves at
+that moment. No condition ends the episode early as a failure; otherwise it runs on until the length cap (below)
+[step_lim].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -29,9 +71,17 @@ RoboDojo's own evaluation gives a policy 800 actions (32 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** Target arms back within 0.15 m per axis and 20 degrees of start end-effector pose at the moment of success; mugs must be on the hooks at that moment.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the mugs must hang on
+the rack without being held. The grippers need not be open.
 
-**Notes from RoboDojo's code.** The z > 0.9 handle height is an absolute number, whose consistency with the world frame (table height, env origin offsets) cannot be verified statically; it just means the handle must be on the elevated hooks. Handle orientation tolerance is loose (60 degrees) but position tolerance to the hook point is 4.5 cm. Mug yaw is random in [15,165] degrees so handles point in different directions. Hook assignment among mugs is unconstrained by code.
+**Notes from RoboDojo's code.** The code is the same as in hang_mugs; this variant uses other mug models (here one red
+mug and two pumpkin mugs), the second rack model and twenty clutter objects. Each mug is tested against every hook
+point, so any assignment of mugs to arms works, but both direction tests always use the first hook (the lower arm
+pointing right), and the pumpkin mugs' handle frame is turned differently from the red mug's (see above). In a recorded
+success (live standard run) the red mug hung from the lower right arm, opening toward you, and the two pumpkin mugs
+hung from the lower left and top left arms with their openings facing left along the arms. The handle-height limit is
+an absolute world height (0.9 m, 13.5 cm above the table top). Partial credit (15 / 40 / 100 for one / two / three mugs
+hung with the grippers open) is separate from success.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

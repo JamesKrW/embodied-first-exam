@@ -46,7 +46,9 @@ task (below).
 The task directories are the deliverable; the tooling that built them is kept outside this repository. Each task carries:
 - in its instruction, what the task asks and exactly what its check tests (every predicate, threshold, stage and
   end-of-episode requirement), written from RoboDojo's code (`task/RoboDojo/tasks/<benchmark>/<task>.py`, its config,
-  `env/reward_manager/`). The code is the reference.
+  `env/reward_manager/`) in terms the agent can observe (PROTOCOL §5): objects by appearance and starting place, axes and
+  points as faces, edges and ends checked against the assets and the frozen layout, RoboDojo's labels and function
+  names in brackets. The code is the reference for thresholds and logic.
 - its instance's `instance.json` (`environment/sim/instance.json`): the evaluation layout verbatim (with its sha256),
   the state hash after RoboDojo's reset, RoboDojo's language instruction for the layout, and per-task fields
   (`physics`, `determinism`) from the determinism test's output (`rcb_robodojo.py make-instance --task T --seed 0
@@ -195,8 +197,10 @@ length is only known once its IK is solved, keeps executing and stops filming (`
   simulator here, so neither the instructions nor the limits have been changed.
 - **Privileged `s.reset()`** in a long-lived process is not always reliable after an articulated object moved ("articulation
   not found", or "All scene Unstable Error"); a fresh process (as the verifier uses) always builds the frozen start.
-- **`pack_objects_into_box(_random)`**: "front sides facing left" is the assets' own axis convention (the checkpoint
-  point's -x, the shoe's root +x), which images do not show; every standard run failed it.
+- **`pack_objects_into_box(_random)`**: the check reads the car, toothbrush and hammer through an asset frame
+  (the 'checkpoint' point) and the shoe through its body frame, with opposite signs in code; physically all four
+  want their front end (car: the end that points right at the start in the non-random layout; brush head, hammer head,
+  shoe toe) to the left, which the instructions now say.
 - The instructions state, where RoboDojo's own text misleads (its checks unchanged): `sort_nesting_dolls_by_size(_random)`'s
   size order (the config's comments call index mod 5 = 4 the largest doll; the dolls' measured sizes say it is the
   smallest); `swap_blocks`' button rests at about 0.79 of its travel, below the 0.9 / 0.95 its stages and press counter
@@ -206,8 +210,8 @@ length is only known once its IK is solved, keeps executing and stops filming (`
 - **Tooling: thin wrappers only.** Joint moves, gripper commands, hold, RoboDojo's IK, plus the frozen instance, state,
   recording, replay and rendering. Task-level skills are never added.
 - **World-frame information.** Instructions give the world frame (axes, the arm bases, the table, the head camera) and
-  state RoboDojo's check as its code has it, including absolute coordinates where the check uses them (e.g. `make_kong`'s
-  target spot); standard tasks never give object poses (privileged tasks give them through the tooling).
+  state RoboDojo's check exactly, in physical terms, including absolute coordinates where the check uses them (e.g.
+  `make_kong`'s target spot); standard tasks never give object poses (privileged tasks give them through the tooling).
 
 ## Compute resources (scripts/task_resources.toml)
 Measured on the heaviest scene (`pour_liquid_into_cup_random`: GPU PhysX liquid and 15-20 clutter objects), RTX 4090,

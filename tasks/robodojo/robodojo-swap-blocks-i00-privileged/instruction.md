@@ -21,21 +21,58 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- Button press count (query): the spring button 'button0' (joint tag 'press') must complete EXACTLY 3 press events over the whole episode. One event = its normalised joint ratio goes from above 0.95 to below 0.5 (the state is armed once the ratio has been above 0.95; ratio between thresholds keeps previous state). A 4th event makes the episode fail immediately; fewer than 3 at the end means no success.
-- Plus the following ORDERED stages (checked one stage per action step, in this exact order; each stage must be observed at some action step after the previous stage was popped). 'near' = 3D root-to-root distance < 0.03 m. plane0 / plane1 = the mats under target0 / target1 at the start, E = the third mat (empty at start). Within a bracket [X OR Y] means either holds.
-- Stage 1: [target0 near plane0 OR target1 near plane1] AND [target0 lifted > 0.03 m above its initial z OR target1 lifted > 0.03 m above its initial z].
-- Stage 2: [target0 near E OR target1 near E] AND [target0 near plane0 OR target1 near plane1]; when this stage passes, the reference poses of target0 and target1 are re-recorded to their current poses (used for the next lift tests).
-- Stage 3: button0 ratio < 0.5 (pressed).
-- Stage 4: button0 ratio > 0.9 (released).
-- Stage 5: [target0 near E OR target1 near E] AND [target1 lifted > 0.03 m OR target0 lifted > 0.03 m, relative to the poses recorded at stage 2].
-- Stage 6: [target0 near E OR target1 near E] AND [target0 near plane1 OR target1 near plane0]; on passing, reference poses of both targets are re-recorded again.
-- Stage 7: button0 ratio < 0.5. Stage 8: button0 ratio > 0.9.
-- Stage 9: [target0 near plane1 OR target1 near plane0] AND [target0 lifted > 0.03 m OR target1 lifted > 0.03 m, relative to poses recorded at stage 6].
-- Stage 10: target1 near plane0 AND target0 near plane1 (both, i.e. the two blocks are swapped; flat list = AND).
-- Stage 11: button0 ratio < 0.5.
-- Stage 12: button0 ratio > 0.9 AND all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the three mats: round light-wood discs, 8 cm across and 0.5 cm thick, in a row left-right in front of you, 11.5 cm
+  apart: the left mat [mat0], the middle mat [mat1], the right mat [mat2];
+- the two blocks: identical red 3.5 cm cubes, one on the left mat [target0] and one on the right mat [target1], each
+  turned a little about the vertical; the middle mat starts empty;
+- the button: the round orange-red spring button (7 cm across, 3 cm tall) on the table just in front of the middle
+  mat, nearer to you [button0].
+Below, "the left block" is the one that starts on the left mat and "the right block" the one that starts on the right
+mat; the check tells them apart by where they started [plane0 = left mat, plane1 = right mat, E = the empty middle
+mat].
 
-**When it is checked.** Staged: the 12 stages of the main check list are evaluated in order, only the current first stage is tested each action (after each action's sim steps) and at most one stage is popped per action; all conditions inside a stage must hold at the same step. In parallel the button-press query is evaluated every action; success requires all stages popped AND exactly 3 press events counted. Success is declared as soon as the last stage passes with the count equal to 3. A 4th press event marks the environment failed immediately. Otherwise the episode ends as failure after step_lim=700 actions.
+*On a mat* below means: the block's centre (the middle of the cube) less than 0.03 m in 3-D from the mat's centre (the
+middle of the disc). A block resting on a mat has its centre 0.02 m above the mat's centre, so this leaves only about
+0.022 m horizontally: the block must sit nearly centred on the mat (a block held 1 cm above the mat also fails).
+*Raised* means the block's centre more than 0.03 m higher than where it last rested (its start, or the latest
+re-recorded pose below) [is_lift]. *Pressed* means the button cap pushed down past half of its travel [press joint
+ratio < 0.5]; *up* means the cap above 0.9 of its travel [ratio > 0.9]. The cap's travel is 10 mm and at rest it sits
+at 0.79 (2 mm below the top), so "pressed" means pushing it more than 2.9 mm down from rest and "up" means pulling it at
+least 1.1 mm above its rest (below).
+
+**The press count** (tested on its own after every action, alongside the stages): the button must be pressed exactly
+3 times in the whole episode. One counted press = the cap is seen above 0.95 of its travel (within 0.5 mm of the top,
+at least 1.6 mm above its rest) at one action boundary and later below 0.5 at another; a cap at a height between the
+two keeps the last state [is_joint_position_ratio_change_from_above_to_below, above 0.95, below 0.5, 3 times]. The
+counter starts undecided and the cap starts at its 0.79 rest, so the FIRST press counts only if the cap was first
+pulled up above 0.95 too; a press from the rest position is not counted. A 4th counted press ends the episode as a
+failure at once; fewer than 3 at the end means no success.
+
+**The stages**, in this order (only the current stage is tested; "either" = at least one of the two):
+1. One block still on its own start mat (the left block on the left mat, or the right block on the right mat), and
+   either block raised.
+2. Either block on the middle mat, and one block still on its own start mat. When this passes, both blocks' current
+   poses are recorded as the new reference for "raised".
+3. Button pressed. 4. Button up.
+5. Either block on the middle mat, and either block raised (from the poses recorded at stage 2): lift the other block.
+6. Either block on the middle mat, and the left block on the right mat or the right block on the left mat (the second
+   block now on the first block's old mat). Both blocks' poses are recorded again.
+7. Button pressed. 8. Button up.
+9. The left block on the right mat or the right block on the left mat, and either block raised (from the poses recorded
+   at stage 6): lift the block from the middle mat.
+10. The right block on the left mat AND the left block on the right mat: the blocks are swapped.
+11. Button pressed.
+12. Button up AND both arms back [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start
+    position on each of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be
+    open.
+
+**When it is checked.** After every action (once its whole control sequence has run; never between actions): first
+the press count, then the current stage; all conditions of a stage must hold at the same action boundary, and at most
+one stage passes per action. A cap pressed and let up again within a single action is never seen. A passed stage stays
+passed. Success is declared at the first action boundary where all 12 stages have passed and exactly 3 presses are
+counted, and the episode ends. A 4th counted press ends the episode as a
+failure at once.
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -43,11 +80,25 @@ simulated time). RoboDojo's own evaluation gives a policy 700 actions (28 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**What changes by itself.** The spring button pushes back up by itself after being released, but in this scene it comes to rest at about 0.79 of its travel ratio (measured in two trials on this frozen layout), below the 0.9 that a 'released' stage needs and the 0.95 that re-arms the press counter: after each press the button cap has to be pulled back up (above 0.95) before the next stage or press can count. Otherwise none.
+**What changes by itself.** The spring button pushes its cap back up after a press, but only to its rest at 0.79 of
+its travel (about 2 mm below the top), where it also starts: below the 0.9 that "button up" needs and the 0.95 that
+arms the press count. So before every press, including the first, and for each "button up" stage, the cap has to be
+pulled up (for example by gripping its rim and lifting); once let go it sinks back to its rest. Otherwise none.
 
-**At the end.** Final stage requires all target arms back within 0.15 m per axis and 20 degrees of their start end-effector pose, simultaneously with button0 ratio > 0.9 (released). Nothing about gripper opening.
+**At the end.** The last stage needs the cap above 0.9 of its travel and both arms back near their start poses at the
+same action boundary; since the cap sinks back to its rest once released, the arm has to reach its start region while
+the cap is still up. Nothing about gripper opening.
 
-**Notes from RoboDojo's code.** Many predicates use OR inside the nested brackets (a bracket list inside a stage is evaluated with OR semantics in check_once; only flat items of a stage are ANDed), so individual stages are looser than the intent (e.g. 'either block lifted'), but the ordered sequence plus the final stage 10 (both blocks swapped) and the exact-3-presses query effectively force the 3-move swap: move one block to the empty mat, press, move the other block into the first block's old mat, press, move the first block into the second block's old mat, press. Which block goes first is free (either order passes since the checks use OR). The button must be pressed fully (<0.5 of travel) and released (>0.9 for stage checks, >0.95 for a new press to be counted by the query) after every move; its spring alone returns it only to about 0.79, so lift its cap back up after each press, and extra presses (e.g. a double tap that re-arms above 0.95) are fatal. Pressing the button before the first lift/move counts toward the 3-press total. 'Lifted' is relative to the z recorded at the start or at the last re-record (stages 2 and 6). Block release is not checked directly, but final positions must be within 0.03 m (root to root) of the mat centres. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically.
+**Notes from RoboDojo's code.** Inside a stage the "either" tests make single stages loose, but the stage order, the
+final swapped stage and the exact count of 3 force the three-move swap: one block to the empty middle mat, press; the
+other block onto the first block's old mat, press; the first block from the middle mat onto the second block's old mat,
+press. Either block may go first. Every counted press uses up one of the three wherever it happens, while each press
+stage still needs its own press: the plain plan is to pull the cap above 0.95 and then press it once at each of the
+three press stages, and never otherwise. Pressing the cap from its rest without pulling it up first is not counted,
+but it is still "pressed" for a press stage, so a first press from rest passes stage 3 while leaving the count one
+short. A block counts as "on" a mat only when nearly centred on it and resting on it (centre within about
+2.2 cm horizontally). The blocks' turn about the vertical is not checked. Release of a block is not checked
+directly.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

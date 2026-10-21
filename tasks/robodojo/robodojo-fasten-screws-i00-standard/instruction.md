@@ -13,13 +13,39 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Insert and tighten each screw into the nut of the same color."*
 
 ## Success (RoboDojo's own check for this task)
-- For each i in 0,1,2 (nut_i with bolt_i, the bolt having the same model index/colour as the nut): the nut's local +z axis within 10 degrees of world +z (nut upright; is_axis_up axis=[0,0,1], threshold=10).
-- For each i: horizontal (xy) distance between nut_i root origin and bolt_i root origin < 0.001 m (1 millimetre, strict), world frame.
-- For each i: insertion depth: (top z of bolt_i's world bbox) - (bottom z of nut_i's world bbox) > 0.009 m (9 mm), i.e. the nut's lowest point must be at least 9 mm below the bolt's highest point.
-- All grippers of the target robots are open: gripper opening fraction (normalised by the gripper's scale range, mean over fingers) >= 0.9 for every target robot (is_all_gripper_open open_threshold=0.9).
-- All target robots back at start end-effector pose: |dx|,|dy|,|dz| each <= 0.15 m and rotation <= 20 degrees (all_robot_back_to_origin defaults).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the three bolts: bolts standing upright on their hexagonal heads, 5.2 cm tall, threaded end up, fixed to the table,
+  all on the near half: a red one at the left, just right of the left gripper [bolt1], a blue one left of centre
+  [bolt0] and a pink one at the right, just left of the right gripper [bolt2];
+- the three nuts: hexagonal nuts, about 4 cm across and 2 cm thick, lying flat: a red one at the far left, next to
+  the left gripper [nut1], a blue one in front, right of centre [nut0], and a pink one at the right, a little farther
+  away than the pink bolt [nut2]. Each nut belongs on the bolt of its own colour [nut0 with bolt0, nut1 with bolt1,
+  nut2 with bolt2].
 
-**When it is checked.** Checked after every action; all conditions (three nut/bolt pairs, gripper open, arm home) must hold at the same step; the first such step is success. Fails at step_lim=1900 actions. No early fail. Process score (partial only): 20/50/100 for 1/2/3 pairs done with grippers open (>=0.8).
+A nut's *centre* below is the point RoboDojo tests for it (its origin): on the axis of its hole, about 0.9 cm above
+its underside. A bolt's centre is the middle of its base, on the bolt's axis, at table level. All of these must hold
+at the same action boundary, for each of the three colours:
+- **Nut flat.** The nut lying flat on its face, the same face up as at the start, within 10 deg [nut local +z;
+  is_axis_up, threshold=10]: true at the start; turning a nut over fails.
+- **Nut centred on its bolt.** The nut's centre within 0.001 m (1 mm, strict) of its bolt's axis, measured
+  horizontally [is_AB_xy_distance_within_threshold, threshold=0.001]: the nut threaded on the bolt, not resting
+  beside it.
+- **Nut down on the bolt.** The bolt's tip (its highest point) more than 0.009 m higher than the nut's lowest point
+  [is_A_depth_in_B, z_threshold=0.009]: the nut slid at least 9 mm down onto the bolt, i.e. its underside lower than
+  4.3 cm above the table.
+
+And, at the same time:
+- **Grippers open.** Both grippers open to at least 0.9 of their full opening [is_all_gripper_open, open_threshold=0.9].
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation.
+
+**When it is checked.** After every action (never between actions), in the order blue, red, pink pair (flat, centred,
+down for each), grippers, arms, stopping at the first condition that fails; all must hold at the same action
+boundary (one stage). Success is declared at the first action boundary where everything holds, and the episode ends.
+No condition ends the episode early as a failure. A separate partial-credit score (not part of success) climbs the
+tiers 20, 50, 100 as 1, 2, then 3 nuts are flat, centred and down on their bolts while both grippers are open (each
+at least 0.8 of its full opening)
+(the 100 tier counts only if the episode succeeds, otherwise the tier below) [process score, transition mode].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -28,9 +54,13 @@ RoboDojo's own evaluation gives a policy 1900 actions (76 s) for this task; no c
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** Gripper(s) open (>= 0.9 of opening range) AND target arms back within 0.15 m per axis and 20 degrees of start end-effector pose at the moment of success.
+**At the end.** Both grippers open (at least 0.9 of their opening) and both arms back near their start poses, as part
+of the success condition.
 
-**Notes from RoboDojo's code.** The 1 mm xy tolerance between nut and bolt root origins is extremely strict; the depth requirement of 9 mm and 10 degree uprightness mean the nut must be fully seated. 'Tighten' (rotation) is not checked. The pairing nut_i with bolt_i is by label; the agent must match by colour/appearance. Whether the bolts are fixed (Geometry) or movable cannot be determined statically.
+**Notes from RoboDojo's code.** The 1 mm horizontal tolerance between the nut's hole axis and the bolt's axis is very
+strict; together with the 9 mm depth and the 10 deg flatness test it means each nut must be seated on its bolt.
+Turning the nut (tightening) is not checked, only where it sits. Pairs go by colour. The bolts cannot be moved; only
+the nuts are carried.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

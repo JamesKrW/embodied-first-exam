@@ -21,11 +21,32 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- All 7 balls sphere_0..sphere_6 are 'in' the vase: for each ball, its centre XY lies inside the footprint (convex hull of the rotated bounding box, XY) of the vase and its centre z is above the vase bbox's minimum z (no upper z bound).
-- The cup is upright: the cup's local +Z axis is within 15 deg (default threshold, strict) of world +Z.
-- Both target arms are back at origin: all target arms (left_arm and right_arm; the support arm is not counted) have their end-effector pose within 0.15 m on EACH axis (|dx|,|dy|,|dz| all <= 0.15 m) and within 20 degrees (quaternion angle) of the pose they had at the start of the episode (recorded after the scene settled).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the balls: seven identical small balls (about 1.4 cm across) lying inside the cup at the start [sphere_0 .. sphere_6];
+  the check treats them all alike, so which is which does not matter;
+- the cup: the yellow cup (8 cm across, 7.2 cm tall), opening up, on the right near the right gripper [cup];
+- the vase: the white vase left of centre, a wide flared round base rising to a narrow round neck whose opening is
+  about 19 cm above the table; it is fixed to the table and cannot be moved [vase].
 
-**When it is checked.** Single stage; all 9 conditions (7 balls, cup upright, arms home) must hold simultaneously after one action. The reward manager is evaluated only once per action (after the sim sub-steps of that action are finished), never between sub-steps. In each evaluation the FIRST pending stage of the check list is tested (every condition in it, all at that same moment; a condition that is a nested list is an OR); when it passes it is removed permanently (never re-verified later) and the next stage becomes pending; at most one stage is removed per action. Reward is 1.0 only when the check list is empty (and no query/trigger counter is violated); the episode is declared a success as soon as reward >= 0.999 after an action, and ends as a failure if the action counter reaches step_lim without that, or earlier if the environment is flagged failed (query counter exceeded, see below). No final_check list is registered by this task, so the final-check logic at step_lim adds nothing. No early failure condition other than the usual physics/end-flag handling.
+A ball's *centre* below is the point RoboDojo tests for it (its origin); it lies about 5 mm from the ball's middle, a
+negligible offset at this scale. All nine conditions must hold at the same action boundary:
+- **Each of the seven balls in the vase** [is_A_in_B, once per ball]: the ball's centre, seen from above, strictly
+  inside the vase's outline as the vase is turned (the convex hull of its turned bounding box, a rectangle about
+  27 x 24 cm around the vase, turned about 13 deg like the vase), and higher than the bottom of that box. The bottom
+  of the vase's box lies about 8.5 cm below the table top, so the height part holds for any ball on or above the
+  table; there is no upper limit. Not true at the start (the balls are in the cup, outside the rectangle).
+- **Cup upright.** The cup's axis from its bottom to its opening points up within 15 deg (strictly less than 15 deg)
+  [cup local +z; is_axis_up]. Already true at the start; the cup must be stood back upright after pouring. Where the
+  cup ends up is not checked.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation (start = the pose after the scene settled). The
+  grippers need not be open.
+
+**When it is checked.** After every action (never between the simulation sub-steps of an action), in the order the
+seven balls, cup, arms, stopping at the first condition that fails; all nine must hold at the same action boundary
+(one stage). Success is declared at the first action boundary where everything holds, and the episode ends. No
+condition ends the episode early as a failure; if the conditions never hold together the episode fails at the action
+limit (below).
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -33,9 +54,14 @@ simulated time). RoboDojo's own evaluation gives a policy 600 actions (24 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** Both arms within 0.15 m per axis / 20 deg of their start pose, and the cup standing upright (<15 deg tilt), all at the same time as all 7 balls are in the vase.
+**At the end.** Both arms back near their start poses and the cup standing upright (above), at the same moment as all
+seven balls count as in the vase; the grippers need not be open.
 
-**Notes from RoboDojo's code.** The ball-in-vase test is only the ball centre's XY inside the vase footprint with z above the vase bbox bottom, so a ball resting on a vase rim or an outer rim region inside the footprint's convex hull also counts, and balls anywhere above the vase footprint count. A vase is a static Geometry object. The vase can be far from the cup. Balls dropped on the table or outside fail the all-7 requirement permanently unless re-picked (not practical). The cup must be put back upright (not left lying/tilted) before the arms return home.
+**Notes from RoboDojo's code.** "In the vase" is tested on each ball's centre alone, against the vase's whole
+rectangular outline seen from above (which is larger than the round base), not against the opening: a ball inside
+the neck, one resting on the flared base, or one lying on the table inside that rectangle all count, and a ball that
+rolls out past the rectangle does not. All seven are required; the cup has to be put back upright before the arms
+return home.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

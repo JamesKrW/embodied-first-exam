@@ -15,19 +15,63 @@ The scene's labelled objects (RoboDojo's labels; `s.objects()` gives their poses
 - mahjong0_0..0_2, 1_0..1_2, 2_0..2_2, 3_0..3_2: four groups of 3 identical tiles (category mahjong, one model per group), the agent's hand, standing in a row at table y=-0.15, x = -0.325,-0.279,-0.233 / -0.187,-0.141,-0.095 / -0.049,-0.003,0.043 / 0.089,0.135,0.181 (place_tag straight_front, fixed, no yaw randomness)
 - mahjong4_0, 4_1: two identical tiles of another model at y=-0.15, x=0.227, 0.273
 - mahjong5_0..8_0: four 'push' tiles, each the same model as groups 0..3 respectively, standing at table y=0.05, x=0.0, 0.046, -0.046, -0.092 (place_tag straight_back)
-- other0 at (-0.4,-0.05) and other1 at (-0.4,-0.002) lying down; other2 stacked on other1; mahjong9_0 stacked on other0, same model as mahjong4_0 (decor/props)
+- other0 at (-0.4,-0.05) and other1 at (-0.4,-0.002) lying face down; other2 stacked face down on other1 (decor/props, not checked)
+- mahjong9_0: the replacement tile, lying face down on top of other0 (long side along x), same model as mahjong4_0/4_1; checked: it must end standing at (0.319,-0.15), the next place right of mahjong4_1
 
 This is a *fixed scene instance*: one of RoboDojo's own evaluation layouts (`arx_x5/0/make_kong_0.json`), frozen; the objects and the
 robot's start pose never change between resets. You may reset and retry as many times as you want. Your deliverable is
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- Two stages, in order. Let PUSH be the push tile (one of mahjong5_0..mahjong8_0) chosen per episode from the seed; TARGET = the 3 tiles of the matching group (mahjong0_*->5_0, 1_*->6_0, 2_*->7_0, 3_*->8_0); OTHER = the 9 tiles of the other three groups.
-- Common to both stages (all at the same action boundary): each of the 3 TARGET tiles has its local z-axis within 30 deg of world up (is_axis_up [0,0,1], thr 30); each of the 9 OTHER tiles has its local y-axis within 7 deg of world up (is_axis_up [0,1,0], thr 7) i.e. they must still be standing as at the start.
-- Stage 1: common conditions AND mahjong9_0's world orientation quaternion (w,x,y,z) is within 7 deg angular distance of [0, 0.707, 0.707, 0] (is_qpos_close, dis_threshold=7) -- i.e. mahjong9_0 still in its initial pose orientation.
-- Stage 2: common conditions AND mahjong9_0's local y-axis within 7 deg of world up AND mahjong9_0 origin within 0.015 m (xy, world/table) of (0.319, -0.15) AND all target grippers open (is_all_gripper_open default threshold 0.6).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms).
+Every tile is the same block, 4.5 cm wide, 6.5 cm long and 3.3 cm thick, with a white face carrying the picture and a
+green back:
+- your row: 14 tiles standing upright on their short ends in a straight line across the front of the table, faces
+  toward you, one tile pitch (4.6 cm) apart. From the left: four groups of three identical tiles [mahjong0_0..0_2,
+  mahjong1_0..1_2, mahjong2_0..2_2, mahjong3_0..3_2], then a pair of identical tiles of a fifth kind at the right end
+  [mahjong4_0, mahjong4_1; not checked];
+- the opponent's row: four tiles standing in the middle of the table in front of the opponent's arm (the white arm on
+  the far side), green backs toward you, faces toward the opponent. Each shows the same picture as one of your four
+  groups of three [mahjong5_0..mahjong8_0, matching mahjong0_*..mahjong3_* in that order];
+- the replacement tile: the top tile of the front (nearer) of the two small stacks of face-down tiles at the far left;
+  it lies flat, green back up, long side left-right, and has the same picture as the pair at the right end of your row
+  [mahjong9_0]. The other three face-down tiles (the bottom tile of that stack and the stack of two just behind it) are
+  not checked [other0, other1, other2].
 
-**When it is checked.** Staged: after every action only the first unpassed stage is tested and removed when it holds; success when both stages are removed (at most one per action). A failure query is also counted every action: FAIL immediately (reward 0, episode over) if at one action boundary [left_arm OR right_arm not back to origin (pos > 0.3 m on any axis or rot > 30 deg from start)] AND [support_arm0 not back to origin (pos > 0.3 m on any axis or rot > 40 deg)] -- i.e. do not move the arms far while the opponent's arm is still moving. Otherwise fails at step_lim (600 actions).
+The discarded tile [the push tile] is the one tile of the opponent's row that the opponent's arm lays down face up
+(picture up) in front of its row after your first action; RoboDojo picks it from the seed. The *matching tiles* are the
+three tiles of your row with the same picture. A tile's *centre* is the middle of the tile (the point RoboDojo tests).
+The face direction is the direction the picture side looks [tile local +z]; the long direction, from the bottom end to
+the top end of a standing tile in your row [local +y].
+
+Two stages, in this order; each holds at one action boundary, and the second at a later one than the first. Both stages
+also need, at that same boundary:
+- **Matching tiles flipped.** Each of the three matching tiles lies face up: its picture side looks within 30 deg of
+  straight up [local +z; is_axis_up, threshold 30]. Not true at the start, where the faces look at you. Tip each one
+  *away* from you, so it falls onto its back and the picture that faced you looks up; tipping it toward you puts the
+  picture face down (180 deg off) and fails. Where the tiles end up is not checked.
+- **The other nine stay standing.** The other nine tiles of your four groups of three still stand upright on their
+  short ends, the top end up, within 7 deg [local +y; is_axis_up, threshold 7]. Already true at the start: do not
+  knock them over. (The pair at the right end and the opponent's tiles are not checked.)
+
+- **Stage 1.** The replacement tile still has its starting orientation: lying face down, long side left-right, within
+  7 deg (angle of the rotation between its pose and the start pose) [mahjong9_0 quaternion (w,x,y,z) close to
+  (0, 0.707, 0.707, 0); is_qpos_close, threshold 7]. Already true at the start; where it lies is not checked. So flip
+  the three matching tiles before turning the replacement tile.
+- **Stage 2.** The replacement tile stands upright on its short end within 7 deg, with the end that pointed right
+  (+x) at the start now on top [mahjong9_0 local +y; is_axis_up, threshold 7]; which way its picture faces is not
+  checked. Its centre is less than 0.015 m horizontally from the point (0.319, -0.15) (world x, y): the next place in
+  your row, one tile pitch to the right of the rightmost tile [is_A_xy_distance_close_to_pos]. And both grippers are
+  open, at least 0.6 of their full opening [is_all_gripper_open].
+
+**When it is checked.** After every action, only the first stage not yet passed is tested; it is passed when it holds,
+at most one stage per action, and the task succeeds when both have passed. A failure test also runs after every action:
+the episode fails at once (reward 0) if at one action boundary one of your arms is away from its start pose (its
+end-effector more than 0.3 m from its start position on x, y or z, or turned more than 30 deg) while the opponent's arm
+is away from its own start pose (more than 0.3 m on any axis or more than 40 deg)
+[(is_robot_not_back_to_origin left_arm OR right_arm, 0.3 m / 30 deg) AND (support_arm0, 0.3 m / 40 deg)]: keep your
+arms near their start poses while the opponent's arm is out. Otherwise the episode runs on until the length cap
+(below) [step_lim].
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -35,13 +79,26 @@ simulated time). RoboDojo's own evaluation gives a policy 600 actions (24 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**What changes by itself.** The support arm (non-target Franka, robot_config dual_x5_and_franka_competition) replays a pre-recorded trajectory chosen by the push tile's rank when the 4 push tiles are sorted by x (0..3) -- it performs the opponent's 'discard' motion. It is queued after the agent's first action and plays in lock-step with the agent's actions. Afterwards the scene is checked once; if the push tile's local z is NOT within 30 deg of world up the sample is flagged unstable and dropped.
+**What changes by itself.** The opponent's arm (the white arm on the far side, not yours) replays a recorded discard
+motion, chosen by where the discarded tile stands in the opponent's row (its rank from the left among the four). It is
+queued after your first action and moves only while your actions run, in lock-step with them. When it has finished,
+RoboDojo checks once that the discarded tile lies face up (within 30 deg); if not, the run is not a valid sample and is
+dropped.
 
-**What you must read or remember.** Yes, visual reasoning: the agent must observe which push tile (and hence which group of 3 identical tiles in its row) the opponent handled, and act on the matching group. No numbers are given; the instruction does not name the tile.
+**What you must read or remember.** Yes, visual: watch which tile the opponent lays face up, find the three tiles in
+your row with the same picture, and flip those. The instruction does not name the tile and no numbers are given.
 
-**At the end.** Stage 2 requires all target grippers open (>= 0.6). No back-to-origin check, but arms must not stray beyond 0.3 m/30 deg during the support arm's motion (failure query).
+**At the end.** Stage 2 needs both grippers open (at least 0.6 of full opening). The arms need not return to their
+start poses, but they must stay near them while the opponent's arm is out (failure test above).
 
-**Notes from RoboDojo's code.** Orientation conventions (which tile axis is face-up, what 'flipped' means physically) cannot be determined statically; the code only tests: TARGET tiles local z up (<=30 deg), others local y up (<=7 deg), mahjong9_0 initial quaternion within 7 deg then y-up at (0.319,-0.15) within 1.5 cm. The exact role of mahjong9_0 (apparently the 'discarded' tile that must be stood at the row end) is inferred; the code does not say. Which group is TARGET is only known at runtime (seeded random choice made in process_execution_order); labels kong[j] are the group's tiles sorted by x but order does not matter for success. Stage 1 requires mahjong9_0 to be still unrotated, so move mahjong9_0 only after the three TARGET tiles are in their final orientation and the 9 other tiles stay upright throughout. Docstring of check_support_arm_stable says 'still upright => unstable' but the code does the opposite (marks unstable if NOT up) -- docstring/code mismatch, code governs. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** The opponent's discard knocks the chosen tile over so that it lies face up, and
+RoboDojo drops the run if it is still standing afterwards; the code and its description agree on this. "Flipped" means
+picture up, so a matching tile is turned by tipping it away from you; its final place does not matter. All thresholds
+are strict (less than 30 deg, less than 7 deg, less than 0.015 m). Which group is the matching one is decided per run
+from the seed (one of the four opponent tiles), so read it from the scene. Stage 1 needs the replacement tile still
+face down and unturned, so flip the three matching tiles first, then stand the replacement tile at the right end of your
+row, then open both grippers; the nine other tiles of the four groups must stay standing throughout. Groups and copies
+inside a group are interchangeable: any order of flipping works.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

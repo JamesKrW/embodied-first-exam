@@ -9,7 +9,7 @@ step, and breaking a rule once fails the task, even if you complete it afterward
 
 ## Goal (what success means)
 The goal holds when all of the following are true at once:
-- `garlic_clove_40` is **inside** `saucepan_38` (OmniGibson's Inside state);
+- `garlic_clove_40` is **inside** `saucepan_38` (OmniGibson's Inside state: the centre of the first object's axis-aligned bounding box lies within the second's bounding box and within one of the second's container volumes, the space its model marks as its interior);
 - `saucepan_38` is **no longer** **covered** with `dust` particles (OmniGibson's Covered state, true while a single particle remains on the object; a particle remover such as a sponge takes off every particle within 2 cm of its axis-aligned bounding box, at every control step).
 They must hold for **10 consecutive control steps** (0.5 s): the episode ends by itself at that moment (later rows of your trajectory are never executed). `s.goal_status()` evaluates it now.
 

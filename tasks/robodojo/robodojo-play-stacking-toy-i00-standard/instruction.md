@@ -13,14 +13,44 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Place all stacking toy pieces onto the correct pegs."*
 
 ## Success (RoboDojo's own check for this task)
-- All at the same action boundary (every threshold is 1 mm for xy):
-- Pole 0 (blocks block0..block3): xy distance between origins of block0-block1, block1-block2, block2-block3 each < 0.001 m; block0 origin xy within 0.001 m of the stack_base passive support point 'pole/0'; each of block0..block3 has stack_base bbox z_max - block bbox z_min > 0.005 m.
-- Pole 1 (block4..block6): block4-block5 and block5-block6 origin xy < 0.001 m; block4 origin xy within 0.001 m of support point 'pole/1'; each of block4..block6: stack_base bbox z_max - block z_min > 0.005 m.
-- Pole 2 (block7, block8): block7-block8 origin xy < 0.001 m; block7 within 0.001 m xy of 'pole/2'; both: stack_base bbox z_max - block z_min > 0.005 m.
-- Pole 3 (block9): origin xy within 0.001 m of 'pole/3'; stack_base bbox z_max - block9 z_min > 0.005 m.
-- all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, at the same action boundary as all other conditions. Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the base: the white board (26 cm long, 6.5 cm deep) lying left-right on the table, centred, nearer to you than the
+  blocks, with four upright pegs in a row, about 6.5 cm apart, getting shorter from left to right (the tallest
+  reaches 6.5 cm above the table) [stack_base]. "Peg 1" to "peg 4" below are these pegs counted from the left
+  [support points pole/0, pole/1, pole/2, pole/3: each is a point on that peg's axis];
+- four identical purple five-pointed stars (7 cm across, 1.3 cm thick), scattered: one near the left gripper, three
+  right of centre [block0, block1, block2, block3]; they belong on peg 1;
+- three identical blue rectangular blocks (5.8 x 2.9 cm), left of centre [block4, block5, block6]; they belong on peg 2;
+- two identical yellow square blocks (5.8 cm), one far left, one just left of centre near the base [block7, block8];
+  they belong on peg 3;
+- one orange-red round disc (5.8 cm across), right of centre [block9]; it belongs on peg 4.
 
-**When it is checked.** All listed conditions are checked together, in order, after every action (reward_manager.step runs once per action, after the action's whole control sequence has executed; nothing is checked between actions). They form a single stage: all must be true at the same action boundary (any list inside the conditions means 'at least one of'). Success is declared at the first action boundary where all hold; the episode then ends. No final_check list is used. Otherwise the episode ends as a failure after step_lim actions. No early-fail rule. Order of stacking within a pole is not checked (only coaxial xy and depth).
+Each block has a hole through its middle; a block's *centre* below is the point RoboDojo tests for it (its origin),
+which lies on the axis of that hole (the middle of the star, square or disc; for the stars it is on the bottom face, for
+the others half-way up; only its horizontal position is used). All of these must hold at the same action boundary
+(every horizontal limit is 1 mm, strict):
+- **Peg 1, the four stars.** Seen from above, the centres of the stars within 0.001 m of each other in a chain (the
+  first and second, the second and third, the third and fourth star, by RoboDojo's labels) [is_AB_xy_distance_within_threshold],
+  and the first star's centre within 0.001 m of peg 1's axis [is_A_xy_close_to_B_support_point, pole/0]; every star's
+  lowest point more than 0.005 m below the top of the base's bounding box, i.e. lower than 6.0 cm above the table
+  [is_A_depth_in_B]. In practice: all four stars threaded on peg 1, in any order.
+- **Peg 2, the three blue blocks.** The same: centres within 0.001 m of each other in a chain, the first one's centre
+  within 0.001 m of peg 2's axis [pole/1], each one's lowest point lower than 6.0 cm above the table: all three threaded
+  on peg 2.
+- **Peg 3, the two yellow squares.** Centres within 0.001 m of each other, the first one's within 0.001 m of peg 3's
+  axis [pole/2], each one's lowest point lower than 6.0 cm above the table: both threaded on peg 3.
+- **Peg 4, the round disc.** Its centre within 0.001 m of peg 4's axis [pole/3], its lowest point lower than 6.0 cm
+  above the table: threaded on peg 4.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+None of this holds at the start. The height test alone is loose (a block lying on the table passes it); the 1 mm
+horizontal tests are what require each block to sit threaded on its peg.
+
+**When it is checked.** After every action (never between actions), all conditions together in the order peg 1, peg 2,
+peg 3, peg 4, arms; all must hold at the same action boundary (one stage). Success is declared at the first action
+boundary where everything holds, and the episode ends. The order of the blocks within a peg is not checked. No
+condition ends the episode early as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -29,11 +59,16 @@ RoboDojo's own evaluation gives a policy 1200 actions (48 s) for this task; no c
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**What you must read or remember.** The block-to-pole assignment is fixed by label groups (identical blocks go together on one pole: 4/3/2/1), but the instruction itself does not state which pole; the solver must infer 'correct pegs' from block sizes/models and the pole slot counts.
+**What you must read or remember.** Which group goes on which peg is fixed by the group sizes: the 4 stars on the
+tallest peg at the left, then the 3 blue blocks, the 2 yellow squares, and the single disc on the shortest peg at the
+right (each peg's height fits its pile).
 
-**At the end.** all_robot_back_to_origin(): every agent-controlled (target) arm's end-effector must be within 0.15 m on EACH of x, y, z (per-axis) and within 20 degrees of its pose at the start of the episode, (part of the success condition). Grippers are NOT required to be open by the success test (only by partial-credit scoring).
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** The 1 mm xy thresholds are very strict (blocks centred on the peg within 1 mm of the pole's support point) and rely on the pegs physically constraining the blocks; the 0.005 m depth test compares to stack_base's bbox top (if the base bbox includes the poles, block bottoms must be 5 mm below the top of the poles; if it excludes them, the blocks need to be on the base surface -- cannot be determined statically). pole/N support-point positions are asset-defined. Which model goes to which pole is determined by the group sizes in the config (4,3,2,1 blocks of identical models), not by an explicit rule in the reward. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** The 1 mm limits are tighter than placing by hand allows: they are met when the block's
+hole is on the peg and the peg holds it centred. Within a group the blocks are interchangeable: every copy must be on the
+same peg, and the chain test then holds whichever copy is where. The base is fixed scenery and does not move.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

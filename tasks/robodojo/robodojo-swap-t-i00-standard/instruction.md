@@ -13,13 +13,37 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Pick up the two T-shaped blocks, swap their positions, and place them back with the correct orientations."*
 
 ## Success (RoboDojo's own check for this task)
-- t0's ROOT position is within 0.02 m horizontally (XY only; z not checked) of t1's INITIAL root XY position (captured when the evaluation starts, i.e. the reset layout).
-- t1's ROOT position is within 0.02 m horizontally (XY only) of t0's INITIAL root XY position.
-- t0's orientation (full 3D quaternion) is within 3 degrees (strictly less; quaternion angular distance) of t1's INITIAL orientation.
-- t1's orientation is within 3 degrees of t0's INITIAL orientation.
-- all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the red T: a flat T-shaped block (8 cm long, 6 cm wide across the crossbar, 1.5 cm thick) lying flat just left of
+  centre near the front; its crossbar on its right, its stem pointing left (world -x) [t0];
+- the blue T: the same shape and size, lying flat about 16 cm to its right (centre to centre); its crossbar at its
+  far-left end, its stem pointing toward you and about 40 deg to the right [t1].
+The two blocks are the same model apart from the colour (identical geometry in the asset metadata).
 
-**When it is checked.** Success conditions form ONE stage: after every action (once all simulation sub-steps of that action are done) the reward manager evaluates all conditions; the episode succeeds as soon as ALL hold simultaneously at the same moment (reward 1 -> episode ends with success). Conditions are not latched or ordered. Otherwise the episode ends as a failure after step_lim=400 actions (the check made after the last action still counts). No early-fail rule exists apart from the environment being flagged invalid (e.g. a required label missing / physics broken).
+A T's *centre* below is the point RoboDojo tests for it (its origin): the middle of its 8 x 6 cm bounding rectangle,
+on the stem's centre line 4 cm from the stem's tip (4 cm from the crossbar's outer edge), half-way up its thickness.
+Its *start pose* is where it lies and how it is turned when the episode starts (recorded once, before the first
+action). All of these must hold at the same action boundary:
+- **Red T in the blue T's place.** Its centre within 0.02 m (strictly less) of the blue T's start centre, measured
+  horizontally (height not checked) [t0 root xy vs t1 initial root; is_A_xy_distance_close_to_pos, 0.02].
+- **Blue T in the red T's place.** Its centre within 0.02 m of the red T's start centre, horizontally [t1 vs t0 initial
+  root].
+- **Red T turned like the blue T was.** Its full 3-D orientation within 3 deg (strictly less) of the blue T's start
+  orientation [t0 quaternion vs t1 initial quaternion; is_qpos_close, 3 deg]: lying flat on the same face as at the
+  start, its stem pointing toward you and about 40 deg to the right. From its start heading that is a turn of about
+  127 deg counterclockwise seen from above (or 233 deg clockwise).
+- **Blue T turned like the red T was.** Its orientation within 3 deg of the red T's start orientation: lying flat, the
+  same face up, its stem pointing left (world -x, 3 deg off it toward the front as the red T is now), its crossbar on
+  its right: a turn of about 127 deg clockwise seen from above.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each of
+  x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+None of the four block conditions holds at the start. Turning a T over onto its other face makes it look the same from above (the T is
+mirror-symmetric) but is 180 deg off in 3-D and fails.
+
+**When it is checked.** After every action (never between actions), all conditions together; they form a single stage,
+nothing is latched, and the order does not matter. Success is declared at the first action boundary where everything
+holds, and the episode ends. Otherwise the episode runs until the step limit (see Episode length). No condition ends the
+episode early as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -28,11 +52,19 @@ RoboDojo's own evaluation gives a policy 400 actions (16 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**What you must read or remember.** Memory: the solver must remember (or note from the first observation) each T block's initial position and orientation, because the goals are defined relative to the INITIAL poses of the other block; once the blocks move the targets cannot be read off the scene any more.
+**What you must read or remember.** The targets are the two blocks' START poses: note where each T lies and which way
+its stem points from the first images, before moving either block; once a block moves, its start pose can no longer be
+read off the scene.
 
-**At the end.** All target (controlled) arms must be back near their start pose when success is evaluated (it is one of the success conditions, see success list): every target arm's end-effector position within 0.15 m on EACH of x, y, z (per-axis, not Euclidean) and orientation within 20 degrees of its pose at the start of the episode (pose recorded right after the robot is set to its initial state). Gripper opening is NOT checked by the success test.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** The target poses are computed once at the start (run_reward is called after reset, before any action) from the initial root poses: t0 must end at t1's start pose and t1 at t0's start pose. Orientation tolerance is only 3 degrees on the full 3D rotation (blocks must lie flat in the same way), and position tolerance 0.02 m on the root points. The two blocks start close together (root distance roughly 0.06-0.18 m along x) so one block usually has to be parked elsewhere first. t0 and t1 are different assets (index 0 vs 1) so their root frames/shapes may differ; the checks compare root frames, not shapes. No gripper-open requirement in success. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically.
+**Notes from RoboDojo's code.** The start poses are read once, before the first action, from the blocks' centres and
+orientations; only centres and orientations are compared, not outlines. Because the two Ts have the same shape and the
+same centre point, setting each one exactly onto the other's starting outline (same spot, same heading, same face up)
+meets both the 0.02 m and the 3 deg test. Each target place is occupied by the other block until it moves, so one
+block has to be set aside first. The 3 deg tolerance is on the full rotation: the block must lie flat, not tilted
+against something.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

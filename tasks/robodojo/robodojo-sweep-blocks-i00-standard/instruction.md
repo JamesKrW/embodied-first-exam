@@ -13,13 +13,43 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Pick up the broom, hand it over to the right hand, then use the dustpan to sweep the blocks."*
 
 ## Success (RoboDojo's own check for this task)
-- is_A_on_B_left(label_A=broom_shovel, label_B=broom, x_threshold=0.1): broom ROOT x minus dustpan ROOT x is greater than 0.1 m (i.e. the dustpan root is more than 0.1 m to the -x side of the broom root in the environment frame).
-- is_not_lift(broom_shovel, z_threshold=0.01): the dustpan root z is not more than 0.01 m above its initial z (the dustpan stays on the table).
-- is_axis_up(broom_shovel, axis [0,0,1], threshold 5): the dustpan's local +z axis is within 5 degrees (strictly less) of world up (not tipped over).
-- EITHER (OR, see notes) every cube-prefixed objects has its root XY within the radius of one of the dustpan's passive support circle(s) ('broom_shovel/0' support tag; centre(s) and radius come from asset metadata, XY distance < radius), OR every such object has its root XY point inside the XY quadrilateral formed by the dustpan's passive functional points tagged 'handle' (4 points; point-in-polygon with tolerance 1e-6 m).
-- all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the dustpan: mustard-yellow, 18 cm wide and 28 cm long with its short handle, lying flat left of centre, near you;
+  its open front edge (the lip) faces right and a little away, its handle points left and a little toward you
+  [broom_shovel];
+- the broom: a small hand brush, 26 cm long, cream handle and yellow bristles, lying at the far left behind the
+  dustpan, bristles pointing right and away [broom];
+- the cubes: three 2 cm cubes on the right half of the table: a yellow one farthest away [cube_0], a magenta one at the
+  right [cube_2] and a magenta one nearest you, right of centre [cube_1]. The check treats them alike (every object
+  whose label starts with "cube").
 
-**When it is checked.** Success conditions form ONE stage: after every action (once all simulation sub-steps of that action are done) the reward manager evaluates all conditions; the episode succeeds as soon as ALL hold simultaneously at the same moment (reward 1 -> episode ends with success). Conditions are not latched or ordered. Otherwise the episode ends as a failure after step_lim=1000 actions (the check made after the last action still counts). No early-fail rule exists apart from the environment being flagged invalid (e.g. a required label missing / physics broken).
+An object's *centre* below is the point RoboDojo tests for it (its origin). For the dustpan it is the middle of its
+bounding box: on its centre line 14 cm behind the front lip (in the back of the pan, just in front of where the handle
+starts) and 2.4 cm above its underside. For the broom it is the middle of its bounding box, about halfway along its
+26 cm. For each cube it is the cube's middle. All of these must hold at the same action boundary:
+- **Broom right of the dustpan.** The broom's centre more than 0.1 m to the right (+x) of the dustpan's centre
+  (strict) [is_A_on_B_left(broom_shovel, broom)]. Not true at the start: the broom lies 17 cm to the left of the dustpan,
+  so it must end on the dustpan's right-hand side (the side of its open lip at the start).
+- **Dustpan on the table.** Its centre at most 0.01 m higher than at the start [is_not_lift]; sliding or turning it on
+  the table is allowed. True at the start.
+- **Dustpan flat.** Its up direction (the pan floor's normal, up at the start) within 5 deg of world up (strict)
+  [dustpan local +z; is_axis_up]: not tipped. True at the start.
+- **Every cube in the dustpan**, seen from above, by EITHER of two tests, and all cubes must pass the same one:
+  - (a) every cube's centre strictly within 0.081 m horizontally of a point on the dustpan's centre line 8.7 cm behind
+    its front lip [support circle 'broom_shovel/0']. That circle is 16.2 cm across, nearly the whole floor of the pan
+    (18.4 cm wide): from 0.6 cm behind the lip back to about the pan's back wall; or
+  - (b) every cube's centre inside the rectangle that runs across the pan 8.5 cm either side of its centre line, from
+    1.6 cm to 9.0 cm behind the front lip: the front half of the pan floor, nearly its full width (boundary included,
+    1e-6 m tolerance) [the dustpan's four 'handle' functional points; is_all_pointA_in_B_functional_bbox]. Despite its
+    name this region is in the pan, not on the handle.
+  Both regions move with the dustpan; only the horizontal position of each cube's centre is tested, not its height.
+  Not true at the start.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), all conditions together as one stage; none of them
+remembers earlier actions. Success is declared at the first action boundary where everything holds, and the episode
+ends. No condition ends the episode early as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -28,9 +58,14 @@ RoboDojo's own evaluation gives a policy 1000 actions (40 s) for this task; no c
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** All target (controlled) arms must be back near their start pose when success is evaluated (it is one of the success conditions, see success list): every target arm's end-effector position within 0.15 m on EACH of x, y, z (per-axis, not Euclidean) and orientation within 20 degrees of its pose at the start of the episode (pose recorded right after the robot is set to its initial state). Gripper opening is NOT checked by the success test.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** Bimanual hand-over is described in the instruction but not itself checked; only the final state is. The dustpan must stay (almost) in place and upright during the whole sweep at success time (z within 0.01 m of start, tilt < 5 deg) and end up more than 0.1 m left (-x) of the broom, so the broom must finish on the +x side of the dustpan. IMPORTANT oddity: the two region tests are written as a list [circle_test, bbox_test] in one check slot, which the reward manager evaluates as OR, not AND; the 'handle' functional quad of the dustpan is unusual and its exact location cannot be determined statically (the support circle likely marks the dustpan's collection pan). All swept objects must satisfy the same test (all-quantifier within each test). Objects that fell off the table or remain outside will make the test fail. No gripper-open requirement in success. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically.
+**Notes from RoboDojo's code.** The hand-over of the broom to the right arm is not checked; only the final state is.
+The dustpan may be slid or turned on the table but not lifted (more than 1 cm) or tipped (5 deg or more). The two
+in-the-pan tests are alternatives, but each one must hold for all cubes at once: one cube near the lip corner (only in
+the rectangle) and one at the back of the pan (only in the circle) fails both. A cube that stays outside the pan or
+falls off the table fails. The broom test compares only left-right (x) positions of the two centres.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

@@ -21,12 +21,41 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- Let n be the number of digit blocks (4 or 5, labels digit_0..digit_{n-1}); each shows a digit d = model_id % 10, all distinct (unique sampling). Sort the blocks by digit value descending: the block with the largest digit must be placed on mat_0, the next largest on mat_1, ..., the smallest on mat_{n-1}. This yields the largest possible number when read in mat order.
-- Mats mat_0..mat_{n-1} are fixed cushions in a row along world x with spacing 0.085 m, centred at x=0, shared y drawn in [-0.10,-0.05] m; mat_0 has the smallest x (x = (i-(n-1)/2)*0.085). Position check per block: xy (horizontal) Euclidean distance from the digit block's root origin to its assigned mat's root origin must be < 0.02 m (z ignored).
-- Orientation per block, every angle strictly < 45 degrees: (a) the block's local +y axis aligned with world +y; for digit 0 either local +y or local -y aligned with world +y is accepted; (b) for every digit except 0 and 8, the block's local +x axis aligned with world +x. So 8 needs only (a); 0 needs only the relaxed (a); digits 1-7 and 9 need both (a) and (b). Which local axes correspond to the block's printed face/orientation is not determinable statically; effectively the block must be placed roughly upright with its text reading direction within 45 degrees of the nominal one (in-plane rotation less than 45 degrees, not tipped on its side).
-- All target robots back at episode-start end-effector pose: |dx|,|dy|,|dz| each <= 0.15 m and rotation diff <= 20 degrees (all_robot_back_to_origin defaults).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the digit blocks: four brown numerals, each about 3.5-4 cm wide, 5 cm tall and 1.5-2 cm thick, lying flat and face
+  up on the near half of the table among the clutter, two left of the mats and two right of them; each is upright as
+  read from the arms' side (the top of the numeral pointing away from you), turned by less than 45 deg (the one at the
+  far left by about 40 deg, close to the limit) [digit_0 ... digit_3, in no particular order; the digit is the block's
+  model, read it from the numeral];
+- the mats: four round, light-wood-coloured pads, 8 cm across and 5 mm thick, in a left-to-right row across the
+  middle of the table, 8.5 cm apart, just beyond the dartboard (it lies between them and you) [mat_0 is the leftmost, then mat_1, mat_2, mat_3 the rightmost].
 
-**When it is checked.** Checked after every action (each action = one call to take_action; the reward manager step runs after the action's control sequence has finished executing). A single stage: all per-block position and orientation conditions for all n blocks plus 'robots back at origin' must hold simultaneously at one step; the first such step ends the episode with success. There is no early-failure rule except the generic ones (physics instability/layout invalid). Otherwise the episode fails at step_lim=1050 actions. The process get_score (transition mode, scores [5,15,30,100] for 4 digits or [5,15,25,40,100] for 5 digits) is only a partial-credit metric: stage k needs all grippers open (open fraction >= 0.8) and any k blocks correctly placed; not required for success.
+A block's or mat's *centre* below is the point RoboDojo tests for it (its origin): the middle of its bounding box (for
+a mat, the middle of the disc). All of these must hold at the same action boundary:
+- **Order.** Sort the digits from largest to smallest: the largest goes on the leftmost mat, the next on the second
+  mat from the left, and so on, the smallest on the rightmost mat, so that the row reads the largest possible number
+  from left to right. There is exactly one such order (the digits differ).
+- **On its mat.** Each block's centre within 0.02 m of its mat's centre, measured horizontally (height is not checked)
+  [is_AB_xy_distance_within_threshold, threshold=0.02].
+- **Upright, as read from the arms' side.** Each block's "up" direction (from the bottom of the numeral to its top,
+  pointing away from you at the start) within 45 deg of world +y, measured in 3-D [block local +y; is_axis_aligned,
+  align_threshold=45]; for the digit 0 the opposite direction also counts (a 0 may lie upside down). For every digit
+  except 0 and 8, also its reading direction (from the left side of the numeral to its right, pointing right at the
+  start) within 45 deg of world +x [block local +x]. So lying flat and face up, turned by less than 45 deg, as every
+  block is at the start, passes; carry the blocks without turning them. Standing a numeral up on its bottom edge fails
+  (its "up" direction would point to world +z). Turning a block upside down (top toward you) fails, also for an 8,
+  which looks the same; only a 0 may. Turning it over left-to-right (face down, top still away from you) fails for
+  every digit except 0 and 8.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), block by block in order of the digits (largest
+first: on its mat, upright tests), then the arms, stopping at the first condition that fails; all must hold at the same
+action boundary (one stage). Success is declared at the first action boundary where everything holds, and the episode
+ends. No condition ends the episode early as a failure. A separate partial-credit score (not part of success) climbs
+the tiers 5, 15, 30, 100 as 1, 2, 3, then all 4 blocks are on their mats and upright as above while both grippers are
+open (each at least 0.8 of its full opening)
+(the 100 tier counts only if the episode succeeds, otherwise the tier below) [process score, transition mode].
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -34,12 +63,19 @@ simulated time). RoboDojo's own evaluation gives a policy 1050 actions (42 s) fo
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**What you must read or remember.** The agent must read the digit on each block from vision (the digit is the model identity, only visible as the number texture; the reward uses model_id % 10) and order them: largest digit to mat_0 (lowest x). Which end is 'left' is, per the code, the mat with smallest world x, mat_0 (the instruction says 'left to right'; confirm orientation from the camera).
+**What you must read or remember.** Read the digit on each block from the cameras (the check knows each block's digit
+from its model; nothing else marks it) and work out the order: largest digit on the leftmost mat (the one farthest to
+world -x), smallest on the rightmost.
 
-**At the end.** All target arms back at start pose within 0.15 m per axis and 20 degrees at the moment the last block is correctly placed (no gripper-state requirement in the success check).
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** Block-to-mat assignment is deterministic: sorted by digit descending, so the order is unique. Digit orientation checks are loose (<45 deg), but the position tolerance is tight (0.02 m xy from the mat's origin). The 8 only needs +y up (< 45 deg), 0 accepts +y or -y, others need both +y and +x. Which digits appear (and how many, 4 vs 5) varies per episode. Digits and mats are identified at runtime by labels digit_i / mat_i, not by digit value, so labels digit_i do not carry the digit value. The success condition has no 'not grasped' or 'gripper open' condition.
-Unlike the plain arrange_largest_number, this _random variant uses other digit textures (ids 30-49) and adds 20 clutter objects and a second keep-out area; the reward is identical.
+**Notes from RoboDojo's code.** The order is unique because the digits differ. The turn tolerance is loose (45 deg), but
+the placement tolerance is tight: 0.02 m horizontally between the block's centre and the mat's centre, so a block
+that only overlaps its mat fails. Nothing tests that a block rests on the mat or that the gripper has let go.
+Identical check to arrange-largest-number; this _random variant uses other digit textures and adds 20 clutter objects
+(the keyboard, dartboard, toy car and the rest), which the check never reads, and a second keep-out area at the front
+edge for the start layout.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

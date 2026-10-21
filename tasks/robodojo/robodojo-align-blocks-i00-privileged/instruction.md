@@ -20,12 +20,35 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- cube0, cube1 and cube2 (three identical cubes) have their centres (object root origin, xy only) on one line: fit a best line through the three (x,y) centres (SVD principal direction); the maximum perpendicular distance of any centre from that line must be <= 0.008 m (is_in_line threshold=0.008).
-- Orientation alignment (is_align defaults to True, align_threshold=8): for every one of the three cubes, at least one of its three local axes (x, y or z in world frame) must make an angle < 8 degrees with the fitted line direction (taken as horizontal, z=0), either parallel or anti-parallel (|angle-180| < 8 deg). In practice each cube must be yawed so that one of its faces is parallel to the row within 8 degrees.
-- All target robots (arms) are back at their episode-start end-effector pose: for each target robot, |dx|,|dy|,|dz| of the real end-pose position vs the start pose are each <= 0.15 m (checked per axis, not Euclidean) and the rotation difference is <= 20 degrees (all_robot_back_to_origin defaults pos_threshold=0.15, rot_threshold=20).
-- Constraint that must hold during the whole episode (query with aim 0): none of cube0, cube1, cube2 may ever be lifted: if at any checked step a cube's z (root position) exceeds its initial z (recorded right after reset) by more than 0.007 m, the episode is marked failed immediately.
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the three blocks: identical magenta cubes, 3.5 cm on each side, scattered just left of centre in front of you: one
+  right of the other two and turned about 30 deg [cube0], one in the middle a little farther away [cube1], and one at
+  the left, nearest to you [cube2]. The check treats the three alike, so which is which does not matter.
 
-**When it is checked.** Checked after every action (each action = one call to take_action; the reward manager step runs after the action's control sequence has finished executing). The three lift queries are evaluated every step (before the main check); each step where a cube is >0.007 m above its initial z increments its counter, and a counter > 0 (i.e. a single violating step) sets success=False and ends the episode with failure. The main check is one single stage whose conditions (in_line+alignment of the three cubes AND robots back at origin) must all hold simultaneously at the same step; the first such step ends the episode with success (reward 1). Otherwise the episode fails at step_lim=200 actions. final_check is not used. Because the check is evaluated at every step, success is declared at the first moment all conditions hold, so the arm must already be home at the moment the row is aligned (or return home afterwards with the row staying aligned).
+The set square (the long light-grey bar with a red stripe, 55 cm long, lying across the front of the table [target]) is
+the tool the task asks you to push with; the check never reads it.
+
+A block's *centre* below is the point RoboDojo tests for it (its origin): the middle of the cube. All of these must hold
+at the same action boundary:
+- **Row.** Seen from above, the three block centres lie on one straight line: RoboDojo fits the best line through the
+  three centres (horizontal only; any position and direction on the table) and every centre must be within 0.008 m of
+  it, measured sideways [is_in_line, threshold=0.008].
+- **Squared to the row.** Each block must have one of its three face directions within 8 deg of the row's direction
+  (either way along it) [one of the cube's local x/y/z axes, align_threshold=8]. Since the row is horizontal, for a
+  block lying on a face this means its side faces are square to the row: its edges run along the row and across it,
+  within 8 deg. Not true at the start for all of them (one block is turned about 30 deg): push the blocks so that each
+  is turned square to the line, e.g. by pressing all three against the straight edge of the set square.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+- **Never lifted (whole episode).** No block's centre may ever be more than 0.007 m higher than it was at the start of
+  the episode (right after the reset) [is_lift, z_threshold=0.007; one query per block, allowed count 0]: push, do not pick up, tip or flip a block;
+  a block that rides up onto the set square or onto another block can trip this too.
+
+**When it is checked.** After every action (never between actions). First the three never-lifted tests: a single
+action at which any block is more than 0.007 m above its start height marks the episode failed at once. Then the main
+check, in the order row (with the squaring test), arms, stopping at the first condition that fails; both must hold at
+the same action boundary (one stage). Success is declared at the first action boundary where they hold, and the episode
+ends; so the arms must be back home while the row stays straight.
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -33,9 +56,14 @@ simulated time). RoboDojo's own evaluation gives a policy 200 actions (8 s) for 
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** Both/all target arms must be back within 0.15 m per axis and 20 degrees of their start end-effector pose at the moment of success (see success). Gripper state is not checked.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** Cubes must not be lifted by more than 0.007 m (less than a centimetre) at any step, so push, do not grasp or flip them; even a cube riding up on the set square or tilting could trip this. 0.008 m line tolerance and 8 degree face-alignment tolerance are tight. The row can be at any position/orientation on the table. No requirement of using the set square is checked programmatically, only the geometry. Success is checked right after each action, so a transient alignment while the arm is home also ends the episode as success.
+**Notes from RoboDojo's code.** Only the geometry of the three blocks is checked: the row can be anywhere on the table
+and in any direction, and nothing tests that the set square was used. The tolerances are tight (0.008 m off the line,
+8 deg of turn). A block lifted by more than 0.007 m at any checked action fails the episode for good, so slide the
+blocks along the table. A row that is straight and squared at an action where the arms are already home ends the
+episode as a success at once.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed
