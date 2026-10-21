@@ -1,22 +1,22 @@
-"""discus (v2): a standing throw (no spin across the circle) from a technique found offline by
-scripts/roboolympics/search_technique.py, RoboOlympics' method (pingyue's kit/throwing/optimize.py): five key
-poses of the whole body (the legs as synergies that keep both feet flat: crouch, shift, sway and the pelvis' turn;
-the trunk and the arms by joint; the start a hand-made wind-up: the trunk turned far to the right, the arm out at the
-side), their times and the release time, searched by CMA-ES in the task's own frozen instance, each trial scored on
-the referee's verdict and distance. The trunk's turn (the H1-2's waist motor, 200 N m) throws; the arm only carries
-the discus. Played as Unitree LowCmd rows along a Catmull-Rom curve through the keys; the grip lets go at the release
-time. Then the walking policy at zero command, backwards out of the rear half of the circle, and stands.
-Measured: release at 12.9 m/s from 1.82 m, the discus tilted 51 degrees and spinning at 24 rad/s; it lands 15.87 m
-from the rim (the line is 15 m); success after 8.5 s. Open loop on the one frozen start, not robust (a few of each
-generation's 48 neighbours succeed)."""
+"""discus: a standing throw (no spin across the circle) from a technique found offline by CMA-ES in this
+family's own physics (scripts/roboolympics/search_technique.py's method and its Discus search space: five key poses of
+the whole body, the legs as synergies that keep both feet flat, the trunk and the arms by joint, their times and the
+release time; 24 trials a generation, 120 generations, each scored on the referee's verdict and distance). The
+discus is held by friction only, clamped by its rim in the right Dex1-1 gripper (the closure command 1 until
+release_s, then 0). Played as Unitree LowCmd rows along a Catmull-Rom curve through the keys; then the walking policy
+at zero command, backwards out of the rear half of the circle, and stands.
+Measured: the trunk's turn pulls the discus out of the still-closed jaws at 1.34 s (0.14 s before the commanded
+opening: the pull exceeds the clamp's friction), at 12.5 m/s, tilted 39 degrees, spinning at 18.5 rad/s; it lands
+15.95 m from the rim (the line is 15 m); success after 8.1 s. Open loop on the one frozen start and on a knife edge
+(a single trial of the search's last generation succeeded)."""
 import numpy as np
 
-TECHNIQUE = {"times": [0.8249, 1.2163, 1.3917, 1.619, 3.2126], "release_s": 1.4132, "hand": 'right', "keys": [
-        [0.3607, -0.3331, -0.0199, 0.7476, -0.4146, 0.0207, 0.3688, -0.4153, -0.0361, 0.7452, -0.3298, 0.0349, -1.671, -0.4805, 0.3875, 0, 1.2313, 0, 0, 0, 0.1163, -1.2419, -0.2503, 2.1856, 0.064, 0.1289, 0.3897],
-        [0.3035, -0.4453, -0.0357, 1.017, -0.5719, 0.0382, 0.3126, -0.5254, -0.0488, 1.0223, -0.4968, 0.0482, -0.8844, -0.7162, 0.7646, 0, 0.0205, 0, 0, 0, -0.7684, -1.3143, -0.2901, 2.4468, -0.4028, -0.0893, -0.1835],
-        [-0.3066, -0.1479, -0.0102, 0.4564, -0.3085, 0.01, -0.3072, -0.0417, -0.0204, 0.3807, -0.3391, 0.0203, 0.858, -0.1811, -0.2889, 0, 0.3146, 0, 0, 0, -0.277, -2.2289, -0.2556, 0.6373, -0.0724, 0.3382, -0.172],
-        [-0.43, -0.346, -0.03, 0.6287, -0.2826, 0.0287, -0.43, -0.179, -0.0766, 0.5774, -0.398, 0.0759, 1.6886, -0.2166, 0.5658, 0, -0.3121, 0, 0, 0, 0.1038, -2.2998, 0.2768, 1.5151, -0.2836, -0.3811, 0.1109],
-        [-0.2404, -0.2152, 0.0925, 0.406, -0.1908, -0.0924, -0.2344, -0.1606, 0.0863, 0.4034, -0.2431, -0.0872, -0.1719, -0.0074, -0.1379, 0, 0.1239, 0, 0, 0, 0.1828, -0.411, -0.4077, 1.4091, 0.1841, 0.47, -0.4777]]}
+TECHNIQUE = {"times": [0.6313, 0.9741, 1.1824, 1.3423, 2.4483], "release_s": 1.4863, "hand": 'right', "keys": [
+        [0.2306, -0.1859, -0.0681, 0.3607, -0.1748, 0.0685, 0.2345, -0.2255, -0.0739, 0.3384, -0.1127, 0.0736, -0.4135, -0.9507, -0.38, 0, 1.0106, 0, 0, 0, 0.1812, -1.0517, 0.5057, 1.3359, -0.5581, -0.0172, 0.932],
+        [0.2509, -0.1181, -0.0592, 0.3226, -0.2046, 0.0597, 0.2556, -0.1767, -0.0662, 0.3278, -0.1511, 0.0661, -1.1629, 0.2433, 0.0301, 0, 0.4143, 0, 0, 0, 0.067, -1.4585, 0.7816, 1.3181, 0.5985, -0.3182, -0.3522],
+        [-0.0553, -0.2706, -0.0378, 0.6468, -0.3761, 0.0376, -0.0558, -0.2551, -0.0382, 0.642, -0.3869, 0.0381, -0.4145, 0.4027, 0.3339, 0, -0.1286, 0, 0, 0, -0.5037, -1.9313, 0.3426, 2.0578, 0.395, 0.071, 0.5999],
+        [-0.3407, -0.0863, 0.0038, 0.1372, -0.0509, -0.0038, -0.3405, 0.0122, -0.0085, 0.0867, -0.0989, 0.0085, 1.6136, -0.31, 0.0185, 0, -0.3031, 0, 0, 0, 0.0439, -2.2727, 0.1183, 1.1458, 0.1565, 0.0423, 0.3611],
+        [-0.43, -0.4065, 0.0223, 0.7719, -0.3654, -0.022, -0.43, -0.277, -0.0093, 0.7499, -0.4729, 0.0074, 0.6142, 0.1035, 0.5843, 0, -0.3828, 0, 0, 0, 0.1181, -0.5574, 0.0692, 0.9972, 0.2236, 0.1066, 0.1847]]}
 
 
 def curve(q0, keys, times, dt):

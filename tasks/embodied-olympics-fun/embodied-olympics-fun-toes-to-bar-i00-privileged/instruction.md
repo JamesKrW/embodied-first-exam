@@ -1,13 +1,13 @@
 # embodied-olympics toes-to-bar — instance i00
 
-You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 33 kg; the Embodied Olympics simulator on MuJoCo)
-via Python. **Task:** Hanging from the high bar by both hands, do five toes-to-bar: bring both feet up to touch the bar between your hands, and come back to the full hang each time, without letting go.
+You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 34 kg; the Embodied Olympics simulator on MuJoCo)
+via Python. **Task:** Hanging from the high bar by the two grippers that are your hands, do five toes-to-bar: bring both feet up to touch the bar between your hands, and come back to the full hang each time, without letting go.
 
 This is a *fixed instance*: the same venue and start every time. You may reset and retry as many times as you want.
 Your deliverable is **one replayable trajectory**, not a general policy.
 
 ## The venue
-At t = 0 you hang still under the middle of the bar, facing +x: both arms straight up, both grips closed on the bar (hands 0.39 m apart: the palms at y = +0.195 and -0.195 m), legs in the standing posture, your pelvis 0.80 m below the bar, your feet 1.55 m below it and 0.04 m behind it, your soles about 1.25 m above the floor (1.05 m above the 0.20 m mats under the bar). Your feet are 0.24 m apart, each 0.08 m wide. A grip command below 0.5 opens that hand and lets go of the bar. Nothing holds the legs up here: the `stand` action keeps the legs in the stance with a feed-forward meant for standing on the ground; `joints` or `lowcmd` rows drive every joint. The uprights stand at the two ends of the bar, 1.2 m to either side of you.
+At t = 0 you hang still under the middle of the bar, facing +x: both arms straight up, the wrists turned so that each gripper's jaws close fore and aft on the bar, the fingers pointing up and the bar between them 0.015 m from the gripper's body (1 mm clear of it; the jaws are 0.08 m long beyond it), the jaws' centres at y = +0.207 and -0.207 m, your legs in the standing posture, your pelvis 0.84 m below the bar, your feet 1.59 m below it and 0.03 m behind it, your soles about 1.21 m above the floor (1.01 m above the 0.20 m mats under the bar). Your feet are 0.24 m apart, each 0.08 m wide. Both grip values are 1: the clamp's full 120 N on each jaw. A grip value is that gripper's closure command (0 open, 1 closed): on the 28 mm bar, about 0.82 or more clamps at 120 N, less clamps more lightly (10 N per mm that the commanded opening, 90 mm times one less the value, is below 28 mm), and below about 0.69 the jaws no longer clamp it. The bar is not a free body: the `held` flags of your state stay empty for it; the grip is judged as the rules say. Nothing holds the legs up here: the `stand` action keeps the legs in the stance with a feed-forward meant for standing on the ground; `joints` or `lowcmd` rows drive every joint. The uprights stand at the two ends of the bar, 1.2 m to either side of you.
 
 Frame: metres; the origin is on the floor under your pelvis at the start, +x is the way you face at the start, +y is
 to your left, +z is up; the floor is z = 0. 
@@ -15,11 +15,12 @@ to your left, +z is up; the floor is z = 0.
 ## The rules
 **Rule book:** CrossFit Games movement standard, toes-to-bar: from a full hang with the arms extended and the heels behind the bar, both feet touch the bar at the same time between the hands; kipping is allowed. The bar is the FIG horizontal bar (FIG Apparatus Norms: 2.80 m above the floor, 2.40 m between the uprights, 28 mm in diameter) over 0.20 m mats. Where this task departs from it:
 
-- the grip (no fingers on this robot): each hand's grip is a rigid hold on the bar (the simulator's weld), and the bar turns freely in its bearings about its own axis in place of the hands turning round a fixed bar, because the hands cannot wrap a bar; opening a grip lets go
-- CrossFit standard (the full hang is judged by eye: arms extended, heels behind the bar): the hang is judged by where the feet are (both feet's centres at least 1.4 m below the bar, nine tenths of the dead hang's 1.55 m, and behind the bar), because the referee has positions, not a judge's eye
+- the grip (the hands on the bar): each hand is a two-finger gripper, Unitree's Dex1-1 (90 mm stroke, 80 mm jaws with rubber pads, at most 120 N; sold for the G1), closed across the bar; it holds the bar by the jaws' friction alone, nothing is welded, and the bar can slide along the jaws and out of them. Flat jaws clamp the bar but cannot wrap round it: the bar is fixed, as the norm's is, and a hand turns on it only by its pads sliding round the bar (as a gymnast's palms slide round it) or by the wrist's joints. The Dex1-1's own rating is a 5 kg friction-grasp load; the model's pads hold some five times that
+- the grip (the hands stay on the bar): defined by contact: a hand holds the bar while the bar touches both of its gripper's jaws; a break of up to 0.05 s (the pads' contact flickering under a load; measured breaks last 1 to 3 ms) is not letting go
+- CrossFit standard (the full hang is judged by eye: arms extended, heels behind the bar): the hang is judged by where the feet are (both feet's centres at least 1.4 m below the bar, about nine tenths of the dead hang's 1.59 m, and behind the bar), because the referee has positions, not a judge's eye
 - FIG Apparatus Norms, horizontal bar (elasticity): the bar is rigid, because the simulator has rigid bodies only
 
-The bar is 0.028 m thick, 2.8 m above the floor, 2.4 m long between its two uprights, along the y axis; it turns freely about its own axis. Both hands grip it from the start. A repetition has two parts, in this order. The touch: both feet touch the bar at the same moment, each at a point between your two hands (shins, knees or anything else on the bar is not a touch, and does not fail). The hang: afterwards the centres of both feet are at least 1.4 m below the bar and behind it (x less than the bar's; the heels back behind the bar), both at the same moment (in your dead hang they are 1.55 m below it). You succeed when the hang of repetition 5 is reached. Swinging is allowed (a kip is legal), as is bending the knees on the way. You fail the moment either hand no longer grips the bar, any part of you touches the uprights, the mats or the floor, or after 60 s.
+The bar is 0.028 m thick, 2.8 m above the floor, 2.4 m long between its two uprights, along the y axis; it is fixed and does not turn. Your hands are two-finger grippers, and at the start each is closed on the bar; they hold it by the friction of their jaws only, so the bar can slide along the jaws and out of them. A hand holds the bar while the bar touches both of that gripper's jaws; when for more than 0.05 s a hand has not held it, you have let go (whether you opened the gripper or the bar slipped out), and there is no re-grip. Besides the grippers only your legs may touch the bar: an arm, the trunk or the head on it fails. A repetition has two parts, in this order. The touch: both feet touch the bar at the same moment, each at a point between your two hands (the jaws' centres; shins, knees or anything else of the legs on the bar is not a touch, and does not fail). The hang: afterwards the centres of both feet are at least 1.4 m below the bar and behind it (x less than the bar's; the heels back behind the bar), both at the same moment (in your dead hang they are 1.59 m below it). You succeed when the hang of repetition 5 is reached. Swinging is allowed (a kip is legal), as is bending the knees on the way. You fail the moment you let go of the bar, an arm, the trunk or the head touches the bar, any part of you touches the uprights, the mats or the floor, or after 60 s.
 
 A referee decides this from the simulator's state after every physics step (1 ms): the events that must happen, in
 order, are **rep 1 → rep 2 → rep 3 → rep 4 → rep 5**. The attempt ends at the success (that moment is the success), at the first rule violation,
@@ -54,6 +55,8 @@ s.rows                                 # the sim rows of every step since the la
 s.status()                             # the referee: success, done, failed, stages, progress, metrics, events
 s.state()                              # privileged state: pelvis (x, y, z, yaw), centre of mass, joints, the palms,
                                        # what each hand holds, and the task's objects under "task"
+                                       # (the grippers' "left_palm" and "right_palm" are their jaw centres; "real_hands": each gripper's
+                                       # command, opening, opening speed, clamp force, what it holds, jaw centre and axes)
 s.world                                # everything: s.world.m, s.world.d (MuJoCo model and data), s.world.robot
                                        # (addresses, limits), s.world.ref (the referee), s.world.task (the rules)
 s.image("head_left")                   # a camera's RGB image (270 x 480; the cameras: `head_left`, `head_right`, `venue`)
@@ -74,16 +77,16 @@ One row is one control step (10 ms; the physics runs at 1 kHz). Every row ends w
 
 | type | row (then `grip_left`, `grip_right`) | floats | who drives what |
 |---|---|---|---|
-| `stand` | waist 3 + arms 14 joint targets | 19 | the platform holds the legs in the stance; you give the waist's 3 and the arms' 14 joint targets (rad) |
-| `walk` | `vx`, `vy`, `wz` + waist 3 + arms 14 joint targets | 22 | Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets |
-| `run` | `vx`, `vy`, `wz` | 5 | the running policy drives all 29 joints from the velocity command (it swings the arms) |
-| `run_arms` | `vx`, `vy`, `wz` + arms 14 joint targets | 19 | the running policy drives the legs and the waist; you give the 14 arm joint targets |
-| `joints` | all 29 joint targets | 31 | you give all 29 joint targets (rad); the default PD gains, no feed-forward |
-| `lowcmd` | all 29 joints × (`q`, `dq`, `tau`, `kp`, `kd`): 29 targets, then 29 velocities, 29 torques, 29 kp, 29 kd | 147 | Unitree's LowCmd for all 29 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz |
-| `walk_falcon` | `vx`, `vy`, `wz` + waist 3 + arms 14 joint targets (as `walk`) | 22 | FALCON's walking policy (LeCAR-Lab, trained with arm motions and forces on the hands; it also nudges the wrists) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets |
-| `walk_agile` | `vx`, `vy`, `wz` + waist 3 + arms 14 joint targets (as `walk`) | 22 | AGILE's velocity-height walking policy (NVIDIA WBC-AGILE, trained while the arms and the waist moved) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets |
+| `stand` | waist 3 + arms 14 joint targets | 19 | the platform holds the legs in the stance; you give the waist's 3 and the arms' 14 joint targets (rad) (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed)) |
+| `walk` | `vx`, `vy`, `wz` + waist 3 + arms 14 joint targets | 22 | Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed)) |
+| `run` | `vx`, `vy`, `wz` | 5 | the running policy drives all 29 joints from the velocity command (it swings the arms) (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed)) |
+| `run_arms` | `vx`, `vy`, `wz` + arms 14 joint targets | 19 | the running policy drives the legs and the waist; you give the 14 arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed)) |
+| `joints` | all 29 joint targets | 31 | you give all 29 joint targets (rad); the default PD gains, no feed-forward (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed)) |
+| `lowcmd` | all 29 joints × (`q`, `dq`, `tau`, `kp`, `kd`): 29 targets, then 29 velocities, 29 torques, 29 kp, 29 kd | 147 | Unitree's LowCmd for all 29 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed)) |
+| `walk_falcon` | `vx`, `vy`, `wz` + waist 3 + arms 14 joint targets (as `walk`) | 22 | FALCON's walking policy (LeCAR-Lab, trained with arm motions and forces on the hands; it also nudges the wrists) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed)) |
+| `walk_agile` | `vx`, `vy`, `wz` + waist 3 + arms 14 joint targets (as `walk`) | 22 | AGILE's velocity-height walking policy (NVIDIA WBC-AGILE, trained while the arms and the waist moved) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed)) |
 
-Velocity commands are in the robot's own frame (`vx` forward, `vy` to its left, m/s; `wz` turning left, rad/s). Bounds: `walk` |vx| ≤ 0.8, |vy| ≤ 0.5, |wz| ≤ 1.57; `walk_falcon` -0.8 ≤ vx ≤ 0.8, -0.5 ≤ vy ≤ 0.5, -1 ≤ wz ≤ 1; `walk_agile` -0.5 ≤ vx ≤ 0.8, -0.5 ≤ vy ≤ 0.5, -1 ≤ wz ≤ 1; `run` and `run_arms` 0 ≤ vx ≤ 5, |vy| ≤ 0.12, |wz| ≤ 0.5. Joint targets are absolute angles (rad). Values outside the bounds are clipped. `grip_left`, `grip_right`: ≥ 0.5 closes the hand's grip, < 0.5 opens it. At the start the robot is in `stand` mode, but not with the arms at rest (the venue text says how it starts): the joint table's last column has the angles in force. The left and the right grips are closed at the start. The `stand` row that keeps the start as it is: `[0, 0, 0, -3.06, 0.57, 1, 1.4, 0, 0, 0, -3.06, -0.57, -1, 1.4, -0, 0, -0, 1, 1]` (`s.hold()` returns it); a `stand` row with other angles or grips moves the arms or lets go.
+Velocity commands are in the robot's own frame (`vx` forward, `vy` to its left, m/s; `wz` turning left, rad/s). Bounds: `walk` |vx| ≤ 0.8, |vy| ≤ 0.5, |wz| ≤ 1.57; `walk_falcon` -0.8 ≤ vx ≤ 0.8, -0.5 ≤ vy ≤ 0.5, -1 ≤ wz ≤ 1; `walk_agile` -0.5 ≤ vx ≤ 0.8, -0.5 ≤ vy ≤ 0.5, -1 ≤ wz ≤ 1; `run` and `run_arms` 0 ≤ vx ≤ 5, |vy| ≤ 0.12, |wz| ≤ 0.5. Joint targets are absolute angles (rad). Values outside the bounds are clipped. `grip_left` and `grip_right`: each gripper's closure command, 0 (open) to 1 (closed). At the start the robot is in `stand` mode, but not with the arms at rest (the venue text says how it starts): the joint table's last column has the angles in force. The left gripper is closed at the start (closure command 1): opening it lets go. The right gripper is closed at the start (closure command 1): opening it lets go. The `stand` row that keeps the start as it is: `[0, 0, 0, -3.06, 0.57, 1, 1.4, 0.97, 0, 0, -3.06, -0.57, -1, 1.4, -0.97, 0, -0, 1, 1]` (`s.hold()` returns it); a `stand` row with other angles or grips moves the arms or lets go.
 
 Joint order everywhere (Unitree's SDK order), with each joint's range, speed limit, torque limit and default gains:
 
@@ -108,14 +111,14 @@ Joint order everywhere (Unitree's SDK order), with each joint's range, speed lim
 | 16 | `left_shoulder_roll` | [-1.5882, 2.2515] | 37 | 25 | 300 | 6 | 0.57 |
 | 17 | `left_shoulder_yaw` | [-2.618, 2.618] | 37 | 25 | 300 | 6 | 1 |
 | 18 | `left_elbow` | [-1.0472, 2.0944] | 37 | 25 | 300 | 6 | 1.4 |
-| 19 | `left_wrist_roll` | [-1.9722, 1.9722] | 37 | 25 | 100 | 2 | 0 |
+| 19 | `left_wrist_roll` | [-1.9722, 1.9722] | 37 | 25 | 100 | 2 | 0.97 |
 | 20 | `left_wrist_pitch` | [-1.6144, 1.6144] | 22 | 5 | 60 | 1 | 0 |
 | 21 | `left_wrist_yaw` | [-1.6144, 1.6144] | 22 | 5 | 60 | 1 | 0 |
 | 22 | `right_shoulder_pitch` | [-3.0892, 2.6704] | 37 | 25 | 300 | 6 | -3.06 |
 | 23 | `right_shoulder_roll` | [-2.2515, 1.5882] | 37 | 25 | 300 | 6 | -0.57 |
 | 24 | `right_shoulder_yaw` | [-2.618, 2.618] | 37 | 25 | 300 | 6 | -1 |
 | 25 | `right_elbow` | [-1.0472, 2.0944] | 37 | 25 | 300 | 6 | 1.4 |
-| 26 | `right_wrist_roll` | [-1.9722, 1.9722] | 37 | 25 | 100 | 2 | -0 |
+| 26 | `right_wrist_roll` | [-1.9722, 1.9722] | 37 | 25 | 100 | 2 | -0.97 |
 | 27 | `right_wrist_pitch` | [-1.6144, 1.6144] | 22 | 5 | 60 | 1 | 0 |
 | 28 | `right_wrist_yaw` | [-1.6144, 1.6144] | 22 | 5 | 60 | 1 | -0 |
 
@@ -154,12 +157,21 @@ What the platform does and does not do for you:
   from the target in force. Joints a type does not name keep their targets. The speed limit is a limit on targets;
   what bounds the joint itself is the motor's torque-speed curve (a `lowcmd` feed-forward torque can turn a joint up to
   about 1.15 times that speed, where the motor's torque has fallen to zero).
-- **The hands** have no working fingers here; each carries a fist pad (a box of 4.4 × 8 × 10 cm beyond the wrist, the
-  10 cm along the forearm) with a grip: while `grip_left` / `grip_right` ≥ 0.5 the hand holds the nearest grippable
-  object whose surface is within 3.5 cm of the palm point (the middle of the pad, 4.5 cm beyond the wrist flange along
-  the forearm) and that moves at most 6 m/s relative to it; below 0.5 it lets go at once. Since the palm point is inside
-  the pad, an object can be gripped where it touches one of the pad's two broad faces, not at its narrow sides or its
-  far end. What is grippable is the task's own equipment, named in the rules.
+- **The left and right hands carry a gripper** instead of a fist pad: Unitree's Dex1-1 two-finger parallel gripper
+  (modelled: 0.55 kg; a housing of 78 × 67 × 63 mm on the wrist and two jaws 80 mm long beyond it, with rubber pads;
+  90 mm stroke; the jaws close along the palm's normal). It holds only by contact and friction (no weld, no help):
+  what it holds can slip, turn in the jaws or drop. `grip_left` and `grip_right` are the closure commands from 0 (open, 90 mm between the pads) to 1 (closed),
+  any value between. The servo's setpoint follows it at about 375 mm/s of opening (the full stroke in 0.24 s; the
+  jaws themselves can move briefly up to about 0.45 m/s when a clamp springs open), and a force-limited servo drives
+  the jaws to it: on an object, the clamp force is about 10 N for every mm that the commanded opening
+  (90 mm × (1 − command)) is below the object's width, at most 120 N, so a firm grip on a handle needs a command well
+  past where the jaws touch it and a light one slips; a command that opens takes effect at once (the clamp eases or
+  lets go within a millisecond, then the jaws open). The proprioception reports each gripper's opening, its speed and
+  its clamp force; `holding_<side>` is 1 while both jaws touch the same object. The housing and the jaws collide with
+  the world and with the rest of your own body. Where the model departs from the device: one command (the real one
+  also sets a speed and a force; here the speed is the maximum and the force follows from the commanded opening), no
+  5 N minimum force, and rubber pads (friction 1.0) that at 120 N hold about 240 N of shear, some five times the
+  device's rated 5 kg friction-grasp load.
 - **A tool on a hand** (a racket, a paddle, a club; where the task has one) is fixed to the wrist in place of the pad.
   It collides with the world, the ball and the rest of your own body.
 - **The air** is real: balls and implements feel drag and, when they spin, lift.

@@ -1,6 +1,8 @@
-"""Volleyball serve (FIVB Rule 12): from behind the end line, toss the ball and hit it with one hand or arm over the
-2.43 m net into the opponent's court."""
+"""Volleyball serve (FIVB Rule 12): nothing grips: the ball rests on the open left palm (palm up) and only gravity and
+friction keep it there; it can roll off. The toss is the arm's own movement throwing the ball up off the palm. From
+behind the end line, toss the ball and hit it with one hand or arm over the 2.43 m net into the opponent's court."""
 import math
+import xml.etree.ElementTree as ET
 
 import numpy as np
 
@@ -12,6 +14,7 @@ from rfo.task import TaskBase
 
 BALL = OFFICIAL["volleyball"]
 ARM = {s: {f"{s}_hand", f"{s}_forearm", f"{s}_upper_arm"} for s in ("left", "right")}
+HANDS = {"left_hand", "right_hand"}
 
 
 class Strike:
@@ -114,6 +117,85 @@ def centre_line_fault(w, ref, centre, yaw) -> str | None:
     return None
 
 
+
+# ---- the ball on the open palm ----
+# The H1-2's hand is a flat palm pad (4.4 x 8 x 10 cm, a box on the wrist mount; its broad face on the mount's +x is
+# the palm). At rest the forearms point forward, the palms facing each other across the body; turning the left forearm
+# by its elbow roll (-90 degrees) turns the left palm up, level, about 1.2 m above the floor, and the ball rests on it
+# under its own weight: nothing else holds it. A ball on a level palm stays only while the palm stays level (the
+# ball's rolling resistance, 4 mm, holds it on a palm tilted by up to about 2 degrees) and moves straight up or down:
+# a palm moved sideways leaves the rolling ball behind. The start command PALM_UP is the palm-up pose with the arm's
+# sag under the ball's weight taken out (the arms have no gravity feed-forward; measured offline with the ball's
+# weight as a force on the palm): with the ball on it the palm settles level. Under that command, with the ball on the
+# palm, the standing robot settles in about 2 s (its legs give a little; measured offline): it starts there, at rest
+# (SETTLED: the pelvis' height and orientation, every joint), the ball resting on the palm where it then rests
+# (BALL_ON_PALM: its centre in the mount's frame, from the middle of the palm's face). Started straight from the
+# command, the first 0.1 s of the stand settling would drop the palm away from the ball.
+# tests/test_volleyball_serve.py checks that the ball stays on the palm, still, for the whole 8 s of the
+# service.
+PALM_UP = dict(left_shoulder_pitch=-0.0161, left_shoulder_roll=0.0002, left_elbow_pitch=-0.0239,
+               left_elbow_roll=-1.5709, left_wrist_yaw=-0.0138)
+SETTLED_Z_QUAT = (1.02075, 1.0, 0.00231, -0.0008, -0.00137)
+SETTLED = (-0.01587, -0.15902, 0.03034, 0.35949, -0.20435, 0.19505, 0.01546, -0.16128, -0.02627, 0.36019, -0.19729,
+           -0.17731, -1e-05, 0.00027, -1e-05, -4e-05, 7e-05, -1.57101, 2e-05, 0.00037, 0.01221, 0.00014, -4e-05,
+           0.01816, 9e-05, 0.00759, -1e-05)
+BALL_ON_PALM = (0.10499, -0.0051, 0.00906)
+PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness and its centre along the forearm
+# The palm-ball contact. The palm pad is the hand's rubber on a rigid mount; its contact with a ball is given the
+# restitution of a ball on a supported human hand: Ivanova, "Energy transfer evaluation in the 'striker-ball' system
+# during impact", ISBS 2000 (18th International Symposium on Biomechanics in Sports, Hong Kong), Table 1: a volleyball
+# dropped 5.5 m (10.4 m/s) onto the hand of a player whose wrist rests on a table keeps 0.10 of its speed with the hand
+# relaxed, 0.14 strained, 0.17 as a clenched fist; ball impacts last 5 to 20 ms. The pad is passive rubber (no muscle
+# tone), so here the relaxed hand's 0.10: a critically damped spring of time constant 5 ms (MuJoCo's solref; solimp
+# 0.99-0.999), measured against a pad fixed in space (tests/probe_palm.py; every official ball alike: MuJoCo's contact
+# is mass-normalised): a ball thrown head-on at 1 to 10.4 m/s keeps 0.09 to 0.11 of its speed (0.093 at 10.4 m/s)
+# after 19 ms of contact. Friction 0.7 (rubber on a ball's cover; not separately measured). With elliptic friction
+# cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py) a squeezed or resting
+# ball stays put (tests); with the ball's own rule-book contact (rebound 0.85, a lightly damped spring) instead, a ball
+# squeezed between two palms rattles out of them within a second. Every other contact of the ball keeps its own rule-book rebound.
+PALM_SOLREF, PALM_SOLIMP, PALM_MU, PALM_REBOUND = "0.005 1", "0.99 0.999 0.001", 0.7, 0.10
+CONE, IMPRATIO = "elliptic", 100.0
+
+
+def _joint(w, name: str) -> int:
+    return w.L.JOINTS.index(name + "_joint")
+
+
+def palm_face(w, side: str) -> tuple[np.ndarray, np.ndarray]:
+    """The centre of the pad's palm face (the mount's +x face) and its outward normal, in the world."""
+    d, b = w.d, w.robot.mount[side]
+    R = d.xmat[b].reshape(3, 3)
+    return d.xpos[b] + R @ np.array([PAD_HALF, 0.0, PAD_Z]), R[:, 0].copy()
+
+
+def palm_contact(sc, ball: str, roll: float) -> None:
+    """The palm-ball pairs (both palms) and the world's friction cones."""
+    opt = sc.root.find("option")
+    opt.set("cone", CONE)
+    opt.set("impratio", f"{IMPRATIO:g}")
+    for side in ("left", "right"):
+        ET.SubElement(sc.root.find("contact"), "pair", name=f"palm_ball_{side}", geom1=ball,
+                      geom2=f"{side}_palm_pad", condim="6",
+                      friction=f"{PALM_MU} {PALM_MU} 0.003 {roll} {roll}", solref=PALM_SOLREF,
+                      solimp=PALM_SOLIMP)
+
+
+def ball_on_palm(w) -> None:
+    """t = 0: the robot settled under its start command (the left arm's is PALM_UP, the other joints' their rest),
+    the ball resting on the left palm."""
+    r, d = w.robot, w.d
+    for jn, v in PALM_UP.items():
+        i = _joint(w, jn)
+        r.arb.q_a[i] = r.arb.q_b[i] = v
+    d.qpos[r.fq + 2:r.fq + 7] = SETTLED_Z_QUAT
+    d.qpos[r.qadr] = SETTLED
+    mujoco.mj_kinematics(w.m, d)
+    c, _ = palm_face(w, "left")
+    R = d.xmat[r.mount["left"]].reshape(3, 3)
+    w.put("ball", c + R @ np.array(BALL_ON_PALM))
+# ---- end of the palm ----
+
+
 class Task(TaskBase):
     name = "volleyball-serve"
     title = "Volleyball: serve"
@@ -127,8 +209,14 @@ class Task(TaskBase):
                 "arm after being tossed or released from the hands; one toss only; the server does not touch the "
                 "court or the floor outside the service zone at the hit; the hit comes within 8 s of the whistle)")
     deviations = [
-        "Rule 12.4.1 (tossed or released): the robot has no fingers; the ball starts held on its left fist by the "
-        "simulator's grip and is released by opening it. A referee's eye for 'tossed, then hit' is replaced by "
+        "Rule 12.4.1 (tossed or released from the hand(s)): the robot's hands are flat palm pads without fingers and "
+        "without grip; the ball starts resting on the open left palm, turned up, and only its weight and friction "
+        "keep it there (it rolls off a palm that tilts by more than about 2 degrees or moves sideways). The toss is "
+        "the arm's own movement throwing the ball up off the palm (or letting it fall from it). The ball has left "
+        "the hand when it has touched no part of the robot for {hold_gap_s} s; the release is the end of its last "
+        "contact; until then only the hands may touch it. The palm pad's contact with the ball is that of "
+        "a ball on a human hand (a ball thrown at a still palm keeps " + f"{PALM_REBOUND:.2f}" + " of its speed, as a volleyball dropped onto a supported, relaxed hand does: Ivanova, ISBS 2000), in the world's elliptic friction cones; every other contact keeps the ball's rule-book rebound.",
+        "Rule 12.4.1 (tossed, then hit): a referee's eye for 'tossed, then hit' is replaced by "
         "numbers: after the release the ball must be clear of the robot for at least {toss_free_s} s before the "
         "hit, it may move at most {toss_max_speed_m_s} m/s just before the hit (the speed of a ball that has fallen "
         "about 1.3 m: a toss, not a throw), the hit's contacts last at most {strike_max_s} s, and the ball must "
@@ -142,43 +230,52 @@ class Task(TaskBase):
     stages = ["toss", "hit", "over the net", "in the court"]
     fall_z = 0.35
     params = dict(court_half_length_m=9.0, court_width_m=9.0, net_height_m=2.43, attack_line_m=3.0, end_line_m=0.5,
-                  service_time_s=8.0, release_grace_s=0.10, toss_free_s=0.10, toss_max_speed_m_s=5.0, strike_max_s=0.10,
-                  clear_s=0.03, fall_z_m=0.35)
+                  service_time_s=8.0, hold_gap_s=0.03, release_grace_s=0.10, toss_free_s=0.10, toss_max_speed_m_s=5.0,
+                  strike_max_s=0.10, clear_s=0.03, fall_z_m=0.35)
 
-    sentence = ("Serve the volleyball: from behind the end line, toss it out of your left hand and hit it with one hand "
-                "or arm over the net into the opponent's court.")
+    sentence = ("Serve the volleyball: from behind the end line, toss it up off your open left palm and hit it with "
+                "one hand or arm over the net into the opponent's court.")
     rules = ("You stand behind the end line of an official volleyball court ({court_half_length_m} m by "
              "{court_width_m} m on each side of the net), facing the net, midway between the side lines; the end "
              "line's outer edge is {end_line_m} m ahead of your pelvis and the net is {court_half_length_m} m beyond "
              "it, its top {net_height_m} m high, with an antenna above each side line. A volleyball (0.21 m across, "
-             "0.27 kg, in air) starts gripped on your left fist. In order: (1) the toss: no hand grips the ball any "
-             "more; for {release_grace_s} s from the release the hand that held it may still touch it (it follows "
-             "the toss up; any other touch in that time is already the hit), and the ball must be clear of that "
-             "hand when that time ends. (2) the "
-             "hit: the next contact of the ball, with one hand or one arm of yours (hand, forearm or upper arm of the same side), within "
+             "0.27 kg, in air) starts resting on your open left palm, turned up. Your hands have no fingers and no "
+             "grip (the grip columns of the action rows do nothing in this task): only the ball's weight and "
+             "friction keep it on the palm, and it rolls off a palm that tilts or moves sideways. Until the toss "
+             "only your hands (the palm pads and the wrists) may touch the ball, and the ball may not touch the "
+             "floor. In order: (1) the toss: the ball has touched no part of you for {hold_gap_s} s; the release is "
+             "the end of its last contact with a hand. For {release_grace_s} s from the release the hand that held "
+             "it may still touch it (it follows the toss up; any other touch in that time is already the hit), and "
+             "the ball must be clear of that hand when that time ends. (2) the hit: the next contact of the ball, "
+             "with one hand or one arm of yours (hand, forearm or upper arm of the same side), within "
              "{service_time_s} s of the start. The ball must have been clear of you for at least {toss_free_s} s "
-             "before the hit (counted from the end of the last touch of the toss), moving at most {toss_max_speed_m_s} m/s just before it; the hit's contacts last at "
-             "most {strike_max_s} s (it is over when the ball has been clear of you for {clear_s} s), and the ball "
-             "leaves the hit faster than it arrived. At the first contact of the hit no foot of yours touches the "
-             "court (the end line included) or the floor beyond the extensions of the side lines; if you are in the "
-             "air, this holds for where you took off. (3) the ball crosses the net's plane above the net and between "
-             "the antennas; it may touch the net. (4) the ball's first contact with the floor is in the opponent's "
-             "court ({court_half_length_m} m by {court_width_m} m, lines included): that is the success. You fail if "
-             "the hit does not come within {service_time_s} s, if after the toss the ball touches the floor or any "
-             "other part of you before the hit, if it is hit before it has been clear for {toss_free_s} s, if it "
-             "moves faster than {toss_max_speed_m_s} m/s just before the hit, if the hit is made with more than one "
-             "arm or another part, lasts longer than {strike_max_s} s or does not add speed, if you touch the ball "
-             "again or grip it again, at a foot fault, if the ball crosses the net's plane under the net or outside "
-             "the antennas or touches an antenna, if it lands anywhere else, if you fall (your pelvis lower than "
-             "{fall_z_m} m above the floor, or any part of you other than the feet on the floor), or after "
-             "{time_limit_s} s.")
-    venue = ("You face the net (+x), which is 9.5 m ahead of you, from the middle of the service zone. The ball sits "
-             "on your left fist, beyond its knuckles, the forearm level and pointing forward; opening the left grip "
-             "(grip_left below 0.5) releases it there.")
-    difficulty = ("The ball has to leave the hit at about 11 m/s (10.8 m/s from 2.2 m up, 11.5 m/s underarm from 1 m) to "
-                  "clear a 2.43 m net 9 m away and still come down inside the far court: a fist at 6 to 7 m/s, about "
-                  "the most a full swing of this arm gives, through a ball the robot has tossed itself, at the right "
-                  "instant, on a 67 kg robot whose stand has no balance feedback.")
+             "before the hit (counted from the end of the last touch of the toss), moving at most "
+             "{toss_max_speed_m_s} m/s just before it; the hit's contacts last at most {strike_max_s} s (it is over "
+             "when the ball has been clear of you for {clear_s} s), and the ball leaves the hit faster than it "
+             "arrived. At the first contact of the hit no foot of yours touches the court (the end line included) or "
+             "the floor beyond the extensions of the side lines; if you are in the air, this holds for where you "
+             "took off. (3) the ball crosses the net's plane above the net and between the antennas; it may touch "
+             "the net. (4) the ball's first contact with the floor is in the opponent's court ({court_half_length_m} "
+             "m by {court_width_m} m, lines included): that is the success. You fail if the hit does not come within "
+             "{service_time_s} s, if after the toss the ball touches the floor or any other part of you before the "
+             "hit, if it is hit before it has been clear for {toss_free_s} s, if it moves faster than "
+             "{toss_max_speed_m_s} m/s just before the hit, if the hit is made with more than one arm or another "
+             "part, lasts longer than {strike_max_s} s or does not add speed, if you touch the ball again or hold it "
+             "again, if a part of you other than the hands touches it before the toss, at a foot fault, if the ball "
+             "crosses the net's plane under the net or outside the antennas or touches an antenna, if it lands "
+             "anywhere else, if you fall (your pelvis lower than {fall_z_m} m above the floor, or any part of you "
+             "other than the feet on the floor), or after {time_limit_s} s.")
+    venue = ("You face the net (+x), which is 9.5 m ahead of you, from the middle of the service zone. Your upper "
+             "arms hang and your forearms point forward; the left forearm is turned palm up (its elbow roll at -90 "
+             "degrees) and the ball rests on the middle of the left palm, its centre about 1.3 m above the floor, "
+             "0.43 m ahead of your pelvis and 0.21 m to its left. The start command keeps the palm level under the "
+             "ball (the joint table's start angles are where the arm stands with the ball on it; the command differs "
+             "from them by the arm's sag).")
+    difficulty = ("The ball has to leave the hit at about 11 m/s (10.8 m/s from 2.2 m up, 11.5 m/s underarm from 1 "
+                  "m) to clear a 2.43 m net 9 m away and still come down inside the far court: a fist at 6 to 7 m/s, "
+                  "about the most a full swing of this arm gives, through a ball the robot has tossed itself off a "
+                  "flat palm (straight up: a palm that moves sideways leaves the ball behind), at the right instant, "
+                  "on a 67 kg robot whose stand has no balance feedback.")
 
     def configure(self, params):
         super().configure(params)
@@ -192,19 +289,12 @@ class Task(TaskBase):
     def build(self, sc):
         p, g = self.p, self.geometry()
         build_court(sc, p, g["centre"], g["yaw"])
-        sc.ball("ball", "volleyball", (0.5, 0.2, 1.3), grippable=True)
+        sc.ball("ball", "volleyball", (0.5, 0.2, 1.3))           # no grip: the ball is not grippable
+        palm_contact(sc, "ball", BALL["roll"])
         sc.camera("venue", (-6.0, -8.0, 5.5), (g["centre"][0] - 2.0, 0.0, 1.0), fovy=62)
 
     def reset(self, w):
-        m, d = w.m, w.d
-        mujoco.mj_kinematics(m, d)
-        b = w.robot.mount["left"]
-        R = d.xmat[b].reshape(3, 3)
-        w.put("ball", d.xpos[b] + R @ np.array([0.0, 0.0, 0.105 + BALL["radius"]]))
-        w.grab("left", "ball", event=False)
-
-    def may_grip(self, w, side, name):
-        return self.trackers.get("released") is None        # one toss: once released, the ball may not be gripped
+        ball_on_palm(w)
 
     # ------------------------------------------------------------------ the referee
     def referee_reset(self, w, ref):
@@ -213,7 +303,8 @@ class Task(TaskBase):
         self.net = ref.geoms(body="net")
         self.antennas = ref.geoms(prefix="net_antenna")
         self.feet = ref.part("feet")
-        self.trackers = {"released": None, "tosser": ["left_hand"], "free_t": None, "strike": None, "flights": Flights(ref, min_air=0.0, also_allowed=self.ball),
+        self.trackers = {"released": None, "tosser": ["left_hand"], "last_on": 0.0, "free_t": None, "strike": None,
+                         "flights": Flights(ref, min_air=0.0, also_allowed=self.ball),
                          "plane": Crossing((1, 0, 0), g["centre"][0], direction=1)}
 
     def _foot_fault(self, w, ref):
@@ -231,12 +322,19 @@ class Task(TaskBase):
     def substep(self, w, ref):
         p, g, tr = self.p, self.geometry(), self.trackers
         tr["flights"].update()
-        if tr["released"] is None:
-            if w.holder("ball"):
-                tr["tosser"] = sorted(f"{s}_hand" for s in w.holder("ball"))
-            else:
-                tr["released"] = ref.time
-                ref.stage("toss")
+        if tr["released"] is None:                           # the ball on the hand(s): nothing but contact holds it
+            if ref.touching(self.ball, ref.ground):
+                return ref.fail("the ball touched the floor before the hit")
+            if ref.touching(self.ball, ref.robot_mask):
+                parts = ref.parts_touching(self.ball)
+                if not parts <= HANDS:
+                    return ref.fail("the ball was held with a part other than the hands", parts=sorted(parts))
+                tr["tosser"] = sorted(set(tr["tosser"]) | parts)
+                tr["last_on"] = ref.time
+            elif ref.time - tr["last_on"] >= p["hold_gap_s"] - 1e-9:
+                # clear of every hand for hold_gap_s: the ball has left the hand at the end of its last contact
+                tr["released"] = tr["free_t"] = tr["last_on"]
+                ref.stage("toss", at=round(tr["last_on"], 3), speed=round(float(np.linalg.norm(w.vel("ball"))), 2))
             return
         b, v = w.pos("ball"), w.vel("ball")
         on = ref.touching(self.ball, ref.robot_mask)

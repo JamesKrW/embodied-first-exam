@@ -12,7 +12,7 @@ instance not rebuilt at the episode's start (`instance_mismatch`, before the age
 for the hook, no record of the live episode (episode.json), GPU faults in the live episode's physics (`live_gpu_faults`:
 PhysX kernels that failed to launch, CUDA out of memory). A give-up after crashes inside the agent's calls
 (`sim_crashed_on_call`) and a simulator error raised during the agent's calls (reason "error", `sim_error`) stay the
-agent's 0. The video never decides anything (`video_rendered`)."""
+agent's 0, even after a success the episode had reached (PROTOCOL §4). The video never decides anything (`video_rendered`)."""
 import json, os, shutil, traceback
 LOG = os.environ.get("RCB_VERIFIER_LOG_DIR", "/logs/verifier"); DATA = os.environ.get("RCB_DATA", "/data")
 os.makedirs(LOG, exist_ok=True)
@@ -38,14 +38,15 @@ def num(k):
     except (TypeError, ValueError): return 0.0
 unfinished = not d.get("finalized")                        # the collect hook never completed final.json
 infra = bool(d.get("infra_error")) or unfinished
-ok = bool(d.get("success")) and not infra
+sim_error = d.get("reason") == "error"                     # PROTOCOL §4: a simulator error is the agent's 0, whatever success came before
+ok = bool(d.get("success")) and not infra and not sim_error
 write(ok, {"success": int(ok), "live_success": int(bool(d.get("success"))), "graded_by_live": 1, "replays": 0,
            "finalized": int(not unfinished), "missing_log": 0, "n_actions": int(num("n_actions")), "sim_steps": int(num("control_steps")),
            "physics_steps": int(num("physics_steps")), "steps": int(num("steps")), "elapsed_s": num("elapsed_s"),
            "episode_timeout": int(d.get("reason") == "episode_timeout"), "time_up": int(d.get("reason") == "time_up"),
            "live_gpu_faults": int(num("live_gpu_faults")), "hold_pad_rows": int(num("hold_pad_rows")),
            "determinism_verdict_mode": int(bool(d.get("determinism_verdict_mode"))), "video_rendered": int(bool(d.get("video"))),
-           "sim_error": int(d.get("reason") == "error"),   # a simulator error during the agent's calls: the agent's 0
+           "sim_error": int(sim_error),   # a simulator error during the agent's calls: the agent's 0
            "instance_mismatch": int(bool(d.get("instance_mismatch"))), "instance_exact": int(bool(d.get("instance_exact"))),
            "grader_error": 0,
            # an infrastructure failure, not the agent's (PROTOCOL §2.6): see the module docstring

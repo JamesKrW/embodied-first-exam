@@ -940,7 +940,10 @@ def make_handler(svc: Service):
             if self.path == "/kinematics":          # stateless: never steps physics, never waits for the episode lock
                 cid = ep.call_begin(self.path) if ep else 0
                 try:
-                    req = parse_kinematics(meta, svc.spec["kinematics"])
+                    try:
+                        req = parse_kinematics(meta, svc.spec["kinematics"])
+                    except (TypeError, OverflowError) as exc:   # wrong-typed fields (a string for q, a list for max_iters)
+                        raise ValueError(f"malformed kinematics request: {exc}") from None
                     out = svc.kinematics(req); svc.kin_calls += 1
                 except ValueError as exc:
                     return self._json(400, {"error": str(exc)[:300]})

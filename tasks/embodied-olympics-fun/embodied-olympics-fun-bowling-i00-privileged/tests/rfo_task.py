@@ -1,7 +1,9 @@
 """Ten-pin bowling (USBC): from the approach, deliver the ball down the official lane without fouling and knock down
-all ten pins with it: a strike. Lane, gutters, pin deck, pins and oil pattern from RoboOlympics' bowling simulator; a
-6 lb ball; the Unitree H1-2."""
+all ten pins with it: a strike. No grip and no finger holes: the 6 lb ball is held only by pressing it between the two
+bare palms (contact and friction), a two-handed delivery. Lane, gutters, pin deck, pins and oil pattern from
+RoboOlympics' bowling simulator; the Unitree H1-2."""
 import math
+import xml.etree.ElementTree as ET
 
 import mujoco
 import numpy as np
@@ -42,14 +44,74 @@ def pin_inertia(mass: float, height: float):
     return float((dm * (r ** 2 / 4 + (zs - PIN_COM_Z) ** 2)).sum() * s), float((0.5 * dm * r ** 2).sum() * s)
 
 
-def set_arm(w, **angles) -> None:
-    """Put arm joints (names without "_joint") at angles for t = 0, and their held targets with them."""
+# ---- the two-palm hold: the palm-ball contact (the pairs' XML is in build()); the bowling ball's own contact,
+# rebound 0.10, stays on the lane, the gutters and the pins ----
+PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness and its centre along the forearm
+# The palm-ball contact. The palm pad is the hand's rubber on a rigid mount; its contact with a ball is given the
+# restitution of a ball on a supported human hand: Ivanova, "Energy transfer evaluation in the 'striker-ball' system
+# during impact", ISBS 2000 (18th International Symposium on Biomechanics in Sports, Hong Kong), Table 1: a volleyball
+# dropped 5.5 m (10.4 m/s) onto the hand of a player whose wrist rests on a table keeps 0.10 of its speed with the hand
+# relaxed, 0.14 strained, 0.17 as a clenched fist; ball impacts last 5 to 20 ms. The pad is passive rubber (no muscle
+# tone), so here the relaxed hand's 0.10: a critically damped spring of time constant 5 ms (MuJoCo's solref; solimp
+# 0.99-0.999), measured against a pad fixed in space (tests/probe_palm.py; every official ball alike: MuJoCo's contact
+# is mass-normalised): a ball thrown head-on at 1 to 10.4 m/s keeps 0.09 to 0.11 of its speed (0.093 at 10.4 m/s)
+# after 19 ms of contact. Friction 0.7 (rubber on a ball's cover; not separately measured). With elliptic friction
+# cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py) a squeezed or resting
+# ball stays put (tests); with the ball's own rule-book contact (rebound 0.85, a lightly damped spring) instead, a ball
+# squeezed between two palms rattles out of them within a second. Every other contact of the ball keeps its own rule-book rebound.
+PALM_SOLREF, PALM_SOLIMP, PALM_MU, PALM_REBOUND = "0.005 1", "0.99 0.999 0.001", 0.7, 0.10
+CONE, IMPRATIO = "elliptic", 100.0
+
+# ---- end of the palm-ball contact ----
+
+
+def pad_face(w, side: str) -> tuple[np.ndarray, np.ndarray]:
+    """The centre of the pad's inner face (the mount's +x face) and its outward normal, in the world."""
+    d, b = w.d, w.robot.mount[side]
+    R = d.xmat[b].reshape(3, 3)
+    return d.xpos[b] + R @ np.array([PAD_HALF, 0.0, PAD_Z]), R[:, 0].copy()
+
+
+
+# ---- the hold at the start (this family's: a 2.72 kg ball, 0.218 m across, in front of the hips) ----
+# The two-handed stance: upper arms a little back, forearms forward and down, turned in (shoulder yaw) until both pads
+# touch the ball in front of the hips (HOLD, the right arm; the left one mirrored); the hold targets (the start
+# command) are SQUEEZE further in, so the shoulder servos press the ball: nothing else holds it. The arms have no
+# gravity feed-forward, so under that command they sag to SETTLED (measured: 4 s of the start command, twice): the
+# robot starts there, the ball where it then sits (BALL_OFFSET from the middle between the two pads).
+# Measured (tests/test_bowling.py; the PNG/MP4 script of the family's report): the start command presses
+# about 45 N on each palm (a still ball needs 19 N at the palms' friction 0.7) and holds the ball for the whole
+# 40 s episode, and under an extra 1.6 g; without the squeeze (the arms at the touching pose) the ball slips out of
+# the palms within 0.2 s. Held higher, at the waist or the chest (0.3 to 0.45 m ahead of the pelvis), the 2.7 kg ball
+# tips the H1-2's open-loop stance over within 3 to 12 s; here (0.19 m ahead) the body leans and sways (pelvis pitch
+# 0 to 4 degrees) and turns about 0.27 rad on its feet during the first 4 s, then stands for the whole episode.
+HOLD = dict(shoulder_pitch=0.30, shoulder_roll=0.0, shoulder_yaw=0.2320, elbow_pitch=0.40)
+SQUEEZE = dict(shoulder_yaw=0.25, shoulder_roll=0.10)
+SETTLED = dict(shoulder_pitch=0.3128, shoulder_roll=0.0111, shoulder_yaw=0.2240, elbow_pitch=0.4361,
+               elbow_roll=-0.0140, wrist_pitch=0.0487, wrist_yaw=-0.1577)
+BALL_OFFSET = (-0.0078, -0.0001, 0.0009)
+MIRROR = ("shoulder_roll", "shoulder_yaw", "elbow_roll", "wrist_yaw")      # the joints whose sign flips on the left
+
+def _joint(w, name: str) -> int:
+    return w.L.JOINTS.index(name + "_joint")
+
+
+def ball_between_palms(w, settled=None, targets=None) -> None:
+    """t = 0: both arms at SETTLED (mirrored on the left), the ball between the pads; the targets (the start command)
+    are HOLD + SQUEEZE."""
     r, d = w.robot, w.d
-    for name, v in angles.items():
-        i = w.L.JOINTS.index(name + "_joint")
-        d.qpos[r.qadr[i]] = v
-        r.arb.q_a[i] = r.arb.q_b[i] = v
+    settled = SETTLED if settled is None else settled
+    if targets is None:
+        targets = {jn: HOLD.get(jn, 0.0) + SQUEEZE.get(jn, 0.0) for jn in set(HOLD) | set(SQUEEZE) | set(settled)}
+    for side in ("right", "left"):
+        for jn in set(settled) | set(targets):
+            s = -1.0 if side == "left" and jn in MIRROR else 1.0
+            i = _joint(w, f"{side}_{jn}")
+            d.qpos[r.qadr[i]] = s * settled.get(jn, targets.get(jn, 0.0))
+            r.arb.q_a[i] = r.arb.q_b[i] = s * targets.get(jn, 0.0)
     mujoco.mj_kinematics(w.m, d)
+    c = [f + BALL["radius"] * n for f, n in (pad_face(w, "right"), pad_face(w, "left"))]
+    w.put("ball", (c[0] + c[1]) / 2 + np.array(BALL_OFFSET))
 
 
 class Task(TaskBase):
@@ -60,11 +122,18 @@ class Task(TaskBase):
     rulebook = ("USBC Playing Rules 2024-2025 and USBC Equipment Specifications: the lane (60 ft from the foul line "
                 "to the head pin, 41.5 in wide, gutters, pin deck), the pins (15 in, 3 lb 6 oz, 12 in apart), the "
                 "ball (at most 8.595 in and 16 lb); the playing rules on a strike, a legal delivery, the foul (Rule "
-                "5) and legal and illegal pinfall")
+                "5) and legal and illegal pinfall. The rules do not say how the ball is held or with how many hands: "
+                "a two-handed delivery is legal")
     deviations = [
-        "Equipment (ball): the hand holds the ball by a grip switched on and off, which stands for the finger holes "
-        "(the ball hangs from the end of the hand); a uniform ball, no weight block; it is released when the grip is "
-        "switched off.",
+        "Equipment (ball) and the hands: the hands are flat rubber palm pads without fingers and the ball has no "
+        "finger holes (a uniform ball, no weight block). Nothing grips it: it is held only by pressing it between "
+        "the palms (contact and friction), a two-handed hold, and it slips or drops when the arms do not press hard "
+        "enough. It is released when it has touched no part of you for {release_s} s.",
+        "Equipment (the hand): the palm pads' contact with the ball is that of a ball on a human hand (a ball "
+        "thrown at a still palm keeps " + f"{PALM_REBOUND:.2f}" + " of its speed, as a volleyball dropped onto a "
+        "supported, relaxed hand does: Ivanova, ISBS 2000; friction " + f"{PALM_MU:g}" + "); the world has elliptic friction cones and an impedance ratio of " + f"{IMPRATIO:g}" + " "
+        "(MuJoCo settings that make a squeezed ball stay put; they apply to every contact, the lane's and the pins' "
+        "too). The lane, the gutters and the pins keep their own contact parameters.",
         "Equipment (pins): each pin is six stacked cylinders and capsules that follow the official profile, with the "
         "official mass, centre of gravity and the profile's moments of inertia.",
         "Lane condition: RoboOlympics' house pattern as friction zones (oil, friction {mu_oil}, for {oil_length_m} m "
@@ -78,43 +147,52 @@ class Task(TaskBase):
         "One ball: the task is the first ball of a frame.",
     ]
     time_limit_s = 40.0
-    start = (-0.60, 0.30, 0.0)
+    start = (-0.60, 0.0, 0.0)
     stages = ["delivery", "pins", "strike"]
     fall_z = LANE_Z + 0.50
     params = dict(lane_length_m=18.288, lane_width_m=1.0541, gutter_width_m=0.235, gutter_depth_m=0.047,
                   approach_length_m=4.572, pin_spacing_m=0.3048, pin_height_m=0.381, pin_mass_kg=1.53,
                   ball_mass_kg=BALL["mass"], ball_diameter_m=2 * BALL["radius"], oil_length_m=13.5, mu_oil=0.040,
-                  mu_dry=0.20, pin_down_tilt_deg=20.0, settle_s=5.0, retouch_grace_s=0.20, fall_pelvis_m=0.50)
+                  mu_dry=0.20, pin_down_tilt_deg=20.0, settle_s=5.0, release_s=0.05, fall_pelvis_m=0.50)
 
-    sentence = ("Bowl a strike: from behind the foul line, deliver the ball that hangs from your right hand down the "
-                "lane so that all ten pins are knocked down.")
+    sentence = ("Bowl a strike: from behind the foul line, deliver the ball you hold pressed between your two palms "
+                "down the lane so that all ten pins are knocked down.")
     rules = ("The lane is {lane_width_m} m wide and runs {lane_length_m} m from the foul line to the head pin's spot, "
              "with a gutter {gutter_width_m} m wide and {gutter_depth_m} m deep on each side; behind the foul line "
              "the approach, level with the lane, is {approach_length_m} m long. Ten pins ({pin_height_m} m tall, "
              "{pin_mass_kg} kg each) stand in the triangle of four rows, {pin_spacing_m} m apart, its point towards "
-             "you. The ball ({ball_diameter_m} m across, {ball_mass_kg} kg) hangs from your right hand. The lane is "
-             "oiled (friction {mu_oil}) for the first {oil_length_m} m in its middle, less far on its outside boards, "
-             "and dry (friction {mu_dry}) beyond. A delivery: you let go of the ball (once: it cannot be gripped "
-             "again) and it crosses the foul line. It is a foul if any part of you touches the lane, a gutter or "
-             "anything else on or beyond the foul line, at any time. Pins count only if the ball reaches them on the "
-             "lane: a ball that touches a gutter before it has touched a pin knocks down nothing. A pin is down when "
-             "it is tilted more than {pin_down_tilt_deg} degrees or is no longer on the lane's surface; the pins are "
-             "counted {settle_s} s after the ball first touches one. You succeed with a strike: all ten pins down. "
-             "You fail on a foul; on a gutter ball; if fewer than ten pins are down at the count; if any part of you "
-             "touches the ball after the release (your right arm may still brush it during the first "
-             "{retouch_grace_s} s); if you fall before the count (your pelvis lower than {fall_pelvis_m} m above the "
-             "approach, or any part of you other than your feet on the approach or the floor); or after "
-             "{time_limit_s} s.")
-    venue = ("You stand on the approach facing the pins (+x), your pelvis 0.60 m behind the foul line and 0.30 m to "
-             "the left of the lane's centre line; your right arm hangs straight down, a little away from the leg, the "
-             "ball under its hand about 0.07 m to the right of the centre line. The approach and the lane are "
-             f"{LANE_Z:g} m above the building's floor, which surrounds the approach. " + "The head pin is "
-             "{lane_length_m} m beyond the foul line on the centre line. The ball is released when the hand's grip is "
-             "switched off.")
+             "you. The ball ({ball_diameter_m} m across, {ball_mass_kg} kg, no finger holes) starts pressed between "
+             "your two palms. Your hands have no fingers and no grip: only the force of your arms and friction hold "
+             "the ball, and it can slip out. Until the release the ball may touch no part of you but your hands (the "
+             "palm pads and the wrists; either or both). The release: the ball has touched no part of you for "
+             "{release_s} s (it is released at its last touch); after that no part of you may touch it again. The "
+             "lane is oiled (friction {mu_oil}) for the first {oil_length_m} m in its middle, less far on its "
+             "outside boards, and dry (friction {mu_dry}) beyond. A delivery: the released ball crosses the foul "
+             "line. It is a foul if any part of you touches the lane, a gutter or anything else on or beyond the foul "
+             "line, at any time. Pins count only if the ball reaches them on the lane: a ball that touches a gutter "
+             "before it has touched a pin knocks down nothing. A pin is down when it is tilted more than "
+             "{pin_down_tilt_deg} degrees or is no longer on the lane's surface; the pins are counted {settle_s} s "
+             "after the ball first touches one. You succeed with a strike: all ten pins down. You fail on a foul; on "
+             "a gutter ball; if fewer than ten pins are down at the count; if the ball touches a part of you other "
+             "than a hand before the release; if any part of you touches the ball after the release; if you fall "
+             "before the count (your pelvis lower than {fall_pelvis_m} m above the approach, or any part of you "
+             "other than your feet on the approach or the floor); or after {time_limit_s} s.")
+    venue = ("You stand on the approach facing the pins (+x), your pelvis 0.60 m behind the foul line on the lane's "
+             "centre line. The ball is pressed between your two palms in front of your hips, its centre about "
+             "0.82 m above the approach and 0.19 m ahead of your pelvis: your upper arms are a little back, your "
+             "forearms point forwards and down and are turned in so that the palms squeeze it; the start command "
+             "keeps that squeeze (the joint table's start angles are a little further in than the arms stand: the "
+             "difference is the squeeze). Under the ball's weight your standing body leans forwards a little and "
+             "sways. "
+             "The approach and the lane are " + f"{LANE_Z:g} m above the building's floor, which surrounds the "
+             "approach. " + "The head pin is {lane_length_m} m beyond the foul line on the centre line. Your hands "
+             "have no grip: the grip columns of the action rows do nothing in this task.")
     difficulty = ("A strike needs the ball in the pocket beside the head pin, a few centimetres wide, after 18 m of "
                   "lane on which it slides on the oil and grips on the dry boards; a 6 lb ball is deflected by the "
-                  "pins more than a heavy one, so it must also arrive fast. Nothing but the release aims it, and the "
-                  "body may not cross the foul line.")
+                  "pins more than a heavy one, so it must also arrive fast. The 2.7 kg ball is held only by the "
+                  "squeeze of two fingerless palms, which the swing's speed and the ball's weight pull apart, both "
+                  "hands have to let go of it at the same moment without steering it off its line, and the body may "
+                  "not cross the foul line.")
 
     # ------------------------------------------------------------------ the venue
     def pin_spots(self):
@@ -196,8 +274,15 @@ class Task(TaskBase):
                 sc.geom(b, f"pin{i + 1}_{k}", type=typ, fromto=(0, 0, z0 * IN, 0, 0, z1 * IN), size=(r * IN,), **pin)
             sc.geom(b, f"pin{i + 1}_band", type="cylinder", fromto=(0, 0, 10.0 * IN, 0, 0, 10.5 * IN), size=(0.93 * IN,),
                     rgba=(0.8, 0.05, 0.05, 1), mass=0, **VISUAL)
-        sc.ball("ball", "bowling", (-0.6, 0.0, H + 0.6), grippable=True, mass=p["ball_mass_kg"],
+        sc.ball("ball", "bowling", (-0.15, 0.0, H + 1.2), mass=p["ball_mass_kg"],      # no grip: not grippable
                 radius=p["ball_diameter_m"] / 2)
+        opt.set("cone", CONE)                                               # the two-palm hold
+        opt.set("impratio", f"{IMPRATIO:g}")
+        for side in ("left", "right"):
+            ET.SubElement(sc.root.find("contact"), "pair", name=f"palm_ball_{side}", geom1="ball",
+                          geom2=f"{side}_palm_pad", condim="6",
+                          friction=f"{PALM_MU} {PALM_MU} 0.003 {BALL['roll']} {BALL['roll']}", solref=PALM_SOLREF,
+                          solimp=PALM_SOLIMP)
         sc.camera("venue", (-3.2, -2.6, 2.3), (4.0, 0.0, 0.2), fovy=55)
         sc.camera("pins", (head - 2.6, -1.3, 1.4), (head + 0.4, 0.0, 0.25), fovy=45)
 
@@ -206,24 +291,21 @@ class Task(TaskBase):
         d.qpos[w.robot.fq + 2] += H                           # the robot stands on the approach
         for i, (x, y) in enumerate(self.spots):
             w.put(f"pin{i + 1}", (x, y, H))
-        set_arm(w, right_elbow_pitch=1.57, right_shoulder_roll=-0.22)
-        b = w.robot.mount["right"]
-        w.put("ball", d.xpos[b] + d.xmat[b].reshape(3, 3) @ np.array([0.0, 0.0, 0.105 + self.p["ball_diameter_m"] / 2]))
-        w.grab("right", "ball", event=False)
+        ball_between_palms(w)
 
     # ------------------------------------------------------------------ the referee
     def referee_reset(self, w, ref):
         self.ball = ref.geoms(body="ball")
         self.robot = ref.part("robot")
-        self.arm = ref.part("right_arm")
-        self.not_arm = self.robot & ~self.arm
+        self.hands = ref.part("hands")
+        self.not_hands = self.robot & ~self.hands
         self.pins = ref.geoms(prefix="pin")
         self.gutters = ref.geoms(names=["gutterL", "gutterR"])
         self.pin_ids = [w.m.body(f"pin{i + 1}").id for i in range(10)]
-        self.trackers = {"released": None, "t_pins": None, "down": 0, "v_before": [0.0, 0.0, 0.0]}
+        self.trackers = {"released": None, "last_touch": 0.0, "t_pins": None, "down": 0, "v_before": [0.0, 0.0, 0.0]}
 
     def may_grip(self, w, side, name):
-        return False                                          # held from t = 0; once let go it cannot be gripped again
+        return False                                          # nothing is grippable: no grip exists in this task
 
     def pins_down(self, w) -> list[bool]:
         """RoboOlympics' pin-down rule: tilted more than the limit, or off the lane's surface."""
@@ -245,14 +327,18 @@ class Task(TaskBase):
                             parts=sorted(ref.parts_touching(~self.robot & ~self.ball)))
         if tr["t_pins"] is not None:
             return
-        held = bool(w.holder("ball"))
         if tr["released"] is None:
-            if not held:
-                tr["released"] = ref.time
-                ref.metrics["release_speed_m_s"] = round(float(np.linalg.norm(w.vel("ball"))), 2)
-            return
-        if (ref.touching(self.ball, self.not_arm)
-                or (ref.time - tr["released"] > p["retouch_grace_s"] and ref.touching(self.ball, self.arm))):
+            if ref.touching(self.ball, self.not_hands):
+                return ref.fail("the ball touched a part other than the hands before the release",
+                                parts=sorted(ref.parts_touching(self.ball) - {"left_hand", "right_hand"}))
+            if ref.touching(self.ball, self.hands):
+                tr["last_touch"] = round(ref.time, 4)
+                return
+            if ref.time - tr["last_touch"] < p["release_s"] - 1e-9:
+                return
+            tr["released"] = tr["last_touch"]
+            ref.metrics["release_speed_m_s"] = round(float(np.linalg.norm(w.vel("ball"))), 2)
+        if ref.touching(self.ball, self.robot):
             return ref.fail("the ball was touched after the release", parts=sorted(ref.parts_touching(self.ball)))
         x, y, _ = w.pos("ball")
         if not ref.has("delivery") and x > 0.0:
@@ -282,6 +368,8 @@ class Task(TaskBase):
                 ref.fail("not a strike", pins_down=tr["down"], standing=[i + 1 for i, d in enumerate(down) if not d])
 
     def privileged(self, w):
-        return {"ball": w.pos("ball").tolist(), "ball_velocity": w.vel("ball").tolist(), "held": bool(w.holder("ball")),
+        tr = self.trackers
+        return {"ball": w.pos("ball").tolist(), "ball_velocity": w.vel("ball").tolist(),
+                "hands_on_ball": bool(w.ref.touching(self.ball, self.hands)), "released": tr["released"] is not None,
                 "pins": [w.d.xpos[b].tolist() for b in self.pin_ids], "pins_down": self.pins_down(w),
                 "lane_surface_z": LANE_Z}

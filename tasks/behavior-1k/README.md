@@ -67,8 +67,8 @@ One manual step, the dataset; the simulator image builds itself.
   image `images/behavior-files/`. The task Dockerfiles take them with `COPY --from=<image@digest>`: the privileged agent
   image at `/opt/tools/`, both modes' verifier images at `/tests/` (`grade.py`, and the privileged one's tooling and robot
   config), and the standard sidecar's image, built from `environment/sim/` (its `Dockerfile`), at `/srv` from
-  `images/behavior-1k-sim-files/` (the sidecar's shared files: this tooling, the service, the 2.2 layer from
-  `images/standard-sim-files/`); the task dirs carry no copy.
+  the same `images/behavior-files/` (it also carries the sidecar's shared files: this tooling and the service; the 2.2 layer
+  comes from `images/standard-files/`); the task dirs carry no copy.
   A changed file needs a new image version (`VERSION`, `python3 scripts/files_image.py build behavior-files`, push, `pin`
   the digest) and the new digest in every task's `COPY --from` lines; `files_image.py check` holds the source to
   FILES.json.

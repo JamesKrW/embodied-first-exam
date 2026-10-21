@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-hurdles-i00-privileged"
-description = "Embodied Olympics hurdles (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Run the 50 m hurdles: go over all four hurdles in your lane, never beside one or under its top, and bring your torso to the finish line. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics hurdles (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Run the women's 50 m hurdles: go over all four 0.838 m hurdles in your lane, never beside one or under its top, and bring your torso to the finish line. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "hurdles"]
 
@@ -19,9 +19,9 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
-expert_time_estimate_hours = 8.0
+expert_time_estimate_hours = 80.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (the H1-2 given 2.0 m/s forward and 5.5 m/s up over each standing 1.067 m hurdle, a real walk to the line); negatives: knocked with a hand, arm or trunk, under the top, beside the hurdle, a leg beside it, left the lane, down. The H1-2's pelvis stands at 1.035 m and walks at 0.7 m/s (50 m alone is 71 s of the 140 s); nothing known lifts it over the bar; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_hurdles.py: positive by injection (a clearance over each of the four 0.838 m hurdles at the women's 50 m indoor marks is injected, then a real walk to the line); the free-standing hurdle topples at 3.81 kgf, not 3.79, in physics and does not creep; a knock with the feet is legal; negatives: walking in (the feet under the bar), a push with the hands (a fail under TR 22.6.2), a flattened hurdle, beside the hurdle, a leg beside it, left the lane, down. the H1-2's standing pelvis (1.035 m) is above the 0.838 m top, and under TR 22.7 a hurdle knocked by the legs is legal, so a step-over one foot at a time may count; no controller for it was found; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

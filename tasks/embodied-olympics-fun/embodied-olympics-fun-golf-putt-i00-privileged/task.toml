@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-golf-putt-i00-privileged"
-description = "Embodied Olympics golf-putt (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Hole the 3.0 m putt: with one stroke of the putter in your right hand, roll the golf ball that lies on the green into the hole. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics golf-putt (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Hole the 3.0 m putt: with one stroke of the putter held in your right hand's gripper, roll the golf ball that lies on the green into the hole, without letting go of the putter. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "golf-putt"]
 
@@ -19,9 +19,9 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
-expert_time_estimate_hours = 3.0
+expert_time_estimate_hours = 6.0
 oracle = "full"
-oracle_evidence = "Reference: a pendulum stroke from the shoulder that holes the 3 m putt; 16 of 16 perturbed runs when it was written. The hole takes a centred ball up to 1.48 m/s. Measured: success after 17.18 s of the 30 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "one Dex1-1 across the grip; club starts hanging (level it turns 23-25 deg in the jaws); two-hand address unreachable by IK; reference carries the club shaft-vertical and swings by wrist roll: holed at 17.3 s, 10/12 perturbations Measured: success after 17.3 s of the 30 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

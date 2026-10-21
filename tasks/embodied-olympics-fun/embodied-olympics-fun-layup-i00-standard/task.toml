@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-layup-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics layup on the same frozen instance as embodied-olympics-fun-layup-i00-privileged. Make a layup: with the basketball in your right hand take at most two steps towards the basket, jump, and let go of the ball in the air close to the ring so that it enters the basket from above. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics layup on the same frozen instance as embodied-olympics-fun-layup-i00-privileged. Make a layup: with the basketball pressed between your two palms take at most two steps towards the basket, jump, and let go of the ball in the air close to the ring so that it enters the basket from above. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "layup"]
 
@@ -32,9 +32,9 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 50
-expert_time_estimate_hours = 10.0
+expert_time_estimate_hours = 12.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a real arm raise and two real walking steps, a 2.6 m/s ghost take-off, a real release in flight with a 4.4 m/s toss set at the release); negatives: a third step, the same foot twice, not in the air, in the air without a take-off, too far from the ring, a miss, touched again, from below, a fall. The H1-2 has no jump; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_layup.py: positive by injection (a real two-palm squeeze raised overhead in stand mode and carried through two real walking steps, robot and ball teleported together and given the same 2.6 m/s ghost take-off, the palms really opened at the apex (release judged by contact), a toss set once the ball is clear of both palms); negatives: a third step, the same foot twice, a release/slip from the floor (no squeeze: out in 0.03 s; one palm: 0.09 s), in the air without a take-off, too far, a miss, caught again, from below, held ball on the floor, held against the chest, a shuffle, a fall; grip columns do nothing. The H1-2 has no jump; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

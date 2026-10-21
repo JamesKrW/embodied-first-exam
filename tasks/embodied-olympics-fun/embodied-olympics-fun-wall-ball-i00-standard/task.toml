@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-wall-ball-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics wall-ball on the same frozen instance as embodied-olympics-fun-wall-ball-i00-privileged. Throw the tennis ball in your right hand at the target circle on the wall and catch the rebound with a hand before it touches the ground, and keep hold of it. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics wall-ball on the same frozen instance as embodied-olympics-fun-wall-ball-i00-privileged. Throw the tennis ball held in your right gripper at the target circle on the wall and catch the rebound in a gripper before it touches the ground, and keep hold of it. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "wall-ball"]
 
@@ -32,9 +32,9 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 50
-expert_time_estimate_hours = 10.0
+expert_time_estimate_hours = 12.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a real release, the ball's velocity set to 20 m/s: the target hit, the rebound's last 0.8 m replaced as in `catch`); negatives: over the line, outside the target, a bounce before the wall, the rebound onto the body or the floor, taken back before the wall, dropped. An arm swing gives 6.9 m/s; the throw needs 16 to 20 m/s; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_wall_ball.py: positive by injection around a real release and a real catch: the right Dex1-1 opens and the tennis ball falls free behind the line (its velocity set to 20 m/s; a straight-arm swing of the H1-2 gives about half), real flight, target bounce and rebound; the last 0.8 m of the rebound injected at 3 m/s into the waiting jaws, which close and clamp it by friction (the real 12 m/s rebound closes on it and loses it again); the start grasp holds the whole episode, a light grasp loses the ball in an arm swing; negatives: nop, over the line, off the target, a bounce before the wall, a rebound onto the body, nobody catches, taken back before the wall, let go after the catch, cradled on half-open jaws, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

@@ -157,8 +157,9 @@ The checklist is in PROTOCOL §4.
   a new digest; results under the earlier cutoff are ranked separately (PROTOCOL §2, H.8).
 - A sidecar's directory (`environment/sim/`, `environment/scorer/`, served at `/srv`) holds only what is the task's own:
   its frozen instance, per-task grader data, files no other task has. Files it shares with other tasks come from a
-  pinned files-only image, the benchmark's `images/<folder>-sim-files/` (sources under `embodied_first_exam/benchmarks/<folder>/`),
-  or `images/standard-sim-files/` for the 2.2 / 2.4 / realtime layers: the sidecar is built from its directory
+  pinned files-only image, the benchmark's one `images/<folder>-files/` (sources under `embodied_first_exam/benchmarks/<folder>/`; the same image
+  serves its agent and verifier images),
+  or `images/standard-files/` for the 2.2 / 2.4 / realtime layers: the sidecar is built from its directory
   (`build: context: sim`, its `Dockerfile`: `COPY . /srv/`, then `COPY --from=<image@digest>` of those files at their paths
   under `/srv`; `.dockerignore` keeps the two build files out). A private evaluator's own data (hidden plants, case banks)
   and files that may not be redistributed stay in the task dir.

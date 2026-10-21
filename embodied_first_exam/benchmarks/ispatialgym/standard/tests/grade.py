@@ -25,7 +25,7 @@ def grade(d: dict) -> tuple[bool, dict]:
     reason = str(d.get("reason") or "")
     infra = bool(d.get("infra_error")) or not finalized
     live = bool(d.get("live_success", d.get("success")))
-    ok = live and bool(d.get("success")) and not d.get("gave_up") and not infra
+    ok = live and bool(d.get("success")) and not d.get("gave_up") and not infra and reason != "error"   # PROTOCOL §4: a simulator error is the agent's 0
     return ok, {
         "success": int(ok), "live_success": int(live), "graded_by_live": 1, "replays": 0,
         "finalized": int(finalized), "missing_log": 0, "n_actions": int(d.get("n_actions") or 0), "sim_steps": int(d.get("control_steps") or 0),

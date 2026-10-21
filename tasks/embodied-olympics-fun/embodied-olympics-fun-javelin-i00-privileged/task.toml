@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-javelin-i00-privileged"
-description = "Embodied Olympics javelin (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Throw the javelin in your right hand over the shoulder from behind the arc so that its head strikes the ground first, inside the sector, at least 20.0 m from the arc, then leave the runway behind the arc and stand. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics javelin (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Throw the javelin held by its cord in your right gripper over the shoulder from behind the arc so that its head strikes the ground first, inside the sector, at least 20.0 m from the arc, then leave the runway behind the arc and stand. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "javelin"]
 
@@ -19,9 +19,9 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
-expert_time_estimate_hours = 8.0
+expert_time_estimate_hours = 10.0
 oracle = "full"
-oracle_evidence = "Reference: a standing throw by the trunk's turn, the hand above the shoulder, from a technique found offline by CMA-ES over whole-body key poses (Embodied Olympics' method): 15.0 m/s at 37 degrees, head first at 21.58 m (the line is 20 m), then back 4 m behind the arc and standing. Open loop on the frozen start, not robust. Referee test negatives: an underarm release, the back turned, over the arc, off the runway early, tail first, outside the sector, short, touched after the release, out in front Measured: success after 15.33 s of the 60 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "Implement: the World Athletics women's 600 g javelin (2.21 m, centre of gravity 0.92 m from the tip), declared (TR 38.3-38.6): with the men's 800 g javelin about 2,400 searched throws never landed head first past 15.3 m. Flight from that javelin's own wind-tunnel data (Seo et al., Sci. Rep. 2023: C_D, C_L, C_m against the angle of attack); a nose-high release does not fly farther (33.59 m vs 32.93 m 10 deg nose-high at 17 m/s). Reference: a whole-body throw found by CMA-ES over whole episodes, with the walking policy taking over at the release: 18.5 m/s at 25 deg from 1.91 m (javelin 11 deg up), head first at 24.87 m from the arc (the mark is 20 m), a walk back behind the arc and a stand, success after 9.6 s; 9 of 10 variations succeed (servo gains x0.94-1.03, release +-5 ms; x1.06 ends in a simulator blow-up on the walk back). Referee test negatives: nop, released below the shoulder, back turned, over the arc, off the runway early, tail first, outside the sector, short, touched after the release, out in front, a fall. Measured (make_oracles.py): success after 9.64 s of the 60 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

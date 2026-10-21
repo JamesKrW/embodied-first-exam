@@ -40,6 +40,10 @@ for step in mode.split(","):
     if step == "ok3": call(3, 7)                       # a completed call of 3 rows, 7 physics ticks each
     elif step == "crash5": call(5, 9, finish=False); ep._jf.flush(); ep._tf.flush(); os._exit(139)   # dies inside a call
     elif step == "hang": call(1, 5, finish=False); time.sleep(60); os._exit(0)                       # a native step that hangs
+    elif step == "slow3":                                                                              # a slow native step (3 s)
+        cid = ep.call_begin("/submit", None, deadline=time.time() + float(os.environ.get("CALL_BUDGET_S", "600")))
+        time.sleep(3); ep.journal([0.0, 1.0], physics_steps=1)
+        E["calls"] += 1; E["step"] += 1; ep.checkpoint(E, lambda: "s%d" % ep.rows, lambda: np.zeros(3)); ep.call_end(cid, "/submit")
     elif step == "crash_idle": os._exit(139)           # dies between calls
 os._exit(0)
 """
@@ -105,7 +109,7 @@ def case_watchdog_fired_ends_the_episode():
     """The watchdog really ends a process whose call hangs: its banner is the evidence, and the restart gives up."""
     d = tempfile.mkdtemp(prefix="v24_")
     t = time.time()
-    rc, _ = child(d, "ok3,hang", RCB_CALL_WATCHDOG_GRACE_S=1, CALL_BUDGET_S=1)
+    rc, _ = child(d, "ok3,hang", RCB_CALL_WATCHDOG_GRACE_S=1, RCB_MAX_CALL_WALL_S=1)
     assert rc == 1 and time.time() - t < 20, (rc, time.time() - t)        # faulthandler's exit, not the 60 s sleep
     trace = open(os.path.join(d, "call-watchdog.trace")).read()
     assert "Timeout (" in trace and "Thread" in trace, trace[:200]
@@ -113,6 +117,18 @@ def case_watchdog_fired_ends_the_episode():
     assert rc is None, "a give-up idles with its PID file; this process went on instead"
     f = final(d)
     assert f.get("gave_up") and f.get("infra_error") == 1 and str(f.get("reason")).startswith("call_watchdog"), f
+
+
+def case_watchdog_not_shortened_by_the_deadline():
+    """The agent's request deadline cannot shorten the hard watchdog: it counts from the service's max_call_wall_s. A call
+    with a 0.5 s deadline whose native step takes 3 s finishes (the old rule, deadline + grace, killed it at 1.5 s and
+    voided the trial as call_watchdog)."""
+    d = tempfile.mkdtemp(prefix="v24_")
+    rc, out = child(d, "ok3,slow3,ok3", RCB_CALL_WATCHDOG_GRACE_S=1, RCB_MAX_CALL_WALL_S=10, CALL_BUDGET_S=0.5)
+    assert rc == 0, (rc, out)
+    assert open(os.path.join(d, "call-watchdog.trace")).read() == "", "the watchdog fired"
+    assert not final(d).get("gave_up"), final(d)
+    assert np.fromfile(os.path.join(d, "journal.f64")).size // 2 == 7
 
 
 def case_watchdog_trace_is_per_call():

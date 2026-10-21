@@ -1,6 +1,19 @@
-"""Javelin throw (World Athletics TR 32 and 38): from the runway, throw the men's javelin over the shoulder from behind
-the arc so that its head strikes the ground first, inside the sector, at least the qualifying mark away; then leave the
-runway behind the arc. Official runway, arc, sector and implement; the Unitree H1-2."""
+"""Javelin throw (World Athletics TR 32 and 38) with the women's 600 g javelin. The javelin is a free body held at
+its cord grip only by the friction of the right hand's Unitree Dex1-1 two-jaw gripper (the core's rfo.realhand): it
+can slip along the jaws, turn in them and drop. The release is the jaws letting go of the cord (opening them; the jaws open
+at most 375 mm/s, so when it happens is the thrower's timing, not a switch); the shaft then slides out through the jaws.
+From the runway, throw it over the shoulder from behind the arc so that its head strikes the ground first, inside the
+sector, at least the qualifying mark away; then leave the runway behind the arc. The Unitree H1-2.
+
+* the official runway, arc, sector and implement (TR 32.9, 32.12, 38.3-38.6);
+* the cord grip is a collision body: TR 38.4's grip at the centre of gravity, 160 mm long (TR 38: 150-160 mm), of
+  uniform thickness, 29 mm across (the shaft's 25 mm plus 4; TR 38: at most 8 mm more);
+* the right hand is the Dex1-1 (the core's model): the cord lies across its jaws (along the jaws' width, 34 mm), at the
+  jaws' centre, the javelin's axis along the wrist mount's y axis; the jaws close on it at reset (close_on, the full
+  120 N clamp);
+* the javelin's flight: published wind-tunnel coefficients applied as forces (below: aero_wrench);
+* the hold, the release and no re-grip are judged from contacts (below), not from a grip switch.
+"""
 import math
 
 import mujoco
@@ -8,17 +21,99 @@ import numpy as np
 
 from rfo.scene import HITTABLE, VISUAL
 from rfo.task import TaskBase
+# A rigid javelin (steel head, aluminium shaft)'s contact with the robot, the venue's fixtures and the other props
+# (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
+# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
+# robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
+# With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 197 mm into the floor at 65 m/s (and
+# then spun up and diverged) and 165 mm into the torso (stress test 2026-10-21).
+from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
-# The implement's model (the numbers of TR 38 that are ranges are fixed inside their range):
-SHAFT_R, TIP_R = 0.0125, 0.006               # collision radii: the shaft (25 mm; TR 38: 25-30 mm at its thickest), the head
-I_AXIAL, I_TRANSVERSE = 6.3e-5, 0.42         # kg m^2 about the centre of gravity (transverse: Hubbard and Rust 1984)
-# Flight in air: MuJoCo's ellipsoid fluid model on one ellipsoid of the javelin's length whose centre, the centre of
-# pressure, lies CP_BEHIND_CG behind the centre of gravity. Coefficients (blunt drag, slender drag, angular drag, Kutta
-# lift, Magnus lift) chosen so that at 25 m/s the drag along the shaft is 0.3 N, the drag at an angle of attack 1.6 N
-# and the lift at 10 degrees 3.4 N: the order of the published wind-tunnel data for the men's javelin; a 30 m/s release
-# at 35 degrees then flies 78 m, a 14 m/s release at 40 degrees 23 m (measured in this model).
-CP_BEHIND_CG = 0.25
-FLUID = (0.04, 0.008, 1.5, 0.5, 1.0)
+# The implement: World Athletics' women's javelin (TR 38.3-38.6, the 600 g implement; this family's deviation: the
+# H1-2's swing cannot release the 800 g men's javelin fast enough along its path), its ranges fixed at the javelin whose
+# aerodynamics were measured (below: 2.21 m, the centre of gravity 0.92 m from the tip, 24.7 mm at its thickest):
+SHAFT_R, TIP_R = 0.01235, 0.005              # collision radii: the shaft (24.7 mm; TR 38: 20-25 mm), the head
+CORD_R, CORD_HALF = 0.01435, 0.0725          # the cord grip: 28.7 mm across (shaft + 4 mm; TR 38: at most + 8 mm), 145 mm
+# kg m^2 about the centre of gravity: the men's javelin's measured transverse moment (0.42, Hubbard and Rust 1984) is
+# 0.90 of a uniform rod's of its mass and length; the same ratio for this one (0.90 x 0.6 x 2.21^2 / 12); the axial one
+# from the men's (6.3e-5) by mass and diameter squared
+I_AXIAL, I_TRANSVERSE = 4.6e-5, 0.219
+# Flight in air: published aerodynamic coefficients, applied as a force and a moment on the javelin every physics step
+# (aero_wrench below; MuJoCo's own fluid model is off for it): the static wind-tunnel case of Seo, Okuizumi, Konishi,
+# Kobayashi, Hasegawa and Obayashi, "Measurement of aerodynamic force and moment acting on a javelin using a magnetic
+# suspension and balance system", Scientific Reports 13, 357 (2023), Fig. 10: a World Athletics women's javelin (Nishi
+# Hybrid Genome X, 2.21 m, the centre of gravity 0.92 m from the tip, 24.7 mm at its thickest) in the 1 m magnetic
+# suspension tunnel at 25 m/s (no support interference), read off the figure at its 12 angles of attack from 0 to 18
+# degrees: C_D and C_L on the cross-section at the thickest point, C_m about the centre of gravity on that area times
+# the length (positive nose up: this javelin pitches up below 12 degrees and down above). Beyond 18 degrees the
+# normal-force coefficient grows as sin^2(alpha) (cross-flow on a cylinder; at 90 degrees it is then 1.14 on the
+# planform, a cylinder's 1.1-1.2), the axial one falls as cos(alpha), and the centre of pressure stays where it is at 18
+# degrees (0.12 m behind the centre of gravity). Rotation: the cross-flow drag of the spinning shaft (C_dc 1.2, a
+# circular cylinder in sub-critical cross-flow, Hoerner, Fluid-Dynamic Drag, 1965) added along it in 12 stations, the
+# static part taken out, damps the pitching and yawing.
+AERO_ALPHA = (0.0, 2.0, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 14.0, 15.0, 16.0, 18.0)       # degrees
+AERO_CD = (1.30, 1.50, 1.65, 1.75, 1.80, 1.95, 2.10, 2.45, 2.85, 3.15, 3.50, 4.55)
+AERO_CL = (0.00, 0.20, 0.45, 0.60, 0.80, 1.40, 2.35, 3.45, 4.70, 5.50, 6.35, 9.10)
+AERO_CM = (0.00, 0.00, 0.01, 0.02, 0.03, 0.05, 0.04, 0.01, -0.06, -0.14, -0.25, -0.56)
+SEO_L, SEO_D = 2.21, 0.0247                  # the measured javelin: length, its reference diameter
+JAV_D = 2 * SHAFT_R                          # this javelin's diameter at its thickest
+CROSSFLOW_CD, AERO_STATIONS = 1.2, 12
+RHO_AIR = 1.225                              # kg/m^3 (scene.AIR: sea level, 15 C)
+
+
+def aero_coefficients(alpha: float) -> tuple[float, float, float]:
+    """(C_N, C_A, C_m) at the angle of attack alpha (rad, 0..pi/2) on the measured javelin's cross-section (C_m also
+    on its length): the normal force (perpendicular to the shaft, towards the side the air comes from below), the
+    axial one (along it, against the motion), the pitching moment about the centre of gravity (positive nose up)."""
+    a = math.degrees(alpha)
+    if a <= AERO_ALPHA[-1]:
+        cd, cl = float(np.interp(a, AERO_ALPHA, AERO_CD)), float(np.interp(a, AERO_ALPHA, AERO_CL))
+        cm = float(np.interp(a, AERO_ALPHA, AERO_CM))
+        return cl * math.cos(alpha) + cd * math.sin(alpha), cd * math.cos(alpha) - cl * math.sin(alpha), cm
+    a18 = math.radians(AERO_ALPHA[-1])
+    cn18 = AERO_CL[-1] * math.cos(a18) + AERO_CD[-1] * math.sin(a18)
+    ca18 = AERO_CD[-1] * math.cos(a18) - AERO_CL[-1] * math.sin(a18)
+    cn = cn18 * (math.sin(alpha) / math.sin(a18)) ** 2
+    return cn, ca18 * math.cos(alpha) / math.cos(a18), AERO_CM[-1] * cn / cn18      # (the centre of pressure kept)
+
+
+def aero_wrench(R: np.ndarray, v: np.ndarray, omega: np.ndarray, length: float, cg_from_tip: float):
+    """The air's force and moment (about the centre of gravity), world frame, on a javelin whose axis (to the tip) is
+    R[:, 0], moving at v with angular velocity omega in still air."""
+    ax = R[:, 0]
+    speed = float(np.linalg.norm(v))
+    F, M = np.zeros(3), np.zeros(3)
+    if speed < 1e-6 and float(np.linalg.norm(omega)) < 1e-6:
+        return F, M
+    seo_a = math.pi * SEO_D ** 2 / 4
+    scale = (length * JAV_D) / (SEO_L * SEO_D)              # planform: this javelin over the measured one (1 here)
+    u = float(v @ ax)
+    vp = v - u * ax                                          # the cross-flow (velocity across the shaft)
+    wp = float(np.linalg.norm(vp))
+    if speed > 1e-6:
+        alpha = math.atan2(wp, abs(u))
+        cn, ca, cm = aero_coefficients(alpha)
+        q = 0.5 * RHO_AIR * speed * speed * seo_a * scale
+        Fa = -q * ca * math.copysign(1.0, u) * ax if abs(u) > 1e-9 else np.zeros(3)
+        if wp > 1e-9:
+            up = -vp / wp                                    # the normal force's side ("up" for a positive angle)
+            F += -q * cn * vp / wp
+            lead = math.copysign(1.0, u) * ax if abs(u) > 1e-9 else ax    # the end that leads into the air
+            M += q * length * cm * np.cross(lead, up)        # positive C_m turns the leading end towards that side
+        F += Fa
+    # rotation: the cross-flow drag of each station with the spin's velocity added, less the static part
+    xs = np.linspace(cg_from_tip - length, cg_from_tip, AERO_STATIONS + 1)
+    xm, dx = 0.5 * (xs[1:] + xs[:-1]), xs[1] - xs[0]
+    spin = np.cross(omega, ax)
+    spin = spin - float(spin @ ax) * ax                      # the spin's velocity across the shaft per metre from the CG
+    w1 = vp[None, :] + xm[:, None] * spin[None, :]
+    k = -0.5 * RHO_AIR * CROSSFLOW_CD * JAV_D * dx
+    df = k * (np.linalg.norm(w1, axis=1)[:, None] * w1 - wp * vp[None, :])
+    F += df.sum(axis=0)
+    M += np.cross(ax, (xm[:, None] * df).sum(axis=0))
+    return F, M
+
+
 LINE_W, ARC_W = 0.05, 0.07                   # TR 32.9: side lines 50 mm, the arc and its end lines 70 mm
 RUNWAY = (0.72, 0.25, 0.18, 1)
 
@@ -40,74 +135,96 @@ class Task(TaskBase):
     robot = "unitree_h1"
     rulebook = ("World Athletics Competition and Technical Rules 2024: TR 32.9 (the javelin runway and its arc), TR "
                 "32.12 (the sector), TR 32.14, 32.16, 32.17 and 32.20 (throwing events: failures, the landing, leaving "
-                "the runway, the measurement), TR 38.1 (the throw), TR 38.3-38.6 (the men's javelin)")
+                "the runway, the measurement), TR 38.1 (the throw), TR 38.3-38.6 (the javelin: the women's implement, "
+                "its grip)")
     deviations = [
-        "TR 38.1(a) (the cord grip): the hand holds the javelin at its cord, round its centre of gravity, by a "
-        "grip switched on and off, not by fingers; it is released when the grip is switched off. \"Over the shoulder "
-        "or upper part of the throwing arm\" is judged at the release: the grip's centre must then be at least "
-        "{release_above_shoulder_m} m higher than the throwing shoulder's joint.",
+        "TR 38.1(a) (\"the javelin shall be held at the grip with one hand\"): the hand is a two-jaw gripper, "
+        "Unitree's Dex1-1 (90 mm stroke, 80 mm jaws, at most 120 N of clamp, opening at most 375 mm/s; Unitree sells "
+        "it for the G1, the H2 and the R1, not the H1-2: here it sits on the H1-2's right wrist where the palm ends); "
+        "the cord lies across its jaws and is held by their friction only. Held means both jaws touching the cord; "
+        "the hold may break for at most {grip_gap_s} s (contacts flicker); the release is the end of the hold, the "
+        "last moment both jaws touched the cord. \"Over the shoulder or upper part of the throwing arm\" is judged "
+        "at the release: the javelin's centre of gravity must then be at least {release_above_shoulder_m} m higher "
+        "than the throwing shoulder's joint.",
+        "TR 38.1(a) (one hand): before the release the javelin may not touch your left arm or hand (it may rest "
+        "against the rest of you: the rule book forbids only the second hand).",
         "TR 38.1(c): \"turned completely around\" is judged as the chest's heading more than {back_turn_deg} degrees "
         "away from the throwing direction at any time before the release.",
+        "TR 38.3-38.6 (the implement): the robot throws the women's javelin, 600 g and 2.21 m (the men's is 800 g and "
+        "2.60-2.70 m): the H1-2's swing, holding the javelin by the friction of two jaws, cannot release the men's "
+        "javelin pointing along its path fast enough to throw it head first past a line (its best: 15.3 m); a lighter "
+        "official implement leaves faster from the same arm. Everything about the throw is otherwise real.",
         "TR 38.3-38.6: the javelin is one rigid body (no bending or vibration) whose head does not stick in the ground; "
-        "the mark is the point where the head first touches the ground.",
-        "Flight: quasi-steady aerodynamics (MuJoCo's ellipsoid fluid model with coefficients of the order of the "
-        "published wind-tunnel data, the centre of pressure " + f"{CP_BEHIND_CG} m behind the centre of gravity), "
-        "still air, no wind. The model's drag does not grow with the angle of attack as a real javelin's does: a "
-        "javelin released nose-high flies up to a fifth farther here than it would.",
+        "the mark is the point where the head first touches the ground; the cord grip is a smooth band "
+        "{cord_length_m} m long and {cord_diameter_m} m across (no pattern: the pads' rubber gives the friction).",
+        "Flight: quasi-steady aerodynamics in still air, no wind: drag and lift against the angle of attack from the "
+        "wind-tunnel measurement of this very kind of javelin (a World Athletics women's javelin, Seo et al., "
+        "Scientific Reports 2023; drag, lift and pitching moment from 0 to 18 degrees, beyond that a cylinder's "
+        "cross-flow); the shaft's cross-flow damps its rotation. The javelin does not bend or vibrate.",
         "TR 32.15 (interrupting a trial, laying the implement down): not modelled; the first release is the throw, "
-        "and the javelin cannot be gripped again.",
+        "and the javelin may not be gripped again.",
         "TR 32.14 names no fall: here a fall ends the trial as a failure, as in every task of this benchmark; the "
         "trial ends when the robot has left the runway correctly and stands.",
         "TR 25.17 (one minute for a trial): the whole trial, leaving the runway included, has {time_limit_s} s.",
-        "The qualifying mark of {qualifying_mark_m} m is this benchmark's (a boys' school standard for the 800 g "
+        "The qualifying mark of {qualifying_mark_m} m is this benchmark's (a girls' school standard for the 600 g "
         "javelin); the rule book only measures.",
     ]
     time_limit_s = 60.0
     start = (-2.0, 0.0, 0.0)
     stages = ["release", "landing", "exit"]
     fall_z = 0.50
-    params = dict(javelin_mass_kg=0.800, javelin_length_m=2.65, javelin_cg_from_tip_m=0.98, javelin_head_m=0.29,
+    params = dict(javelin_mass_kg=0.600, javelin_length_m=2.21, javelin_cg_from_tip_m=0.92, javelin_head_m=0.28,
+                  cord_length_m=2 * CORD_HALF, cord_diameter_m=2 * CORD_R,
                   runway_width_m=4.0, runway_length_m=30.0, arc_radius_m=8.0, exit_line_m=4.0,
-                  qualifying_mark_m=20.0, release_above_shoulder_m=0.0, back_turn_deg=135.0, retouch_grace_s=0.20,
-                  stand_s=1.0, fall_pelvis_m=0.50)
+                  qualifying_mark_m=20.0, release_above_shoulder_m=0.0, back_turn_deg=135.0, grip_gap_s=0.02,
+                  retouch_grace_s=0.20, stand_s=1.0, fall_pelvis_m=0.50)
 
-    sentence = ("Throw the javelin in your right hand over the shoulder from behind the arc so that its head strikes "
-                "the ground first, inside the sector, at least {qualifying_mark_m} m from the arc, then leave the "
-                "runway behind the arc and stand.")
-    rules = ("The men's javelin ({javelin_mass_kg} kg, {javelin_length_m} m long, its centre of gravity "
-             "{javelin_cg_from_tip_m} m from the tip, a metal head of {javelin_head_m} m) is gripped at its cord, at "
-             "the centre of gravity, by your right hand. The runway is {runway_width_m} m wide between the inner "
-             "edges of its side lines and {runway_length_m} m long; it ends at the arc, a white strip whose inner edge "
-             "is a circle of {arc_radius_m} m radius round a point on the runway's centre line; short white lines run "
-             "outwards from the arc's two ends at right angles to the side lines. The sector is bounded by the two "
-             "lines from the arc's centre through the arc's ends (28.96 degrees between them). The throw: you let go "
-             "of the javelin (once: it cannot be gripped again) while the grip's centre is at least "
-             "{release_above_shoulder_m} m higher than your right shoulder joint. It is valid only if the head touches "
-             "the ground before any other part of the javelin, at a point inside the sector lines (on a line is out). "
-             "It is measured from that point to the inner edge of the arc along the line through the arc's centre. "
-             "You succeed when a valid throw measures at least {qualifying_mark_m} m and you have then left the "
-             "runway correctly and stood for {stand_s} s. Leaving correctly: after the javelin has landed, your first "
-             "touch of a side line or of the ground outside the runway is behind the arc's end lines, or you touch "
-             "the ground {exit_line_m} m or more behind the arc's ends. Standing: only your feet on the ground, the "
-             "torso within about 20 degrees of upright, the pelvis slower than 0.35 m/s. You fail if, at any time "
-             "before that, any part of you touches the arc, its end lines or the ground beyond them; if you touch a "
-             "side line or the ground outside the runway (also behind its rear end) before the javelin has landed; if "
-             "your chest is turned more than {back_turn_deg} degrees away from the throwing direction before the "
-             "release (your back to the arc); if the javelin is let go lower than the shoulder; if it does not land "
-             "head first, lands outside the sector or short of {qualifying_mark_m} m; if any part of you touches it "
-             "after the release (your throwing arm may still brush it during the first {retouch_grace_s} s); if you "
-             "fall (your pelvis lower than {fall_pelvis_m} m above the ground, or any part of you other than your "
-             "feet on the ground); or after {time_limit_s} s. Where you touch the ground is judged on the points of "
-             "contact.")
+    sentence = ("Throw the javelin held by its cord in your right gripper over the shoulder from behind the arc so "
+                "that its head strikes the ground first, inside the sector, at least {qualifying_mark_m} m from the "
+                "arc, then leave the runway behind the arc and stand.")
+    rules = ("The women's javelin ({javelin_mass_kg} kg, {javelin_length_m} m long, its centre of gravity "
+             "{javelin_cg_from_tip_m} m from the tip, a metal head of {javelin_head_m} m; its cord grip, "
+             "{cord_length_m} m long and {cord_diameter_m} m across, covers the centre of gravity) starts held at its "
+             "cord between the two jaws of your right hand, a two-jaw gripper that holds only by friction: the "
+             "javelin can slip along or turn in the jaws, and drop. It is held while both jaws touch the cord (breaks "
+             "of at most {grip_gap_s} s are ignored); the release is the end of the hold: the last moment both jaws "
+             "touched the cord, however it ends (opened, slipped or dropped). Until the release the javelin may "
+             "not touch your left arm or hand (the javelin is held with one hand). The runway is {runway_width_m} m wide between "
+             "the inner edges of its side lines and {runway_length_m} m long; it ends at the arc, a white strip whose "
+             "inner edge is a circle of {arc_radius_m} m radius round a point on the runway's centre line; short "
+             "white lines run outwards from the arc's two ends at right angles to the side lines. The sector is "
+             "bounded by the two lines from the arc's centre through the arc's ends (28.96 degrees between them). The "
+             "throw: at the release the javelin's centre of gravity must be at least {release_above_shoulder_m} m "
+             "higher than your right shoulder joint. There is one release: after it the javelin may not be held again "
+             "(both jaws on the cord once more) and no part of you may touch it, except that your right arm and its "
+             "gripper may still touch it during the first {retouch_grace_s} s (the shaft sliding out through the "
+             "jaws). The throw is valid only if the head touches the ground before any other part of the javelin, at "
+             "a point inside the sector lines (on a line is out). It is measured from that point to the inner edge "
+             "of the arc along the line through the arc's centre. You succeed when a valid throw measures at least "
+             "{qualifying_mark_m} m and you have then left the runway correctly and stood for {stand_s} s. Leaving "
+             "correctly: after the javelin has landed, your first touch of a side line or of the ground outside the "
+             "runway is behind the arc's end lines, or you touch the ground {exit_line_m} m or more behind the arc's "
+             "ends. Standing: only your feet on the ground, the torso within about 20 degrees of upright, the pelvis "
+             "slower than 0.35 m/s. You fail if, at any time before that, any part of you touches the arc, its end "
+             "lines or the ground beyond them; if you touch a side line or the ground outside the runway (also behind "
+             "its rear end) before the javelin has landed; if your chest is turned more than {back_turn_deg} degrees "
+             "away from the throwing direction before the release (your back to the arc); if the javelin touches your "
+             "left arm or hand before the release; if it is released lower than the "
+             "shoulder; if it is held again, or touched, after the release (but for the grace above); if it does not "
+             "land head first, lands outside the sector or short of {qualifying_mark_m} m; if you fall (your pelvis "
+             "lower than {fall_pelvis_m} m above the ground, or any part of you other than your feet on the ground); "
+             "or after {time_limit_s} s. Where you touch the ground is judged on the points of contact.")
     venue = ("You stand on the runway's centre line facing the sector (+x), your pelvis 2.0 m behind the middle of "
              "the arc; the arc's centre is 6.0 m behind you, its ends are 0.25 m behind its middle and "
-             "2.0 m to either side, and the runway reaches 28 m behind you. Your right arm hangs straight down, the "
-             "javelin level in its hand, pointing forwards (the tip {javelin_cg_from_tip_m} m ahead of the hand). "
-             "Still air. The javelin is released when the hand's grip is switched off.")
-    difficulty = ("{qualifying_mark_m} m asks for a release at about 14 m/s near 35 to 40 degrees with the javelin "
-                  "pointing along its flight, or it will not come down head first; the H1-2 has no running policy "
-                  "and its arm motors give 40 N m at the shoulder. The throw must come from above the shoulder on "
-                  "a body that has to stay on its feet behind the arc.")
+             "2.0 m to either side, and the runway reaches 28 m behind you. Your right arm hangs down, its gripper's "
+             "fingers pointing down; the javelin lies level across the gripper's closed jaws, its cord between "
+             "them, pointing forwards (the tip {javelin_cg_from_tip_m} m ahead of the jaws). Still air. The jaws "
+             "open when your right grip command goes to 0 (at most 375 mm/s).")
+    difficulty = ("{qualifying_mark_m} m asks for a release near 18 m/s at 25 to 30 degrees with the javelin "
+                  "pointing close enough to its flight that it comes down head first; the H1-2 has no running policy "
+                  "and its arm motors give 40 N m at the shoulder. Nothing holds the 2.21 m javelin but two jaws "
+                  "34 mm wide on its cord: a whip of the arm turns it in them, and the jaws must let go of it at the "
+                  "right moment, above the shoulder, on a body that has to stay on its feet behind the arc.")
 
     # ------------------------------------------------------------------ geometry
     def geometry(self):
@@ -119,6 +236,7 @@ class Task(TaskBase):
     def build(self, sc):
         p, g = self.p, self.geometry()
         self.fall_z = p["fall_pelvis_m"]
+        sc.real_hands["right"] = "dex1"
         R, hw, cx, xe, xr = g["R"], g["hw"], g["cx"], g["x_end"], g["x_rear"]
         sc.box("runway", ((xr + xe) / 2, 0, 0.0003), ((xe - xr) / 2, hw, 0.0003), rgba=RUNWAY)
         k = 16
@@ -153,46 +271,64 @@ class Task(TaskBase):
         b = sc.body("javelin", (-2.0, -0.3, 0.75), free=True)   # the body's origin: the centre of gravity; +x: the tip
         b.insert(1, b.makeelement("inertial", dict(pos="0 0 0", mass=f"{p['javelin_mass_kg']!r}",
                                                     diaginertia=f"{I_AXIAL} {I_TRANSVERSE} {I_TRANSVERSE}")))
-        col = dict(friction=(0.8, 0.005, 0.0001), condim=4, mass=0, **HITTABLE)
+        col = dict(friction=(0.8, 0.005, 0.0001), condim=4, mass=0, **HITTABLE, **RIGID)
         sc.geom(b, "javelin_head", type="capsule", fromto=(cg - head, 0, 0, cg - TIP_R, 0, 0), size=(TIP_R,),
                 rgba=(0.75, 0.76, 0.8, 1), **col)
         sc.geom(b, "javelin_shaft", type="capsule", fromto=(cg - L + SHAFT_R, 0, 0, cg - head, 0, 0), size=(SHAFT_R,),
                 rgba=(0.85, 0.75, 0.2, 1), **col)
-        sc.geom(b, "javelin_cord", type="cylinder", fromto=(-0.08, 0, 0, 0.08, 0, 0), size=(SHAFT_R + 0.002,),
-                rgba=(0.2, 0.3, 0.7, 1), mass=0, **VISUAL)
-        sc.geom(b, "javelin_air", type="ellipsoid", pos=(-CP_BEHIND_CG, 0, 0),
-                size=(L / 2, SHAFT_R, SHAFT_R), rgba=(0, 0, 0, 0), mass=0, fluidshape="ellipsoid", fluidcoef=FLUID,
+        # the cord grip: a collision band (capsule ends inside the band's length), what the jaws hold
+        sc.geom(b, "javelin_cord", type="capsule", fromto=(-CORD_HALF + CORD_R, 0, 0, CORD_HALF - CORD_R, 0, 0),
+                size=(CORD_R,), rgba=(0.2, 0.3, 0.7, 1), **col)
+        sc.geom(b, "javelin_cord_look", type="cylinder", fromto=(-CORD_HALF, 0, 0, CORD_HALF, 0, 0),
+                size=(CORD_R - 0.0002,), rgba=(0.2, 0.3, 0.7, 1), mass=0, **VISUAL)
+        # MuJoCo's fluid model off for the javelin (an ellipsoid of zero coefficients: without one, a body in the
+        # venue's air would get MuJoCo's inertia-box drag); the air acts through aero_wrench (substep)
+        sc.geom(b, "javelin_air", type="ellipsoid", pos=(0, 0, 0),
+                size=(L / 2, SHAFT_R, SHAFT_R), rgba=(0, 0, 0, 0), mass=0, fluidshape="ellipsoid",
+                fluidcoef=(0, 0, 0, 0, 0),
                 **VISUAL)
-        sc.grippables["javelin"] = {"radius": SHAFT_R, "half_length": 0.08, "axis": "x"}
         sc.camera("venue", (-8.5, -7.5, 4.5), (4.0, 0.5, 0.3), fovy=55)
         sc.camera("sector", (-3.0, 0.0, 14.0), (12.0, 0.0, 0.0), fovy=70)
+        sc.camera("hand", (-1.2, -1.4, 1.2), (-1.85, -0.3, 0.75), fovy=45)
 
     def reset(self, w):
-        # the right arm straight down, a little away from the leg; the javelin level in the hand, along the thumb
+        # javelin's start: the right arm straight down, a little away from the leg; the javelin level, its axis along
+        # the wrist mount's y (forwards), its centre of gravity (the cord's middle) at the jaws' centre
         set_arm(w, right_elbow_pitch=1.57, right_shoulder_roll=-0.15)
-        d = w.d
-        b = w.robot.mount["right"]
-        R = d.xmat[b].reshape(3, 3)
-        Rb = np.column_stack([R[:, 1], R[:, 2], R[:, 0]])     # the javelin's axis: the mount's y (forwards)
+        c, R = w.jaw_frame("right")
+        Rb = np.column_stack([R[:, 1], R[:, 2], R[:, 0]])     # javelin x (to the tip) = across the jaws
         q = np.zeros(4)
         mujoco.mju_mat2Quat(q, Rb.reshape(-1))
-        w.put("javelin", d.xpos[b] + R @ np.array([0.022 + SHAFT_R + 0.003, 0.0, 0.045]), quat=q)
-        w.grab("right", "javelin", event=False)
+        w.put("javelin", c, quat=q)
+        w.close_on("right", "javelin")
 
     # ------------------------------------------------------------------ the referee
     def referee_reset(self, w, ref):
         self.jav = ref.geoms(body="javelin")
         self.head = ref.geoms(names=["javelin_head"])
-        self.shaft = ref.geoms(names=["javelin_shaft"])
+        self.shaft = ref.geoms(names=["javelin_shaft", "javelin_cord"])
+        self.cord = ref.geoms(names=["javelin_cord"])
+        self.jaws = [ref.geoms(body=f"right_hand_jaw_{j}") for j in ("a", "b")]
         self.robot = ref.part("robot")
         self.arm = ref.part("right_arm")
         self.not_arm = self.robot & ~self.arm
+        self.other_arm = ref.part("left_arm")
         self.jav_id = w.m.body("javelin").id
         self.shoulder = w.m.body("right_shoulder_roll_link").id
-        self.trackers = {"released": None, "landed": None, "exit": False}
+        # held: the last time both jaws touched the cord; at: the javelin's state then (the release, if it ends there)
+        self.trackers = {"held": 0.0 if self._held(ref) else None, "at": self._snapshot(w), "released": None,
+                         "landed": None, "exit": False}
+
+    def _held(self, ref) -> bool:
+        return all(ref.touching(j, self.cord) for j in self.jaws)
+
+    def _snapshot(self, w) -> list:
+        c, v = w.pos("javelin"), w.vel("javelin")
+        ax = w.d.xmat[self.jav_id].reshape(3, 3)[:, 0]
+        return [round(float(x), 6) for x in (*c, *v, ax[2], c[2] - w.d.xpos[self.shoulder][2])]
 
     def may_grip(self, w, side, name):
-        return False                                          # held from t = 0; once let go it cannot be gripped again
+        return False                                          # (nothing is grippable)
 
     def _marks(self, w, ref):
         """Where the robot touches the ground now: None, or (in front of the arc or its end lines?, outside the
@@ -208,7 +344,32 @@ class Task(TaskBase):
         back = x <= g["x_end"] - p["exit_line_m"]
         return bool(front.any()), bool(out.any()), bool(back.any())
 
+    def _release(self, ref):
+        """The hold has ended (no both-jaw contact with the cord for more than grip_gap_s): the release, judged on the
+        javelin's state at the hold's last moment."""
+        tr, p = self.trackers, self.p
+        tr["released"] = tr["held"] if tr["held"] is not None else 0.0
+        x, y, z, vx, vy, vz, axz, above = tr["at"]
+        ref.metrics["release_speed_m_s"] = round(math.sqrt(vx * vx + vy * vy + vz * vz), 2)
+        ref.metrics["release_height_m"] = round(z, 3)
+        ref.metrics["release_elevation_deg"] = round(math.degrees(math.atan2(vz, math.hypot(vx, vy))), 1)
+        ref.metrics["release_attitude_deg"] = round(math.degrees(math.asin(max(-1.0, min(1.0, axz)))), 1)
+        if above < p["release_above_shoulder_m"]:
+            return ref.fail("the javelin was released below the shoulder", above_shoulder_m=round(above, 3))
+        ref.stage("release", t=tr["released"])
+
+    def air(self, w) -> None:
+        """The air's force and moment on the javelin for the next physics step (aero_wrench, at its centre of
+        gravity: the body's origin)."""
+        d, b = w.d, self.jav_id
+        R = d.xmat[b].reshape(3, 3)
+        _, va = w.free["javelin"]
+        F, M = aero_wrench(R, d.qvel[va:va + 3], R @ d.qvel[va + 3:va + 6], self.p["javelin_length_m"],
+                           self.p["javelin_cg_from_tip_m"])
+        d.xfrc_applied[b, :3], d.xfrc_applied[b, 3:] = F, M
+
     def substep(self, w, ref):
+        self.air(w)
         tr, p, g = self.trackers, self.p, self.geometry()
         mk = self._marks(w, ref)
         if mk is not None:
@@ -221,22 +382,21 @@ class Task(TaskBase):
                 ref.stage("exit")
         if tr["landed"] is not None:
             return
-        held = bool(w.holder("javelin"))
+        held = self._held(ref)
         if tr["released"] is None:
+            if ref.touching(self.jav, self.other_arm):
+                return ref.fail("the javelin touched your other arm before the release (one hand)",
+                                parts=sorted(ref.parts_touching(self.jav)))
             if held:
+                tr["held"], tr["at"] = round(ref.time, 4), self._snapshot(w)
                 return
-            tr["released"] = ref.time
-            c = w.pos("javelin")
-            v = w.vel("javelin")
-            ax = w.d.xmat[self.jav_id].reshape(3, 3)[:, 0]
-            above = float(c[2] - w.d.xpos[self.shoulder][2])
-            ref.metrics["release_speed_m_s"] = round(float(np.linalg.norm(v)), 2)
-            ref.metrics["release_height_m"] = round(float(c[2]), 3)
-            ref.metrics["release_elevation_deg"] = round(math.degrees(math.atan2(v[2], math.hypot(v[0], v[1]))), 1)
-            ref.metrics["release_attitude_deg"] = round(math.degrees(math.asin(max(-1.0, min(1.0, float(ax[2]))))), 1)
-            if above < p["release_above_shoulder_m"]:
-                return ref.fail("the javelin was let go below the shoulder", above_shoulder_m=round(above, 3))
-            ref.stage("release")
+            if tr["held"] is not None and ref.time - tr["held"] <= p["grip_gap_s"] + 1e-9:
+                return
+            self._release(ref)
+            if ref.done:
+                return
+        elif held:
+            return ref.fail("the javelin was held again after the release")
         elif (ref.touching(self.jav, self.not_arm)
               or (ref.time - tr["released"] > p["retouch_grace_s"] and ref.touching(self.jav, self.arm))):
             return ref.fail("the javelin was touched after the release", parts=sorted(ref.parts_touching(self.jav)))
@@ -272,6 +432,8 @@ class Task(TaskBase):
     def privileged(self, w):
         g = self.geometry()
         return {"javelin": w.pos("javelin").tolist(), "javelin_velocity": w.vel("javelin").tolist(),
-                "javelin_axis": w.d.xmat[self.jav_id].reshape(3, 3)[:, 0].tolist(), "held": bool(w.holder("javelin")),
+                "javelin_axis": w.d.xmat[self.jav_id].reshape(3, 3)[:, 0].tolist(),
+                "held": self.trackers.get("released") is None and w.held["right"] == "javelin",
+                "released_t": self.trackers.get("released"),
                 "arc_centre": [g["cx"], 0.0], "arc_radius": g["R"], "arc_ends_x": g["x_end"],
                 "sector_half_angle_deg": math.degrees(g["half_sector"])}

@@ -38,7 +38,7 @@ def num(k):
     except (TypeError, ValueError): return 0.0
 unfinished = not d.get("finalized")                        # the collect hook never completed final.json
 infra = bool(d.get("infra_error")) or unfinished
-ok = bool(d.get("success")) and not infra
+ok = bool(d.get("success")) and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
 write(ok, {"success": int(ok), "live_success": int(bool(d.get("success"))), "graded_by_live": 1, "replays": 0,
            "finalized": int(not unfinished), "missing_log": 0, "n_actions": int(num("n_actions")), "sim_steps": int(num("control_steps")),
            "physics_steps": int(num("physics_steps")), "steps": int(num("steps")), "elapsed_s": num("elapsed_s"),

@@ -595,6 +595,57 @@ def every_adapter_reports_the_agents_clock():
     expect(not bad, "adapters whose clock does not start at the agent's first request:\n  " + "\n  ".join(bad))
 
 
+@case
+def kinematics_wrong_types_are_400():
+    """/kinematics with wrong-typed fields (a string for q, a list for max_iters, null tolerances) is the client's
+    error, 400, never a 500 (as in 2.4); the service's kinematics never runs and the episode goes on."""
+    from http.server import HTTPServer
+    ran = []
+    kin = {"joint_names": ["a", "b"], "links": ["tcp"], "ik_targets": ["tcp"], "frame": "world"}
+    svc = L.Service(spec={"kinematics": kin}, lock=threading.Lock(), state={"done": False}, submit=lambda meta, A: ({"ok": True}, []),
+                    observe=lambda meta: ({"ok": True}, []), kinematics=lambda req: (ran.append(req), {"ok": True})[1],
+                    status=lambda: {}, on_submit_error=lambda exc: None, log=lambda ev: None)
+    srv = HTTPServer(("127.0.0.1", 0), L.make_handler(svc)); url = f"http://127.0.0.1:{srv.server_address[1]}/kinematics"
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        for what, body in {"q is a string": b'{"op": "fk", "q": "abc"}', "q holds an object": b'{"op": "fk", "q": [{}, 1]}',
+                           "max_iters is a list": b'{"op": "ik", "targets": {"tcp": [0,0,0,1,0,0,0]}, "max_iters": [3]}',
+                           "tol_pos_m is null": b'{"op": "ik", "targets": {"tcp": [0,0,0,1,0,0,0]}, "tol_pos_m": null}',
+                           "max_iters is too large for a float": b'{"op": "ik", "targets": {"tcp": [0,0,0,1,0,0,0]}, "tol_pos_m": 1'
+                                                                 + b"0" * 400 + b'}'}.items():
+            code = requests.post(url, data=body, headers={"Content-Type": "application/json"}, timeout=10).status_code
+            expect(code == 400, f"/kinematics where {what}: {code}")
+        expect(not ran, f"the service's kinematics ran on a malformed request: {ran}")
+        code = requests.post(url, json={"op": "fk", "q": [0.1, 0.2]}, timeout=10).status_code
+        expect(code == 200 and len(ran) == 1, f"a well-formed request: {code}, {ran}")
+    finally:
+        srv.shutdown()
+
+
+@case
+def client_read_timeout_outlasts_the_service_cap():
+    """The client's read timeout of /submit and /observe is at least the service's per-call cap (spec max_call_wall_s,
+    900 s by default) + 120 s: a long watch comes back stopped instead of timing out while the service still runs it."""
+    seen = []
+
+    class Resp:
+        status_code, headers = 200, {"Content-Type": "application/x-rcb1"}
+        content = rcb_client.rcb1.encode({"ok": True}, [])
+    real = rcb_client.requests.post
+    rcb_client.requests.post = lambda url, **kw: (seen.append((url.rsplit("/", 1)[1], kw["timeout"][1])), Resp())[1]
+    try:
+        for cap in (None, 900, 3000):
+            r = object.__new__(rcb_client.Robot); r.base = "http://sim:8000"
+            r._spec = {"default_cameras": ["c"], **({} if cap is None else {"max_call_wall_s": cap})}
+            seen.clear()
+            r.get_obs(seconds=1.0); r.submit("joint_position", np.zeros((1, 2)))
+            want = (cap or 900) + 120
+            expect(all(t >= want for _, t in seen) and [p for p, _ in seen] == ["observe", "submit"],
+                   f"max_call_wall_s {cap}: read timeouts {seen}, want >= {want}")
+    finally:
+        rcb_client.requests.post = real
+
+
 def main() -> int:
     sel = sys.argv[1:]
     todo = [f for f in CASES if not sel or any(s in f.__name__ for s in sel)]

@@ -1,7 +1,9 @@
-"""Shot put (World Athletics TR 32 and 33): from the circle, put the men's shot from the shoulder with one hand so that
-it lands inside the sector at least the qualifying mark away; then leave the circle from its rear half. Official circle,
-stop board, sector and shot; the Unitree H1-2."""
+"""Shot put (World Athletics TR 32 and 33): the circle, the stop board, the sector and the men's shot; nothing grips:
+the shot rests on the open right palm against the neck, held by contact and friction only, and is put from the
+shoulder with that hand so that it lands inside the sector at least the qualifying mark away; then leave the circle
+from its rear half. The Unitree H1-2."""
 import math
+import xml.etree.ElementTree as ET
 
 import mujoco
 import numpy as np
@@ -12,21 +14,53 @@ from rfo.task import TaskBase
 SHOT = OFFICIAL["shot"]                       # TR 33: 7.260 kg, 110-130 mm (120 mm here)
 APRON, RAMP = 1.0, 1.0                        # the ground outside the circle: level for APRON m, then down to the field
 N_WEDGE = 48
-# The stance of t = 0: the right arm folded, the shot against the palm beside the neck (found by a search over the arm's
-# joints: the shot 0.18 m from the neck line, 6 mm from the trunk's hull, every arm motor under a quarter of its torque).
-STANCE = dict(right_shoulder_pitch=-0.155, right_shoulder_roll=-0.024, right_shoulder_yaw=0.278,
-              right_elbow_pitch=-0.94, right_elbow_roll=-1.036, right_wrist_pitch=-0.46, right_wrist_yaw=-1.26)
-PALM_OFFSET = 0.022 + 0.003                   # the palm face of the hand's pad, and a gap, from the wrist mount's axis
+# ---- the hold at the start ----
+# No grip: the shot (120 mm, larger than any gripper's stroke) rests on the open right palm (the pad's broad face, the
+# mount's +x) beside the neck, pressed against the trunk's hull there (the H1-2's trunk and head are one hull), the
+# palm facing up, in and a little back (about 37 degrees from vertical, towards the neck): the palm carries most of its
+# weight, the neck the rest, friction both. The H1-2's arm servos are soft (40 N m/rad at the shoulder, 18 at the
+# elbow) and have no gravity feed-forward, so the start command (HOLD) differs from where the arm stands: under the
+# shot's weight the arm settles at SETTLED, where the robot starts, at rest, the shot where it then rests (SHOT_AT: from
+# the centre of the pad's face plus the shot's radius along its normal, mount frame). Found by a CMA-ES search in
+# physics over the arm's angles, its targets and where the shot touches the neck, every angle and target inside the
+# joints' ranges (a target outside them would make every plan be refused), then settled for 8 s: under the start
+# command the shot moves 4 mm relative to the hand and then rests, and the robot stands.
+SETTLED = dict(shoulder_pitch=-0.6816, shoulder_roll=0.1604, shoulder_yaw=0.2654, elbow_pitch=-0.8991,
+               elbow_roll=-0.8855, wrist_pitch=-0.4440, wrist_yaw=-1.1934)
+HOLD = dict(shoulder_pitch=-0.7315, shoulder_roll=0.1587, shoulder_yaw=0.3103, elbow_pitch=-0.8292,
+            elbow_roll=-1.0113, wrist_pitch=-0.4500, wrist_yaw=-0.8479)
+SHOT_AT = (-0.0001, 0.0084, -0.0293)
+PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness and its centre along the forearm
+# The palm-ball contact. The palm pad is the hand's rubber on a rigid mount; its contact with a ball is given the
+# restitution of a ball on a supported human hand: Ivanova, "Energy transfer evaluation in the 'striker-ball' system
+# during impact", ISBS 2000 (18th International Symposium on Biomechanics in Sports, Hong Kong), Table 1: a volleyball
+# dropped 5.5 m (10.4 m/s) onto the hand of a player whose wrist rests on a table keeps 0.10 of its speed with the hand
+# relaxed, 0.14 strained, 0.17 as a clenched fist; ball impacts last 5 to 20 ms. The pad is passive rubber (no muscle
+# tone), so here the relaxed hand's 0.10: a critically damped spring of time constant 5 ms (MuJoCo's solref; solimp
+# 0.99-0.999), measured against a pad fixed in space (tests/probe_palm.py; every official ball alike: MuJoCo's contact
+# is mass-normalised): a ball thrown head-on at 1 to 10.4 m/s keeps 0.09 to 0.11 of its speed (0.093 at 10.4 m/s)
+# after 19 ms of contact. Friction 0.7 (rubber on a ball's cover; not separately measured). With elliptic friction
+# cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py) a squeezed or resting
+# ball stays put (tests); with the ball's own rule-book contact (rebound 0.85, a lightly damped spring) instead, a ball
+# squeezed between two palms rattles out of them within a second. Every other contact of the ball keeps its own rule-book rebound.
+PALM_SOLREF, PALM_SOLIMP, PALM_MU, PALM_REBOUND = "0.005 1", "0.99 0.999 0.001", 0.7, 0.10
+CONE, IMPRATIO = "elliptic", 100.0
+# ---- end of the hold ----
 
 
-def set_arm(w, **angles) -> None:
-    """Put arm joints (names without "_joint") at angles for t = 0, and their held targets with them."""
+def shot_on_palm(w, radius: float) -> None:
+    """t = 0: the right arm settled in the stance (SETTLED), its targets (the start command) HOLD; the shot where it
+    then rests: on the palm pad's face, SHOT_AT (mount frame) from the face's centre plus its radius along the
+    normal."""
     r, d = w.robot, w.d
-    for name, v in angles.items():
-        i = w.L.JOINTS.index(name + "_joint")
+    for jn, v in SETTLED.items():
+        i = w.L.JOINTS.index(f"right_{jn}_joint")
         d.qpos[r.qadr[i]] = v
-        r.arb.q_a[i] = r.arb.q_b[i] = v
+        r.arb.q_a[i] = r.arb.q_b[i] = HOLD[jn]
     mujoco.mj_kinematics(w.m, d)
+    b = r.mount["right"]
+    R = d.xmat[b].reshape(3, 3)
+    w.put("shot", d.xpos[b] + R @ (np.array([PAD_HALF + radius, 0.0, PAD_Z]) + np.array(SHOT_AT)))
 
 
 def build_circle(sc, R: float, rim_h: float, half_sector: float, mark: float, far: float) -> list[str]:
@@ -78,20 +112,27 @@ class Task(TaskBase):
                 "leaving the circle, the measurement), TR 33.1 (the put from the shoulder), TR 33.2 (the stop board), "
                 "TR 33.4-33.5 (the men's shot)")
     deviations = [
-        "TR 33.1 (\"touch or be in close proximity to the neck or the chin\"): the hand holds the shot by a grip "
-        "switched on and off; the stance is given at the start (the shot against the palm beside the neck, its "
-        "centre within {neck_reach_m} m of the line from the base of the neck to the chin). From then to the release "
-        "the rule is judged on the shot's centre in the trunk's frame: \"the hand shall not be dropped below this "
-        "position\" as not lower than {drop_below_shoulders_m} m below the line of the two shoulder joints, \"not "
-        "behind the line of the shoulders\" as not more than {behind_shoulders_m} m behind that line, and \"put\" "
-        "(not thrown or slung) as: at the release the shot moves away from the putting shoulder's joint with at "
+        "TR 33.1 (\"the shot shall touch or be in close proximity to the neck or the chin\"; the hand that holds it): the "
+        "H1-2's hand is a flat rubber palm pad without fingers and nothing grips: the shot rests on the open right "
+        "palm, which faces up and in towards the neck, and leans against the neck (the trunk's hull: the H1-2's trunk "
+        "and head are one hull), held only by the palm's support, the neck and friction; it rolls or slides off when "
+        "the palm does not carry it. The stance is given at the start (the shot's centre within {neck_reach_m} m of "
+        "the line from the base of the neck to the chin). From then to the release the rule is judged on the shot's "
+        "centre in the trunk's frame: \"the hand shall not be dropped below this position\" as not lower than "
+        "{drop_below_shoulders_m} m below the line of the two shoulder joints, \"not behind the line of the "
+        "shoulders\" as not more than {behind_shoulders_m} m behind that line, and \"put\" (not thrown or slung) as: "
+        "at the release (the right hand's last contact) the shot moves away from the putting shoulder's joint with at "
         "least {push_fraction} of its speed relative to that joint.",
+        "The hand: the palm pad's contact with the shot is that of a ball on a human hand (a ball thrown at a "
+        f"still palm keeps {PALM_REBOUND:.2f} of its speed, as a volleyball dropped onto a supported, relaxed hand does: "
+        f"Ivanova, ISBS 2000; friction {PALM_MU:g}); the shot's contact with the rest of the robot, the ground and the stop board is "
+        "its own (rebound " + f"{SHOT['bounce']:.2f}" + ").",
         "TR 32.5-32.6: the ground outside the circle is level with the rim's top for " + f"{APRON:g} m and then falls to "
         f"the field's level over {RAMP:g} m" + " (the circle's inside is the field's level, {rim_height_m} m below the "
         "rim, instead of the field being level with the rim).",
         "TR 32.20: the mark is the point where the shot first touches the ground, not the nearest edge of its dent.",
         "TR 32.15 (interrupting a trial, laying the implement down): not modelled; the first release is the put, and "
-        "the shot cannot be gripped again.",
+        "nothing of the robot may touch the shot again.",
         "TR 32.14 names no fall: here a fall ends the trial as a failure, as in every task of this benchmark; the "
         "trial ends when the robot has left the circle correctly and stands.",
         "TR 25.17 (one minute for a trial): the whole trial, leaving the circle included, has {time_limit_s} s.",
@@ -107,25 +148,31 @@ class Task(TaskBase):
                   rim_height_m=0.02, rim_edge_m=0.003, stop_board_length_m=1.21, stop_board_width_m=0.112, stop_board_height_m=0.10,
                   sector_deg=34.92, qualifying_mark_m=6.0, neck_reach_m=0.22, neck_base_above_shoulders_m=0.08,
                   chin_above_shoulders_m=0.20, chin_forward_m=0.09, drop_below_shoulders_m=0.0,
-                  behind_shoulders_m=0.0, push_fraction=0.5, retouch_grace_s=0.20, stand_s=1.0, fall_pelvis_m=0.50)
+                  behind_shoulders_m=0.0, push_fraction=0.5, release_gap_s=0.03, stand_s=1.0, fall_pelvis_m=0.50)
 
-    sentence = ("Put the shot that your right hand holds at your neck, from the shoulder with that hand alone, so that "
-                "it lands inside the sector at least {qualifying_mark_m} m from the circle, then leave the circle "
-                "from its rear half and stand.")
-    rules = ("The men's shot ({shot_mass_kg} kg, {shot_diameter_m} m across) starts gripped against your right palm "
-             "beside your neck: you have taken your stance. The circle is {circle_diameter_m} m across inside its "
-             "rim; the ground outside is {rim_height_m} m higher than its inside. At the front, a stop board "
-             "{stop_board_length_m} m long, {stop_board_width_m} m wide and {stop_board_height_m} m high follows the "
-             "rim. The sector opens from the circle's centre, {sector_deg} degrees wide, symmetric about the "
-             "direction you face at the start. The put (TR 33.1), judged on the shot's centre relative to your trunk "
+    sentence = ("Put the shot that rests on your open right palm at your neck, from the shoulder with that hand alone, "
+                "so that it lands inside the sector at least {qualifying_mark_m} m from the circle, then leave the "
+                "circle from its rear half and stand.")
+    rules = ("The men's shot ({shot_mass_kg} kg, {shot_diameter_m} m across) starts resting on your open right palm "
+             "beside your neck, leaning against the neck: you have taken your stance. Your hands have no fingers and "
+             "no grip (the grip columns do nothing; nothing is grippable): only the palm's support, your neck and "
+             "friction hold the shot, and it rolls or slides off when the palm does not carry it. The circle is "
+             "{circle_diameter_m} m across inside its rim; the ground outside is {rim_height_m} m higher than its "
+             "inside. At the front, a stop board {stop_board_length_m} m long, {stop_board_width_m} m wide and "
+             "{stop_board_height_m} m high follows the rim. The sector opens from the circle's centre, {sector_deg} "
+             "degrees wide, symmetric about the direction you face at the start. Holding: the shot touches your right "
+             "hand (the palm pad and the wrist); breaks of that contact shorter than {release_gap_s} s are part of "
+             "the hold. The release is the hand's last contact before a break of at least {release_gap_s} s; at that "
+             "moment of the break's end the shot must touch no part of you (a shot that leaves the hand but still "
+             "rests on your trunk is a failure). The put (TR 33.1), judged on the shot's centre relative to your trunk "
              "(the line through your two shoulder joints, your trunk's up and forward directions) from the start to "
              "the release: the centre never lower than {drop_below_shoulders_m} m below the line of the shoulders and "
              "never more than {behind_shoulders_m} m behind it; nothing but your right hand and your trunk touches "
-             "the shot; and when you let go (once: it cannot be gripped again) the shot must be moving away from "
-             "your right shoulder joint with at least {push_fraction} of its speed relative to that joint (a push "
-             "from the shoulder, not a throw or a sling). The shot's first touch of the ground must be inside the "
-             "sector lines (on a line is out); the put is measured from that point to the inside of the rim along "
-             "the line through the circle's centre. You succeed when a valid put measures at least "
+             "the shot; and at the release the shot must be moving away from your right shoulder joint with at least "
+             "{push_fraction} of its speed relative to that joint (a push from the shoulder, not a throw or a sling). "
+             "There is one release: after it nothing of you may touch the shot. The shot's first touch of the ground "
+             "must be inside the sector lines (on a line is out); the put is measured from that point to the inside "
+             "of the rim along the line through the circle's centre. You succeed when a valid put measures at least "
              "{qualifying_mark_m} m and you have then left the circle correctly and stood for {stand_s} s. Leaving "
              "correctly: after the shot has landed, your first touch of the rim's top or of the ground outside the "
              "circle is behind the line through the circle's centre across the putting direction (the rear half). "
@@ -133,25 +180,28 @@ class Task(TaskBase):
              "than 0.35 m/s. You fail if any part of you touches the rim's top (its top inside edge included), the "
              "ground outside the circle or any part of the stop board other than its inner side (its top edge is "
              "not its inner side) before the shot has landed, or in the front half before you have left correctly; "
-             "if the shot drops below or goes behind the line of the shoulders, is touched by anything but the right "
-             "hand and the trunk, or is not pushed at the release; if it lands outside the sector or short of "
-             "{qualifying_mark_m} m; if any part of you touches it after the release (your right arm and your trunk "
-             "may still brush it during the first {retouch_grace_s} s); if you fall (your pelvis lower than {fall_pelvis_m} m above "
-             "the circle's floor, or any part of you other than your feet on the ground); or after {time_limit_s} s. "
-             "Where you touch the ground is judged on the points of contact; a contact within {rim_edge_m} m of the rim's "
-             "top, or that far outside the stop board's inner side, counts as on the top. The neck line of the stance runs from "
-             "{neck_base_above_shoulders_m} m above the middle of the shoulder line to the chin, "
+             "if the shot drops below or goes behind the line of the shoulders (falling off the palm included), is "
+             "touched by anything but the right hand and the trunk, leaves the hand onto the trunk, or is not pushed "
+             "at the release; if it lands outside the sector or short of {qualifying_mark_m} m; if any part of you "
+             "touches it after the release; if you fall (your pelvis lower than {fall_pelvis_m} m above the circle's "
+             "floor, or any part of you other than your feet on the ground); or after {time_limit_s} s. Where you "
+             "touch the ground is judged on the points of contact; a contact within {rim_edge_m} m of the rim's top, "
+             "or that far outside the stop board's inner side, counts as on the top. The neck line of the stance runs "
+             "from {neck_base_above_shoulders_m} m above the middle of the shoulder line to the chin, "
              "{chin_above_shoulders_m} m above and {chin_forward_m} m in front of it; at the start the shot's centre "
              "is within {neck_reach_m} m of it.")
     venue = ("You stand in the rear half of the circle facing the sector (+x), your pelvis 0.45 m behind the circle's "
-             "centre; the stop board is at the front of the circle, 1.5 m ahead of you. Your right arm is folded, "
-             "the shot against its palm beside the neck above the right shoulder. Still air. The shot is released "
-             "when the hand's grip is switched off.")
-    difficulty = ("The shot weighs 7.26 kg and the H1-2's arm motors give 40 N m at the shoulder and 18 N m at the "
-                  "elbow: the arm alone cannot push it fast, so the legs and the trunk have to drive the put, inside "
-                  "a circle two steps wide. {qualifying_mark_m} m needs a release near 7 m/s at about 40 degrees. The "
-                  "stance you start in is not in balance under the shot: held as it is in `stand` mode the robot "
-                  "topples forward within about 4.5 s, so the put (or a counter-lean) has to begin at once.")
+             "centre; the stop board is at the front of the circle, 1.5 m ahead of you. Your right arm is folded up "
+             "in front of the right side of your chest, the open palm facing up, in towards the neck and a little "
+             "back, the shot resting on it against the right side of the neck, just above and in front of the right "
+             "shoulder. The start command is not where the arm stands (the joint table's start targets differ from "
+             "its angles: the difference carries the shot's weight on the soft arm servos); held as it is, the shot "
+             "stays and the robot stands (its pelvis drifts about 2 cm in the minute). Still air.")
+    difficulty = ("The shot weighs 7.26 kg and rests on a flat palm without fingers: every move of the trunk or the arm "
+                  "that tilts the palm or accelerates the hand sideways rolls it off, and the H1-2's arm motors (40 N m "
+                  "at the shoulder, 18 N m at the elbow, soft servos) only just carry it, so the legs and the trunk have "
+                  "to drive the put while the palm stays under and behind the shot, inside a circle two steps wide. "
+                  "{qualifying_mark_m} m needs a release near 7 m/s at about 40 degrees.")
 
     def build(self, sc):
         p = self.p
@@ -170,37 +220,42 @@ class Task(TaskBase):
                 sc.geom(sc.wb, f"{tag}{i}", type="box", pos=((R + hw) * math.cos(a), (R + hw) * math.sin(a), (z0 + z1) / 2),
                         size=(hw, seg, (z1 - z0) / 2), quat=(math.cos(a / 2), 0, 0, math.sin(a / 2)), rgba=(1, 1, 1, 1),
                         friction=(1.0, 0.005, 0.0001), **HITTABLE)
-        sc.ball("shot", "shot", (0.3, -0.3, 1.5), grippable=True, mass=p["shot_mass_kg"],
-                radius=p["shot_diameter_m"] / 2)
+        sc.ball("shot", "shot", (0.3, -0.3, 1.5), mass=p["shot_mass_kg"], radius=p["shot_diameter_m"] / 2)
+        opt = sc.root.find("option")                          # no grip: the shot is not grippable
+        opt.set("cone", CONE)
+        opt.set("impratio", f"{IMPRATIO:g}")
+        for side in ("left", "right"):
+            ET.SubElement(sc.root.find("contact"), "pair", name=f"palm_ball_{side}", geom1="shot",
+                          geom2=f"{side}_palm_pad", condim="6",
+                          friction=f"{PALM_MU} {PALM_MU} 0.003 {SHOT['roll']} {SHOT['roll']}", solref=PALM_SOLREF,
+                          solimp=PALM_SOLIMP)
         sc.camera("venue", (-2.6, -3.4, 2.4), (1.2, 0.0, 0.8), fovy=55)
         sc.camera("sector", (-2.0, 0.0, 9.0), (4.5, 0.0, 0.0), fovy=70)
 
     def reset(self, w):
-        set_arm(w, **STANCE)
-        d = w.d
-        b = w.robot.mount["right"]
-        R = d.xmat[b].reshape(3, 3)
-        w.put("shot", d.xpos[b] + R @ np.array([PALM_OFFSET + self.p["shot_diameter_m"] / 2, 0.0, 0.045]))
-        w.grab("right", "shot", event=False)
+        shot_on_palm(w, self.p["shot_diameter_m"] / 2)
 
     # ------------------------------------------------------------------ the referee
     def referee_reset(self, w, ref):
         m = w.m
         self.shot = ref.geoms(body="shot")
         self.robot = ref.part("robot")
-        self.arm = ref.part("right_arm")
-        self.not_put = self.robot & ~self.arm & ~ref.part("torso")
         self.apron = ref.geoms(prefix="apron")
         self.floor = ref.geoms(names=["floor"])
         self.stop = ref.geoms(prefix="stop")
         self.sh = (m.body("right_shoulder_pitch_link").id, m.body("left_shoulder_pitch_link").id)
         self.joint = m.body("right_shoulder_roll_link").id       # the putting shoulder's joint
         self.shot_id = m.body("shot").id
-        self.trackers = {"released": None, "landed": None, "exit": False}
+        # last: the shot's state at the right hand's last contact (time, centre, velocity, the shoulder joint's velocity)
+        vs = np.zeros(6)
+        mujoco.mj_objectVelocity(m, w.d, mujoco.mjtObj.mjOBJ_BODY, self.joint, vs, 0)
+        self.trackers = {"released": None, "landed": None, "exit": False,
+                         "last": [0.0, *w.d.xpos[self.shot_id].tolist(), *w.vel("shot").tolist(), *vs[3:].tolist(),
+                                  *w.d.xpos[self.joint].tolist()]}
         ref.metrics["stance_neck_distance_m"] = round(self.shot_in_trunk(w)[2], 3)
 
     def may_grip(self, w, side, name):
-        return False                                          # held from t = 0; once let go it cannot be gripped again
+        return False                                          # no grip at all (nothing is grippable either)
 
     def shot_in_trunk(self, w):
         """The shot's centre in the trunk's frame: (height above the line of the shoulder joints, distance in front of
@@ -249,34 +304,40 @@ class Task(TaskBase):
                 ref.stage("exit")
         if tr["landed"] is not None:
             return
-        held = bool(w.holder("shot"))
         if tr["released"] is None:
             up, fwd, _ = self.shot_in_trunk(w)
-            others = ref.parts_touching(self.shot) - {"right_hand", "torso"}
+            on = ref.parts_touching(self.shot)
+            others = on - {"right_hand", "torso"}
             if up < -p["drop_below_shoulders_m"]:
                 return ref.fail("the shot dropped below the line of the shoulders", below_m=round(-up, 3))
             if fwd < -p["behind_shoulders_m"]:
                 return ref.fail("the shot went behind the line of the shoulders", behind_m=round(-fwd, 3))
             if others:
                 return ref.fail("the shot was touched by something other than the putting hand", parts=sorted(others))
-            if held:
+            if "right_hand" in on:                             # in the hand: remember its state at this contact
+                vs = np.zeros(6)
+                mujoco.mj_objectVelocity(w.m, w.d, mujoco.mjtObj.mjOBJ_BODY, self.joint, vs, 0)
+                tr["last"] = [ref.time, *w.d.xpos[self.shot_id].tolist(), *w.vel("shot").tolist(),
+                              *vs[3:].tolist(), *w.d.xpos[self.joint].tolist()]
                 return
-            tr["released"] = ref.time
-            m, d = w.m, w.d
-            c, v = d.xpos[self.shot_id], w.vel("shot")
-            vs = np.zeros(6)
-            mujoco.mj_objectVelocity(m, d, mujoco.mjtObj.mjOBJ_BODY, self.joint, vs, 0)
-            rel, arm = v - vs[3:], c - d.xpos[self.joint]
+            if ref.time - tr["last"][0] < p["release_gap_s"] - 1e-9:
+                return                                         # a short break of the contact: still in the hand
+            if on:
+                return ref.fail("the shot left the hand but not the body (it rests on the trunk)")
+            last = np.asarray(tr["last"], float)                # the release: the hand's last contact
+            tr["released"] = round(float(last[0]), 4)
+            c, v, vj, pj = last[1:4], last[4:7], last[7:10], last[10:13]
+            rel, arm = v - vj, c - pj
             speed = float(np.linalg.norm(rel))
             away = float(rel @ arm / max(float(np.linalg.norm(arm)), 1e-9))
+            ref.metrics["release_time_s"] = tr["released"]
             ref.metrics["release_speed_m_s"] = round(float(np.linalg.norm(v)), 2)
             ref.metrics["release_height_m"] = round(float(c[2]), 3)
             ref.metrics["release_push_fraction"] = round(away / speed, 3) if speed > 1e-6 else 0.0
             if away < p["push_fraction"] * speed or speed <= 1e-6:
                 return ref.fail("the shot was not put from the shoulder", push_fraction=round(away / max(speed, 1e-9), 3))
             ref.stage("release")
-        elif (ref.touching(self.shot, self.not_put)             # (the putting arm and the trunk, where the shot lay,
-              or (ref.time - tr["released"] > p["retouch_grace_s"] and ref.touching(self.shot, self.robot))):  # may brush it)
+        elif ref.touching(self.shot, self.robot):
             return ref.fail("the shot was touched after the release", parts=sorted(ref.parts_touching(self.shot)))
         pts = ref.contact_points(self.shot, ref.ground)
         if not len(pts):
@@ -298,6 +359,8 @@ class Task(TaskBase):
 
     def privileged(self, w):
         up, fwd, neck = self.shot_in_trunk(w)
-        return {"shot": w.pos("shot").tolist(), "shot_velocity": w.vel("shot").tolist(), "held": bool(w.holder("shot")),
+        tr = self.trackers
+        return {"shot": w.pos("shot").tolist(), "shot_velocity": w.vel("shot").tolist(),
+                "in_hand": tr["released"] is None and tr["last"] is not None and w.t - tr["last"][0] < 0.011,
                 "shot_above_shoulder_line_m": up, "shot_in_front_of_shoulder_line_m": fwd, "shot_to_neck_line_m": neck,
                 "circle_radius": self.R, "sector_half_angle_deg": math.degrees(self.half_sector)}

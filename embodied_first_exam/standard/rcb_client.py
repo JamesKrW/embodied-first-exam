@@ -152,6 +152,9 @@ class Robot:
         return self._spec
 
     def _post(self, path: str, meta: dict, parts: list, timeout: float) -> Result:
+        # the read timeout outlasts the service's own per-call cap (spec max_call_wall_s, 900 s by default): a long call
+        # comes back stopped (meta.stopped) instead of timing out here while the service is still executing it
+        timeout = max(timeout, float(self._spec.get("max_call_wall_s") or 900) + 120)
         body = rcb1.encode(meta, parts)
         r = requests.post(self.base + path, data=body, headers={"Content-Type": "application/x-rcb1"}, timeout=(5, timeout))
         if r.status_code == 409:
@@ -190,7 +193,7 @@ class Robot:
         """Current frames (seconds=0, free) or hold the last command and watch for `seconds` (returns the video).
         depth: None | True (= "last": the last frame's depth) | "frames" (one depth map per frame)."""
         meta = {"seconds": float(seconds), "video": video, **self._common(cameras, video_fps, depth, include_depth)}
-        res = self._post("/observe", meta, [], timeout=600)
+        res = self._post("/observe", meta, [], timeout=1800)
         if res.stopped:
             print(f"[rcb_client] the service stopped this watch early ({res.stopped}) after {res.meta.get('control_steps_watch')} control "
                   "steps", file=sys.stderr)

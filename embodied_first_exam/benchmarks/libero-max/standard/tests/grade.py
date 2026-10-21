@@ -55,7 +55,7 @@ def main() -> None:
         failed_finalize = bool(d.get("finalize_error"))
         reason = str(d.get("reason") or "")
         infra = bool(d.get("infra_error")) or not finalized or failed_finalize
-        ok = bool(d.get("success")) and live and by_live and not infra
+        ok = bool(d.get("success")) and live and by_live and not infra and reason != "error"   # PROTOCOL §4: a simulator error is the agent's 0
         out = {"success": int(ok), "live_success": int(live), "graded_by_live": int(by_live),
                "replays": int(d.get("replays") or 0), "finalized": int(finalized), "missing_log": 0,
                "infra_error": int(infra), "grader_error": int(failed_finalize),

@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-pitch-target-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics pitch-target on the same frozen instance as embodied-olympics-fun-pitch-target-i00-privileged. Pitch a strike: from the pitcher's plate on the mound, with a foot on the plate, throw the baseball in your right hand through the strike zone over home plate, on the fly. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics pitch-target on the same frozen instance as embodied-olympics-fun-pitch-target-i00-privileged. Pitch a strike: from the pitcher's plate on the mound, with a foot on the plate, throw the baseball held in your right gripper through the strike zone over home plate, on the fly. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "pitch-target"]
 
@@ -34,7 +34,7 @@ instance_seed = 0
 reset_budget = 50
 expert_time_estimate_hours = 10.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a real stand on the mound and release, the ball's velocity set to 22 m/s: a strike; a 14.5 m/s lob at 29 degrees is a strike too); negatives: no foot on the plate, a bounce, high, wide, touched after the release. An arm swing of the H1-2 gives 6.8 m/s, 9.9 m/s with the trunk (and a fall); human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_pitch_target.py: positive by injection (a real release by opening the right Dex1 gripper on the plate, then 22 m/s: a strike; a 14.5 m/s lob too); real overhand swings release at 3-8 m/s (too early: back onto the robot; 0.25 s in: 1.4 m ahead on the mound); a 5 N clamp loses the ball in the swing, 10 N keeps it; negatives: held past the pitch timer, dropped, no foot on the plate, a bounce, high, wide, held again, touched after the release, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

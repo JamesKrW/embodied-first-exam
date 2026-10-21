@@ -1,5 +1,32 @@
-"""Clean and jerk (IWF): the loaded men's barbell from the platform to the shoulders, then to locked arms overhead, and
-held motionless there until the referee's "down" signal."""
+"""Clean and jerk (IWF): a 5 kg aluminium technique bar from the platform to the shoulders, then to locked arms
+overhead, held motionless there until the referee's "down" signal. Nothing is welded: the hands are Unitree's Dex1-1
+two-finger grippers, open at the start; the bar (a free body: the shaft and two revolving sleeves with their inner
+collars) is held only by the friction of the jaws closed on its 25 mm grip section, and can slip, turn in the jaws and
+drop.
+
+The load (a deviation): American Barbell's ATB-5-E aluminium technique bar, 5 kg (49 N), 1.835 m, 25 mm
+(ironcompany.com / americanbarbell.com listing: aluminium shaft and sleeves, 25 mm, 1835 mm), lying on its inner
+collars. The IWF's women's bar is 15 kg and the lightest competition barbell 21 kg (IWF TCRR 2020).
+
+Why not heavier (measured and computed in the simulator image; tests/cj_*.py):
+- the grippers' clamps begin to let a hanging bar slide at about 400 N (the men's lightest barbell, 45 kg, slides out);
+- with the women's 15 kg bar the clean's turnover is out of reach: every path from the hang (the bar below the elbows)
+  to the rack passes a pose with the bar level with the elbow joint, and there the best arm pose found needs 1.08 to
+  1.17 times the elbow and shoulder motors' torque (a search bound, tests/cj_level.py); fast, the bar's pull along the
+  fingers is limited by their friction and across them by the coupled jaw servos (240 N), and a search over a
+  dip-drive-flip never kept the bar in the jaws;
+- with 5 kg the same bound is 0.54, and along the reference's whole path no arm joint needs more than 0.78 of its limit.
+
+The reference solution (oracles/clean-and-jerk: `lowcmd` rows; a whole-body plan with the feet flat and the centre of
+mass, the bar's included, over the soles; static feed-forward torques; the arms by inverse kinematics with the jaws'
+across axis along the bar): squats to the bar, closes the jaws 18 mm from their tips (a deeper grip puts the tips on
+the platform), stands up with straight arms (the attempt begins at 5.3 s), straightens the knees, brings the bar up
+in front of the hips and the trunk to the shoulders (the clean, 11.3 s), presses it overhead with the arms' null space
+drawn smoothly to straight arms (overhead at 17.4 s) and holds until the down signal (19.5 s): 10 of 10 variations of
+its timing succeed (19.2 to 22.3 s); the verifier's replay gives the same verdict and state.
+
+The hold's other surfaces: the bar touches every collision geom of the robot (it may rest on the trunk, as in a front
+rack); the grippers' pads win the contact parameters on it (priority 2, friction 1.0, realhand.py)."""
 import math
 import xml.etree.ElementTree as ET
 
@@ -7,11 +34,18 @@ import numpy as np
 
 from rfo.scene import HITTABLE, bounce_solref
 from rfo.task import TaskBase
+# A rigid barbell's steel (shaft, sleeves, collars; the bumper discs keep their bounce)'s contact with the robot, the
+# venue's fixtures and the other props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of
+# the core's shells (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics'
+# weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins over a default-contact geom; a
+# ball (priority 1) keeps its own bounce. With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank
+# 36 mm into the platform (stress test 2026-10-21).
+from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
-# What the IWF barbell rule does not fix (estimates, stated in `deviations`): how the bar's 20 kg is split between the
-# shaft and the two revolving sleeves, the width of a disc and of a collar, the bumpers' bounce on the platform.
-SHAFT_KG, SLEEVE_KG = 7.0, 6.5
-FLANGE_M, DISC_W_M, COLLAR_W_M, COLLAR_R_M = 0.030, 0.034, 0.070, 0.045
+# What the bar's maker does not give (estimates, stated in `deviations`): how the technique bar's 5 kg is split between
+# the shaft (a 25 mm x 1.31 m aluminium rod: 1.74 kg) and the two revolving sleeves with their inner collars (flanges,
+# 0.08 m across, 0.03 m wide), the width of a disc and of a collar, the bumpers' bounce on the platform.
+FLANGE_M, FLANGE_R_M, DISC_W_M, COLLAR_W_M, COLLAR_R_M = 0.030, 0.040, 0.034, 0.070, 0.045
 BUMPER_BOUNCE = 0.4
 SIDES = ("left", "right")
 
@@ -21,20 +55,30 @@ class Task(TaskBase):
     title = "Weightlifting: clean and jerk"
     category = "parkour-apparatus-balance"
     robot = "unitree_h1"
-    rulebook = ("IWF Technical and Competition Rules & Regulations (International Weightlifting Federation; quoted "
-                "from memory of the 2020s editions): 2.3 the clean and jerk, 2.5 incorrect movements, 3.1 the "
-                "platform, 3.3 the barbell")
+    rulebook = ("IWF Technical and Competition Rules & Regulations (International Weightlifting Federation; 2020 "
+                "edition, article numbers quoted from memory of the 2020s editions): 2.3 the clean and jerk, 2.5 "
+                "incorrect movements, 3.1 the platform, 3.3 the barbell (the women's bar: 15 kg, 2.01 m, a 25 mm grip "
+                "section 1.31 m long, sleeves 50 mm thick; collars 2.5 kg; the lightest barbell in competition, "
+                "women: 21 kg = the bar, two collars and two 0.5 kg discs)")
     deviations = [
-        "3.3 (the barbell's load): the barbell is the lightest one the men's equipment gives on full-size discs: the "
-        "{bar_mass_kg} kg bar, one {disc_mass_kg} kg disc of {disc_diameter_m} m (the lightest disc of the full "
-        "diameter) and one {collar_mass_kg} kg collar on each sleeve, {total_mass_kg} kg; there is no choice of weight "
-        "and no progression of attempts, because the task is one attempt",
-        "3.3 (what the rule leaves open): the bar's {bar_mass_kg} kg are split 7 kg for the shaft and 6.5 kg for each "
-        "revolving sleeve, a disc is 0.034 m wide and a collar 0.07 m, and a disc keeps 0.4 of its speed when it "
-        "bounces on the platform; these are estimates, the rule gives no numbers for them",
-        "3.3 (the grip): the robot's hands have no fingers; a closed grip holds the bar's grip section rigidly to the "
-        "palm when the bar's surface is within 3.5 cm of the palm point, so the hook grip, chalk and the strength of "
-        "the fingers are not simulated",
+        "3.3 (the barbell): the barbell is an aluminium technique bar, American Barbell's ATB-5-E (5 kg, 1.835 m, "
+        "a 25 mm grip section 1.31 m long as the women's bar's, sleeves 50 mm thick), training equipment, not a "
+        "competition barbell (the women's bar is 15 kg, the lightest competition barbell {min_load_kg} kg), without "
+        "collars or discs, lying on the platform on its inner collars, not on 0.45 m discs. The reason is the "
+        "robot's arms and hands: with the women's 15 kg bar the turnover from the hang to the shoulders asks 1.08 "
+        "to 1.17 times what the elbow and shoulder motors give, and the two-finger grippers let a bar slide at "
+        "about 400 N, so neither a heavier bar nor a faster turnover is open. There is no choice of weight and no "
+        "progression of attempts, because the task is one attempt",
+        "3.3 (what the maker does not give): the bar's {bar_mass_kg} kg are split {shaft_mass_kg} kg for the shaft "
+        "and the rest between the two revolving sleeves with their inner collars (0.08 m across, 0.03 m wide); "
+        "these are estimates",
+        "3.3 (the grip): each hand is a two-finger gripper, Unitree's Dex1-1 (90 mm stroke, 80 mm jaws with rubber "
+        "pads, at most 120 N; sold for the G1, not for this robot: here it sits where the H1-2's hand would), open "
+        "at the start; it holds the bar by the jaws' friction alone (nothing is welded), so the hook grip, chalk and "
+        "the fingers are not simulated, and the bar can slip, turn in the jaws and drop. A hand holds the bar while "
+        "the grip section touches both of its jaws (a break of up to {off_bar_s} s, the pads' contact flickering "
+        "under a load, is not letting go). The Dex1-1's own rating is a 5 kg friction-grasp load; the model's pads "
+        "hold some five times that",
         "2.3.1 (the clean): the referee judges the end of the clean, not the movement: the bar at the shoulders (its "
         "axis within {clean_rack_m} m of both shoulder joints; the robot's rigid chest stands 0.07 m ahead of them, "
         "so the bar cannot lie on the collarbones) with the legs extended, the feet on one line and everything "
@@ -65,22 +109,24 @@ class Task(TaskBase):
     stages = ["lift-off", "clean", "overhead", "down signal"]
     fall_rule = False                # the family's own contact rules (2.5): feet only on the platform, nothing off it
     params = dict(platform_size_m=4.0, platform_height_m=0.10,
-                  bar_mass_kg=20.0, bar_length_m=2.20, grip_diameter_m=0.028, grip_length_m=1.31,
-                  sleeve_diameter_m=0.050, sleeve_length_m=0.415, disc_mass_kg=10.0, disc_diameter_m=0.45,
-                  collar_mass_kg=2.5, total_mass_kg=45.0, bar_ahead_m=0.10,
+                  bar_mass_kg=5.0, bar_length_m=1.835, grip_diameter_m=0.025, grip_length_m=1.31,
+                  sleeve_diameter_m=0.050, sleeve_length_m=0.2325, shaft_mass_kg=1.74, disc_mass_kg=0.0,
+                  disc_diameter_m=0.45, collar_mass_kg=0.0, total_mass_kg=5.0, min_load_kg=21.0, bar_ahead_m=0.20,
                   lift_tolerance_m=0.03, knee_height_m=0.48, clean_rack_m=0.15, clean_hold_s=0.5, overhead_m=0.25,
                   elbow_lock_deg=10.0, knee_lock_deg=10.0, feet_line_m=0.05, bar_tilt_max_deg=60.0, still_m_s=0.10,
                   upright_cos=0.94, bar_centre_m=0.25, bar_align_deg=20.0,
-                  hold_s=2.0)
+                  hold_s=2.0, off_bar_s=0.05)
 
     sentence = ("Clean and jerk the barbell: lift it from the platform to your shoulders, then to locked arms "
                 "overhead, and hold it there motionless until the down signal.")
-    rules = ("The barbell is the IWF men's bar ({bar_mass_kg} kg, {bar_length_m} m long; the grip section between the "
-             "sleeves is {grip_length_m} m long and {grip_diameter_m} m thick; the sleeves are {sleeve_length_m} m "
-             "long and {sleeve_diameter_m} m thick and revolve on the bar) with one {disc_mass_kg} kg rubber disc of "
-             "{disc_diameter_m} m and one {collar_mass_kg} kg collar on each sleeve: {total_mass_kg} kg. It lies on "
+    rules = ("The barbell is an aluminium technique bar ({bar_mass_kg} kg, {bar_length_m} m long; the grip section "
+             "between the inner collars is {grip_length_m} m long and {grip_diameter_m} m thick; the sleeves are "
+             "{sleeve_length_m} m long and {sleeve_diameter_m} m thick and revolve on the bar), without discs or "
+             "collars: {total_mass_kg} kg. It lies on "
              "the competition platform ({platform_size_m} m by {platform_size_m} m, {platform_height_m} m high), on "
-             "which you stand. A hand can grip the grip section anywhere along it. "
+             "which you stand. Your hands are two-finger grippers, open at the start; a hand holds the bar while the "
+             "bar's grip section touches both of that gripper's jaws (a break of up to {off_bar_s} s is not letting "
+             "go); they hold it by the friction of their jaws only, so it can slip, turn in the jaws and drop. "
              "Lift-off: the bar may leave the platform only in both hands: you fail the moment the bar's axis is more "
              "than {lift_tolerance_m} m above where it lies at rest while fewer than two hands grip it. "
              "The attempt: once the bar's centre has been {knee_height_m} m above the platform (knee height) the lift "
@@ -110,16 +156,23 @@ class Task(TaskBase):
              "rule: you may squat as low as you like, and the bar may touch your body.")
     venue = ("You stand upright in the middle of the platform, facing +x, your soles {platform_height_m} m above the "
              "floor, in the rest pose (upper arms down, forearms forward). The barbell lies on the platform across "
-             "your front, parallel to your shoulders and centred on you: its axis is {bar_ahead_m} m ahead of your "
-             "pelvis and 0.225 m above the platform (above your feet, just clear of your shins), the discs 0.69 m "
-             "to each side of its middle. Your shoulder joints are 1.46 m above the platform when you stand, 0.30 m "
-             "apart; the centre of your head is at 1.70 m, its top at 1.79 m; your knee joints are at 0.48 m. In "
+             "your front, parallel to your shoulders and centred on you, on its inner collars (0.08 m across, 0.655 m "
+             "to each side of its middle): its axis is {bar_ahead_m} m ahead of your pelvis and 0.04 m above the "
+             "platform, just beyond your toes (they reach 0.164 m ahead of your pelvis). Your shoulder joints are "
+             "1.46 m above the platform when you stand, 0.30 m apart; the centre of your head is at 1.70 m, its "
+             "top at 1.79 m; your knee joints are at 0.48 m. In "
              "the `stand` action's stance your knees are bent by about 21 degrees, and your elbows are at a right "
              "angle in the rest pose: neither is extended. Your elbow joints have no stop at the straight arm (they "
-             "bend both ways from it). The platform's edges are 2 m away in every direction.")
-    difficulty = ("The barbell weighs two thirds of the robot: held at the shoulders it asks about twice the torque "
-                  "the elbow motors give (18 N m), so the arms cannot simply carry it there. Nothing balances the "
-                  "robot under a load, and no built-in action bends down to the bar or straightens the knees.")
+             "bend both ways from it). Both grippers are open (grip values 0): a grip value is that gripper's closure "
+             "command (0 open, 90 mm between the pads; 1 closed); on the 25 mm grip section about 0.86 or more "
+             "clamps at the full 120 N per jaw, less clamps more lightly (10 N per mm that the commanded opening, "
+             "90 mm times one less the value, is below 25 mm). The barbell is a free body: `held` in your state says "
+             "which gripper touches it with both jaws. The platform's edges are 2 m away in every direction.")
+    difficulty = ("The bar is light but lies low, 0.04 m above the platform, and the hands are two-finger grippers "
+                  "that hold it by friction, near their tips at first. Turning it over from the hang to the "
+                  "shoulders, slowly, asks about half of what the elbow and shoulder motors give; too fast, and the "
+                  "bar slides out of the jaws. Nothing balances the robot under a load, and no built-in action bends "
+                  "down to the bar or straightens the knees.")
 
     # ------------------------------------------------------------------ the venue
     def build(self, sc):
@@ -130,6 +183,7 @@ class Task(TaskBase):
         total = p["bar_mass_kg"] + 2 * p["disc_mass_kg"] + 2 * p["collar_mass_kg"]
         if abs(total - p["total_mass_kg"]) > 1e-6:
             raise ValueError(f"clean-and-jerk: total_mass_kg must be the bar, two discs and two collars ({total:g} kg)")
+        loaded = [(p["disc_mass_kg"], r_disc), (p["collar_mass_kg"], COLLAR_R_M)]
         if abs(half - (half_grip + FLANGE_M + p["sleeve_length_m"])) > 1e-6:
             raise ValueError("clean-and-jerk: bar_length_m must be the grip section, two 0.03 m flanges and two sleeves")
         sc.platform("platform", (0.0, 0.0), (S, S, H / 2), rgba=(0.72, 0.60, 0.42, 1))
@@ -139,29 +193,35 @@ class Task(TaskBase):
         opt = sc.root.find("option")
         flag = opt.find("flag") if opt.find("flag") is not None else ET.SubElement(opt, "flag")
         flag.set("multiccd", "enable")
-        self.rest = np.array([p["bar_ahead_m"], 0.0, H + r_disc])
+        r_rest = max([FLANGE_R_M, r_sleeve] + [r for mass, r in loaded if mass > 0])    # what it lies on
+        self.rest = np.array([p["bar_ahead_m"], 0.0, H + r_rest])
         self.rest_z = float(self.rest[2])
-        steel, kw = (0.78, 0.78, 0.80, 1), dict(friction=(0.8, 0.005, 0.0001), **HITTABLE)
+        steel, kw = (0.78, 0.78, 0.80, 1), dict(friction=(0.8, 0.005, 0.0001), **HITTABLE, **RIGID)
         b = sc.body("bar", tuple(self.rest), free=True)
         sc.geom(b, "bar_shaft", type="cylinder", fromto=(0, -half_grip, 0, 0, half_grip, 0), size=(r_grip,),
-                mass=SHAFT_KG, rgba=steel, **kw)
-        split = p["bar_mass_kg"] - SHAFT_KG
+                mass=p["shaft_mass_kg"], rgba=steel, **kw)
+        split = p["bar_mass_kg"] - p["shaft_mass_kg"]
         for s, tag in ((1, "L"), (-1, "R")):
             y0 = half_grip                                   # the sleeve assembly, on a hinge about the bar's axis
             sl = sc.body(f"bar_sleeve{tag}", (0.0, s * y0, 0.0), parent=b)
             ET.SubElement(sl, "joint", name=f"bar_sleeve{tag}", type="hinge", axis="0 1 0", damping="0.002",
                           armature="0.0005")
-            sc.geom(sl, f"bar_flange{tag}", type="cylinder", fromto=(0, 0, 0, 0, s * FLANGE_M, 0), size=(0.04,),
-                    mass=0.5, rgba=steel, **kw)
+            # the inner collar, on which the bar alone lies: rolling resistance of steel on the hardwood platform,
+            # about 1 mm (engineering tables: steel on wood 0.0005-0.0015 m; condim 6 so that it applies)
+            sc.geom(sl, f"bar_flange{tag}", type="cylinder", fromto=(0, 0, 0, 0, s * FLANGE_M, 0), size=(FLANGE_R_M,),
+                    mass=0.5, rgba=steel, condim="6", **dict(kw, friction=(0.8, 0.005, 0.001)))
             sc.geom(sl, f"bar_sleeve{tag}", type="cylinder", fromto=(0, s * FLANGE_M, 0, 0, s * (half - y0), 0),
                     size=(r_sleeve,), mass=split / 2 - 0.5, rgba=steel, **kw)
-            y1 = FLANGE_M + DISC_W_M
-            sc.geom(sl, f"bar_disc{tag}", type="cylinder", fromto=(0, s * FLANGE_M, 0, 0, s * y1, 0), size=(r_disc,),
-                    mass=p["disc_mass_kg"], rgba=(0.10, 0.55, 0.22, 1), priority=1, solref=bounce_solref(BUMPER_BOUNCE),
-                    friction=(0.9, 0.005, 0.0005), **HITTABLE)
-            sc.geom(sl, f"bar_collar{tag}", type="cylinder", fromto=(0, s * y1, 0, 0, s * (y1 + COLLAR_W_M), 0),
-                    size=(COLLAR_R_M,), mass=p["collar_mass_kg"], rgba=(0.55, 0.55, 0.58, 1), **kw)
-        sc.grippables["bar"] = {"radius": r_grip, "half_length": half_grip, "axis": "y"}
+            y1 = FLANGE_M + (DISC_W_M if p["disc_mass_kg"] > 0 else 0.0)
+            if p["disc_mass_kg"] > 0:                        # (none on the women's bar alone)
+                sc.geom(sl, f"bar_disc{tag}", type="cylinder", fromto=(0, s * FLANGE_M, 0, 0, s * y1, 0),
+                        size=(r_disc,), mass=p["disc_mass_kg"], rgba=(0.10, 0.55, 0.22, 1), priority=1,
+                        solref=bounce_solref(BUMPER_BOUNCE), friction=(0.9, 0.005, 0.0005), **HITTABLE)
+            if p["collar_mass_kg"] > 0:
+                sc.geom(sl, f"bar_collar{tag}", type="cylinder", fromto=(0, s * y1, 0, 0, s * (y1 + COLLAR_W_M), 0),
+                        size=(COLLAR_R_M,), mass=p["collar_mass_kg"], rgba=(0.55, 0.55, 0.58, 1), **kw)
+        for side in SIDES:                                   # the hands: Dex1-1 grippers (rfo.realhand), no weld
+            sc.real_hands[side] = "dex1"
         sc.camera("venue", (3.3, -3.0, 1.9), (0.1, 0.0, 0.95), fovy=50)
 
     def reset(self, w):
@@ -242,7 +302,12 @@ class Task(TaskBase):
         self.robot = ref.part("robot")
         self.foot = {s: ref.part(f"{s}_foot") for s in SIDES}
         self.not_feet = self.robot & ~ref.part("feet")
-        self.trackers = {"attempt": False, "max_height_m": 0.0}
+        self.trackers = {"attempt": False, "max_height_m": 0.0, "on_t": {s: None for s in SIDES}}
+
+    def hands_on(self, w) -> list:
+        """The hands that hold the bar: the grip section touching both jaws now, or within the last off_bar_s."""
+        on = self.trackers["on_t"]
+        return [s for s in SIDES if on[s] is not None and w.ref.time - on[s] <= self.p["off_bar_s"] + 1e-9]
 
     # ------------------------------------------------------------------ the referee
     def substep(self, w, ref):
@@ -255,15 +320,18 @@ class Task(TaskBase):
             return ref.fail("touched the platform with a part other than the feet",
                             parts=sorted(ref.parts_touching(self.platform) - {"left_foot", "right_foot"}))
         z = float(w.d.xpos[self._bar][2])
-        hands = len(w.holder("bar"))
+        for s in SIDES:
+            if w.held[s] == "bar":
+                tr["on_t"][s] = round(ref.time, 4)
+        hands = len(self.hands_on(w))
         if tr["attempt"]:
             if hands < 2:
-                return ref.fail("let go of the bar", holding=w.holder("bar"))
+                return ref.fail("let go of the bar", holding=self.hands_on(w))
             if ref.touching(self.bar_g, self.platform):
                 return ref.fail("the bar came down before the down signal")
         elif z > self.rest_z + p["lift_tolerance_m"]:
             if hands < 2:
-                return ref.fail("the bar left the platform without both hands on it", holding=w.holder("bar"))
+                return ref.fail("the bar left the platform without both hands on it", holding=self.hands_on(w))
             ref.stage("lift-off")
             if z >= p["platform_height_m"] + p["knee_height_m"]:
                 tr["attempt"] = True
@@ -275,7 +343,7 @@ class Task(TaskBase):
         c, _, v_bar = self.bar_state(w)
         v_pelvis = float(np.linalg.norm(w.d.qvel[w.robot.fv:w.robot.fv + 3]))
         return {
-            "both hands": len(w.holder("bar")) == 2,
+            "both hands": len(self.hands_on(w)) == 2,
             "knees": max(self.knee_flex_deg(w, s) for s in SIDES) <= p["knee_lock_deg"],
             "elbows": max(self.elbow_flex_deg(w, s) for s in SIDES) <= p["elbow_lock_deg"],
             "feet on the platform": all(ref.touching(self.foot[s], self.platform) for s in SIDES),
@@ -317,7 +385,7 @@ class Task(TaskBase):
     def privileged(self, w):
         c, a, v = self.bar_state(w)
         return {"bar_centre": c.tolist(), "bar_axis": a.tolist(), "bar_speed_m_s": v, "bar_rest": self.rest.tolist(),
-                "held_by": w.holder("bar"), "shoulder_distance_m": self.rack_distance(w),
+                "held_by": w.holder("bar"), "hands_on": self.hands_on(w), "shoulder_distance_m": self.rack_distance(w),
                 "elbow_flex_deg": [self.elbow_flex_deg(w, s) for s in SIDES],
                 "knee_flex_deg": [self.knee_flex_deg(w, s) for s in SIDES],
                 "feet_offset_m": self.feet_offset_m(w), "head_centre_z": self.head_z(w),

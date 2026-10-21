@@ -74,10 +74,10 @@ def ctrl_steps() -> int:
     return int(S.n_steps) if E["ready"] else 0
 
 
-# Episode ends that are infrastructure failures, never the agent's: a simulator error, and a numerically unstable simulation
+# Episode ends that are infrastructure failures, never the agent's: a numerically unstable simulation
 # (rcb_topogym.SIMULATOR_INSTABILITY: a cloth particle faster than PARTICLE_SPEED_LIMIT_M_S, before the task's own failure
-# predicates).
-INFRA_REASONS = ("error", "simulator_instability")
+# predicates). A simulator error the agent's call raised (reason "error") is the agent's 0 (PROTOCOL §4).
+INFRA_REASONS = ("simulator_instability",)
 
 
 def instability_fields() -> dict:
@@ -387,7 +387,8 @@ def recorder(cams: list[str], fps: int, meta: dict) -> L.Recorder:
 # standard mode"): meta["safety"] carries exactly the fields rcb_topogym._SafetyMonitor.read returns, as on main, with
 # the names of the parts involved (user decision 2026-10-13: names are allowed in standard mode; only positions / poses
 # in the simulator's world frame, the table height and physics parameters are withheld). The fields are forces, depths
-# (mm), ratios, times, counts and names; the table guard's asked_mm / stopped_mm are heights relative to the tabletop.
+# (mm), ratios, times, counts and names; the table guard's asked_mm / stopped_mm are heights relative to the tabletop, or
+# to the cloth surface under the gripper when the event's floor is "cloth".
 # None holds a position or pose, so nothing here needs the robot frame; a field added later that does must go through
 # to_robot first.
 SAFETY_PUBLISHED = ("rules", "scope", "forcing", "task_contact_mm", "held_finger_contact_mm", "review", "soft_volume_ratio",
@@ -447,9 +448,14 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder, *, row_start=False, notes: list | 
             e = S.last_guard.get(arm)
             reason = f"table guard: the {arm} gripper"
             if e and not any(n["row"] == ri and n["reason"].startswith(reason + " ") for n in notes[-8:]):
-                notes.append({"row": ri, "index": int(ARM[arm][1]), "reason": (
-                    f"{reason} would have reached {e['asked_mm']:+.1f} mm from the tabletop; its target stopped at "
-                    f"{e['stopped_mm']:+.1f} mm (no gripper target goes lower than {M.table_guard_words()})")})
+                if e.get("floor") == "cloth":   # the cloth floor: heights from the cloth surface under the gripper
+                    text = (f"{reason} would have reached {e['asked_mm']:+.1f} mm from the cloth surface under it; its target "
+                            f"stopped at {e['stopped_mm']:+.1f} mm (over the cloth, heights are measured from the cloth "
+                            "surface, not the tabletop)")
+                else:
+                    text = (f"{reason} would have reached {e['asked_mm']:+.1f} mm from the tabletop; its target stopped at "
+                            f"{e['stopped_mm']:+.1f} mm (no gripper target goes lower than {M.table_guard_words()})")
+                notes.append({"row": ri, "index": int(ARM[arm][1]), "reason": text})
     stop = EP.journal(S.hold_action(), physics_steps=S.last_step_ticks) if S.n_steps != before else EP.poll_stop()
     rec.tick()
     if S.episode_end is not None and "end_row" not in E and S._recording is not None:

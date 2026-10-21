@@ -30,7 +30,7 @@ Every task shares the tooling `rcb_topogym.py`, the graders, the sim service and
   `nyx_direct.py` from the files-only image `ghcr.io/mll-lab-nu/efe:roboarc-files-<version>` (`images/roboarc-files/`, built
   from `embodied_first_exam/benchmarks/roboarc/`; `FILES.json` pins its digest and the files' sha256) with
   `COPY --from=<image@digest>`: the privileged task dirs carry no copy. The standard sim service is built from `environment/sim/` (its `Dockerfile`)
-  and takes them, and the rest of the files it shares with other tasks, at `/srv` from `images/roboarc-sim-files/`;
+  and takes them, and the rest of the files it shares with other tasks, at `/srv` from the same `images/roboarc-files/`;
 - the texts state what the tooling grades: the contact-review values come from `CONTACT_RULE`, and the grasping rule is
   `Session.grasp_rules()` of the instance (the weld's slip force over 20 ms, 60 N ALOHA / 65 N Robotiq, and the
   Robotiq's release after 0.2 s without finger contact).
@@ -104,7 +104,7 @@ verdict, and a failed, killed or GPU-less pass loses only the video. `tests/grad
   startup record (`startup_binding.json`) against its own copy of the binding.
 - **Infrastructure** (H.5): no, unreadable or unfinalized `final.json`, the end timed out, `instance_mismatch`, a give-up
   after crashes not all inside the agent's calls (`sim_crashed`, `resume_failed`, `call_watchdog`), `simulator_instability`
-  in the live episode, a simulator error (reason `error`). The agent's 0: the task's failure predicate,
+  in the live episode. The agent's 0: a simulator error (reason `error`, `sim_error`), the task's failure predicate,
   `forced_breakdown`, the wall clock, `step_guard`, `sim_crashed_on_call`. A video-pass error or a GPU lost after the
   episode never voids a trial.
 - **Re-scoring recorded standard trials.** The verdict is the recorded live fields of `final.json`: the `success` of

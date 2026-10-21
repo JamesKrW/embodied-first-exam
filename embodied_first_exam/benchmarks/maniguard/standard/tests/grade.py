@@ -11,8 +11,8 @@ none of these: final.json is missing (the service never came up, or its containe
 or unreadable (also grader_error); the collect hook did not finish (`finalized` false: only the service's own running
 copy is there); the service gave up after crashes outside a call, never ended the episode, or found at the episode's start
 that the scene did not rebuild the frozen instance (`instance_mismatch`, before serving); no record of the live episode.
-A give-up after crashes during a call (sim_crashed_on_call) and a simulator error raised by the agent's actions stay its
-failure."""
+A give-up after crashes during a call (sim_crashed_on_call) and a simulator error raised by the agent's actions (reason
+"error" or "nonfinite") stay its failure, even after a success the episode had reached (PROTOCOL §4)."""
 import json, os, re, shutil, traceback
 LOG = os.environ.get("RCB_VERIFIER_LOG_DIR") or "/logs/verifier"; os.makedirs(LOG, exist_ok=True)
 OUTCOMES = ("idle", "reached", "manipulated", "success")
@@ -23,7 +23,8 @@ def grade(d):
     step = lambda k: -1 if d.get(k) is None else int(d[k])  # noqa: E731
     finalized, gave_up = bool(d.get("finalized")), bool(d.get("gave_up"))
     infra = bool(d.get("infra_error")) or not finalized
-    ok = bool(d.get("success")) and not gave_up and not infra
+    sim_error = d.get("reason") in ("error", "nonfinite")   # PROTOCOL §4: a simulator error is the agent's 0, whatever success came before
+    ok = bool(d.get("success")) and not gave_up and not infra and not sim_error
     ts, lv = bool(d.get("task_success")), bool(d.get("ltl_violated"))
     out = {"success": int(ok), "live_success": int(bool(d.get("success"))), "graded_by_live": 1, "replays": 0,
            "task_success": int(ts), "ltl_violated": int(lv), "safety_violated": int(bool(d.get("safety_violated"))),
@@ -39,7 +40,7 @@ def grade(d):
            "physics_steps": int(d.get("physics_steps") or 0), "steps": int(d.get("steps") or 0), "elapsed_s": num("elapsed_s"),
            "video_rendered": int(bool(d.get("video"))), "gpu_lost": int(bool(d.get("gpu_lost"))),
            # the episode ended at the technical cap (max_control_steps; reason "runaway_guard") or by a simulator error
-           "step_cap_reached": int(d.get("reason") == "runaway_guard"), "sim_error": int(d.get("reason") in ("error", "nonfinite")),
+           "step_cap_reached": int(d.get("reason") == "runaway_guard"), "sim_error": int(sim_error),
            # crash recovery (eai-standard/2.2): service starts, resumes, whether a resumed state differed and by how much, a give-up
            "sim_startups": int(d.get("sim_startups") or 0), "resumes": int(d.get("resumes") or 0),
            "resume_state_mismatch": int(bool(d.get("resume_state_mismatch"))), "resume_max_tcp_dev_m": num("resume_max_tcp_dev_m"),

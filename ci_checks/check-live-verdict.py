@@ -15,6 +15,7 @@ docs/protocol/running.md ("Infrastructure failures"). For every standard / stand
       a give-up after crashes between calls (sim_crashed)       -> reward 0, infra_error 1
       a finalized live failure at the cutoff                    -> reward 0, infra_error 0 (the agent's result)
       a give-up after crashes inside the agent's calls          -> reward 0, infra_error 0 (never a free retry)
+      a live success that then ended in a simulator error       -> reward 0, infra_error 0 (PROTOCOL §4)
       an unreadable final.json; a scene off the frozen instance -> reward 0, infra_error 1
       a live success whose settle / hold check failed           -> reward 0, infra_error 0 (`success` decides)
       standard-realtime: a simulator error after the agent's first command -> reward 0, infra_error 0; before it (the
@@ -68,6 +69,8 @@ CASES = (
     ("a give-up after crashes inside the agent's calls",
      {"finalized": True, "success": False, "live_success": False, "done": True,
       "reason": "sim_crashed_on_call", "gave_up": True}, 0, 0),
+    ("a live success that then ended in a simulator error",       # PROTOCOL §4: the agent's 0, not infrastructure
+     {**LIVE_OK, "reason": "error", "sim_error": 1}, 0, 0),
     ("a replay success where the live episode failed",
      {"finalized": True, "success": False, "live_success": False, "replay_success": True, "deterministic": True,
       "done": True, "reason": "timeout", "n_actions": 10}, 0, None),

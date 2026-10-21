@@ -2,10 +2,10 @@
 # frozen instance. Nothing the agent did in its container reaches this one: Harbor uploads only /app/output/.
 FROM ghcr.io/mll-lab-nu/efe:molmospaces-0.2.5
 COPY instance.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:molmospaces-files-0.1.1@sha256:6a9e3baaf42a25af19d5969171a86ba3cb3a5eea01e9d3e23f49f252049514b6 /privileged/environment/rcb_molmospaces.py /privileged/tests/grade.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:molmospaces-files-0.2.0@sha256:d6664262a50477c3a55c6e50347817ea4645e3e60ef586d9c2e9a3cb2748f7fc /privileged/environment/rcb_molmospaces.py /privileged/tests/grade.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests
 # resource limits: the verifier step (from the monitor image) and its copy of the limits (docs/protocol/README.md §2.10) # rcb-monitor
-COPY --from=ghcr.io/mll-lab-nu/efe:monitor-0.3.0@sha256:53154417782408df8309194971b08b18c3682d2b337e2e3b2eb4c88fe025ab85 /opt/rcb_monitor/rcb_limits.py /tests/rcb_limits.py
+COPY --from=ghcr.io/mll-lab-nu/efe:monitor-0.3.1@sha256:dd6eacbf8886a62365d53bd0b3832d09749ea0e10b098b3442bb0cd26cbfd35d /opt/rcb_monitor/rcb_limits.py /tests/rcb_limits.py
 COPY rcb_limits.json /tests/rcb_limits.json

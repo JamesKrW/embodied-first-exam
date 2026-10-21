@@ -7,6 +7,13 @@ import numpy as np
 
 from rfo.scene import STANDABLE, VISUAL
 from rfo.task import TaskBase
+# A rigid roller (PVC pipe) and wooden deck's contact with the robot, the venue's fixtures and the other props (the
+# ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
+# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
+# robot's aluminium) with a solmix that wins over a default-contact geom; a ball (priority 1) keeps its own bounce.
+# With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 60 mm into the floor and 53 mm into the
+# robot (stress test 2026-10-21).
+from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 DECK_MASS, ROLLER_MASS = 2.7, 1.8        # kg: a 18 mm plywood deck, a hollow plastic roller
 
@@ -75,19 +82,19 @@ class Task(TaskBase):
         # the rolling surface is a capsule whose straight part is the roller's length (exact line contact with the
         # floor and the deck; its round ends are beyond the deck's edges); the flat-ended cylinder is what is drawn
         sc.geom(b, "roller", type="capsule", fromto=(-rl, 0, 0, rl, 0, 0), size=(R,), rgba=(0, 0, 0, 0),
-                friction=fr, condim=3, **STANDABLE)
+                friction=fr, condim=3, **STANDABLE, **RIGID)
         sc.geom(b, "roller_look", type="cylinder", fromto=(-rl, 0, 0, rl, 0, 0), size=(R,), rgba=(0.20, 0.45, 0.75, 1),
                 **VISUAL)
         sc.geom(b, "roller_mark", type="box", pos=(0, 0, 0), size=(rl + 0.001, 0.004, R * 0.98), rgba=(1, 1, 1, 1),
                 **VISUAL)
         dk = sc.body("deck", (self.cx, 0.0, 2 * R + T / 2), free=True)
         sc.geom(dk, "deck", type="box", size=(hw, hl, T / 2), mass=DECK_MASS * 0.94, rgba=(0.72, 0.52, 0.30, 1),
-                friction=fr, condim=3, **STANDABLE)
+                friction=fr, condim=3, **STANDABLE, **RIGID)
         lip = (p["stop_length_m"], p["stop_height_m"])       # the stops under the deck's two ends
         for s, tag in ((1, "L"), (-1, "R")):
             sc.geom(dk, f"deck_stop{tag}", type="box", pos=(0, s * (hl - lip[0] / 2), -T / 2 - lip[1] / 2),
                     size=(hw, lip[0] / 2, lip[1] / 2), mass=DECK_MASS * 0.03, rgba=(0.45, 0.30, 0.15, 1), friction=fr,
-                    condim=3, **STANDABLE)
+                    condim=3, **STANDABLE, **RIGID)
         sc.camera("venue", (2.3, -0.9, 0.9), (0.0, 0.0, 0.60), fovy=50)
 
     def reset(self, w):

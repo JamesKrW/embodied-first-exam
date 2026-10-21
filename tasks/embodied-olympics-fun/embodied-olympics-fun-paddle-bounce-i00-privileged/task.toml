@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-paddle-bounce-i00-privileged"
-description = "Embodied Olympics paddle-bounce (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Keep the table tennis ball that is dropped in front of you bouncing on the paddle in your right hand: 20 bounces in a row, each back up to the height the ball was dropped from. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics paddle-bounce (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Keep the table tennis ball that is dropped in front of you bouncing on the paddle held in your right hand's gripper: 20 bounces in a row, each back up to the height the ball was dropped from, without letting go of the paddle. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "paddle-bounce"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md ย
 instance_seed = 0
 expert_time_estimate_hours = 4.0
 oracle = "full"
-oracle_evidence = "Reference: the paddle kept level under the ball and tapped up at each bounce, closed loop on the ball's state: 20 bounces, each back to the drop height; 11 of 11 perturbations when it was written. A still blade gets 6 to 13 bounces of the 0.15 m rise alone, which is why each bounce must also reach the drop height. Measured: success after 14.53 s of the 20 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "Reference: a mirror law (minimum mirror fraction 0.05) with the paddle held in the gripper: 20 bounces at 14.9 s; the ball falls out of a dropper's trapdoor cup (no pin); 10 of 10 perturbed instances (drop point +-1 cm, height +-2 cm, drop time +-0.1 s) succeed. Negatives: nop (the floor), a still blade, the gripper opened, resting on the blade, touched before the drop, on the dropper after the drop, a fall, time. Measured (make_oracles.py): success after 14.96 s of the 20 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md ยง2.9)

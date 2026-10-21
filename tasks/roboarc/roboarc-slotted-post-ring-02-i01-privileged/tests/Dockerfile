@@ -7,9 +7,9 @@ FROM ghcr.io/mll-lab-nu/efe:roboarc-0.2.0
 ENV NPY_DISABLE_CPU_FEATURES=AVX512F,AVX512CD,AVX512_SKX,AVX512_CLX,AVX512_CNL,AVX512_ICL,AVX512_SPR OPENBLAS_CORETYPE=Haswell
 COPY runtime_binding.json /tests/runtime_binding.json
 COPY grade.py test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.1.0@sha256:3ebbe4b6947849941de2dd5b9af0592ead637da1bd9125df1a1b0d584ea4a49a /rcb_topogym.py /tests/rcb_topogym.py
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.1.0@sha256:3ebbe4b6947849941de2dd5b9af0592ead637da1bd9125df1a1b0d584ea4a49a /render_bridge.py /tests/render_bridge.py
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.1.0@sha256:3ebbe4b6947849941de2dd5b9af0592ead637da1bd9125df1a1b0d584ea4a49a /nyx_direct.py /tests/nyx_direct.py
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.3.0@sha256:525ec49ce1eda97825dabe79807ede9a4f38a18d57fef1de7bcc0188cbccfefb /rcb_topogym.py /tests/rcb_topogym.py
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.3.0@sha256:525ec49ce1eda97825dabe79807ede9a4f38a18d57fef1de7bcc0188cbccfefb /render_bridge.py /tests/render_bridge.py
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.3.0@sha256:525ec49ce1eda97825dabe79807ede9a4f38a18d57fef1de7bcc0188cbccfefb /nyx_direct.py /tests/nyx_direct.py
 RUN python /opt/robotangle/stage_instance.py slotted-post-ring-02-i01 /tests --purge   # the frozen instance, from the image (images/roboarc/assets.json), checked against runtime_binding.json
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests:/opt/topogym
@@ -17,5 +17,5 @@ ENV PYTHONPATH=/tests:/opt/topogym
 ENV RCB_MAX_STEPS=200000 RCB_VERIFIER_BUDGET_S=45000
 WORKDIR /tests
 # resource limits: the verifier step (from the monitor image) and its copy of the limits (docs/protocol/README.md §2.10) # rcb-monitor
-COPY --from=ghcr.io/mll-lab-nu/efe:monitor-0.3.0@sha256:53154417782408df8309194971b08b18c3682d2b337e2e3b2eb4c88fe025ab85 /opt/rcb_monitor/rcb_limits.py /tests/rcb_limits.py
+COPY --from=ghcr.io/mll-lab-nu/efe:monitor-0.3.1@sha256:dd6eacbf8886a62365d53bd0b3832d09749ea0e10b098b3442bb0cd26cbfd35d /opt/rcb_monitor/rcb_limits.py /tests/rcb_limits.py
 COPY rcb_limits.json /tests/rcb_limits.json

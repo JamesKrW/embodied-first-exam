@@ -25,20 +25,32 @@ try:
     out = json.load(open(p))
 except Exception:
     out = {}
-episode = None
+def fresh(ep):
+    """episode.json is the newest service process's: its sim_startups is the number of lines in startups.jsonl. A dump
+    from an earlier process (it ended the episode, then crashed; the resumed one did not dump again) is stale: the
+    resume rolled back to the last checkpoint and the episode went on, so it is no verdict on the episode that ran."""
+    try:
+        with open(os.path.join(d, "startups.jsonl")) as f:
+            n = sum(1 for line in f if line.strip())
+    except OSError:
+        return True                  # no startup record: nothing to compare with
+    return "sim_startups" not in ep or int(ep.get("sim_startups") or 0) == n
+episode, err = None, None
 if rc in ("0", "1"):
     try:
         episode = json.load(open(os.path.join(d, "episode.json")))
+        if not isinstance(episode, dict): raise ValueError("not an object")
+        if not fresh(episode): raise ValueError(f"stale: written by service start {episode.get('sim_startups')}, before a crash and resume")
     except Exception as exc:
-        err = exc
+        episode, err = None, exc
 if episode is not None:
     out.update(episode)
     if rc == "1":       # the episode was dumped but the service did not exit in time: the live verdict stands, no video
         out["service_exit_timed_out"] = True
     if not os.path.isfile(os.path.join(d, "trajectory.npz")):   # evidence only: the verdict is the live record's
         out["dump_error"] = out.get("dump_error") or "no trajectory.npz"
-elif rc == "0":
-    out.update(success=False, infra_error=1, error=f"no episode.json: {err!r}")
+elif rc == "0" or (err is not None and not isinstance(err, FileNotFoundError)):
+    out.update(success=False, infra_error=1, error=f"no current episode.json: {err!r}")
 elif rc != "2":
     out.update(success=False, infra_error=1, error="collect hook: the sim service did not end and dump the episode in time")
 # A simulator breakdown without forcing in the live episode (rcb_topogym.SIMULATOR_INSTABILITY) is an infrastructure
@@ -52,7 +64,7 @@ if out.get("reason") == "simulator_instability":
 # live_success: the live episode's own success; success: the verdict (no infrastructure failure, not held for review)
 out["live_success"] = bool(out.get("success")) and not out.get("gave_up")
 out["held_for_review"] = out["live_success"] and isinstance(out.get("review"), dict)
-out["success"] = out["live_success"] and not out.get("infra_error") and not out["held_for_review"]
+out["success"] = out["live_success"] and not out.get("infra_error") and not out["held_for_review"] and out.get("reason") != "error"   # a simulator error: the agent's 0 (PROTOCOL §4)
 out.update(finalized=True, graded_by="live", replays=0, state_sha=out.get("live_sha"))
 for k, v in (("video", False), ("video_source", "render"), ("video_pending", rc == "0"),
              ("media_status", "pending" if rc == "0" else "none")):

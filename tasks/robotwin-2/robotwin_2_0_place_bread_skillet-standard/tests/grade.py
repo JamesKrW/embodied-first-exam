@@ -31,7 +31,7 @@ def main():
         infra = (bool(d.get("infra_error")) or bool(d.get("finalize_error")) or mismatch or reason == "sim_crashed"
                  or reason.startswith("resume_failed") or (not verdict and reason != "sim_crashed_on_call"))
         live = bool(d.get("success"))   # the verdict: final.json `success` decides (live_success is reported beside it)
-        ok = live and verdict and not infra
+        ok = live and verdict and not infra and reason != "error"   # PROTOCOL §4: a simulator error is the agent's 0
         out = {"success": int(ok), "live_success": int(bool(d.get("live_success", d.get("success")))), "graded_by_live": int(verdict), "replays": 0,
                "finalized": int(bool(d.get("finalized"))), "missing_log": 0,
                "n_actions": int(d.get("n_actions") or 0), "sim_steps": int(d.get("physics_steps") or 0), "steps": int(d.get("steps") or 0),

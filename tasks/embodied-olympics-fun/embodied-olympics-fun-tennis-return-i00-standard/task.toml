@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-tennis-return-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics tennis-return on the same frozen instance as embodied-olympics-fun-tennis-return-i00-privileged. Return the serve: after the tennis ball has bounced once in your service box, hit it with the racket on your right hand back over the net so that it lands in the singles court on the far side. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics tennis-return on the same frozen instance as embodied-olympics-fun-tennis-return-i00-privileged. Return the serve: after the tennis ball has bounced once in your service box, hit it with the racket held in your right hand's gripper back over the net so that it lands in the singles court on the far side, without letting go of the racket. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "tennis-return"]
 
@@ -32,9 +32,9 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 50
-expert_time_estimate_hours = 10.0
-oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (the real 30 m/s serve, bounce and contact with the strings; the robot moved 2.9 m sideways and the return's velocity set at the contact: 24 m/s at 9 degrees); negatives: two bounces, the own side, outside the court, through the net, a volley, the body, a double hit, carried, a net touch. The serve reaches the baseline at 15 m/s after 1.1 s, 1.5 m from the robot, which moves 1.2 m in that time; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+expert_time_estimate_hours = 12.0
+oracle = "full"
+oracle_evidence = "Reference: walks 0.7 m, then a backhand with the free racket in the right Dex1-1, the swing at 3.99 s timed for the machine's serve; the two-wheel ball machine serves at 30.3 m/s, bouncing 2 cm from its target point, and the return lands 2.3 m past the net; 10 of 10 starts moved by up to 4 cm succeed. Negatives: two bounces, dropped, thrown, the racket out of the hand in the ball's path, the gripper, the forearm, a volley, a double hit, a carry, short, long, wide, into the net, through the net, line in and out, the racket on the post, the robot in the net, the far side, touched before the serve, a fall. The privileged twin's reference rows (593 control steps, success after 5.93 s) streamed through the client."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -74,7 +74,7 @@ sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = []
+oracle = [0]
 
 [verifier]
 timeout_sec = 900.0

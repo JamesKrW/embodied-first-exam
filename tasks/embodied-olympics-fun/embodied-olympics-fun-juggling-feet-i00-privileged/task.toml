@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-juggling-feet-i00-privileged"
-description = "Embodied Olympics juggling-feet (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Juggle the football with your feet: drop it from your hand and keep it in the air for ten foot touches in a row, each one sending the ball up above your knees, without it touching the ground or any other part of you. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics juggling-feet (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Juggle the football with your feet: drop it from between your palms and keep it in the air for ten foot touches in a row, each one sending the ball up above your knees, without it touching the ground or any other part of you. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "juggling-feet"]
 
@@ -15,12 +15,13 @@ robot = "unitree-g1"
 family = "juggling_feet"
 category = "football-and-volleyball"
 mode = "privileged"
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
 expert_time_estimate_hours = 10.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a real release; the pelvis held where it stands and the ball put back over the toe after each touch; ten real strikes by the right foot's own motors, a lowcmd hip/knee stroke lifting the toe at 0.8 m/s, in/out about 3 m/s, contacts 0.011-0.013 s against a 0.05 s carry limit); negatives: a still raised foot (0.54 of the speed back, not counted), soft strikes, below knee height, the shin above the instep, the thigh, the chest, the head, a hand (also a hand during a foot touch inside the release grace), resting on the foot, trapped between the feet, a re-grip, out of the grid, down. On the G1 a falling ball meets the foot clear of the lower leg's collision hull only on the front 2-3 cm of its top; a foot-following strike controller (pelvis held) lost the ball after two touches; nothing built in stands on one leg; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_juggling_feet.py: positive by injection (the ball held for real between the palms while the right leg rises; the drop: the ball taken from the palms to 0.25 m over the toe, the pelvis held where it stands; ten real strikes of the right foot by its own motors, about 3 m/s in and out); negatives: a still foot, soft strikes, the knee-height rule, shin, thigh, chest, head, hands, a ball resting on the toe, a carry, a hand during a touch, the real drop to the ground, trapped between the feet, out of the grid, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

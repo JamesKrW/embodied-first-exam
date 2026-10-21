@@ -3,7 +3,7 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:robopaint-0.2.0
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:robopaint-sim-files-0.1.1@sha256:41107bf4b3121b8fbe30fb3eba96deab112bf76e219cda2ea72860a23f630e3c \
+COPY --from=ghcr.io/mll-lab-nu/efe:robopaint-files-0.3.0@sha256:ffcfa94d02192f1e999c8016e814fb4c4dbbd6c9aa65f22bfc75bc9931e3238a \
      /sim/variants/055fb18b90/NOTICE-exemplar.md \
      /sim/finalize.sh \
      /rcb_brush.py \
@@ -11,7 +11,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:robopaint-sim-files-0.1.1@sha256:41107bf4b312
      /rcb_brush_strict.py \
      /sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-sim-files-0.1.1@sha256:d9a4e130a67056d0fb47594562ac303b2f000c5f48fbe5ec235593bef0f3543f \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.3.0@sha256:e2d97664330216cfc9359f88199033f94142e7e53505625de0ab0c3842379bbc \
      /rcb1.py \
      /rcb_limited.py \
      /run.sh \

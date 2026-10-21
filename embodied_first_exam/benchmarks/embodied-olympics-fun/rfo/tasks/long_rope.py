@@ -1,14 +1,16 @@
-"""Long rope (跳长绳): two scripted turners turn a long rope; standing in the middle, the robot jumps it, the rope
-passing under both feet while they are off the ground, a number of times in a row, without the rope ever touching
+"""Long rope (跳长绳): two rope-turning machines turn a long rope; standing in the middle, the robot jumps it, the
+rope passing under both feet while they are off the ground, a number of times in a row, without the rope ever touching
 it.
 
 The rope is a chain of 40 capsules (a 10 mm cotton rope, 60 g/m), each a free body joined to its neighbours by
-`connect` equalities (ball-joint chains cost far more: see SUB_K); its two ends are tied the same way to the turners'
-hands, mocap bodies that the referee moves on their circles at every
-physics step. It hangs, swings and slaps the floor under gravity, air drag and its own inertia, and collides with the
-floor and every part of the robot (never with itself). At t = 0 it is already turning: its state is that of the
-same rope model turned for a few seconds by the same hands (computed once per process, in a model of the rope and
-the floor alone), so the first pass comes at a fixed time."""
+`connect` equalities (ball-joint chains cost far more: see SUB_K); its two ends are tied the same way to the tips of
+two crank arms, one per rope-turning machine: each arm is a body on a hinge (its axle, along the rope's axis) driven by
+a torque-limited gear motor (a force-limited servo: MuJoCo's forcerange) whose setpoint turns at the steady tempo;
+nothing writes a pose or a velocity after reset, and a rope that is caught loads the motors (they can stall). The rope
+hangs, swings and slaps the floor under gravity, air drag and its own inertia, and collides with the floor, the
+machines, every part of the robot and itself (non-neighbouring segments). At t = 0 it is already turning: its state
+and the cranks' are those of the same rope and cranks turned for a few seconds by the same motors (computed once per
+process, in a model of the rope, the cranks and the floor alone), so the first pass comes at a fixed time."""
 import math
 import xml.etree.ElementTree as ET
 
@@ -29,6 +31,9 @@ JOINT_ARMATURE = 1e-6          # kg m^2, each ball joint (SUB_K > 1 only)
 TWIST_INERTIA = 2e-6           # kg m^2: a segment's inertia about its own axis (numerical: a 10 mm cord's is ~7e-8,
 #                                which makes the twist mode stiff at 1 ms; a rope's twist plays no part in its motion)
 EQ_SOLREF = "0.004 1"          # the connects' constraint time constant (s) and damping ratio
+EQ_SOLIMP = "0.99 0.999 0.0005 0.5 2"   # ... and their impedance: the rope does not stretch at a tie (with MuJoCo's
+#                                default, whose force scales with a segment's 5 g, a robot leaning on the rope pulled a
+#                                tie 19 cm apart: stress test 2026-10-21; as rfo's shared rope_turner v2's swivel)
 CONTACT_SOLREF = "0.005 1"     # the rope's contacts (priority 1: the rope's numbers win)
 ROPE_RGBA = (0.85, 0.12, 0.10, 1)
 # the air on each segment, MuJoCo's ellipsoid model on the capsule's own size (not the body's inertia box, which the
@@ -38,6 +43,20 @@ FLUIDCOEF = (0.6, 0.25, 1.5, 0.0, 0.0)
 PREROLL_S = 8.0                # the rope is turned this long before t = 0 (it reaches its steady loop in about 3 s)
 RAMP_S = 0.6                   # ... the turners' spin-up from the rope hanging still, at the start of that
 _PREROLL: dict = {}            # the pre-rolled rope state, by its parameters
+# The rope-turning machines (a long-rope turning machine: a gear motor on a stand turning a crank, the rope tied to its
+# tip on a swivel). The crank arm: a 25 mm aluminium tube of hand_circle_radius_m with its hub and swivel, 0.5 kg (about
+# 0.027 kg m^2 about the axle). The motor: a geared DC motor of the 60 W class, at most CRANK_TORQUE_N_M at the output
+# shaft (the stall/peak torque of such a 24 V worm or planetary gear motor at 60-120 rpm output; the rope's own load
+# at 1 rev/s peaks at about 3 N m, measured over the reference jumper's 11 s: Task.privileged()["crank_torque_n_m"]); its servo is a PD on the turning setpoint
+# (KP, KV: stiff and about critically damped on the arm's inertia), saturated at the torque limit. The axle's bearings:
+# 0.05 N m of friction.
+CRANK_ARM_MASS = 0.5           # kg
+CRANK_TUBE_R = 0.0125          # m
+CRANK_TORQUE_N_M = 10.0        # N m, the motor's torque limit
+CRANK_KP, CRANK_KV = 300.0, 6.0     # N m / rad, N m s / rad
+CRANK_FRICTION = 0.05          # N m
+CRANKS = ("crank_a", "crank_b")     # at -y (the rope's first end) and +y
+ROPE_SELF_COLLISION = True     # the rope's segments collide with each other (not with their tied neighbours)
 
 
 def _catenary_a(L: float, span: float) -> float:
@@ -75,13 +94,17 @@ def rope_xml(p) -> tuple[str, str]:
     g = rope_geometry(p)
     m_seg, L = g["mass"] / N_SEG, g["seg"]
     i_bend = m_seg * (L * L / 12 + g["r"] ** 2 / 4)     # a solid cylinder's, about a diameter through its centre
-    geom = (f'size="{g["r"]:.6g}" mass="{m_seg:.6g}" contype="2" conaffinity="13" condim="3" '
+    geom = (f'size="{g["r"]:.6g}" mass="{m_seg:.6g}" contype="2" conaffinity="{15 if ROPE_SELF_COLLISION else 13}" condim="3" '
             f'friction="0.6 0.005 0.0001" solref="{CONTACT_SOLREF}" priority="1" rgba="{_fmt(ROPE_RGBA)}" '
             f'fluidshape="ellipsoid" fluidcoef="{_fmt(FLUIDCOEF)}"')
-    hand = ('<body name="hand_{k}" mocap="true" pos="{pos}"><site name="hand_{k}" size="0.01"/><geom name="hand_{k}" '
-            'type="sphere" size="0.045" contype="0" conaffinity="0" rgba="0.85 0.65 0.5 1"/></body>')
-    bodies = (hand.format(k="a", pos=_fmt(hand_pos(g, math.pi / 2, -1)))
-              + hand.format(k="b", pos=_fmt(hand_pos(g, math.pi / 2, 1))))
+    # a crank: the axle on the rope's axis (hinge about y; qpos theta = -phi: at 0 the arm points along +x), the rope
+    # tied at its tip (site hand_k); the arm touches the robot, the floor and the rope (not the two segments tied to it)
+    crank = ('<body name="crank_{k}" pos="0 {y:.6g} {hz:.6g}"><joint name="crank_{k}" type="hinge" axis="0 1 0" '
+             f'damping="0" armature="0" frictionloss="{CRANK_FRICTION:g}"/>'
+             f'<geom name="crank_{{k}}" type="capsule" fromto="0 0 0 {g["rt"]:.6g} 0 0" size="{CRANK_TUBE_R:g}" '
+             f'mass="{CRANK_ARM_MASS:g}" contype="1" conaffinity="13" rgba="0.75 0.76 0.78 1"/>'
+             f'<site name="hand_{{k}}" pos="{g["rt"]:.6g} 0 0" size="0.01"/></body>')
+    bodies = crank.format(k="a", y=-g["half"], hz=g["hz"]) + crank.format(k="b", y=g["half"], hz=g["hz"])
     eqs = ""
     for g0 in range(0, N_SEG, SUB_K):
         chain = ""
@@ -97,9 +120,29 @@ def rope_xml(p) -> tuple[str, str]:
                      f'<site name="rope{i}_end" pos="{L:.6g} 0 0" size="0.002"/>{chain}</body>')
         bodies += chain
         eqs += (f'<connect name="rope_tie{g0}" site1="rope{g0}" site2="{"hand_a" if g0 == 0 else f"rope{g0 - 1}_end"}" '
-                f'solref="{EQ_SOLREF}"/>')
-    eqs += f'<connect name="rope_tie_end" site1="rope{N_SEG - 1}_end" site2="hand_b" solref="{EQ_SOLREF}"/>'
+                f'solref="{EQ_SOLREF}" solimp="{EQ_SOLIMP}"/>')
+    eqs += (f'<connect name="rope_tie_end" site1="rope{N_SEG - 1}_end" site2="hand_b" solref="{EQ_SOLREF}" '
+            f'solimp="{EQ_SOLIMP}"/>')
     return bodies, eqs
+
+
+def machine_xml(p) -> tuple[str, str]:
+    """(actuators, contact excludes) MJCF: the two crank motors, and the contacts that are not there (a segment with
+    its tied neighbours, which it overlaps at the tie; a crank with the two segments next to its tip). The rope's
+    self-collision is every other pair of segments (rope contype 2, conaffinity 15)."""
+    acts = "".join(f'<general name="{c}_motor" joint="{c}" gainprm="{CRANK_KP:g}" biastype="affine" '
+                   f'biasprm="0 {-CRANK_KP:g} {-CRANK_KV:g}" ctrllimited="false" forcelimited="true" '
+                   f'forcerange="{-CRANK_TORQUE_N_M:g} {CRANK_TORQUE_N_M:g}"/>' for c in CRANKS)
+    ex = "".join(f'<exclude body1="rope{i}" body2="rope{i + 1}"/>' for i in range(N_SEG - 1))
+    ex += "".join(f'<exclude body1="{c}" body2="rope{i}"/>' for c, ii in zip(CRANKS, ((0, 1), (N_SEG - 1, N_SEG - 2)))
+                  for i in ii)
+    return acts, ex
+
+
+def crank_command(theta: float, omega: float) -> float:
+    """The servo's command for a setpoint angle theta turning at omega: with the affine bias the motor's torque is
+    KP (theta - q) + KV (omega - q') (speed feed-forward), clipped to the torque limit."""
+    return theta + CRANK_KV / CRANK_KP * omega
 
 
 def _qmul(a, b):
@@ -139,10 +182,15 @@ def rope_joints(m) -> list[int]:
     return [m.joint(f"rope{i}").id for i in range(N_SEG)]
 
 
+def crank_joints(m) -> list[int]:
+    return [m.joint(c).id for c in CRANKS]
+
+
 def preroll(p, phi_start: float):
-    """The rope's state (qpos, qvel per rope joint, in order) after the hands have turned it for about PREROLL_S
-    from hanging still with the hands at the top of their circles (a spin-up of RAMP_S, then the steady tempo),
-    ending with the hands at phi_start (to within one physics step's turn); a model of the floor and the rope
+    """The rope's and the cranks' state (qpos, qvel per rope joint, in order, then per crank joint) after the
+    machines have turned it for about PREROLL_S from hanging still with the crank tips at the top of their circles
+    (the motors' setpoint spins up over RAMP_S, then turns at the steady tempo), ending with the setpoint at
+    phi_start (to within one physics step's turn); a model of the floor, the rope and the cranks with their motors
     alone, in the venue's air. Cached per parameters."""
     g = rope_geometry(p)
     key = (tuple(sorted((k, float(v)) for k, v in p.items())), round(phi_start, 12))
@@ -157,28 +205,30 @@ def preroll(p, phi_start: float):
                                                                       2 * math.pi)))
     phi_a = phi_start + sweep(n * dt)
     bodies, eqs = rope_xml(p)
+    acts, ex = machine_xml(p)
     xml = ('<mujoco><compiler angle="radian" autolimits="true"/><option timestep="0.001" integrator="implicitfast" '
            'density="1.225" viscosity="1.8e-05"/><worldbody><geom name="floor" type="plane" size="40 20 0.05" '
            f'contype="1" conaffinity="5" friction="1 0.005 0.0001"/>{bodies}</worldbody><equality>{eqs}</equality>'
-           '</mujoco>')
+           f'<actuator>{acts}</actuator><contact>{ex}</contact></mujoco>')
     m = mujoco.MjModel.from_xml_string(xml)
     d = mujoco.MjData(m)
     for j, q in zip(rope_joints(m), rope_rest_qpos(p, phi_a)):
         qa = int(m.jnt_qposadr[j])
         d.qpos[qa:qa + len(q)] = q
-    for j, s in ((0, -1), (1, 1)):
-        d.mocap_pos[j] = hand_pos(g, phi_a, s)
+    rate = lambda t: w * t / RAMP_S if t < RAMP_S else w  # noqa: E731
+    for c in CRANKS:                                      # the cranks at the top, at rest (theta = -phi)
+        d.qpos[int(m.jnt_qposadr[m.joint(c).id])] = -phi_a
+    act = [m.actuator(f"{c}_motor").id for c in CRANKS]
     mujoco.mj_forward(m, d)
-    for k in range(n):
-        for j, s in ((0, -1), (1, 1)):
-            d.mocap_pos[j] = hand_pos(g, phi_a - sweep((k + 1) * dt), s)
+    for k in range(n):                                    # the motors' setpoint: the turn, from rest
+        d.ctrl[act] = crank_command(-phi_a + sweep((k + 1) * dt), rate((k + 1) * dt))
         mujoco.mj_step(m, d)
     if not np.all(np.isfinite(d.qpos)):
         raise RuntimeError("long-rope: the rope's pre-roll diverged")
     out = []
-    for j in rope_joints(m):
+    for j in rope_joints(m) + crank_joints(m):
         qa, va = int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j])
-        nq, nv = (7, 6) if m.jnt_type[j] == mujoco.mjtJoint.mjJNT_FREE else (4, 3)
+        nq, nv = {mujoco.mjtJoint.mjJNT_FREE: (7, 6), mujoco.mjtJoint.mjJNT_BALL: (4, 3)}.get(m.jnt_type[j], (1, 1))
         out.append((d.qpos[qa:qa + nq].copy(), d.qvel[va:va + nv].copy()))
     _PREROLL[key] = out
     return out
@@ -220,12 +270,13 @@ class Task(TaskBase):
         "8 Jumpers: one jumper (the robot) instead of eight, and a count of consecutive jumps, {jumps_required} "
         "in a row with no miss, instead of the jumps in 1 minute; the count is the benchmark's qualifying mark, a "
         "round number (school long-rope practice counts runs of consecutive jumps; no rule book sets this one)",
-        "the turners are scripted, not athletes: each holds the rope {rope_held_from_end_m} m from its end, the rest "
-        "wound round the hand, so that the free rope between the hands ({free_length_m} m) just brushes the floor "
-        "under the jumper (as turners shorten a long rope to the jumpers); each moves the hand on a vertical circle of "
-        "{hand_circle_radius_m} m radius whose centre is {hand_height_m} m high and {hand_inset_m} m in front of the "
-        "turner, at a steady {tempo_rev_s} revolutions per second; they never adapt to the jumper, and they do not "
-        "stop when the rope is caught (the rope's ends beyond the hands are not modelled)",
+        "the turners are two rope-turning machines, not athletes: each stands on a turner's spot and turns a crank "
+        "arm of {hand_circle_radius_m} m on an axle {hand_height_m} m high, {hand_inset_m} m in front of the spot, "
+        "with a gear motor of at most {crank_torque_n_m} N m whose setpoint turns at a steady {tempo_rev_s} "
+        "revolutions per second; the rope is tied to the arm's tip on a swivel {rope_held_from_end_m} m from its "
+        "end (the rest is not modelled: turners wind it round the hand), so that the free rope between the tips "
+        "({free_length_m} m) just brushes the floor under the jumper; the machines never adapt to the jumper and "
+        "do not stop when the rope is caught (their motors only stall if it is held hard enough)",
         "the start: the rope is already turning at the start (t = 0), not still until a signal; its lowest part "
         "has just passed under the robot, going backwards",
         "the end: the event has none (the clock stops the round); here the robot must land on its feet after the "
@@ -236,13 +287,15 @@ class Task(TaskBase):
         "of the rope (the centre zone) instead of the event's space rule",
         "the rope: a {rope_diameter_m} m cotton rope of {rope_linear_density_kg_m} kg/m (a typical 10 mm braided "
         "cotton rope) modelled as a chain of 40 short capsules joined end to end by stiff point constraints (free to "
-        "bend and twist: a cord has almost no bending stiffness), in still air with its drag; no wind",
+        "bend and twist: a cord has almost no bending stiffness) that collides with the floor, the machines, the "
+        "robot and itself, in still air with its drag; no wind",
     ]
     time_limit_s = 20.0
     start = (0.0, 0.0, 0.0)
     params = dict(turner_distance_m=3.6, hand_inset_m=0.4, hand_height_m=1.0, hand_circle_radius_m=0.4,
                   rope_length_m=6.0, rope_held_from_end_m=1.4, free_length_m=3.2, turner_y_m=1.8, rope_diameter_m=0.010,
                   rope_linear_density_kg_m=0.06, tempo_rev_s=1.0, hand_angle0_deg=-130.0, jumps_required=10,
+                  crank_torque_n_m=CRANK_TORQUE_N_M,
                   zone_half_x_m=0.5, zone_half_y_m=0.5, stand_s=0.5,
                   fall_z_m=0.35)
 
@@ -260,14 +313,16 @@ class Task(TaskBase):
         p["turner_y_m"] = round(p["turner_distance_m"] / 2, 6)
         self.stages = [f"jump {i}" for i in range(1, int(p["jumps_required"]) + 1)] + ["landing", "stand"]
 
-    sentence = ("Jump the long rope: standing in the middle of a rope turned by two turners, jump it {jumps_required} "
+    sentence = ("Jump the long rope: standing in the middle of a rope turned by two rope-turning machines, jump it "
+                "{jumps_required} "
                 "times in a row, the rope passing under both your feet while you are in the air, without the rope "
                 "ever touching you.")
-    rules = ("Two turners stand {turner_distance_m} m apart, one on each side of you (on the y axis, at y = "
-             "-{turner_y_m} and +{turner_y_m} m); they turn a {rope_length_m} m rope, {rope_diameter_m} m thick, "
-             "holding it {rope_held_from_end_m} m from each end, at a steady {tempo_rev_s} revolutions per second: "
-             "each hand goes round a vertical circle of {hand_circle_radius_m} m radius, {hand_height_m} m above "
-             "the floor, {hand_inset_m} m in front of its turner. The rope goes over your head from behind you to "
+    rules = ("Two rope-turning machines stand on the turners' spots, {turner_distance_m} m apart, one on each side "
+             "of you (on the y axis, at y = -{turner_y_m} and +{turner_y_m} m); they turn a {rope_length_m} m rope, "
+             "{rope_diameter_m} m thick, tied {rope_held_from_end_m} m from each end to the tip of a crank arm, at a "
+             "steady {tempo_rev_s} revolutions per second: each tip goes round a vertical circle of "
+             "{hand_circle_radius_m} m radius, {hand_height_m} m above the floor, {hand_inset_m} m in front of its "
+             "machine's spot, driven by a motor of at most {crank_torque_n_m} N m. The rope goes over your head from behind you to "
              "the front, down in front of you and under you towards your back; it is already turning at the start. "
              "A jump "
              "counts when the rope passes under both your feet while nothing of you touches the ground (at the "
@@ -276,16 +331,16 @@ class Task(TaskBase):
              "contact with the floor is your feet only and you then stand still for {stand_s} s (only your feet on "
              "the floor, your torso within about 20 degrees of vertical, your pelvis slower than 0.35 m/s): the "
              "turners keep turning, so this has to be done before the rope comes round again, and it must not touch "
-             "you until then. You fail at once if the rope touches any part of you (a miss: the turners do not "
+             "you until then. You fail at once if the rope touches any part of you (a miss: the machines do not "
              "stop), if "
              "your pelvis leaves the centre zone (within {zone_half_x_m} m of the rope's axis forwards and backwards "
-             "and {zone_half_y_m} m of the middle between the turners sideways), if the rope passes under a foot "
+             "and {zone_half_y_m} m of the middle between the machines sideways), if the rope passes under a foot "
              "that is on the ground or through you, on a fall (your pelvis lower than {fall_z_m} m, or any part of "
              "you other than your feet on the ground), on a landing that is not on the feet after the last jump, or "
              "after {time_limit_s} s.")
-    venue = ("You stand facing +x on a wooden gym floor, in the middle between two turners, who stand at y = "
-             "-{turner_y_m} m and y = +{turner_y_m} m on the line through your feet (you face across the rope). The "
-             "rope's axis, the line between the centres of the turners' hand circles, is {hand_height_m} m above the "
+    venue = ("You stand facing +x on a wooden gym floor, in the middle between two rope-turning machines, which "
+             "stand at y = -{turner_y_m} m and y = +{turner_y_m} m on the line through your feet (you face across "
+             "the rope). The rope's axis, the line between the machines' crank axles, is {hand_height_m} m above the "
              "floor right above your feet. The centre zone is painted on the floor. At the start the rope is turning "
              "at {tempo_rev_s} revolutions per second; its lowest part has just passed under you and is rising "
              "behind you: it comes over your head, down in front of you and under your feet once per turn.")
@@ -306,52 +361,62 @@ class Task(TaskBase):
         for i, (a, b) in enumerate((((-zx, -zy), (zx, -zy)), ((zx, -zy), (zx, zy)), ((zx, zy), (-zx, zy)),
                                     ((-zx, zy), (-zx, -zy)))):
             sc.line(f"zone{i}", a, b, width=0.04, z=0.0009)
-        for s in (-1, 1):                                # the turners (drawn only): a body, a head, a spot
+        hz, half = p["hand_height_m"], hd - p["hand_inset_m"]
+        steel = (0.30, 0.31, 0.34, 1)
+        for s in (-1, 1):                                # the machines: a base, a post, the motor and its axle
             y = s * hd
-            sc.geom(sc.wb, f"turner{s:+d}_body", type="capsule", fromto=(0, y, 0.15, 0, y, 1.35), size=(0.16,),
-                    rgba=(0.20, 0.32, 0.65, 1), contype="0", conaffinity="0")
-            sc.geom(sc.wb, f"turner{s:+d}_head", type="sphere", pos=(0, y, 1.62), size=(0.12,),
-                    rgba=(0.85, 0.65, 0.5, 1), contype="0", conaffinity="0")
-            sc.box(f"turner{s:+d}_spot", (0, y, 0.0008), (0.25, 0.25, 0.0005), rgba=(0.96, 0.96, 0.96, 1))
+            sc.box(f"machine{s:+d}_base", (0, y, 0.02), (0.30, 0.25, 0.02), rgba=steel, solid="hit")
+            sc.box(f"machine{s:+d}_post", (0, y, hz / 2), (0.04, 0.04, hz / 2 - 0.04), rgba=steel, solid="hit")
+            sc.box(f"machine{s:+d}_motor", (0, y, hz), (0.07, 0.09, 0.07), rgba=(0.15, 0.30, 0.60, 1), solid="hit")
+            ln = hd - half - 0.09 - 0.02                 # the axle from the motor to just short of the crank's hub
+            sc.geom(sc.wb, f"machine{s:+d}_axle", type="cylinder", pos=(0, s * (hd - 0.09 - ln / 2), hz),
+                    quat=(math.cos(math.pi / 4), math.sin(math.pi / 4), 0, 0), size=(0.015, ln / 2), rgba=steel,
+                    contype="1", conaffinity="13")
         bodies, eqs = rope_xml(p)
         for el in ET.fromstring(f"<x>{bodies}</x>"):
             sc.wb.append(el)
         eq = sc.root.find("equality")
         for el in ET.fromstring(f"<x>{eqs}</x>"):
             eq.append(el)
+        acts, ex = machine_xml(p)
+        for tag, xml in (("actuator", acts), ("contact", ex)):
+            node = sc.root.find(tag)
+            for el in ET.fromstring(f"<x>{xml}</x>"):
+                node.append(el)
         sc.camera("venue", (4.2, -3.6, 1.9), (0.0, 0.0, 0.8), fovy=55)
-        sc.camera("side", (1.3, -5.2, 0.9), (0.0, 0.0, 0.8), fovy=45)        # along the rope, past the turner
+        sc.camera("side", (1.3, -5.2, 0.9), (0.0, 0.0, 0.8), fovy=45)        # along the rope, past a machine
 
     def reset(self, w):
         m, d = w.m, w.d
         self._init(w)
         state = preroll(self.p, self._phi0())
-        for j, (q, v) in zip(rope_joints(m), state):
+        for j, (q, v) in zip(rope_joints(m) + crank_joints(m), state):     # t = 0: the turning rope and cranks
             qa, va = int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j])
             d.qpos[qa:qa + len(q)] = q
             d.qvel[va:va + len(v)] = v
-        self._set_hands(w, 0.0)
 
     def _init(self, w):
+        m = w.m
         self.g = rope_geometry(self.p)
-        self._mocap = [int(w.m.body_mocapid[w.m.body(n).id]) for n in ("hand_a", "hand_b")]
+        self._act = np.array([m.actuator(f"{c}_motor").id for c in CRANKS])
+        self._crank_q = np.array([int(m.jnt_qposadr[j]) for j in crank_joints(m)])
+        self._tips = np.array([m.site(n).id for n in ("hand_a", "hand_b")])
 
     def _phi(self, t: float) -> float:
+        """The cranks' setpoint at time t, as the angle phi of hand_pos (the crank's joint angle is -phi)."""
         return self._phi0() - self.g["omega"] * t
 
-    def _set_hands(self, w, t: float) -> None:
-        """The hands where they are at time t (MuJoCo moves a mocap body to its target at the next step: the step
-        from t - dt to t gets the hands' position at t, as in the pre-roll)."""
-        ph = self._phi(t)
-        for j, s in zip(self._mocap, (-1, 1)):
-            w.d.mocap_pos[j] = hand_pos(self.g, ph, s)
+    def _command(self, w, t: float) -> None:
+        """The motors' command for the physics step that ends at t (the setpoint at t, as in the pre-roll): the only
+        thing the script sets; the cranks move by the motors' torque."""
+        w.d.ctrl[self._act] = crank_command(-self._phi(t), self.g["omega"])
 
     # ------------------------------------------------------------------ the referee
     def referee_reset(self, w, ref):
         m = w.m
         self.fall_z = self.p["fall_z_m"]
         self._init(w)
-        self._set_hands(w, ref.time + w.PHYS_DT)        # the first physics step's target
+        self._command(w, ref.time + w.PHYS_DT)          # the first physics step's command
         self.rope = ref.geoms(prefix="rope")
         self.robot_sel = ref.part("robot")
         self.nodes = np.array([m.site(f"rope{i}").id for i in range(N_SEG)] + [m.site(f"rope{N_SEG - 1}_end").id])
@@ -365,7 +430,7 @@ class Task(TaskBase):
 
     def substep(self, w, ref):
         p, tr, d, r = self.p, self.trackers, w.d, w.robot
-        self._set_hands(w, ref.time + w.PHYS_DT)        # the hands' target for the next physics step
+        self._command(w, ref.time + w.PHYS_DT)          # the motors' command for the next physics step
         fl = tr["flights"]
         landed = fl.update()
         if ref.touching(self.rope, self.robot_sel):
@@ -429,9 +494,10 @@ class Task(TaskBase):
 
     def privileged(self, w):
         tr = self.trackers
-        ph = self._phi(w.ref.time)
+        ph = float(-np.mean(w.d.qpos[self._crank_q]))
         return {"pelvis": w.pelvis().tolist(), "rope_nodes": self._rope_nodes(w).round(4).tolist(),
-                "rope_radius_m": self.g["r"], "hand_angle_rad": ph, "hands": [list(hand_pos(self.g, ph, s)) for s in
-                                                                             (-1, 1)],
+                "rope_radius_m": self.g["r"], "hand_angle_rad": ph,
+                "hands": w.d.site_xpos[self._tips].tolist(), "setpoint_angle_rad": self._phi(w.ref.time),
+                "crank_torque_n_m": w.d.actuator_force[self._act].tolist(),
                 "rope_axis_z": self.g["hz"], "tempo_rev_s": self.p["tempo_rev_s"], "jumps": tr["jumps"],
                 "over_since_last_jump": tr["over"]}
