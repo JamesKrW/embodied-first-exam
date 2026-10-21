@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-high-bar-swing-i00-privileged"
-description = "Embodied Olympics high-bar-swing (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Hanging from the high bar by both hands, do one giant swing: take your extended body in a full circle around the bar, without letting go. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics high-bar-swing (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Standing on the block under the high bar, jump up and catch the bar with both grippers, then do one giant swing: take your extended body in a full circle around the bar, without letting go. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "high-bar-swing"]
 
@@ -19,9 +19,9 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
-expert_time_estimate_hours = 4.0
-oracle = "full"
-oracle_evidence = "Reference: from the dead hang a leg pump that tucks on the way up and extends elsewhere takes the extended body over the top: one full giant swing at 23.6 s; 8 of 8 parameter sets (24 to 35 s) when it was written. Measured: success after 23.62 s of the 60 s limit, live and in a fresh replay, ending in the same state."
+expert_time_estimate_hours = 12.0
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_high_bar_swing.py: positive by a declared magic action (the G1 on a 1.0 m block; two Dex1-1 grippers with the clamp force raised 4.4 times to 528 N per jaw, declared; no weld): the jump is one injected velocity (1.82 m/s up, a 0.17 m rise, aimed so the bar enters the half-closed jaws), the jaws close in flight and catch the bar (1.6 body weights at the catch), then an injected spin as from 60 deg and a gravity-like drive of at most 400 N m about the bar (no joint loaded by it), limp wrists: a full extended circle in 4.58 s, bottom load 5.2 body weights (100 ms mean); the same state hash twice. The clamp force: the device's 120 N holds 1.41 body weights with both hands, a giant swing pulls at least 4.2 (gymnasts 3.5-3.7); 240, 360, 420 and 480 N per jaw all lose the bar in the same magic-action swing, 528 N completes it. Negatives: nop (time), no catch (jaws open: back on the block, time), starting already hanging (held the bar without jumping to it), grippers opened (let go), a fall from the block (the mats), a tucked circle and a circle that turns back (referee-only rotations: no count); stress: 4 s of random joint targets on the bar held (2.9 body weights), then the grippers opened let go in 0.06 s; the jaw pads press at most 5.8 mm into the bar.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0
