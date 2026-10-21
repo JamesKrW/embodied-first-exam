@@ -59,8 +59,8 @@ The rule is PROTOCOL Appendix H.5; how the runner applies it:
   after a reset (`instance_mismatch`). Only what the service itself records as `infra_error = 1` (or a missing,
   unreadable or unfinalized record) is one; a grader never infers it from missing fields. What the agent's commands
   caused stays a result, never an infrastructure failure (a retry would be a free second attempt): crashes all inside
-  its calls (`sim_crashed_on_call`), a simulator error its actions raised where the task counts that as the agent's
-  (standard-realtime: a simulator error or crash after the agent's first command, standard_mode.md Part 3), the cutoff, no actions, a failed settle or hold, and a crash or error while the service
+  its calls (`sim_crashed_on_call`), a simulator error its actions raised (PROTOCOL §4; standard-realtime: a simulator
+  error or crash after the agent's first command, standard_mode.md Part 3), the cutoff, no actions, a failed settle or hold, and a crash or error while the service
   runs a settle or hold window on the agent's final state (it counts as one inside the agent's last call). The video is
   never one: a render that fails or runs out of time loses only the video. A resume that continued from a state that
   does not match its checkpoint exactly (`approx` resume class, `resume_state_mismatch = 1`) keeps its live verdict

@@ -74,10 +74,10 @@ def ctrl_steps() -> int:
     return int(S.n_steps) if E["ready"] else 0
 
 
-# Episode ends that are infrastructure failures, never the agent's: a simulator error, and a numerically unstable simulation
+# Episode ends that are infrastructure failures, never the agent's: a numerically unstable simulation
 # (rcb_topogym.SIMULATOR_INSTABILITY: a cloth particle faster than PARTICLE_SPEED_LIMIT_M_S, before the task's own failure
-# predicates).
-INFRA_REASONS = ("error", "simulator_instability")
+# predicates). A simulator error the agent's call raised (reason "error") is the agent's 0 (PROTOCOL §4).
+INFRA_REASONS = ("simulator_instability",)
 
 
 def instability_fields() -> dict:

@@ -36,7 +36,7 @@ def verdict(d):
     grade_error = bool(d.get("grade_error")) and not sim_error
     live = bool(d.get("success"))   # the verdict: final.json `success` decides (live_success is reported beside it)
     infra = bool(d.get("infra_error")) or no_verdict or grade_error
-    ok = live and live_verdict and not infra
+    ok = live and live_verdict and not infra and not sim_error   # PROTOCOL §4: a simulator error is the agent's 0
     return ok, {**{k: float(v) for k, v in m.items() if isinstance(v, (int, float)) and not isinstance(v, bool)},
                 "success": int(ok), "live_success": int(bool(d.get("live_success", d.get("success")))), "graded_by_live": int(live_verdict), "replays": 0,
                 "instance_exact": int(bool(d.get("instance_exact"))),

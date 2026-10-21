@@ -7,7 +7,8 @@
 #      until the service is ready again), signals only the newest service process, resends every 30 s, and exits 2 when
 #      final.json already holds the verdict (the service gave up: after crashes, or because the frozen instance did not
 #      rebuild at the episode's start, `instance_mismatch`): that verdict stays.
-#   2. final.json = the live record (episode.json) + `graded_by` "live", `replays` 0, `finalized`: written whole (a
+#   2. final.json = the live record (episode.json, only when the newest service process wrote it: a dump from before a
+#      crash and resume is stale, no verdict, infra_error) + `graded_by` "live", `replays` 0, `finalized`: written whole (a
 #      temporary file + rename) BEFORE the video, with `video_pending` true, so the verifier never reads a half-written
 #      one and nothing the video does can change or delay the verdict.
 #   3. the video: `live_video.py encode` (CPU only, no simulator) turns the frames the service took during the live
@@ -35,6 +36,16 @@ def read(name):
         return v if isinstance(v, dict) else {}
     except Exception:
         return {}
+def fresh(ep):
+    """episode.json is the newest service process's: its sim_startups is the number of lines in startups.jsonl. A dump
+    from an earlier process (it ended the episode, then crashed; the resumed one did not dump again) is stale: the
+    resume rolled back to the last checkpoint and the episode went on, so it is no verdict on the episode that ran."""
+    try:
+        with open(os.path.join(d, "startups.jsonl")) as f:
+            n = sum(1 for line in f if line.strip())
+    except OSError:
+        return True                  # no startup record: nothing to compare with
+    return "sim_startups" not in ep or int(ep.get("sim_startups") or 0) == n
 live = {"graded_by": "live", "replays": 0, "video": False, "video_pending": True, "video_source": "live"}
 if rc == "2":
     # the service's own verdict (a give-up: after crashes, or instance_mismatch at the start): kept as it is
@@ -46,10 +57,11 @@ elif rc == "0" or os.path.isfile(os.path.join(d, "episode.json")):
     try:
         ep = json.load(open(os.path.join(d, "episode.json")))
         if not isinstance(ep, dict): raise ValueError("not an object")
+        if not fresh(ep): raise ValueError(f"stale: written by service start {ep.get('sim_startups')}, before a crash and resume")
         out.update(ep)
     except Exception as exc:
-        # the service's record of the live episode is missing: no verdict either way
-        out.update({"success": False, "infra_error": 1, "error": f"infrastructure: no episode.json ({exc!r})"})
+        # the service's record of the live episode is missing or stale: no verdict either way
+        out.update({"success": False, "infra_error": 1, "error": f"infrastructure: no current episode.json ({exc!r})"})
 else:
     out = {**read("final.json"), **live, "finalized": True, "success": False, "infra_error": 1,
            "error": "collect hook: the sim service did not end and dump the episode in time"}
