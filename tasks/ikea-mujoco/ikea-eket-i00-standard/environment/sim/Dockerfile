@@ -3,7 +3,7 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:ikea-mujoco-sim-0.4.0
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-sim-files-0.1.1@sha256:803b86ace64a8a7587e9a9bed6d0cc1879dc17b8c55e2bdb00201ae55f94977d \
+COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.3.0@sha256:8396e542e144afe82fb30773316193b23d5c942e05363888f857bccdf163d7fa \
      /sim/finalize.sh \
      /sim/ikea_nyx.py \
      /sim/ikea_rig.py \
