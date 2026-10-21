@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-rugby-conversion-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `rugby_conversion` / seed 0 |
-| Oracle | `full` — Reference: a standing power kick through lowcmd; the ball passes the goal plane at 4.5 m (the bar is at 3.0 m); 12 of 13 gain and tee-offset perturbations score. The robot falls after the kick, which is allowed (Law 8 judges the ball). Measured (make_oracles.py): success after 4.33 s of the 60 s limit, live and in a fresh replay, ending in the same state. |
+| Oracle | `full` — Reference: a standing power kick through lowcmd; the foot meets the ball above the rigid tee's cup and sends it through the goal plane at 3.9 m (the bar is at 3.0 m); 12 of 16 perturbations score (9 of 12 offsets of the wind-up pose, hip roll, crouch and ankle; 3 of 4 tee offsets of 1 cm). The kick is sensitive: the swinging foot brushes the grass before the ball, and nearby settings send the ball under the bar. A fall after the kick would be allowed (Law 8 judges the ball). Measured (make_oracles.py): success after 4.01 s of the 60 s limit, live and in a fresh replay, ending in the same state. |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -18,7 +18,7 @@ Kick a conversion: with one place kick of a foot, send the rugby ball standing o
 To clear a 3 m bar 5 m away the ball must leave the foot at about 10 m/s or more, rising at 45 to 60 degrees: a hard, steep kick under the ball's lower end. The robot has no kicking skill; a hard swing on one leg throws the 33 kg body round, and the robot must stay on its feet until the ball has scored.
 
 ## Reference solution
-`solution/oracle.py` drives the robot through the task's own tooling, closed loop on the privileged state, and writes the trajectory (`solution/solve.sh`). Reference: a standing power kick through lowcmd; the ball passes the goal plane at 4.5 m (the bar is at 3.0 m); 12 of 13 gain and tee-offset perturbations score. The robot falls after the kick, which is allowed (Law 8 judges the ball). Measured (make_oracles.py): success after 4.33 s of the 60 s limit, live and in a fresh replay, ending in the same state.
+`solution/oracle.py` drives the robot through the task's own tooling, closed loop on the privileged state, and writes the trajectory (`solution/solve.sh`). Reference: a standing power kick through lowcmd; the foot meets the ball above the rigid tee's cup and sends it through the goal plane at 3.9 m (the bar is at 3.0 m); 12 of 16 perturbations score (9 of 12 offsets of the wind-up pose, hip roll, crouch and ankle; 3 of 4 tee offsets of 1 cm). The kick is sensitive: the swinging foot brushes the grass before the ball, and nearby settings send the ball under the bar. A fall after the kick would be allowed (Law 8 judges the ball). Measured (make_oracles.py): success after 4.01 s of the 60 s limit, live and in a fresh replay, ending in the same state.
 
 ## Verification
 `/tests/grade.py` replays `/app/output/trajectory.npz` from the frozen start in two fresh processes (`rcb_rfo.py replay`:
