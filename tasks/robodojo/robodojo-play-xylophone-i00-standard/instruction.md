@@ -13,11 +13,37 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Pick up the mallet and strike all xylophone keys from left to right."*
 
 ## Success (RoboDojo's own check for this task)
-- Eight strikes must be completed in the order key 0, 1, ... 7 (the xylophone's functional regions bbox_0..bbox_7 / hit_0..hit_7, intended to be left to right). A strike on key i is a single moment where BOTH: the mallet's active functional point 'beat' (the mallet head) is horizontally (XY) inside the 4-point quadrilateral 'bbox_i' of the xylophone (boundary counts), AND (z of mallet 'beat' point minus z of xylophone 'hit_i' point) lies strictly between 0.01 m and 0.036 m (i.e. the head is 1.0 to 3.6 cm above the hit point of that key).
-- After each of the strikes 0..6 the mallet must be raised: the z of the mallet root pose (root, not the head) must exceed by more than 0.025 m (strict) its z at the moment the strike was registered (the root pose is re-recorded at the action when the strike stage passes).
-- After strike 7 nothing more is required (no final lift, no return home).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the xylophone: the rainbow xylophone (42 x 21 cm, 2.3 cm tall) on a light wooden frame, just left of centre, its
+  eight coloured keys side by side from left to right, the longest (pink-red, 11 cm) at the left end and the shortest
+  (magenta, 7 cm) at the right end [xylophone]. "Key 0" to "key 7" below are these keys counted from left to right
+  [RoboDojo's per-key regions bbox_0..bbox_7 and points hit_0..hit_7; hit_0 lies at the left end];
+- the mallet: the wooden stick with a red ball head (2.6 cm across) at its right end, about 21 cm long, lying across
+  its stand in front of the xylophone, near the left gripper [mallet];
+- the stand: the small white rest under the mallet's handle [mallet_stand]; the check does not read it.
 
-**When it is checked.** Staged and sequential, 15 stages in this order: strike0, lift, strike1, lift, strike2, lift, strike3, lift, strike4, lift, strike5, lift, strike6, lift, strike7. The reward manager is evaluated only once per action (after the sim sub-steps of that action are finished), never between sub-steps. In each evaluation the FIRST pending stage of the check list is tested (every condition in it, all at that same moment; a condition that is a nested list is an OR); when it passes it is removed permanently (never re-verified later) and the next stage becomes pending; at most one stage is removed per action. Therefore at least 15 actions are needed, and a strike or a lift only counts if it is observed at an action boundary (a hit that happens and ends between two actions is invisible). Order matters: strikes on the wrong key or earlier keys are simply ignored (no penalty), only the pending stage is tested. Reward is 1.0 only when the check list is empty (and no query/trigger counter is violated); the episode is declared a success as soon as reward >= 0.999 after an action, and ends as a failure if the action counter reaches step_lim without that, or earlier if the environment is flagged failed (query counter exceeded, see below). No final_check list is registered by this task, so the final-check logic at step_lim adds nothing. There is no early failure condition.
+The mallet's *head point* [functional point 'beat'] is either of two points 1 cm from the centre of the red ball, on
+opposite sides along the ball's axis that points up while the mallet lies on its stand (just inside the bottom and the
+top of the ball); a test on the head point passes if either point passes. The mallet's *centre* (the point the lift is
+measured on) is the centre of the red ball. A key's *hit point* [hit_i] lies 1.4 cm above the xylophone's base (the
+table top), about 0.2-0.9 cm below that key's top surface, roughly in the middle of the key.
+- **Strike on key i.** At one action boundary, both: a head point is, seen from above, inside the outline of key i's
+  top (its four corner points [bbox_i]; the edge counts) [is_pointA_in_B_functional_bbox], and a head point is more
+  than 0.01 m and less than 0.036 m higher than key i's hit point [is_A_point_above_B_point_by_z_range]. That is a
+  head point 2.4 to 5.0 cm above the table. With the stick level and the ball not rolled about the handle, this holds
+  for a ball centre 1.4 to 6.0 cm above the table: the ball resting on the key (centre about 3 cm up) or hovering up to
+  about 2.5 cm above it passes. The head does not have to touch the key. Not true at the start.
+- **Lift after strikes 0 to 6.** The ball's centre more than 0.025 m higher than it was at the action where that strike
+  passed [is_lift; the mallet pose is re-recorded when the strike passes, update_object_state].
+- After strike 7 nothing more is required (no final lift, no return of the arms).
+
+**When it is checked.** After every action (never between actions), 15 stages in this order: strike on key 0, lift,
+key 1, lift, key 2, lift, key 3, lift, key 4, lift, key 5, lift, key 6, lift, key 7. Only the first unfinished stage is
+tested, with all its conditions at the same action boundary; once it passes it is done for good (never re-checked) and
+the next stage waits for a later action, so at most one stage passes per action and at least 15 actions are needed. A
+strike or lift counts only if it is seen at an action boundary: a tap that starts and ends inside one action is
+invisible. Strikes on other keys are ignored, with no penalty. Success is declared at the action where the last stage
+(the strike on key 7) passes, and the episode ends. No condition ends the episode early as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -26,7 +52,12 @@ RoboDojo's own evaluation gives a policy 500 actions (20 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**Notes from RoboDojo's code.** Success is geometric: the mallet head only has to be in a 1.0-3.6 cm height window above the hit point while over the key's footprint, it does not need to touch the key. The hit points' exact heights and the bbox_i polygons are defined in the xylophone asset metadata (not available statically), and the mapping of key index 0..7 to 'left to right' is assumed from the instruction. The lift stage is measured on the mallet ROOT z (not the head), relative to the pose captured at the strike action, so a tilt of the mallet could change the root height. Dwell is not required (one action boundary inside the window is enough). Because only one stage is advanced per action, strike and subsequent lift cannot both happen inside a single action. The mallet must be grasped first (it starts on the stand).
+**At the end.** Nothing beyond the last strike: no final lift, the arms need not return and the grippers need not open.
+
+**Notes from RoboDojo's code.** Success is geometric: the head only has to be over the key's top and inside the height
+window at an action boundary; contact, sound and dwell are not needed. The lift is measured on the ball's centre, so
+raising the head itself by more than 2.5 cm is what counts (tilting the stick up while the ball stays low does not).
+The xylophone does not move (it is fixed scenery). The mallet must be picked up first: it starts lying on its stand.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

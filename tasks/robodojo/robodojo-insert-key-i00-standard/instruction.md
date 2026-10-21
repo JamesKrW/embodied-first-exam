@@ -13,12 +13,37 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Pick up the key, hand it over to the other hand, insert it into the keyhole, then turn it."*
 
 ## Success (RoboDojo's own check for this task)
-- key's bbox lowest point is more than 0.025 m below the top of slot's bbox: slot bbox z_max - key bbox z_min > 0.025 m (is_A_depth_in_B).
-- key origin and slot origin are within 0.007 m in the horizontal (world xy) plane (is_AB_xy_distance_within_threshold, threshold=0.007).
-- key's local z-axis is within 7 deg of world up (is_axis_up, axis [0,0,1], threshold=7).
-- key's local +x axis (in world) is within 30 deg of the direction R_slot * (0.5, -0.866, 0), i.e. the slot's local x-axis rotated by -60 deg about the slot's local z (is_axis_aligned label_A=key axis_A=[1,0,0] vs label_B=slot axis_B=[1/2,-sqrt(3)/2,0], align_threshold=30).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the key: a small white key, 6.5 cm long, 2.6 cm wide and 1 cm thick, lying flat on the table left of centre in front
+  of the left arm, its round ring (the bow) toward you and its blade pointing away from you, with the two teeth sticking
+  out to the right near the tip [key];
+- the keyhole block: the round brown block (about 12 cm across, 5.5 cm tall) right of centre in front of the right arm,
+  fixed to the table, with the keyhole slit in the middle of its top face, running roughly left-right [slot].
 
-**When it is checked.** All listed conditions are checked together, in order, after every action (reward_manager.step runs once per action, after the action's whole control sequence has executed; nothing is checked between actions). They form a single stage: all must be true at the same action boundary (any list inside the conditions means 'at least one of'). Success is declared at the first action boundary where all hold; the episode then ends. No final_check list is used. Otherwise the episode ends as a failure after step_lim actions. There is no requirement to release the key or to return the arms; no early-fail rule.
+The key's *centre* (the point RoboDojo tests) sits inside its ring, about 1 cm from the ring's outer end and 5.4 cm from
+the blade's tip. The block's *centre* is the middle of its round footprint, under the keyhole. All of these must hold at
+the same action boundary:
+- **Deep enough.** The key's lowest point is more than 0.025 m below the block's top face [block bbox top minus key
+  bbox bottom > 0.025 m; is_A_depth_in_B]: with the key upright, at least 2.5 cm of the blade is inside the keyhole.
+- **Centred.** The key's centre is less than 0.007 m from the block's centre horizontally (world x, y)
+  [is_AB_xy_distance_within_threshold, threshold 0.007]: the key stands in the keyhole, ring straight above it.
+- **Upright, ring up.** The key's long direction, from the blade tip to the ring, points within 7 deg of straight up
+  [key local +z; is_axis_up, threshold 7]: ring on top, blade down in the keyhole. Not true at the start (the key lies
+  flat, ring toward you); standing it the other way up fails.
+- **Turned.** The direction across the key's flat blade toward the side its teeth stick out (pointing right at the
+  start) [key local +x] is within 30 deg (3-D angle) of a direction fixed to the block: the block's own x direction
+  turned 60 deg clockwise seen from above [key local +x vs block local x turned -60 deg about
+  its vertical axis; is_axis_aligned, threshold 30]. The block's x direction points 15 deg anticlockwise from world +x (to the right,
+  slightly away from you; the keyhole slit runs about this way), so the required direction points right and toward you,
+  45 deg from each (world heading -45 deg): with the key upright, its teeth must point between 15 and 75 deg clockwise
+  from world +x, seen from above. Not true at the start (teeth to the right, about 6 deg clockwise from +x). Inserting
+  the key with its teeth toward the right-hand end of the slit and then turning it 60 deg clockwise (seen from above)
+  ends in the middle of that range.
+
+**When it is checked.** After every action (never between actions), all four conditions together (one stage).
+Success is declared at the first action boundary where they all hold, and the episode ends. You need not release the
+key or bring the arms back. No condition ends the episode early as a failure; otherwise it runs on until the length
+cap (below) [step_lim].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -27,7 +52,13 @@ RoboDojo's own evaluation gives a policy 300 actions (12 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**Notes from RoboDojo's code.** The 'hand it over' part of the instruction is not checked; only the final key pose relative to the slot matters. The turn requirement is the -60 deg (relative to the slot's local x) alignment within +-30 deg, i.e. a rotation of roughly 30-90 deg from the slot's x direction, measured in 3-D angle (no projection). The required key rotation about its vertical axis depends on the slot's yaw, so the target orientation is expressed relative to the slot, not the world. Threshold 0.007 m xy is tight (7 mm). Partial credit (get_score: lift key >0.05 m = 15, full = 100) is separate from success. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** The hand-over in the instruction is not checked; only the key's final pose in the
+keyhole counts. The turn is measured against the block's own orientation (its x direction turned 60 deg clockwise),
+which in this scene is world heading -45 deg; the test is a 3-D angle (no projection), so a key leaning a few degrees
+loses a little of the 30 deg margin. Which end goes up matters: ring up, blade down (the upright test is one-sided).
+The centring tolerance is tight (7 mm, on the key's centre in its ring), so the key must stand straight in the keyhole.
+All thresholds are strict. Partial credit (lifting the key more than 0.05 m: 15; full success: 100) is separate from
+success.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

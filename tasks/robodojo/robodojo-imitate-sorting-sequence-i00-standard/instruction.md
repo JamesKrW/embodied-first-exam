@@ -13,13 +13,43 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Observe the object placement order, remember it, then place the corresponding objects into the basket in the same order."*
 
 ## Success (RoboDojo's own check for this task)
-- Five stages, evaluated strictly in order (stage k+1 is only tested after stage k has been passed). Let target_label[0..4] be the five agent-side objects (labels t0..t4 in some permutation) listed in the order the support arm placed their copies aim_i (the permutation is stored in a per-seed trajectory pickle; not known statically).
-- Stage k (k = 0..4), true at one action boundary: target_label[i] is in basket0 for every i <= k, AND target_label[i] is NOT in basket0 for every i > k, AND all five demonstrator objects aim0..aim4 are in basket1.
-- 'In basket' = object origin xy inside the convex hull of the basket's world bbox and object origin z above the basket bbox z_min (is_A_in_B / is_A_not_in_B).
-- Stage 4 (the last) additionally requires all_robot_back_to_origin(): each target arm within 0.15 m per axis and 20 deg of its start pose.
-- Additionally two 'query' rules must never be violated (see evaluation).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- your basket: the white open basket (30 x 20 cm, 8 cm tall) at the front left, next to the left arm [basket0];
+- the far basket: the identical white basket at the far right, next to the opponent's arm (the white arm on the far
+  side) [basket1];
+- your five objects, on the near half of the table: a smartwatch with a dark green band (right), a small black action
+  camera (centre), a yellow toy school bus (front left), a mobile phone lying flat (front, left of centre) and a bunny
+  figurine in a navy outfit (left of centre) [t0 watch, t1 action camera, t2 toy bus, t3 phone, t4 bunny];
+- the opponent's five objects: an identical copy of each of yours, on the far half of the table [aim0..aim4, the copy
+  of t0..t4 in the same order].
 
-**When it is checked.** Stages are held in a queue: after every action only the first not-yet-passed stage is tested; when it holds it is removed (at most one stage per action). Success when all 5 are removed. Because stage k demands that later objects are not in basket0, the objects must enter basket0 one at a time in exactly the demonstrated order. Two failure queries are counted every action and any count > 0 immediately fails the episode (reward 0, episode ends): (Q1) FAIL if at an action boundary [left_arm OR right_arm is 'not back to origin' (pos > 0.3 m on any axis or rot > 30 deg from start pose)] AND [support_arm0 is not back to origin (pos > 0.3 m on any axis or rot > 40 deg)]. I.e. the agent must not move its arms far away while the support arm is demonstrating. (Q2) FAIL if at an action boundary, for any k in {4,3,2,1}: [all target grippers open (>=0.8) AND target_label[k] has moved < 0.004 m since the previous evaluation of this check AND target_label[k] is in basket0 AND at least one of target_label[0..k-1] is NOT in basket0]. I.e. releasing an object in basket0 while an earlier-demonstrated object is still missing is an immediate failure (wrong order). Otherwise fails at step_lim.
+The *demonstrated order*: the opponent's arm puts its five objects into the far basket one after another; your object
+that matches the first one it moves is first, and so on [target_label[0..4], read by RoboDojo from the recorded
+demonstration for this seed]. *In a basket* means the object's centre is, seen from above, inside the basket's outline
+and higher than the basket's underside [is_A_in_B; is_A_not_in_B for its negation]. An object's *centre* (the point
+RoboDojo tests) is the middle of the watch, the toy bus and the bunny; the middle of the action camera's base; and the
+middle of the phone's top end (the end away from you at the start).
+
+Five stages, k = 1 to 5, each true at one action boundary, in order:
+- **Stage k.** The first k objects of the demonstrated order are in your basket, the other 5 - k are not in it, and all
+  five of the opponent's objects are in the far basket. Stage 5 also needs **both arms back**
+  [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each of x, y and z
+  separately, and within 20 deg of its start orientation (the grippers need not be open).
+None holds at the start (your basket is empty and the opponent's objects are on the table).
+
+**When it is checked.** After every action, only the first stage not yet passed is tested; it is passed when it holds,
+at most one stage per action, and the task succeeds when all five have passed. Since stage k needs the later objects
+*out* of your basket, the objects must go in one at a time, in exactly the demonstrated order. Two failure tests also
+run after every action; either ends the episode at once as a failure (reward 0):
+- **Arms out during the demonstration.** One of your arms is away from its start pose (end-effector more than 0.3 m
+  from its start position on x, y or z, or turned more than 30 deg) while the opponent's arm is away from its own start
+  pose (more than 0.3 m on any axis or more than 40 deg) [(is_robot_not_back_to_origin left_arm OR right_arm, 0.3 m /
+  30 deg) AND (support_arm0, 0.3 m / 40 deg)].
+- **Wrong order.** For any of the 2nd to 5th objects of the demonstrated order: both grippers open to at least 0.8 of
+  their full opening, that object moved at most 0.004 m since this test last reached it [is_not_moved, update=True],
+  it is in your basket, and at least one object earlier in the order is not in your basket. That is, letting go of an
+  object in your basket while an earlier one is still missing fails.
+Otherwise the episode runs on until the length cap (below) [step_lim].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -28,13 +58,23 @@ RoboDojo's own evaluation gives a policy 1600 actions (64 s) for this task; no c
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**What changes by itself.** A second, non-target arm (support_arm0, a Franka in robot_config dual_x5_and_franka_competition) replays a pre-recorded joint trajectory that picks aim objects and puts them into basket1 in the secret order. The trajectory is queued after the agent's first action and is consumed in lock-step with the agent's actions (collect_interval control sub-steps per action), so it plays during the first part of the episode while the agent is also acting. After it finishes, the scene is validated once: if any aim_i is not in basket1 the sample is flagged unstable and dropped from the evaluation.
+**What changes by itself.** The opponent's arm (not yours) replays a recorded demonstration: it picks its five objects
+and puts them into the far basket in the secret order. It is queued after your first action and moves only while your
+actions run, in lock-step with them, so it plays during the first part of the episode. When it has finished, RoboDojo
+checks once that all five of its objects are in the far basket; if not, the run is not a valid sample and is dropped.
 
-**What you must read or remember.** Yes: the agent must watch (via cameras) the order in which the support arm moves the five objects into basket1, remember it, and reproduce it with the matching (same-model) objects on its own side. The order is different per seed and nothing in the instruction states it.
+**What you must read or remember.** Yes: watch (with the cameras) the order in which the opponent's arm puts its objects
+into the far basket, remember it, and put your matching objects into your basket in the same order. The order depends
+on the seed and the instruction does not state it.
 
-**At the end.** Final stage: both target arms within 0.15 m per axis and 20 deg of their start pose (all_robot_back_to_origin, defaults). Grippers need not be open for success.
+**At the end.** Stage 5 needs both arms back near their start poses (above); the grippers need not be open.
 
-**Notes from RoboDojo's code.** The order is only known at runtime (labels are read from the pickle in Assets/Traj/<benchmark>/imitate_sorting_sequence/<eval_seed>/<seed>.pkl). Q2 as written: the nested lists inside the query are combined as OR over k=4..1 of AND(gripper open, not moved, in basket0, OR(earlier ones not in basket0)). Each is evaluated with short-circuiting; is_not_moved(update=True) compares against the position stored at its last evaluation (initially the episode-start pose). Q1 limits are loose (0.3 m per axis / 30 deg for the agent arms) so only large arm motions during the demonstration cause failure. Whether the agent may begin acting before the demonstration ends is allowed by the code but any large arm excursion during it is a failure. Predicate conventions (from func_parser.py): object 'position' = the object's root/origin position in world coordinates (metres, z up); 'bbox' = the 8 corners of the object's local bounding box transformed to world; is_A_in_B = A's origin xy lies inside the convex hull of B's world-projected bbox AND A's origin z > B's bbox z_min; is_axis_up(label, axis, threshold) = angle between (object rotation applied to the local axis) and world +z is < threshold degrees (wrapper default threshold 15 deg); is_axis_aligned = angle between two (optionally functional-point-frame) axes < align_threshold degrees, optionally after projection onto a plane (project_plane='xy' drops z and renormalises); all_robot_back_to_origin() default = for every target (agent-controlled) arm, end-effector pose vs its pose at episode start: |dx|,|dy|,|dz| each <= 0.15 m (per-axis, not Euclidean) and orientation difference <= 20 deg; is_all_gripper_open(open_threshold) = every target gripper's normalised opening ((val-scale0)/(scale1-scale0)) >= open_threshold (wrapper default 0.6). 
+**Notes from RoboDojo's code.** The order is read at run time from the recorded demonstration, not from the scene. The
+wrong-order test looks only at moments when both grippers are wide open (at least 0.8) and an object in your basket is
+at rest, so release each object only after the earlier ones are in. Its at-rest check [is_not_moved, update=True]
+compares with the position stored the last time the test reached that object (at first, the start position) and stores
+the new one. The arm limits during the demonstration are loose (0.3 m per axis, 30 deg), so only large arm motions
+while the opponent's arm is out fail; you may act during the demonstration within those limits.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

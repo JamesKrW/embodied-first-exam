@@ -23,11 +23,41 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- Staged sequence (in this exact order, each stage is one condition on the spring buttons' joint position ratio r = (position - lower)/(upper - lower), tag 'press'): N0 times [button0 pressed: r < 0.5, then button0 released: r > 0.9], where N0 = model index of card num0 (1..9, the digit on the card); then 1 time [button2 (blue) r < 0.5, then r > 0.9]; then N1 times [button1 r < 0.5, then r > 0.9], N1 = model index of card num1; then [button2 r < 0.5]; then [button2 r > 0.9 AND both target arms back at origin: all target arms (left_arm and right_arm; the support arm is not counted) have their end-effector pose within 0.15 m on EACH axis (|dx|,|dy|,|dz| all <= 0.15 m) and within 20 degrees (quaternion angle) of the pose they had at the start of the episode (recorded after the scene settled)].
-- Exact press counts (queries, aim values; counted as transitions of the ratio from above 0.95 to below 0.5, each transition counted once): button0 pressed exactly N0 times, button1 exactly N1 times, button2 (blue) exactly 2 times, at the end of the episode (reward requires current count == aim for each; ending with fewer than required also gives reward 0).
-- Going over the count for any button (count > aim) immediately fails the episode.
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the left red button: a round red push button (6 cm across, 3 cm tall) left of centre, the left one of the three
+  buttons in a row near you, 15 cm apart [button0];
+- the middle red button: the same red button in the middle of the row, straight ahead [button1];
+- the blue button: the blue push button at the right end of the row [button2];
+- the left card: a 10 cm square wooden card with one printed digit (1 to 9), propped up leaning back, its digit facing
+  you, 12 cm behind the left red button [num0];
+- the middle card: the same kind of card 12 cm behind the middle red button [num1].
+The "first" red button and card of the task are the left ones; the "second" are the middle ones.
 
-**When it is checked.** Sequential stages (about 2*N0 + 2 + 2*N1 + 2 stages) evaluated after every action, one stage removed per action at most. The reward manager is evaluated only once per action (after the sim sub-steps of that action are finished), never between sub-steps. In each evaluation the FIRST pending stage of the check list is tested (every condition in it, all at that same moment; a condition that is a nested list is an OR); when it passes it is removed permanently (never re-verified later) and the next stage becomes pending; at most one stage is removed per action. In parallel, three counters (queries) are evaluated after every action: whenever a button's ratio goes from >0.95 ('above') to <0.5 ('below') the counter of that button increases by one (the transition detector needs the button to have been seen above 0.95 before the next fall below 0.5; ratios between the thresholds keep the previous state). If any counter exceeds its aim value (N0, N1, 2) the environment is flagged failed and the episode ends immediately as a failure. Reward is 1.0 only when all stages are removed AND every counter equals its aim exactly; so success is declared at the action where the last stage passes (blue button released >0.9 with the arms home) provided the counts are exact. Otherwise the episode ends at step_lim as a failure.
+*N-left* and *N-middle* below are the digits printed on the left and the middle card [RoboDojo reads the card's model
+number, which is the printed digit: this scene's start image shows each card's model number as its digit].
+Each button's cap travels 1.0 cm along a spring-loaded slide and rests fully up [joint 'press' ratio r = (position -
+lower)/(upper - lower): 1 at rest, fully up; 0 fully down]. *Pressed* means the cap pushed down more than 5.0 mm, more
+than half its travel [r < 0.5]; *released* means it is back to within 1.0 mm of fully up [r > 0.9]; a press is
+*counted* when the cap goes from within 0.5 mm of fully up [r > 0.95] to pressed. All three buttons start fully up.
+- **Presses in order.** The check walks through these stages in order: the left red button pressed, then released,
+  N-left times; the blue button pressed, then released; the middle red button pressed, then released, N-middle
+  times; the blue button pressed; finally the blue button released while both arms are back (below), at the same
+  action.
+- **Exact counts.** Every counted press is tallied per button, all episode long: the left red button exactly N-left
+  times, the middle red button exactly N-middle times, the blue button exactly 2 times. One count over on any button
+  ends the episode at once as a failure; a count short at the end also fails.
+- **Both arms back** [all_robot_back_to_origin], in the last stage: each arm's end-effector within 0.15 m of its start
+  position on each of x, y and z separately, and within 20 deg of its start orientation.
+
+**When it is checked.** After every action (never between actions). Only the first stage not yet passed is tested;
+when it holds, it is passed for good and the next one waits for a later action (at most one stage per action; here
+2 x N-left + 2 + 2 x N-middle + 2 stages). The press tallies are updated at every action, whatever the stage: a
+button's state is remembered as up once seen within 0.5 mm of fully up and as down once seen pressed (in between,
+the last state is kept); each change from up to down adds one press. So a press-and-release that starts and ends
+within one action is not seen at all, and a release that stops between 1.0 and 0.5 mm below the top passes the
+stage but the next press is not counted. Success is declared at the first action at which every stage has passed
+and every tally is exact; the episode then ends. A tally over its number ends it at once as a failure; otherwise it
+runs on until the cap in **Episode length** below.
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -35,11 +65,20 @@ simulated time). RoboDojo's own evaluation gives a policy 700 actions (28 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**What you must read or remember.** Yes: the agent must read the digits N0 and N1 on the two number cards (the card's digit is assumed to equal its model index 1..9; the digit-to-index relation cannot be verified from the source) and keep count of the presses per button; the order is red0 x N0, blue, red1 x N1, blue, home.
+**What you must read or remember.** Yes: read the digit on each card (left card for the left red button, middle card
+for the middle red button) and keep count of your presses per button; the order is left red button N-left times,
+blue once, middle red button N-middle times, blue once more, then arms home.
 
-**At the end.** After the final blue-button press is released (ratio > 0.9), both target arms must be within 0.15 m per axis and 20 deg of their start pose, at the same action.
+**At the end.** Both arms back near their start poses (above) at the action at which the second blue press is
+released; the grippers need not be open.
 
-**Notes from RoboDojo's code.** The blue button must be pressed exactly twice in total (once between the two red groups, once at the end); pressing it extra at any time fails. Pressing a red button too many times fails immediately and cannot be undone; pressing too few and moving on makes the stage order wait forever. Pressing in a different order than the stages (e.g. button1 before button0 is done) breaks the exact count/sequence. Because states are only sampled once per action, a press-release cycle that happens entirely within one action is invisible; the button must be seen below 0.5 and above 0.9 (and for the count, above 0.95 before the next press) at action boundaries. Which direction is 'pressed' is inferred from the thresholds (r<0.5 = pressed down); the exact joint limits are in the asset metadata.
+**Notes from RoboDojo's code.** The blue button must be counted exactly twice in total (once between the two red
+groups, once at the end); an extra blue press at any time fails. One press too many on a red button fails at once and
+cannot be undone; moving on too early leaves the stage order waiting for the missing press. The stages and the
+tallies are separate: a stage passes on the cap's position alone, while a press is counted only after the cap was
+back within 0.5 mm of fully up, so let each button come fully back up (its spring pushes the cap up as the finger lifts: lift
+the finger clear of the cap) and be seen there at an action boundary before pressing it again. Since everything is sampled once per action, the cap must
+be seen pressed (more than 5.0 mm down) and released at action boundaries, not only in between.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

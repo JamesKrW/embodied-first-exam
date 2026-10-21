@@ -13,12 +13,32 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Stack the three bowls together."*
 
 ## Success (RoboDojo's own check for this task)
-- bowl0, bowl1 and bowl2 each: local +z axis within 45 degrees (strictly less than) of world up (is_axis_up, axis [0,0,1], threshold 45 deg), i.e. no bowl is upside-down or tipped more than 45 deg.
-- The lowest bowl (the one with the smallest root z among bowl0/1/2, chosen at evaluation time) has its local +z axis within 7 degrees (strictly less) of world up, i.e. the bottom bowl sits (nearly) flat and upright.
-- is_stacked with label_list=[bowl0, bowl1, bowl2], in_order=False, xy_threshold=0.04 m, no z_threshold: root positions sorted by height; each vertically adjacent pair has horizontal (XY) root distance <= 0.04 m and root z gap >= 0.005 m (no upper limit). Any bowl may be bottom/middle/top.
-- all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- three identical white bowls (18.2 cm across, 6 cm tall), standing upright, opening up: one at the far right
+  in the middle of the table, one on the left, one on the right near the front, just in front of the right gripper
+  [bowl0 = far right, bowl1 = left, bowl2 = front right; all the same model, bowl model 14]. The check treats them
+  alike: any bowl may end at the bottom, middle or top. The other objects on the table (toys, keyboard, game
+  controller, speaker, ...) are distractors and are not checked.
 
-**When it is checked.** Success conditions form ONE stage: after every action (once all simulation sub-steps of that action are done) the reward manager evaluates all conditions; the episode succeeds as soon as ALL hold simultaneously at the same moment (reward 1 -> episode ends with success). Conditions are not latched or ordered. Otherwise the episode ends as a failure after step_lim=800 actions (the check made after the last action still counts). No early-fail rule exists apart from the environment being flagged invalid (e.g. a required label missing / physics broken).
+A bowl's *centre* below is the point RoboDojo tests for it (its origin): the middle of its bounding box, on its axis
+3 cm above the bottom of its foot (half its height). All of these must hold at the same action boundary:
+- **No bowl tipped.** Each of the three bowls upright, opening up, its axis within 45 deg of straight up (strictly
+  less) [bowl local +z; is_axis_up, 45 deg]. Already true at the start; a bowl upside-down or on its side fails.
+- **Bottom bowl flat.** The lowest bowl (the one whose centre is lowest, chosen anew at every check) upright within
+  7 deg of straight up (strictly less) [local +z of the bowl with the smallest centre height; select_label_by_zmin,
+  is_axis_up, 7 deg]: it must sit flat, opening up, as all three do at the start (about 1 deg off).
+- **One stack.** Order the three bowls by the height of their centres. Each bowl's centre within 0.04 m horizontally
+  (inclusive) of the centre of the bowl just below it, and at least 0.005 m higher (no upper limit) [is_stacked,
+  unordered, xy_threshold 0.04]. With 18.2 cm bowls this means the three nested into each other (or stacked) in one
+  column, axes lined up to within 4 cm; any bowl may be at the bottom, middle or top. Not true at the start (the bowls
+  stand 0.28-0.71 m apart).
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each of
+  x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), all conditions together; they form a single stage,
+nothing is latched, and the order does not matter. Success is declared at the first action boundary where everything
+holds, and the episode ends. Otherwise the episode runs until the step limit (see Episode length). No condition ends the
+episode early as a failure.
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -27,9 +47,15 @@ RoboDojo's own evaluation gives a policy 800 actions (32 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** All target (controlled) arms must be back near their start pose when success is evaluated (it is one of the success conditions, see success list): every target arm's end-effector position within 0.15 m on EACH of x, y, z (per-axis, not Euclidean) and orientation within 20 degrees of its pose at the start of the episode (pose recorded right after the robot is set to its initial state). Gripper opening is NOT checked by the success test.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** Bowls are checked on ROOT positions only: 'stacked' means nested/stacked bowls whose root points are within 0.04 m horizontally and each higher root is at least 0.005 m higher. The bowl asset varies per episode (which of the models is used is random), so nesting height/size varies. The tilt limit for non-bottom bowls is lenient (45 deg) but the bottom bowl must be within 7 deg. No gripper-open requirement in success. A process score (15 for a pair of bowls stacked in some order with gripper open (>=0.8 normalised) and the lower bowl within 7 deg/upper within 45 deg; 100 for full stack with gripper open) exists but does not decide success. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically.
+**Notes from RoboDojo's code.** Only the bowls' centres and tilt are tested, not contact or the gripper: a bowl resting
+in another counts as soon as the centres line up within 0.04 m and step up by at least 5 mm, which nesting identical
+bowls gives. In this frozen instance the three bowls are the same model (RoboDojo picks one model per episode; here
+model 14), so they nest fully. The upper bowls may tilt up to 45 deg, the bottom one only 7 deg; the stack may stand
+anywhere on the table. RoboDojo also has a partial-credit score (a pair stacked with the grippers open, then all
+three); it does not decide success.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

@@ -13,11 +13,31 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Pick up the coin from the holder and insert it precisely into the coin bank."*
 
 ## Success (RoboDojo's own check for this task)
-- coin0 (the coin) bbox is inside the piggy_bank bbox region defined by is_A_bbox_in_B_bbox: the xy convex-hull footprint of coin0's oriented bbox must be fully contained in piggy_bank's xy footprint (convex hull of its oriented bbox).
-- Vertical range: coin0's bbox lowest z >= (z lower bound) - 1e-6 m, and its bbox highest z <= (z upper bound) + 1e-6 m, where the lower bound = max(piggy_bank bbox z_min, highest z among piggy_bank's 'bottom' passive functional point(s)) and the upper bound = min(piggy_bank bbox z_max, lowest z among its 'center' passive functional point(s)). I.e. the whole coin must be below the piggy bank's 'center' functional point and above its 'bottom' functional point, so the coin must have dropped inside the bank's body (not merely sit on top). The exact heights of these points are asset metadata, not determinable statically.
-- All target robots back at start end-effector pose: |dx|,|dy|,|dz| each <= 0.15 m and rotation <= 20 degrees (all_robot_back_to_origin defaults).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the coin: a small gold coin, 2.9 cm across and 2 mm thick, standing on its edge in a small dark holder on the left
+  of the table, in front of the left gripper, its faces toward you and away [coin0] (the holder is not checked
+  [vertical_coin_stand]);
+- the piggy bank: the pink piggy bank on the right, in front of the right gripper, 21.5 cm long (its body runs
+  left-right), 15 cm deep and 11.5 cm tall, with the coin slot on top of its back, in the middle, about 11 cm above
+  the table, running along the body [piggy_bank; the slot is its 'slot_opening' point, not checked]. The bank is
+  fixed to the table.
 
-**When it is checked.** Checked after every action; all conditions must hold at the same step; the first such step is success. Fails at step_lim=300 actions. Process score only (not for success): 20 if coin0 is lifted > 0.08 m (z of root above its start), 100 when inserted. No early-fail rule other than generic ones.
+All of these must hold at the same action boundary:
+- **Coin inside the bank's lower half** [is_A_bbox_in_B_bbox]. RoboDojo tests a box around the coin: a 2.85 cm square
+  around the disc set at 45 deg in the coin's plane (its corners reach 2 cm from the coin's middle) and 2 mm thick.
+  Seen from above, that box must lie entirely inside the bank's outline (its bounding box as it is turned). And the
+  whole box must lie between two heights inside the bank: not lower than 0.8 cm above the table (the bank's 'bottom'
+  point, on the floor of the body under its middle) and not higher than 5.75 cm above the table (the bank's 'center'
+  point, about half-way up the body, under the slot), each with 1e-6 m tolerance. A coin dropped through the slot and
+  lying inside the bank passes; a coin resting on the bank's back, stuck in the slot or held above it fails.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), coin first, then arms; both must hold at the same
+action boundary (one stage). Success is declared at the first action boundary where they hold, and the episode ends.
+No condition ends the episode early as a failure. A separate partial-credit score (not part of success) climbs the
+tiers 20 (coin lifted more than 0.08 m above where it started) and 100 (coin inside as above)
+(the 100 tier counts only if the episode succeeds, otherwise the tier below) [process score, transition mode].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -26,9 +46,13 @@ RoboDojo's own evaluation gives a policy 300 actions (12 s) for this task; no ch
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** Target arms back within 0.15 m per axis and 20 degrees of their start end-effector pose at the moment of success.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** The coin must be entirely inside the piggy bank's vertical extent between the 'bottom' and 'center' functional-point heights: a coin merely resting on the piggy bank's top or held in the gripper over the slot does not count. Positions of those points are in asset metadata (not available statically). The piggy bank is a Geometry (fixed or heavy) object; whether it can move cannot be determined statically. The slot being narrow requires precise alignment.
+**Notes from RoboDojo's code.** The coin must end up wholly inside the bank's body, below about half its height: being
+on top of the bank, in the slot or above it does not count. The bank cannot be moved, so the coin has to be brought to
+the slot; the slot is narrow, so line the coin's faces up with it (the slot runs along the pig's body) before letting
+go. The holder is fixed too.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator

@@ -20,13 +20,36 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- All four conditions hold at the same time after one action (single stage):
-- Insertion depth: (top z of the socket's world bounding box) minus (lowest z of the charger's world bounding box) > 0.015 m, i.e. the bottom of the charger is more than 1.5 cm below the top of the socket's bbox.
-- Position: the charger root position's XY lies inside the footprint (convex hull of the rotated bbox, in XY) of the 'socket' bbox and the charger root z is above the socket bbox's bottom z.
-- Orientation: the charger's local +Y axis is within 10 deg (strict) of the world +Z (up) axis.
-- Both target arms back at origin: all target arms (left_arm and right_arm; the support arm is not counted) have their end-effector pose within 0.15 m on EACH axis (|dx|,|dy|,|dz| all <= 0.15 m) and within 20 degrees (quaternion angle) of the pose they had at the start of the episode (recorded after the scene settled).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the charger: the small white wall-charger block (about 4.7 x 7 x 3 cm, the 7 cm including its two metal prongs) on
+  the left, near the left gripper, lying flat with its prongs pointing toward you [charger];
+- the power strip: the long white strip (15.9 x 3.7 cm, 2.1 cm tall) on the right, near you, lying flat, its long side
+  left-right but turned about 20 deg so that its right end is nearer to you; its outlets are on its top face [socket].
 
-**When it is checked.** Single stage; all four conditions must hold simultaneously after the same action. The reward manager is evaluated only once per action (after the sim sub-steps of that action are finished), never between sub-steps. In each evaluation the FIRST pending stage of the check list is tested (every condition in it, all at that same moment; a condition that is a nested list is an OR); when it passes it is removed permanently (never re-verified later) and the next stage becomes pending; at most one stage is removed per action. Reward is 1.0 only when the check list is empty (and no query/trigger counter is violated); the episode is declared a success as soon as reward >= 0.999 after an action, and ends as a failure if the action counter reaches step_lim without that, or earlier if the environment is flagged failed (query counter exceeded, see below). No final_check list is registered by this task, so the final-check logic at step_lim adds nothing. There is no early failure condition; if never satisfied the episode fails at step_lim.
+The charger's *centre* below is the point RoboDojo tests for it (its origin): on the charger's middle line, about
+1.7 cm from the prong tips (5.3 cm from the opposite end), halfway through its thickness. All four must hold at the same
+action boundary:
+- **Pushed in deep enough.** The charger's lowest point is more than 0.015 m below the top of the strip
+  [is_A_depth_in_B, z_threshold 0.015: strip's world-bbox top z minus charger's world-bbox bottom z > 0.015 m]. The
+  strip's top is about 2.1 cm above the table, so the charger's lowest point (the prong tips, once it stands prongs
+  down) must be less than about 0.6 cm above the table while it is over the strip: the prongs must go about 1.5 cm or
+  more into an outlet. Resting on top of the strip fails. Not true at the start.
+- **Over the strip.** The charger's centre, seen from above, strictly inside the strip's outline as the strip is
+  turned (the convex hull of its rotated bounding box, projected on the table), and higher than the strip's underside
+  [is_A_in_B]. Which outlet is used is not checked. Not true at the start.
+- **Standing prongs down.** The charger's long axis, from the prong end to the opposite end, points up within 10 deg
+  (strictly less than 10 deg) [charger local +Y; is_axis_up, threshold 10]. At the start that direction points away
+  from you along the table (the charger lies flat, prongs toward you), so the condition is false: tip the charger up so
+  the prongs point straight down and its back end straight up. Standing it on its back end (prongs up) fails.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation (start = the pose after the scene settled). The
+  grippers need not be open.
+
+**When it is checked.** After every action (never between the simulation sub-steps of an action), in the order depth,
+over the strip, standing, arms, stopping at the first condition that fails; all four must hold at the same action
+boundary (one stage). Success is declared at the first action boundary where everything holds, and the episode ends. No
+condition ends the episode early as a failure; if the conditions never hold together the episode fails at the action
+limit (below).
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -34,9 +57,15 @@ simulated time). RoboDojo's own evaluation gives a policy 400 actions (16 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** Both target arms must be within 0.15 m per axis and 20 deg of their start end-effector pose at the moment the plug conditions hold (part of the single success stage), so the charger must remain inserted while the arms are brought home (or the arms must already be within the home tolerance, e.g. after release).
+**At the end.** Both arms back near their start poses (above), as part of the success condition, while the charger
+stays plugged in; the grippers need not be open, so letting go of the charger first and then bringing the arms back
+is the usual way.
 
-**Notes from RoboDojo's code.** Precision task: the socket is a free Rigid body (it can move/be knocked or pushed while plugging). The orientation test uses the charger's LOCAL Y axis ([0,1,0]) as 'up' (asset-specific convention; the charger's plug direction relative to local axes is not statically known). The insertion test uses axis-aligned world bounding boxes and the charger root point, so merely placing the charger on top of/inside the strip's bbox footprint with its bbox bottom 1.5 cm below the socket's bbox top is enough as far as the code is concerned. The socket and charger may be on the same or opposite sides of the table.
+**Notes from RoboDojo's code.** Precision task. The power strip is a free object: it can be pushed or knocked while
+plugging, and the tests use wherever it is at that moment. The heights are compared on the two objects' bounding boxes
+as they are turned (lowest corner of the charger, highest corner of the strip); the "over the strip" test uses the
+charger's centre only and the strip's turned outline seen from above, not a box aligned with the table. Successful
+runs end with the charger standing upright, prongs down, in an outlet left of the strip's middle, its back end up.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

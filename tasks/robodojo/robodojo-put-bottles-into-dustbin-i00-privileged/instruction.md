@@ -20,10 +20,29 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- For each bottle k in bottle0..bottle3 simultaneously: the dustbin's footprint (convex hull of its rotated bbox in XY) contains the bottle's whole footprint (convex hull of its rotated bbox corners in XY); the bottle's bbox top z is below the dustbin's bbox top z; and the bottle's bbox bottom z minus the dustbin's bbox bottom z is within [0.0, 0.4] m (this also implies bottle bottom > dustbin bottom - 0.03 m).
-- Both target arms are back at origin: all target arms (left_arm and right_arm; the support arm is not counted) have their end-effector pose within 0.15 m on EACH axis (|dx|,|dy|,|dz| all <= 0.15 m) and within 20 degrees (quaternion angle) of the pose they had at the start of the episode (recorded after the scene settled).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x as seen from the arms, "away" = +y):
+- the yellow juice bottle with a white cap (19 cm tall), standing just right of centre, near you [bottle0];
+- the white bottle with a green logo (19 cm tall), standing at the far right, further back [bottle1];
+- the clear tea bottle with pale yellow drink, a white label and a green neck band (20 cm long), lying on its side at the
+  right, under the right gripper [bottle2];
+- the pink metal water bottle with a black lid (24 cm tall), standing left of centre [bottle3];
+- the dustbin: the black square bin (47 x 47 cm, 65 cm tall) standing beside the left end of the table, its rim about
+  4 cm below the table top; it does not move [dustbin].
 
-**When it is checked.** Single stage; all 4 bottle conditions and the arms-home condition must hold simultaneously after one action. The reward manager is evaluated only once per action (after the sim sub-steps of that action are finished), never between sub-steps. In each evaluation the FIRST pending stage of the check list is tested (every condition in it, all at that same moment; a condition that is a nested list is an OR); when it passes it is removed permanently (never re-verified later) and the next stage becomes pending; at most one stage is removed per action. Reward is 1.0 only when the check list is empty (and no query/trigger counter is violated); the episode is declared a success as soon as reward >= 0.999 after an action, and ends as a failure if the action counter reaches step_lim without that, or earlier if the environment is flagged failed (query counter exceeded, see below). No final_check list is registered by this task, so the final-check logic at step_lim adds nothing. No early failure.
+Every bottle is tested with its bounding box (the box around the whole bottle, turned with it) against the dustbin's
+bounding box. All of these must hold at the same action boundary:
+- **Each of the four bottles inside the dustbin** [is_A_on_B_bottom with min_z_gap 0.0, max_z_gap 0.4, which includes
+  is_A_cover_B]: seen from above, the bottle's whole outline lies inside the dustbin's outline; the bottle's top is lower
+  than the dustbin's rim (strictly); and the bottle's lowest point is between 0.0 and 0.4 m (inclusive) above the
+  dustbin's bottom. In practice: the whole bottle inside the bin, below the rim, standing or lying in any direction; a
+  bottle leaning on the rim or sticking out above it fails. Not true at the start.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each of
+  x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions). The four bottle conditions and the arms condition
+form one stage and must all hold at the same action boundary; success is declared at the first action boundary where
+they all hold, and the episode ends. Otherwise the episode ends as a failure after the action limit. No condition ends
+the episode early as a failure.
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -31,9 +50,15 @@ simulated time). RoboDojo's own evaluation gives a policy 700 actions (28 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**At the end.** Both arms within 0.15 m per axis and 20 deg of their start pose at the same action in which all four bottles are inside the dustbin.
+**At the end.** Both arms back near their start poses (above), in the same action in which all four bottles are inside
+the dustbin; the grippers need not be open.
 
-**Notes from RoboDojo's code.** The dustbin is only reachable by one arm, bottles on the right side of the table need a handover between the hands (per the task description in the wiki; not enforced by code). The in-bin test is a bounding-box test of the bottle's entire bbox in the dustbin's footprint hull and below the bin's top, so a bottle leaning on the rim or sticking out above the rim fails; a bottle that falls out later invalidates the stage because all four are tested together on the same action. The upper z bound of 0.4 m relative to the dustbin bottom is rarely binding. Partial score (get_score only): 10/25/40/100 for 1/2/3/4 bottles with open grippers (>=0.8) / home.
+**Notes from RoboDojo's code.** The dustbin is beside the left end of the table, so it is within reach of the left arm
+only; RoboDojo's task description suggests handing the bottles on the right side over from the right hand to the left
+hand, but nothing in the check requires a handover: only where the bottles end up counts. Dropping a bottle into the bin
+from above counts the same as placing it. All four bottles are tested together at the same action, so a bottle that
+bounces back out undoes the result. The 0.4 m limit on the bottle's height above the bin's bottom does not matter in
+practice: a bottle resting inside the bin is far lower.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

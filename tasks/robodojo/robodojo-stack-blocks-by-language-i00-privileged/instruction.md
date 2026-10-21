@@ -19,10 +19,28 @@ robot's start pose never change between resets. You may reset and retry as many 
 **one replayable trajectory**, not a general policy.
 
 ## Success (RoboDojo's own check for this task)
-- is_stacked with in_order=True, label_list=[block_0, block_1, block_2], xy_threshold=0.0175 m, no z_threshold: block_0 is the bottom, block_1 in the middle, block_2 on top. For each adjacent pair (lower, upper): horizontal (XY) distance between the two object ROOT positions <= 0.0175 m AND (upper root z - lower root z) >= 0.005 m (no upper limit on the z gap).
-- all_robot_back_to_origin: every target arm's end-effector pose is within 0.15 m per axis (|dx|,|dy|,|dz| each <= 0.15 m) and within 20 degrees (quaternion angular distance) of its start-of-episode pose (the arms must be returned to roughly their starting pose).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms).
+Three plain cubes, 3.5 cm on each edge, one per colour, each turned a little (15-24 deg) about the vertical:
+- the blue cube, just right of the table's centre, as near you as the yellow one [block_0];
+- the yellow cube, at the far left, ahead of the left gripper [block_1];
+- the orange cube, right of centre, a little behind and right of the blue cube [block_2].
 
-**When it is checked.** Success conditions form ONE stage: after every action (once all simulation sub-steps of that action are done) the reward manager evaluates all conditions; the episode succeeds as soon as ALL hold simultaneously at the same moment (reward 1 -> episode ends with success). Conditions are not latched or ordered. Otherwise the episode ends as a failure after step_lim=400 actions (the check made after the last action still counts). No early-fail rule exists apart from the environment being flagged invalid (e.g. a required label missing / physics broken).
+RoboDojo's instruction asks for the order blue (bottom), yellow (middle), orange (top). A cube's *centre* below is the
+point RoboDojo tests for it (its origin): the middle of the cube. All of these must hold at the same action boundary:
+- **The tower in this order** [is_stacked, in_order=True, xy_threshold=0.0175]: the yellow cube's centre at most
+  0.0175 m from the blue cube's centre horizontally (inclusive) and at least 0.005 m higher (no upper limit); and the
+  orange cube's centre at most 0.0175 m from the yellow cube's centre horizontally and at least 0.005 m higher. Resting
+  on each other, the centres are 3.5 cm apart in height, so it means blue at the bottom, yellow on it, orange on top,
+  each within 1.75 cm of centred on the one below. The cubes' orientation is not tested. Not true at
+  the start (all three lie on the table).
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions; once all simulation sub-steps of the action are
+done), both conditions are checked together: one stage, nothing latched or ordered. Success is declared at the first
+action boundary where both hold, and the episode ends. No condition ends the episode early as a failure (only a broken
+environment, e.g. a missing object or exploded physics, does). RoboDojo's own 400-action limit [step_lim] does not apply
+here (Episode length, below).
 
 **Episode length.** No step cap: the episode ends at the first action where the task's check passes (success; later rows
 are never executed) or when a check fails for good (failure); a runaway guard stops it after 15000 actions (10 min of
@@ -30,11 +48,21 @@ simulated time). RoboDojo's own evaluation gives a policy 400 actions (16 s) for
 reads that limit and it does not apply here: where the description above mentions step_lim, read the guard.
 `s.status()` reports the end.
 
-**What you must read or remember.** Language: the instruction names the colour of the bottom, middle and top block (e.g. 'blue, green, and red'). The solver must identify which cube is which colour (via vision/colour) and map them to block_0 (bottom), block_1 (middle), block_2 (top). Which colour is block_0/1/2 is randomised per episode; the instruction text is generated from the actual cube model indices.
+**What you must read or remember.** RoboDojo's instruction names the colours from bottom to top (here blue, yellow,
+orange). Each colour is one cube on the table; find it by its colour. RoboDojo builds that sentence from the three
+cubes it drew for the scene [block_0, block_1, block_2 = bottom, middle, top; cube models 1 blue, 2 green, 3 red,
+7 yellow, 8 orange, 9 cyan; here models 1, 7, 8].
 
-**At the end.** All target (controlled) arms must be back near their start pose when success is evaluated (it is one of the success conditions, see success list): every target arm's end-effector position within 0.15 m on EACH of x, y, z (per-axis, not Euclidean) and orientation within 20 degrees of its pose at the start of the episode (pose recorded right after the robot is set to its initial state). Gripper opening is NOT checked by the success test.
+**At the end.** Both arms back near their start poses (above, start = the pose right after the robot is set to its
+initial state), as part of the success condition; the grippers need not be open.
 
-**Notes from RoboDojo's code.** The order matters: with in_order=True the list order is the stacking order, so a correct tower in a different colour order fails (z gap sign checked: upper must be >= 0.005 m above lower). No gripper-open requirement in success (only in the process score). XY tolerance 0.0175 m is on root-to-root distance, i.e. cubes must be quite well centred. A get_score() process score exists (20 for block_0/block_1 stacked within z gap <=0.04 m + gripper open (threshold 0.92 normalised) + block_0 not lifted more than 0.01 m from initial z; 100 for the full tower with gripper open) but does not determine success. Success is evaluated on object root poses/points, not on gripper contact. Object geometry sizes/asset dimensions are not in the source and cannot be determined statically. Instruction template is an f-string: each {color[...]} is replaced by the colour of that block's model index (1 blue, 2 green, 3 red, 7 yellow, 8 orange, 9 cyan).
+**Notes from RoboDojo's code.** The order matters: a tower of the same three cubes in another colour order fails,
+because each named upper cube must be at least 0.005 m above the one named below it. The horizontal limit of 0.0175 m
+is on the cubes' centres, so the cubes must be well centred on each other (half the 3.5 cm edge). The test reads only
+the cubes' centres: it does not need the cubes to touch, to be turned alike, or to be released. All three cubes are
+the same 3.5 cm size with their centre in the middle of the cube. A process score (20 for yellow stacked on blue with
+the centres at most 0.04 m apart in height, blue not lifted more than 0.01 m from its start height and both grippers
+open at least 0.92 of their range; 100 for the full tower with grippers open) exists but does not decide success.
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed

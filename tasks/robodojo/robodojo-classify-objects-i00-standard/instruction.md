@@ -13,11 +13,38 @@ start in a trial takes ~4-15 min (Client, below).
 RoboDojo's own instruction for this scene: *"Sort the objects by category into the three baskets."*
 
 ## Success (RoboDojo's own check for this task)
-- A label is 'in' a basket when the object's root origin xy lies inside the basket's bbox footprint (convex hull of the oriented 3D bbox projected to xy) and its root z is strictly above the bbox's lowest z. For each of basket0, basket1, basket2: at least one of the three categories (cat0, cat1, cat2, each category = all its object instances) must have ALL of its objects inside that basket. Because a basket needs a whole category and each category can only be in one basket, this forces a bijection: every category fully in its own distinct basket, so every object ends up in a basket. Which category goes into which basket is free (any permutation is accepted).
-- Settled: for each i in 0..2, every object of category cat_i has root z - (top z of the world-frame bbox of basket_i) < 0.01 m. NOTE the pairing cat_i with basket_i is hard-coded here regardless of which basket the category is actually in; because objects resting on the table or inside baskets are normally below the basket rim, this only fails if an object is lifted (e.g. held in the gripper) higher than 0.01 m above basket top.
-- All target robots back at start end-effector pose: |dx|,|dy|,|dz| each <= 0.15 m and rotation <= 20 degrees (all_robot_back_to_origin defaults).
+The objects the check reads (RoboDojo's labels in brackets; left/right = world -x/+x, "away" = +y, away from the arms):
+- the three baskets: open-top plastic bins, 25.2 x 16.8 cm and 7.7 cm high, in a row across the far half of the
+  table: white on the left [basket0], blue in the middle [basket1], red on the right [basket2];
+- the objects to sort, three kinds [one label group per kind]:
+  - two pens [cat0]: a black-and-gold pen (18.6 cm) on the right, just in front of the red basket [cat0_0], and a white
+    pen (14.5 cm) in front, right of centre [cat0_1];
+  - two watches [cat1]: a silver-and-black round watch right of centre [cat1_0] and a black band watch just in front of it to the
+    right [cat1_1];
+  - three identical bunny figurines (13 cm tall, tan, in a navy outfit) [cat2]: two on the left, one at the far right
+    next to the right gripper [cat2_0, cat2_1, cat2_2].
 
-**When it is checked.** Checked after every action (the reward manager step runs after each action's control sequence completes). One stage: all of the above must hold at the same step, with the arm home; success at the first such step (all objects released, since objects held in the gripper would typically be above the 0.01 m rim threshold). Otherwise fails at step_lim=1100 actions. Process score (partial only): transition mode scores 15, 40, 100 for 1, 2, 3 baskets correctly filled with grippers open (open fraction >= 0.8).
+An object's *centre* below is the point RoboDojo tests for it (its origin); for every object here that is about the
+middle of its bounding box. All of these must hold at the same action boundary:
+- **One kind per basket.** For each basket, all objects of at least one kind are in it [is_all_A_in_B]. An object is
+  *in* a basket when its centre, seen from above, lies inside the basket's outline and is higher than the basket's
+  underside [is_A_in_B]. Since an object can be in only one basket, this means each kind fills its own basket, every
+  object is in the basket of its kind, and no basket mixes kinds. Which kind goes into which basket is free.
+- **Released.** Every object's centre less than 0.01 m above the basket rims (the rims are all 7.7 cm above the
+  table) [is_all_A_z_lower_than_B_bbox_zmax, z_threshold=0.01]. RoboDojo compares the pens with the white basket's
+  rim, the watches with the blue one's and the figurines with the red one's, but all three rims are at the same
+  height, so this does not depend on where each kind goes. An object resting in a basket passes; one still held up in
+  a gripper fails.
+- **Both arms back** [all_robot_back_to_origin]: each arm's end-effector within 0.15 m of its start position on each
+  of x, y and z separately, and within 20 deg of its start orientation. The grippers need not be open.
+
+**When it is checked.** After every action (never between actions), in the order baskets, released, arms, stopping at
+the first condition that fails; all must hold at the same action boundary (one stage). Success is declared at the
+first action boundary where everything holds, and the episode ends. No condition ends the episode early as a failure.
+A separate partial-credit score (not part of success) climbs the tiers 15, 40, 100 as 1, 2, then 3 baskets each hold
+exactly one complete kind (all of it, released below the rim, and nothing of another kind) while both grippers are
+open (each at least 0.8 of its full opening)
+(the 100 tier counts only if the episode succeeds, otherwise the tier below) [process score, transition mode].
 
 **Episode length.** No step budget: the episode ends by itself at the first action where the task's check passes (success)
 or when a check fails for good (failure); one technical cap ends it after **15,000 actions** (10 min of simulated time;
@@ -26,9 +53,12 @@ RoboDojo's own evaluation gives a policy 1100 actions (44 s) for this task; no c
 it does not apply here: where the description above mentions step_lim, read the guard. `res.meta["done"]` /
 `res.meta["reason"]` report the end.
 
-**At the end.** All target arms back within 0.15 m per axis and 20 degrees of start end-effector pose at the moment of success.
+**At the end.** Both arms back near their start poses (above), as part of the success condition; the grippers need not
+be open.
 
-**Notes from RoboDojo's code.** Count of objects varies (3 to 9 total). The check does not require uniformly-sorted-to-specific baskets; any bijection of categories to baskets is accepted. Object membership uses the object's root origin xy-inside-basket-footprint test, so an object leaning over the rim is judged by its origin. Baskets are fixed (geometry, not movable by design). Details of the asset origin are not determinable statically.
+**Notes from RoboDojo's code.** Any assignment of kinds to baskets is accepted, as long as each basket holds one
+complete kind. Being in a basket is judged by the object's centre alone, so an object leaning over the rim counts if its
+centre is inside the outline. The baskets are fixed in place.
 
 ## Rules (real-robot rules)
 - **No reset.** The episode starts when the service comes up and ends as above, when your time is up, or on a simulator
