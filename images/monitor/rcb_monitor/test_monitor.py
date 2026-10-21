@@ -726,6 +726,15 @@ def test_sanitize():
         except OSError:
             pass
         check(n == 0 and not os.path.lexists(log), "the session log that pointed to /dev/zero is gone")
+        # a session log linked to a file of the agent's own inside the directory (one huge line) is removed, not followed;
+        # the file it pointed to stays (it is the agent's), and a grader that opens the log by name finds none
+        big = os.path.join(out, "sub", "big.bin")
+        open(big, "wb").write(b"x" * 10000)
+        os.symlink(os.path.join("sub", "big.bin"), log)
+        done = rcb_limits.sanitize([out], max_log=4096)
+        check(not os.path.lexists(log) and any("session log is a symbolic link" in x for x in done)
+              and os.path.getsize(big) == 10000, f"a session log linked inside the directory is removed: {done}")
+        os.remove(big)
         # a root that is missing or itself a link, and the command line the generated test.sh line runs: never an error
         check(rcb_limits.sanitize([os.path.join(d, "missing")]) == [], "no directory: nothing")
         os.symlink("/", os.path.join(d, "rootlink"))

@@ -388,10 +388,12 @@ def sanitize(roots=("/app/output",), max_log=MAX_SESSION_LOG):
     """Before the grader: the files the agent left (PROTOCOL §2.6: collected from its container as they are, links and
     all) are untrusted input, and a grader opens some of them by name. Remove what is not a file of the agent's own
     under the root: a symbolic link that leaves it or does not end at a regular file (`rcb_session_log.jsonl ->
-    /dev/zero` made a grader read until the verifier ran out of memory or time: no verdict), and every FIFO, device and
-    socket (opening a FIFO blocks). A session log larger than `max_log` is cut there (graders read it line by line,
-    and one endless line is as bad). Regular files, directories and links to regular files inside the root stay as
-    they are: nothing a grader could have read safely changes. Returns what it removed or cut (also printed)."""
+    /dev/zero` made a grader read until the verifier ran out of memory or time: no verdict), every FIFO, device and
+    socket (opening a FIFO blocks), and a session log that is a symbolic link wherever it points (a link to a file of
+    the agent's own, gigabytes without a newline, is as bad: graders open the log by name). A session log larger than
+    `max_log` is cut there (graders read it line by line, and one endless line is as bad). Regular files, directories
+    and other links to regular files inside the root stay as they are: nothing a grader could have read safely changes.
+    Returns what it removed or cut (also printed)."""
     done = []
     for root in roots:
         real_root = os.path.realpath(root)
@@ -403,17 +405,21 @@ def sanitize(roots=("/app/output",), max_log=MAX_SESSION_LOG):
                 except OSError:
                     pass
             continue
+        log = os.path.join(real_root, "rcb_session_log.jsonl")
         for dirpath, dirnames, filenames in os.walk(real_root, followlinks=False):
             for name in list(dirnames) + filenames:
                 path = os.path.join(dirpath, name)
                 try:
                     st = os.lstat(path)
                     if stat.S_ISLNK(st.st_mode):
-                        target = os.path.realpath(path)
-                        inside = target.startswith(real_root + os.sep)
-                        if inside and stat.S_ISREG(os.stat(target).st_mode):
-                            continue
-                        why = "a symbolic link that leaves the directory or does not end at a regular file"
+                        if path == log:              # the session log is read by name: a link to any file (a huge one
+                            why = "the session log is a symbolic link"   # without a newline) is removed, never followed
+                        else:
+                            target = os.path.realpath(path)
+                            inside = target.startswith(real_root + os.sep)
+                            if inside and stat.S_ISREG(os.stat(target).st_mode):
+                                continue
+                            why = "a symbolic link that leaves the directory or does not end at a regular file"
                     elif stat.S_ISREG(st.st_mode) or stat.S_ISDIR(st.st_mode):
                         continue
                     else:
@@ -429,7 +435,6 @@ def sanitize(roots=("/app/output",), max_log=MAX_SESSION_LOG):
                             done.append(f"removed {path}: a symbolic link that cannot be resolved ({type(e).__name__})")
                     except OSError:
                         pass
-        log = os.path.join(real_root, "rcb_session_log.jsonl")
         try:
             if os.path.isfile(log) and not os.path.islink(log) and os.path.getsize(log) > max_log:
                 os.truncate(log, max_log)
