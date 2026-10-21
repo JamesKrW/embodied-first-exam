@@ -30,6 +30,10 @@ Guide for maintainers. The contract is [protocol/README.md](protocol/README.md);
 
 ## Questions to ask
 - Could you write the verifier from the instruction alone? Is every convention the agent needs stated?
+- Could the agent tell, from what it observes in its mode, whether each condition holds (PROTOCOL §5)? Objects named by
+  appearance or starting place, axes and points described physically (and whether they already hold at the start),
+  upstream identifiers only in brackets after that, thresholds equal to the grader's; the advisory `check-instruction.sh`
+  flags code-like terms in standard-mode texts.
 - Can the agent reach a solution, a pointer to one, or the success predicate (images, tooling, docs, network)? In the
   image too: recorded episodes, demonstration files, a `source_url` or dataset name in instance metadata (PROTOCOL
   Appendix H.2). Does the task work with the allowlist only (H.6, unless it declares open egress: oracle run under it, nothing downloaded at run time)? Is a
