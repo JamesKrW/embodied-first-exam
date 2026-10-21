@@ -3,13 +3,13 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:olympiad-0.1.0
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 /sim/metering/ /srv/metering/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 /privileged/environment/fullsim/renderers/ /srv/renderers/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 /sim/bodies/hands/ /srv/bodies/hands/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 /sim/skilleval/probe/ /srv/skilleval/probe/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 /sim/skilleval/tests/fixture/ /srv/skilleval/tests/fixture/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 /shared/tests/grade.py /srv/core/grading.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 /sim/metering/ /srv/metering/
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 /privileged/environment/fullsim/renderers/ /srv/renderers/
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 /sim/bodies/hands/ /srv/bodies/hands/
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 /sim/skilleval/probe/ /srv/skilleval/probe/
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 /sim/skilleval/tests/fixture/ /srv/skilleval/tests/fixture/
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 /shared/tests/grade.py /srv/core/grading.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /sim/bodies/__init__.py \
      /sim/bodies/assembly.py \
      /sim/bodies/configuration.json \
@@ -19,7 +19,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha25
      /privileged/environment/fullsim/bodies/servo.py \
      /privileged/environment/fullsim/bodies/sources.py \
      /srv/bodies/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /sim/bodies/ssl_robot/LICENSE \
      /sim/core/metering/__init__.py \
      /sim/bodies/ssl_robot/assist.py \
@@ -29,7 +29,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha25
      /sim/bodies/ssl_robot/model.xml \
      /sim/bodies/ssl_robot/trajectory.py \
      /srv/bodies/ssl_robot/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /sim/variants/f2ac92d9b2/core/README.md \
      /sim/variants/6e764a014e/core/__init__.py \
      /sim/core/builtin_seat.py \
@@ -58,28 +58,28 @@ COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha25
      /privileged/environment/fullsim/core/turn.py \
      /privileged/environment/fullsim/core/workers.py \
      /srv/core/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /sim/core/metering/__init__.py \
      /privileged/environment/fullsim/core/metering/api_errors.py \
      /privileged/environment/fullsim/core/metering/think_clock.py \
      /srv/core/metering/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /privileged/environment/fullsim/core/tests/fixture/plugin.py \
      /sim/core/tests/fixture/sport.toml \
      /srv/core/tests/fixture/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /privileged/environment/fullsim/core/tests/fixture_images/plugin.py \
      /sim/core/tests/fixture_images/sport.toml \
      /srv/core/tests/fixture_images/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /privileged/environment/fullsim/core/tests/fixture_turn/plugin.py \
      /sim/core/tests/fixture_turn/sport.toml \
      /srv/core/tests/fixture_turn/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /sim/core/tests/test_core.py \
      /privileged/environment/fullsim/core/tests/test_diagnose.py \
      /srv/core/tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /privileged/environment/fullsim/skilleval/__init__.py \
      /privileged/environment/fullsim/skilleval/cases.py \
      /privileged/environment/fullsim/skilleval/contract.py \
@@ -93,14 +93,14 @@ COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha25
      /privileged/environment/fullsim/skilleval/skillhost.py \
      /privileged/environment/fullsim/skilleval/toolkit.py \
      /srv/skilleval/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 /privileged/environment/fullsim/skilleval/tests/test_skilleval.py /srv/skilleval/tests/test_skilleval.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 /privileged/environment/fullsim/spectator/broadcast_log.py /srv/spectator/broadcast_log.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 /privileged/environment/fullsim/skilleval/tests/test_skilleval.py /srv/skilleval/tests/test_skilleval.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 /privileged/environment/fullsim/spectator/broadcast_log.py /srv/spectator/broadcast_log.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /shared/environment/fullsim/sports/soccer_ssl/grade.py \
      /sim/sport/skill_api.py \
      /srv/sport/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 /sim/sport/opponents/__init__.py /srv/sport/opponents/__init__.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-sim-files-0.1.1@sha256:a6b9bafd62ee655d17a3c29abfcb7ce81c52541f2fa5c4106fccd69ed03de765 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 /sim/sport/opponents/__init__.py /srv/sport/opponents/__init__.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-files-0.2.0@sha256:da0cd2f6914e82e81f5db6ccf0df02ce357522bea4ac844f3c88019f8ef0db08 \
      /sim/sport/sim/__init__.py \
      /sim/sport/sim/ball.py \
      /sim/sport/sim/camera.py \
