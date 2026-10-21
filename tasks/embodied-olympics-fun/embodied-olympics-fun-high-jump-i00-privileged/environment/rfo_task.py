@@ -69,10 +69,12 @@ class Task(TaskBase):
     deviations = [
         "TR 27.1 (one foot) is judged by a number: in the last {single_support_s} s before the lift-off of the "
         "jump's flight only one foot touches the ground, and nothing else does",
-        "TR 27.2(b) is judged geometrically: before the jump's flight nothing of the robot may touch the ground or "
-        "the mat beyond the plane; the robot's pelvis and feet (the ankle joints) must pass the plane between the "
-        "uprights and above the height of the bar's upper side; the bar is cleared when every part of the robot is "
-        "beyond the plane",
+        "TR 27.2(b) is judged geometrically, in one flight: the robot's pelvis and feet (the ankle joints) must "
+        "pass the plane between the uprights and above the height of the bar's upper side, and every part of the "
+        "robot must get beyond the plane, all in the same flight (from the take-off to the first contact with "
+        "anything but the bar); a crossing made while touching the ground or the mat, or after a landing, never "
+        "counts; any contact with the ground or the mat beyond the plane before that clearance is the rule's "
+        "failure; the rule's allowance for a foot that touches the landing area without advantage is not used",
         "TR 27.2(a): the bar is judged {bar_wait_s} s after the clearance and the landing; it is off its supports "
         "when its centre is more than {bar_drop_m} m below its resting height",
         "TR 27.10 (the landing area): the mat is one box whose contact follows soft polyurethane foam (about 5 kPa "
@@ -84,7 +86,10 @@ class Task(TaskBase):
         "the bar is rigid (no sag); no wind; the athlete alone, one trial at one height, {bar_height_m} m "
         "(FAMILIES.md: a school competition's opening height; the men's world record is 2.45 m)",
         "TR 27 does not define a jump; here its flight lasts at least {min_air_s} s and raises the pelvis at least "
-        "{rise_min_m} m above its height at lift-off",
+        "{rise_min_m} m above its height at lift-off (a fall from a stand raises it by nothing); the number is kept "
+        "within this robot's reach: its two-foot squat jump leaves the ground at about 1.8 m/s (0.17 m of rise), "
+        "and one leg gives at most half that push's work (an estimate of about 0.1 m of rise off one foot); a "
+        "human's jump raises it far more",
         "the bar is rigid and its supports are fixed, so unlike a real bar it would carry a body: touching it is "
         "allowed, as in the rules, but contact with it for more than {bar_touch_max_s} s in all is a failure (a real "
         "bar sags and falls under any weight); a pelvis or a foot that comes back over the plane has not passed it",
@@ -96,7 +101,7 @@ class Task(TaskBase):
     params = dict(bar_height_m=1.00, bar_length_m=4.00, bar_diameter_m=0.030, bar_mass_kg=2.0, upright_gap_m=4.02,
                   support_width_m=0.04, support_length_m=0.06, mat_length_m=4.0, mat_width_m=6.0, mat_height_m=0.70,
                   mat_gap_m=0.10, **MAT_CONTACT, runway_m=15.0, single_support_s=0.05,
-                  min_air_s=0.05, rise_min_m=0.05, bar_drop_m=0.05, bar_wait_s=2.0, bar_touch_max_s=0.3)
+                  min_air_s=0.05, rise_min_m=0.08, bar_drop_m=0.05, bar_wait_s=2.0, bar_touch_max_s=0.3)
 
     sentence = ("Do a high jump: approach the bar, take off from one foot, go over the bar between the uprights "
                 "without knocking it off its supports, and come down on the landing mat.")
@@ -109,23 +114,24 @@ class Task(TaskBase):
              "deep, {mat_height_m} m high, soft, beginning {mat_gap_m} m behind that plane. The approach is free "
              "(any direction, any distance on the {runway_m} m of level runway). A flight is a time of at least "
              "{min_air_s} s in which nothing of you touches anything but the bar. Your jump is the flight in which "
-             "your pelvis crosses the bar's plane or which ends with your first contact beyond the plane. Its "
-             "take-off must be from one foot: in the last {single_support_s} s before lift-off only one foot "
-             "touches the ground and nothing else of you does; and in it your pelvis must rise at least "
-             "{rise_min_m} m above its height at lift-off. Before your jump nothing of you may touch the ground or "
-             "the mat beyond the plane. Your pelvis and both feet (the ankle joints) must cross the plane between "
-             "the uprights and higher than the bar's upper side; one that comes back over the plane has not passed "
-             "it and must pass it again. You have cleared the bar when every part of you "
-             "is beyond the plane; from the landing until then nothing of you may touch the ground on the take-off "
-             "side. You may touch the bar, for at most {bar_touch_max_s} s in all (it does not carry you), and you "
-             "may land on any part of your body, on the mat or not. You "
+             "your pelvis crosses the bar's plane. Its take-off must be from one foot: in the last "
+             "{single_support_s} s before lift-off only one foot touches the ground and nothing else of you does; and "
+             "in it your pelvis must rise at least {rise_min_m} m above its height at lift-off. The clearance is "
+             "judged in that one flight, between the take-off and your first contact with anything but the bar: "
+             "your pelvis and both feet (the ankle joints) must cross the plane between the uprights and higher "
+             "than the bar's upper side (one that comes back over the plane has not passed it and must pass it "
+             "again), and every part of you must get beyond the plane. A crossing made while you touch the ground "
+             "or the mat, or after the flight has ended, never counts. You have cleared the bar when all of that "
+             "has happened in the flight. You may touch the bar, for at most {bar_touch_max_s} s in all (it does "
+             "not carry you), and after the clearance you may land on any part of your body, on the mat or not. You "
              "succeed when you have cleared the bar and landed, and {bar_wait_s} s later the bar is still on its "
              "supports. A fall is not a failure by itself. You fail if the bar drops more than {bar_drop_m} m at "
-             "any time; if you are in contact with the bar for more than {bar_touch_max_s} s in all; if you touch the "
-             "ground or the mat beyond the plane without a jump; if the take-off is not "
-             "from one foot; if the flight is not a jump; if your pelvis or a foot passes the plane outside the "
-             "uprights or not higher than the bar; if you touch the ground on the take-off side after the "
-             "landing before you have cleared the bar; or after {time_limit_s} s (the time allowed for a trial).")
+             "any time; if you are in contact with the bar for more than {bar_touch_max_s} s in all; if you touch "
+             "the ground or the mat beyond the plane before you have cleared the bar, with or without a jump; if "
+             "your jump's flight ends (you touch anything but the bar) before you have cleared the bar; if the "
+             "take-off is not from one foot; if the flight is not a jump; if your pelvis or a foot passes the plane "
+             "outside the uprights or not higher than the bar; if your landing after the clearance touches the "
+             "ground on the take-off side; or after {time_limit_s} s (the time allowed for a trial).")
     venue = ("You stand on the runway facing the bar (+x), your pelvis 8 m before it, opposite its middle. The bar "
              "is red with white ends, the uprights grey, the mat blue; the runway is level and goes on 15 m before "
              "the bar and to both sides.")
@@ -197,6 +203,8 @@ class Task(TaskBase):
         done = fl.update()                               # a flight of at least min_air_s that lands now, or None
         if fl.air and not was_air:
             tr["at_t0"] = {**tr["last_on"], "other": tr["other_on"]}
+            if not ref.has("clearance"):                 # TR 27.2(b) in one flight: a new flight starts the count again
+                tr["crossed"] = []
         for s in SIDES:
             if ref.touching(self.sole[s], ref.ground):
                 tr["last_on"][s] = ref.time
@@ -204,7 +212,6 @@ class Task(TaskBase):
             tr["other_on"] = ref.time
         pts = {k: [float(x) for x in w.d.xpos[b]] for k, b in self.points.items()}
         prev, tr["prev"] = tr["prev"], pts
-        in_flight = fl.air and ref.time - fl.cur["t0"] >= p["min_air_s"]
         for k, (x1, y1, z1) in pts.items():              # the pelvis or an ankle through the plane: where?
             if prev is None:
                 continue
@@ -220,32 +227,49 @@ class Task(TaskBase):
                 return ref.fail("went round the bar", what=k, y=round(y, 3))
             if z <= H:
                 return ref.fail("passed under the bar", what=k, z=round(z, 3))
+            if not fl.air or ref.has("clearance"):       # touching the ground or the mat: a crossing that never counts
+                continue
             tr["crossed"] = sorted(tr["crossed"] + [k])
-            if k == "pelvis" and tr["phase"] == "approach" and in_flight and not self._takeoff(w, ref):
-                return
+        if (tr["phase"] == "approach" and fl.air and "pelvis" in tr["crossed"]
+                and ref.time - fl.cur["t0"] >= p["min_air_s"] and not self._takeoff(w, ref)):
+            return                                       # the pelvis over the plane in a flight: the jump; its take-off
+        if (tr["phase"] == "jump" and fl.air and not ref.has("clearance") and len(tr["crossed"]) == 3
+                and ref.robot_span((1.0, 0.0, 0.0))[0] > plane):
+            tr["t_clear"] = ref.time                     # cleared in the jump's flight, before any landing
+            ref.stage("clearance")
+        if fl.air:
+            return
         cp = ref.contact_points(self.robot, ref.ground)
         beyond = len(cp) and bool(np.any(cp[:, 0] > plane))
-        if tr["t_land"] is None and beyond:              # the first contact beyond the plane
-            if tr["phase"] == "approach":
-                if done is None:
+        if not ref.has("clearance"):
+            if beyond:                                   # TR 27.2(b): beyond the plane before clearing the bar
+                if tr["phase"] == "approach" and done is None:
                     return ref.fail("touched the ground or the mat beyond the bar's plane without a jump",
                                     parts=sorted(ref.parts_touching(ref.ground)))
-                if not self._takeoff(w, ref):
-                    return
-            if done is not None:                         # the jump's flight has ended: was it a jump?
-                rise = done["apex_z"] - done["pelvis0"][2]
-                ref.metrics["air_s"], ref.metrics["rise_m"] = done["air_s"], round(rise, 3)
-                if rise < p["rise_min_m"]:
-                    return ref.fail("the flight was not a jump", rise_m=round(rise, 3))
+                if done is not None:
+                    ref.metrics["air_s"] = done["air_s"]
+                    ref.metrics["rise_m"] = round(done["apex_z"] - done["pelvis0"][2], 3)
+                return ref.fail("touched the ground or the mat beyond the bar's plane before clearing the bar",
+                                parts=sorted(ref.parts_touching(ref.ground)), crossed=list(tr["crossed"]),
+                                on_the_mat=bool(ref.touching(self.robot, ref.geoms(names=["mat"]))))
+            if tr["phase"] == "jump":                    # the jump's flight ended (a contact, not the bar's) uncleared
+                return ref.fail("the jump's flight ended before the bar was cleared", crossed=list(tr["crossed"]),
+                                parts=sorted(ref.parts_touching(~ref.robot_mask & ~self.bar_mask)))
+            return
+        if tr["t_land"] is None:                         # the landing after the clearance: was the flight a jump?
+            if done is None:
+                return ref.fail("the flight was not a jump", air_s=round(ref.time - fl.flights[-1]["t0"], 3)
+                                if fl.flights else None)
+            rise = done["apex_z"] - done["pelvis0"][2]
+            ref.metrics["air_s"], ref.metrics["rise_m"] = done["air_s"], round(rise, 3)
+            if rise < p["rise_min_m"]:
+                return ref.fail("the flight was not a jump", rise_m=round(rise, 3))
+            if len(cp) and bool(np.any(cp[:, 0] <= plane)):
+                return ref.fail("touched the ground on the take-off side after the clearance",
+                                parts=sorted(ref.parts_touching(ref.ground)))
             tr["t_land"] = ref.time
-            ref.event("landing", parts=sorted(ref.parts_touching(ref.ground)),
+            ref.event("landing", parts=sorted(ref.parts_touching(~ref.robot_mask & ~self.bar_mask)),
                       on_the_mat=bool(ref.touching(self.robot, ref.geoms(names=["mat"]))))
-        elif tr["t_land"] is not None and len(cp) and bool(np.any(cp[:, 0] <= plane)):
-            return ref.fail("touched the ground on the take-off side before clearing the bar",
-                            parts=sorted(ref.parts_touching(ref.ground)))
-        if tr["phase"] == "jump" and len(tr["crossed"]) == 3 and ref.robot_span((1.0, 0.0, 0.0))[0] > plane:
-            tr["t_clear"] = ref.time
-            ref.stage("clearance")
 
     def step(self, w, ref):
         tr, p = self.trackers, self.p
