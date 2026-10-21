@@ -8,11 +8,19 @@ import numpy as np
 import mujoco
 
 from rfo.task import TaskBase
+# A rigid rope handle (plastic)'s contact with the robot, the venue's fixtures and the other props (the ground keeps
+# its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py SHELL_CONTACT: solref
+# 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the robot's aluminium) with
+# a solmix that wins over a default-contact geom; a ball (priority 1) keeps its own bounce. With MuJoCo's default soft
+# contact (solref 0.02 1, solimp 0.9 0.95) it sank 58 mm into the floor (stress test 2026-10-21).
+from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 SIDES = ("left", "right")
 FLOOR = (0.80, 0.62, 0.40, 1)           # a sports hall's wooden floor (looks.py dresses it as wood)
 ROPE_RGBA = ((0.85, 0.15, 0.15, 1), (0.95, 0.95, 0.95, 1))     # beads alternate in two colours
 HANDLE_RGBA = (0.10, 0.25, 0.75, 1)
+ROPE_SELF_COLLISION = True      # the rope's segments collide with each other (a rope that crosses itself does not
+#                                 pass through; not a segment with its tied neighbours, which it overlaps at the pivot)
 
 
 def _qmul(a, b):
@@ -84,8 +92,9 @@ class Task(TaskBase):
         "beaded school rope, the length that skipping-rope sizing charts give a skipper shorter than 1.45 m "
         "(4 ft 9 in): {n_seg} rigid segments of two 38 mm low-density polyethylene beads each (9.5 mm across, "
         "Kanga's deluxe beaded rope), {rope_mass_kg} kg in all (a 7 ft segmented rope weighs 0.2 lb). Neighbouring "
-        "segments are tied by stiff pivots that stretch by a few millimetres under load (the cord), and the rope "
-        "feels the air's drag. Its two plastic handles are {handle_length_m} m long and {handle_mass_kg} kg each, "
+        "segments are tied by stiff pivots that stretch by a few millimetres under load (the cord); the rope "
+        "feels the air's drag and collides with itself, the floor and the robot. Its two plastic handles are "
+        "{handle_length_m} m long and {handle_mass_kg} kg each, "
         "with the rope on a swivel at their far ends.",
         "Hands: the robot's hands are Unitree Dex1-1 two-finger grippers. Each handle is held between the jaws "
         "only by their friction, so it can slip out or be dropped.",
@@ -175,14 +184,15 @@ class Task(TaskBase):
         for s, y in (("left", 0.6), ("right", -0.6)):
             b = sc.body(f"handle_{s}", (0.0, y, 1.8), free=True)
             sc.geom(b, f"handle_{s}", type="cylinder", size=(hr, hl / 2), mass=hm,
-                    rgba=HANDLE_RGBA, contype="1", conaffinity="13", condim="4", friction=(0.8, 0.005, 0.0001))
+                    rgba=HANDLE_RGBA, contype="1", conaffinity="13", condim="4", friction=(0.8, 0.005, 0.0001),
+                    **RIGID)
             ET.SubElement(b, "site", name=f"swivel_{s}", pos=f"0 0 {hl / 2:.6g}", size="0.004", group="4")
         # the rope: N segments, each a free body; neighbours, and the two ends to the handles' swivels, are tied by
         # `connect` constraints (the beads' pivots on the cord, the swivel bearings). A chain of ball joints instead
         # makes MuJoCo factor one deep tree densely (slow) and blows up when the rope snaps taut (an inextensible
         # chain); the connects' slight compliance is the cord's stretch.
         i_bend = mseg * (l * l / 12 + r * r / 4)
-        rope = dict(contype="2", conaffinity="13", condim="3", priority="3",
+        rope = dict(contype="2", conaffinity="15" if ROPE_SELF_COLLISION else "13", condim="3", priority="3",
                     friction=f"{p['rope_friction']:g} 0.005 0.0001", solref=f"{p['rope_solref_s']:g} 1",
                     solimp="0.9 0.95 0.001", fluidshape="ellipsoid", fluidcoef=(p["rope_drag_cd"] / 2, 0.25, 1.5, 0, 0))
         eq = sc.root.find("equality")
@@ -202,6 +212,8 @@ class Task(TaskBase):
         for s in SIDES:
             for i in range(N):
                 ET.SubElement(ex, "exclude", body1=f"handle_{s}", body2=f"rope{i}")
+        for i in range(N - 1):                        # nor a segment on its tied neighbours (self-collision: the rest)
+            ET.SubElement(ex, "exclude", body1=f"rope{i}", body2=f"rope{i + 1}")
         sc.camera("venue", (2.6, -2.2, 1.3), (0.0, 0.0, 0.65), fovy=50)
         sc.camera("side", (0.0, -3.2, 0.8), (0.0, 0.0, 0.7), fovy=45)
 

@@ -4,7 +4,7 @@ whole shuttle below 1.15 m, the racket moving forwards, over the net into the re
 
 Official setting: the BWF court (13.40 m x 6.10 m, the singles side lines 5.18 m apart, the short service lines 1.98 m
 from the net, 40 mm lines), the net (1.524 m at the centre, 1.55 m at the posts on the doubles side lines, 0.76 m
-deep), a feathered shuttle of Law 2 that flies in the venue's air, and a racket of Law 4 as a FREE body held only by
+deep; a net of cord hung from its tensioned top cord, a mechanism: build_net), a feathered shuttle of Law 2 that flies in the venue's air, and a racket of Law 4 as a FREE body held only by
 the friction of the right hand's real gripper (Unitree Dex1-1, rfo/realhand.py); the shuttle starts pinched by its
 skirt in the left hand's gripper. Nothing is scaled to the robot.
 
@@ -57,6 +57,13 @@ import numpy as np
 from rfo.referee import Crossing, Touch
 from rfo.scene import AIR, HITTABLE, VISUAL, bounce_solref, fmt
 from rfo.task import TaskBase
+# A rigid racket (graphite frame and shaft, strung bed)'s contact with the robot, the venue's fixtures and the other
+# props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
+# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
+# robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
+# With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 48 mm into the gripper, 80 mm into the
+# floor (stress test 2026-10-21).
+from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 # ------------------------------------------------------------------------------------------------ the court (Law 1)
 LENGTH, WIDTH, SINGLES, SHORT, DOUBLES_LONG = 13.40, 6.10, 5.18, 1.98, 0.76
@@ -64,13 +71,127 @@ LINE = 0.040
 NET_CENTRE, NET_POST, NET_DEPTH = 1.524, 1.55, 0.76
 POST_Y = WIDTH / 2                              # the posts stand on the doubles side lines (Law 1.5)
 POST_R = 0.02
-NET_HALF_THICK = 0.01                           # the net's collision body: a wall 2 cm thick
-DEAD = "-4e5 -1000"                             # a shuttle on the net: stiff and nearly dead
+DEAD = "-4e5 -1000"                             # a shuttle on a post: stiff and nearly dead
+# The net's numbers (the mechanism: build_net below):
+NET_MASS = 0.45                                 # kg: a 6.1 m competition net of 19 mm nylon mesh with its tape and cord
+#                                                 (Harrod Sport No.3 Competition Badminton Net, the maker's listing)
+NET_AREA_DENSITY = NET_MASS / (WIDTH * NET_DEPTH)
+# Law 1.9: the cord "firmly stretched, flush with the tops of the posts"; the net's top sags from 1.55 m at the posts to
+# 1.524 m at the centre (Law 1.10) under its own weight: a uniformly loaded cord sags w L^2 / (8 T), so the tension is
+# m g L / (8 sag) (about 130 N)
+NET_TENSION = NET_MASS * 9.81 * WIDTH / (8 * (NET_POST - NET_CENTRE))
+NET_SOLIDITY = 2 * 0.8 / 19                     # fine cord about 0.8 mm thick, 19 mm mesh (Law 1.6: 15-20 mm)
+NET_BAND_M = 0.075                              # Law 1.8: a 75 mm white tape doubled over the cord
+NET_STRIP_M, NET_SEGMENTS = 0.5, 2
 
 
 def net_top(dy: float) -> float:
-    """The height of the net's top edge dy metres from the centre (straight from the centre to each post)."""
-    return NET_CENTRE + (NET_POST - NET_CENTRE) * min(abs(dy), POST_Y) / POST_Y
+    """The height of the net's top edge dy metres from the centre: the cord's sag under the net's weight, a parabola
+    from NET_CENTRE at the centre to NET_POST at the posts."""
+    u = min(abs(dy), POST_Y) / POST_Y
+    return NET_CENTRE + (NET_POST - NET_CENTRE) * u * u
+
+
+# ---------------------------------------------------------------------------------------- the net (a mechanism)
+# The net is a real one, a mechanism of bodies on joints, nothing scripted: the cable at its top, tensioned between the
+# posts, is a string of beads (one per strip of net, NET_STRIP_M wide), each on a slide joint across the net (x), coupled
+# to its neighbours and to the posts by springs of stiffness T / spacing (fixed tendons: a taut string's transverse
+# stiffness, linearised); under each bead hangs that strip of mesh as a chain of NET_SEGMENTS rigid panels on hinges
+# along the cable (a hanging sheet: it swings away from a ball and back under its weight; the strips are not coupled to
+# each other below the cable, and the mesh does not stretch). Masses from the net's mass per area and the cable's per
+# length; air drag on the mesh by its solidity (Loland's net drag formula, C_d = 0.04 + (-0.04 + 0.33 S + 6.54 S^2 -
+# 4.88 S^3) for a net square to the flow; Loland 1991, "Current forces on and flow through fish farms", NTH Trondheim);
+# the beads have 5 % of critical damping (the cable's internal friction, not measured). A ball meets the twine with
+# its own rule-book restitution (an explicit pair whose spring is stiff enough that a fast ball does not pass through
+# the 2 cm panel); what absorbs it is the net's own motion.
+NET_SEG_HALF_T = 0.01                           # m: each panel's collision box is 2 cm thick
+NET_GAP = 0.01                                  # m: between neighbouring strips (a ball cannot pass)
+
+
+def net_drag_cd(solidity: float) -> float:
+    s = solidity
+    return 0.04 + (-0.04 + 0.33 * s + 6.54 * s ** 2 - 4.88 * s ** 3)
+
+
+def build_net(sc, net, top, half_span, anchor_y, bottom, strip_w, n_seg, area_density, cable_density, tension,
+              strap_k, band_h, solidity, balls=(), ball_solref=None, ball_friction="0.3 0.3 0.005 0.0001 0.0001",
+              mesh_rgba=(0.1, 0.1, 0.1, 0.55), band_rgba=(0.97, 0.97, 0.97, 1)):
+    """The net under the static body `net` (its frame: x across the net, y along it, z up from the floor): strips of
+    width ~strip_w between y = -half_span and +half_span, the cable anchored at y = +-anchor_y (the posts); top(y) the
+    height of the band's top edge, bottom(y) the mesh's lower edge. strap_k (N/m) is an extra spring on the two middle
+    beads together (tennis' centre strap). Geoms: net_band<i> (the band over the cable) and net_mesh<i>_<k>."""
+    root = sc.root
+    tendons = root.find("tendon")
+    if tendons is None:
+        tendons = ET.SubElement(root, "tendon")
+    contact = root.find("contact")
+    n = max(2, int(round(2 * half_span / strip_w)))
+    w = 2 * half_span / n
+    half_w = w / 2 - NET_GAP / 2
+    # MuJoCo's blunt drag is C rho A |v| v on the equivalent ellipsoid's projected area (pi a b); a panel's outline is
+    # 4 a b: C = C_d / 2 * 4 / pi
+    mesh_fluid = (net_drag_cd(solidity) / 2 * 4 / math.pi, 0.0, 0.0, 0.0, 0.0)
+    band_fluid = (1.2 / 2 * 4 / math.pi, 0.0, 0.0, 0.0, 0.0)          # the band: a solid strip (flat plate, C_d 1.2)
+    T2 = (2 * NET_SEG_HALF_T) ** 2                                   # (the panels' thickness, for the inertia)
+    k_link = tension / w
+    k_end = tension / (anchor_y - half_span + w / 2)
+    geoms = []
+    for i in range(n):
+        yc = -half_span + (i + 0.5) * w
+        zt = top(yc)
+        slope = (top(yc + 1e-4) - top(yc - 1e-4)) / 2e-4
+        a = math.atan(slope)
+        h_mesh = zt - band_h - bottom(yc)
+        hs = h_mesh / n_seg
+        m_seg = area_density * w * hs
+        m_bead = area_density * w * band_h + cable_density * w
+        k = 2 * k_link if 0 < i < n - 1 else k_link + k_end
+        if strap_k and i in (n // 2 - 1, n // 2) and n % 2 == 0:
+            k += strap_k / 2
+        m_eff = m_bead + n_seg * m_seg                                  # the strip moves with its bead
+        c = 2 * 0.05 * math.sqrt(k * m_eff)
+        bead = sc.body(f"net_cord{i}", (0.0, yc, zt - band_h / 2), parent=net)
+        extra = 0.0
+        if i in (0, n - 1):
+            extra = k_end
+        if strap_k and i in (n // 2 - 1, n // 2) and n % 2 == 0:
+            extra += strap_k / 2
+        ET.SubElement(bead, "joint", name=f"net_cord{i}", type="slide", axis="1 0 0", stiffness=f"{extra:.6g}",
+                      springref="0", damping=f"{c:.6g}")
+        ET.SubElement(bead, "inertial", pos="0 0 0", mass=f"{m_bead:.6g}",
+                      diaginertia=f"{m_bead * (w * w + band_h ** 2) / 12:.6g} {m_bead * (band_h ** 2 + T2) / 12:.6g} "
+                                  f"{m_bead * (w * w + T2) / 12:.6g}")
+        sc.geom(bead, f"net_band{i}", type="box", size=(NET_SEG_HALF_T, half_w, band_h / 2),
+                quat=(math.cos(a / 2), math.sin(a / 2), 0.0, 0.0), rgba=band_rgba, mass=0, fluidshape="ellipsoid",
+                fluidcoef=band_fluid, **HITTABLE)
+        geoms.append(f"net_band{i}")
+        parent, z0 = bead, -band_h / 2
+        for kk in range(n_seg):
+            seg = sc.body(f"net_seg{i}_{kk}", (0.0, 0.0, z0), parent=parent)
+            # a panel folds against the one above it at most to the horizontal: the mesh is one sheet, tied along its
+            # sides to the neighbouring strips (not modelled), so a strip cannot turn over; free hinges let a hit spin
+            # a light panel round its cord at 124 rad/s (stress test 2026-10-21). The limit is the sheet's ties, taut:
+            # stiff (the core's shells' solref 0.004 s, solimp 0.99 0.999; MuJoCo's default limit let a hand push a
+            # panel 0.75 rad past it)
+            ET.SubElement(seg, "joint", name=f"net_seg{i}_{kk}", type="hinge", axis="0 1 0", damping="1e-4",
+                          range=f"{-math.pi / 2:.6g} {math.pi / 2:.6g}", solreflimit="0.004 1",
+                          solimplimit="0.99 0.999 0.0005 0.5 2")
+            ET.SubElement(seg, "inertial", pos=f"0 0 {-hs / 2:.6g}", mass=f"{m_seg:.6g}",
+                          diaginertia=f"{m_seg * (w * w + hs * hs) / 12:.6g} {m_seg * (hs * hs + T2) / 12:.6g} "
+                                      f"{m_seg * (w * w + T2) / 12:.6g}")
+            sc.geom(seg, f"net_mesh{i}_{kk}", type="box", pos=(0.0, 0.0, -hs / 2), size=(NET_SEG_HALF_T, half_w, hs / 2),
+                    rgba=mesh_rgba, mass=0, fluidshape="ellipsoid", fluidcoef=mesh_fluid, **HITTABLE)
+            geoms.append(f"net_mesh{i}_{kk}")
+            parent, z0 = seg, -hs
+        if i < n - 1:
+            t = ET.SubElement(tendons, "fixed", name=f"net_cable{i}", stiffness=f"{k_link:.6g}", springlength="0")
+            ET.SubElement(t, "joint", joint=f"net_cord{i}", coef="1")
+            ET.SubElement(t, "joint", joint=f"net_cord{i + 1}", coef="-1")
+    for b in balls:
+        for g in geoms:
+            ET.SubElement(contact, "pair", name=f"{b}_{g}", geom1=b, geom2=g, condim="3", friction=ball_friction,
+                          solref=ball_solref, solimp="0.99 0.99 0.001")
+    return dict(n=n, strip_w=w, k_link=k_link, k_end=k_end, geoms=geoms)
 
 
 # --------------------------------------------------------------------------------------------- the shuttle (Law 2)
@@ -176,23 +297,34 @@ def build_racket(sc, pos=(0.3, -0.4, 0.8)) -> None:
     hx, hy = RACKET["handle_flats_m"][0] / 2, RACKET["handle_flats_m"][1] / 2
     sc.geom(b, "racket_handle", type="box", pos=(0, 0, RACKET["handle_length_m"] / 2),
             size=(hx, hy, RACKET["handle_length_m"] / 2), mass=0.040, rgba=(0.12, 0.12, 0.14, 1), condim="4",
-            friction="1.0 0.01 0.0001", **HITTABLE)
+            friction="1.0 0.01 0.0001", **HITTABLE, **RIGID)
     sc.geom(b, "racket_shaft", type="capsule", fromto=(0, 0, RACKET["handle_length_m"], 0, 0, zc - HEAD_A),
-            size=(0.0035,), mass=0.008, rgba=(0.75, 0.75, 0.8, 1), **HITTABLE)
+            size=(0.0035,), mass=0.008, rgba=(0.75, 0.75, 0.8, 1), **HITTABLE, **RIGID)
     n = 24
     ring = [(HEAD_B * math.sin(2 * math.pi * i / n), zc + HEAD_A * math.cos(2 * math.pi * i / n)) for i in range(n)]
     for i in range(n):
         y0, z0 = ring[i]
         y1, z1 = ring[(i + 1) % n]
         sc.geom(b, f"racket_frame{i}", type="capsule", fromto=(0, y0, z0, 0, y1, z1), size=(0.005,), mass=0.030 / n,
-                rgba=(0.1, 0.25, 0.8, 1), priority="2", solref=STRINGS_SOLREF, solimp="0.95 0.99 0.001", **HITTABLE)
+                rgba=(0.1, 0.25, 0.8, 1), **HITTABLE, **RIGID)
     m = 32
     pts = [(STRINGS_B * math.sin(2 * math.pi * i / m), zc + STRINGS_A * math.cos(2 * math.pi * i / m))
            for i in range(m)]
     ET.SubElement(sc.root.find("asset"), "mesh", name="racket_strings",
                   vertex=" ".join(f"{c:.5f}" for x in (-STRINGS_HALF, STRINGS_HALF) for y, z in pts for c in (x, y, z)))
     sc.geom(b, "racket_strings", type="mesh", mesh="racket_strings", mass=0.007, rgba=(0.95, 0.95, 0.95, 0.5),
-            priority="2", solref=STRINGS_SOLREF, solimp="0.95 0.99 0.001", friction="0.4 0.005 0.0001", **HITTABLE)
+            friction="0.4 0.005 0.0001", **HITTABLE, **RIGID)
+    # The strings' and the frame's bounce (STRINGS_SOLREF: 785 rad/s, e = 0.5) is the shuttle's contact with them only:
+    # explicit pairs (the shuttle's own contact with the racket excluded). As the geoms' own contact it also held for
+    # the gripper's jaws, the floor and the robot, where a racket twisted in the jaws took up to 160 kN and 595 J and
+    # flew off at 32 m/s (stress test 2026-10-21); everywhere else the racket is a rigid graphite frame (RIGID).
+    contact = sc.root.find("contact")
+    ET.SubElement(contact, "exclude", body1=SHUTTLE, body2="racket")
+    for g in ["racket_strings"] + [f"racket_frame{i}" for i in range(n)]:
+        mu = "0.4" if g == "racket_strings" else "1"
+        for s in ("cork", "skirt"):
+            ET.SubElement(contact, "pair", name=f"{SHUTTLE}_{s}_{g}", geom1=f"{SHUTTLE}_{s}", geom2=g, condim="3",
+                          friction=f"{mu} {mu} 0.005 0.0001 0.0001", solref=STRINGS_SOLREF, solimp="0.95 0.99 0.001")
     ET.SubElement(b, "site", name="racket_head", pos=fmt((0, 0, zc)), size="0.005", group="4")
     ET.SubElement(b, "site", name="racket_grip", pos=fmt((0, 0, GRIP_Z)), size="0.005", group="4")
 
@@ -251,8 +383,11 @@ class Task(TaskBase):
         "shuttle first touches the floor",
         "Law 4 (the racket): a rigid racket (no string-bed deflection, no frame flex); its strings meet the shuttle "
         "with a restitution of {string_restitution}",
-        "Law 1 (the net): a 2 cm thick wall instead of a mesh of cord; a shuttle that meets it is stopped by a stiff, "
-        "strongly damped contact",
+        "Law 1 (the net): a net of cord hung from its tensioned top cord, modelled as strips of mesh "
+        f"{NET_STRIP_M:g} m wide, each a chain of {NET_SEGMENTS} rigid panels 2 cm thick hinged under the tape, the tape "
+        "and cord a string of beads across the net (the net's mass, its sag and the cord's tension as in the venue "
+        "text); the strips are not joined to each other below the cord and the mesh does not stretch; a shuttle meets "
+        "the mesh with its own contact (it cannot pass through it)",
         "the hall's air: still (no draught), at sea level and 15 C; the shuttle's spin about its axis is not driven "
         "by its feathers",
     ]
@@ -280,7 +415,8 @@ class Task(TaskBase):
         "wide and is part of the area it bounds (the centre line is shared by the two service courts). This is "
         "singles: a service court reaches from the short service line to the back boundary line and from the centre "
         "line to the singles side line. The net stands across the middle, its top {net_centre_m} m high at the centre "
-        "and rising in a straight line to {net_post_m} m at the posts on the doubles side lines; it is {net_depth_m} "
+        "and rising to {net_post_m} m at the posts on the doubles side lines (the cord sags under the net's weight); "
+        "it is {net_depth_m} "
         "m deep, with open space under it. The shuttle is a feathered shuttle (5.1 g, a cork base 26 mm across, 16 "
         "feathers whose tips form a circle 64 mm across) with a shuttle's heavy air drag (it falls at 6.8 m/s at "
         "most) that turns it to fly cork first; it starts pinched by its feathers in your left hand's gripper, cork "
@@ -364,23 +500,13 @@ class Task(TaskBase):
         server, target = self.courts()
         sc.zone("target_court", ((target[0] + target[1]) / 2, (target[2] + target[3]) / 2),
                 ((target[1] - target[0]) / 2 - LINE, (target[3] - target[2]) / 2 - LINE), rgba=(0.95, 0.85, 0.2, 0.18))
-        asset = sc.root.find("asset")
-        t = NET_HALF_THICK
         net = sc.body("net", (nx, cy, 0.0))
-        for s, tag in ((1, "L"), (-1, "R")):
-            v = [(x, s * y, z) for x in (-t, t) for y, z in ((0, NET_CENTRE - NET_DEPTH), (0, NET_CENTRE),
-                                                              (POST_Y, NET_POST), (POST_Y, NET_POST - NET_DEPTH))]
-            ET.SubElement(asset, "mesh", name=f"net_{tag}", vertex=" ".join(f"{c:.5f}" for q in v for c in q))
-            sc.geom(net, f"net_{tag}", type="mesh", mesh=f"net_{tag}", rgba=(0.1, 0.1, 0.1, 0.45), priority="3",
-                    solref=DEAD, solimp="0.95 0.99 0.001", friction="0.3 0.005 0.0001", **HITTABLE)
-            sc.geom(net, f"net_post{tag}", type="cylinder", pos=(0, s * (POST_Y + POST_R + t), NET_POST / 2),
+        for s_, tag in ((1, "L"), (-1, "R")):
+            sc.geom(net, f"net_post{tag}", type="cylinder", pos=(0, s_ * (POST_Y + POST_R + NET_SEG_HALF_T), NET_POST / 2),
                     size=(POST_R, NET_POST / 2), rgba=(0.25, 0.25, 0.28, 1), priority="3", solref=DEAD,
                     solimp="0.95 0.99 0.001", **HITTABLE)
-            Ln = math.hypot(POST_Y, NET_POST - NET_CENTRE)
-            a = math.atan2(NET_POST - NET_CENTRE, POST_Y)
-            sc.geom(net, f"net_band{tag}", type="box", pos=(0, s * POST_Y / 2, (NET_CENTRE + NET_POST) / 2 - 0.0375),
-                    size=(t + 0.002, Ln / 2, 0.0375), quat=(math.cos(s * a / 2), math.sin(s * a / 2), 0, 0),
-                    rgba=(0.97, 0.97, 0.97, 1), **VISUAL)
+        build_net(sc, net, net_top, POST_Y - 0.005, POST_Y, lambda y: net_top(y) - NET_DEPTH, NET_STRIP_M, NET_SEGMENTS,
+                  NET_AREA_DENSITY, 0.0, NET_TENSION, 0.0, NET_BAND_M, NET_SOLIDITY)
         build_shuttle(sc)
         build_racket(sc)
         sc.real_hands["right"] = sc.real_hands["left"] = "dex1"
@@ -388,7 +514,7 @@ class Task(TaskBase):
 
     # ------------------------------------------------------------------ the hands (Unitree Dex1-1, realhand.py)
     def may_grip(self, w, side, name):
-        return False                            # (both hands are real: no weld grip anywhere)
+        return False                            # (both hands are grippers: nothing is grippable)
 
     def _racket_in_hand(self, w, ref) -> bool:
         """The racket has touched both jaws of the right hand within the last hold_gap_s (a swing's contact chatter
