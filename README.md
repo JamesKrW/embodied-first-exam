@@ -95,7 +95,7 @@ harbor run -d embodied-first-exam --privileged -a codex -m openai/gpt-6-astra
 ```
 
 ```bash
-# every task: 2128 task dirs (1090 tasks in their modes, 32 benchmarks)
+# every task: 2126 task dirs (1089 tasks in their modes, 32 benchmarks)
 harbor run -d embodied-first-exam@all -a codex -m openai/gpt-6-astra
 ```
 

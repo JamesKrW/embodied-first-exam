@@ -1456,7 +1456,7 @@ task = "embodied-olympics-fun-hurdles-freestanding-i00"
 default_mode = "standard"
 
 [[task]]
-task = "embodied-olympics-fun-hurdles-i00"
+task = "embodied-olympics-fun-sprint-i00"
 default_mode = "standard"
 
 [[task]]
