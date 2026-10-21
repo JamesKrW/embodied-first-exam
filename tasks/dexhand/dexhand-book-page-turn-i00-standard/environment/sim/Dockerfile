@@ -11,7 +11,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-sim-files-0.1.1@sha256:676fccc44be31a
      /sim/rcb_dexhand.py \
      /sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-sim-files-0.1.2@sha256:57c474cd8a011e77b8351e2d7aed463994fc4aa02ff1f465b80efb214ae4521a \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-sim-files-0.1.3@sha256:48ed026a31b72a54269db520e3172bace45552d08887a5776d72f531834144f5 \
      /rcb1.py \
      /rcb_limited.py \
      /run.sh \
