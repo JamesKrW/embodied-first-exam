@@ -1,9 +1,9 @@
 """Pole vault (World Athletics TR 28): the sunken box, a 4.5 m bar on pegs between uprights 4.3 m apart, the
 5 m x 5 m x 0.8 m landing mat; the pole planted in the box, over the bar, and the bar stays on. The pole is rigid and a
-free body that collides with everything, the robot's own body included; nothing is welded: the hands are Unitree's
-Dex1-1 two-finger grippers and hold the pole by the friction of their jaws alone.
+free body that collides with everything, the robot's own body included; nothing is welded: the hands are the G1's own
+Dex3-1 three-finger hands (rfo.realhand, "dex3") and hold the pole by the contact and friction of their fingers alone.
 
-The robot is the G1 (34.4 kg with its grippers, 338 N), the pole the lightest one rated for it: UCS's Junior
+The robot is the G1 (34.8 kg with its hands, 341 N), the pole the lightest one rated for it: UCS's Junior
 Spirit, 2.35 m (7 ft 8 in), rated 90 lb (40.8 kg), the makers' rule being a pole rated at or above the athlete's
 weight (athleticsdirect.co.uk, UCS Junior Spirit poles: 2.35 m rated 55/65/75/90 lb; a top-hand grip 6 to 18 in
 below the top); its mass (1.1 kg) and thickness (32 mm) are estimates. The bar is at 1.00 m, set for this robot.
@@ -15,17 +15,17 @@ height or pole length.
   at least half the robot's weight then, or a jump with a pole in the hands would pass; and, so that a standing jump
   that pushes down on the top of a near-vertical pole does not pass either, a run-up of at least 2.5 m/s over the
   last 0.5 s before the take-off, the pole at least 20 degrees from vertical at the take-off, and a hand above the
-  pelvis while the pole carries the robot): two grippers would hold about
-  500 N along a pole (one lets it slide at 250 N, measured), 1.5 times the robot's 338 N. But a parallel gripper holds a
-  pole only across its jaws, square to the forearm, so on a pole tilted up from the horizontal the hanging robot's
+  pelvis while the pole carries the robot): two hands would hold about 310 N along a pole (one lets it slide at about
+  157 N, measured), less than the robot's 341 N. And a hand holds a pole only across its palm, square to the forearm
+  (as the parallel gripper of the earlier analysis did across its jaws), so on a pole tilted up from the horizontal the hanging robot's
   weight comes on the arms' joints with a lever: over all arm poses of both arms (a search, the trunk upright, both
   grip points on the pole's line, half the weight on each hand), the smallest largest arm torque against its limit is
   0.65 for a level pole, 1.47 at 20 degrees, 2.45 at 40, 4.46 at 60 and 5.83 at 80 (the 5 N m wrists and the 25 N m
   shoulders). A vault plants the pole at 45 degrees or more and swings it up to vertical: two to six times the
   motors. The bar's height and the pole's length do not change this.
 - The plant: with the run-up injected (3 and 4 m/s, the pole planted 30 and 45 degrees from vertical with its tip at the
-  stop board, the right gripper 2.0 m from the tip, the joints held), the rigid pole stops the run along it at once and
-  the gripper loses the pole within the plant; the robot runs on into the mats.
+  stop board, the right hand 2.0 m from the tip, the joints held), the rigid pole stops the run along it at once and
+  the hand loses the pole within the plant; the robot runs on into the mats (measured with the earlier grippers).
 - The energy: the running policy's 4 m/s carries 0.82 m of height; what the plant leaves (the speed square to the pole,
   2.8 m/s at 45 degrees) carries 0.41 m: the centre of mass, about 0.65 m up when running, reaches about 1.06 m at best.
 The module is kept physical and honest; its test's positive is a declared referee-only injection.
@@ -42,7 +42,7 @@ damped (a body lands dead in a pit; foam's loss is high), the full stiffness fro
 below the mat's top and comes to rest with it 0.06 m above the top. The mat's
 boxes reach below the floor (their middle at the floor) so a deep landing is not pushed out through their bottom.
 The box (TR 28.8): sheet metal; the pole's tip (a nylon plug on fibreglass) on it at friction 0.4 (nylon on steel,
-dry: 0.3-0.5, engineering tables), the pole's friction on everything but the grippers' pads (whose rubber wins)."""
+dry: 0.3-0.5, engineering tables), the pole's friction on everything but the hands' finger pads (whose rubber wins)."""
 import math
 import xml.etree.ElementTree as ET
 
@@ -67,8 +67,9 @@ POLE = dict(contype="2", conaffinity="14")               # the pole: the box and
 #                                                          grippers (4), the feet's strike boxes (8); props meet it by
 #                                                          their own conaffinity (bar, uprights 15, mats 7)
 POLE_FRICTION = (0.4, 0.005, 0.0001)                     # fibreglass / the tip's nylon plug on sheet steel (see above)
-CARRY_ARM = (0.3, -0.25, 0.0, 1.2, -1.65, 0.0, 0.0)      # the right arm carrying the pole: hanging, the forearm down,
-#                                                          the jaws closing sideways, the pole across them along +x
+CARRY_ARM = (0.0, -0.5, 0.5, 1.0, 0.633, 0.5, 0.0)       # the right arm carrying the pole: out to the side, the forearm
+#                                                          forwards and down, the hand turned so that the pole across
+#                                                          the palm lies level along +x, clear of the hip
 # The box (TR 28.8), in the vertical plane of the runway's middle: the bottom is 1.00 m long and slopes from the
 # runway's level at the front down to 0.20 m below it at the stop board; the stop board stands at 105 degrees to the
 # bottom, so it leans towards the landing area and its top inside edge (the "zero line", x = 0) is 0.10 m beyond its
@@ -155,15 +156,14 @@ class Task(TaskBase):
     deviations = [
         "TR 28.11 (vaulting poles: any material, length and diameter, a smooth surface): the pole is a {pole_length_m} "
         "m (7 ft 8 in) pole rated {pole_rating_kg} kg (90 lb), UCS's Junior Spirit, the lightest rating at or above "
-        "the robot's 34.4 kg with its grippers (the makers' rule: a pole rated at or above the athlete's weight); its "
+        "the robot's 34.8 kg with its hands (the makers' rule: a pole rated at or above the athlete's weight); its "
         "mass ({pole_mass_kg} kg) and thickness ({pole_diameter_m} m) are estimates, the makers give none; it is "
         "rigid: it does not bend and stores no energy (the simulator has no validated model of a bending pole)",
-        "the grip: each hand is a two-finger gripper, Unitree's Dex1-1 (90 mm stroke, 80 mm jaws with rubber pads, at "
-        "most 120 N; sold for this robot, the G1); it holds the "
-        "pole by the jaws' friction alone (nothing is welded), so the pole can slide along the jaws, turn in them "
-        "and drop; a hand holds the pole while the pole touches both of its jaws. The pole collides with the robot's "
-        "body as with everything else. The Dex1-1's own rating is a 5 kg friction-grasp load; the model's pads hold "
-        "some five times that",
+        "the grip: each hand is the G1's own Dex3-1 three-finger hand (thumb 3 joints, index and middle 2 each, one "
+        "motor per joint, at the device's torques); it holds the pole by its fingers' contact and friction alone "
+        "(nothing is welded), so the pole can slide in the hand, turn in it and drop; a hand holds the pole while "
+        "the pole touches its fingers and its thumb or palm. The pole collides with the robot's body as with "
+        "everything else",
         "TR 28.8 (the box): it is sunk below the runway as the rule draws it, but only the pole (and the bar) can "
         "enter it; for the robot's feet it is covered at runway level; its side walls are planes",
         "TR 28.2(b), (c), (d) are judged geometrically: any contact of the robot or the pole with the ground or the "
@@ -210,9 +210,10 @@ class Task(TaskBase):
                 "it, go over the bar between the uprights and come down on the mat, with the bar still on its pegs.")
     rules = ("World Athletics rules for the pole vault. You carry the pole ({pole_length_m} m long, "
              "{pole_diameter_m} m thick, {pole_mass_kg} kg; rigid: it does not bend) held at its middle in your right "
-             "hand. Your hands are two-finger grippers that hold by the friction of their jaws only, so the pole can "
-             "slide along the jaws, turn in them and drop; a hand holds the pole while the pole touches both of that "
-             "gripper's jaws, anywhere along its length, and it can be let go and taken again. The pole touches the "
+             "hand. Your hands are three-finger hands (a thumb, an index and a middle finger) that hold by contact and "
+             "friction only, so the pole can slide in a hand, turn in it and drop; a hand holds the pole while the "
+             "pole touches that hand's index or middle finger and its thumb or palm, anywhere along its length, and "
+             "it can be let go and taken again. The pole touches the "
              "box, the mats, the uprights, the bar and your body (not the runway's surface around the box: it rests "
              "on the ground beside it as on a level floor). The "
              "runway ({runway_m} m, {runway_width_m} m wide) leads along +x to the box, which is sunk into the "
@@ -247,17 +248,18 @@ class Task(TaskBase):
              "(climbing); if your hands touch the bar for more than {bar_hand_s} s in all (steadying it); or after "
              "{time_limit_s} s (the time allowed for a trial).")
     venue = ("You stand on the runway facing the box (+x), your pelvis 20 m before the zero line, in the middle of "
-             "the runway; the runway goes on 20 m behind you. The pole lies level along +x in your right gripper, "
-             "held at its middle across the jaws (grip value 1: the full 120 N per jaw), the right arm hanging, the "
-             "forearm pointing down; the left gripper is open (grip value 0). A grip value is that gripper's closure "
-             "command (0 open, 90 mm between the pads; 1 closed); on the 32 mm pole about 0.78 or more clamps at "
-             "120 N. The pole is a free body: `held` in your state says which gripper touches it with both jaws. "
+             "the runway; the runway goes on 20 m behind you. The pole lies level along +x in your right hand, "
+             "held at its middle across the palm (grip value 1), the right arm hanging, the forearm pointing forwards "
+             "and down; "
+             "the left hand is open (grip value 0). A grip value is that hand's closure command (0 open, 1 every "
+             "finger and thumb joint closing towards its closed angle; a finger stops on what it touches). The pole "
+             "is a free body: `held` in your state says which hand holds it. "
              "The bar is red with white ends, the uprights grey, the mats blue; "
              "the box is the dark patch at the runway's end, the zero line white.")
     difficulty = ("The bar is 1.0 m up and the robot 1.32 m tall: its whole body has to pass over it on a rigid "
                   "pole that gives nothing back, from a run-up that the running policy makes at about 4 m/s, with "
-                  "arms whose motors give 25 N m, and two-finger grippers that hold about 1.4 times the robot's "
-                  "weight along the pole: the plant's jolt slides the jaws along the pole. Nothing built in grips, "
+                  "arms whose motors give 25 N m, and three-finger hands that hold little along the pole: the "
+                  "plant's jolt slides the pole through the hands. Nothing built in grips, "
                   "plants, swings or lets go.")
 
     # ------------------------------------------------------------------ the venue
@@ -294,21 +296,26 @@ class Task(TaskBase):
                 solimp=(0.95, 0.99, 0.001), **POLE)
         sc.geom(b, "pole_tip", type="sphere", pos=(L / 2 - r, 0, 0), size=(r * 1.02,), mass=0.0001,
                 rgba=(0.85, 0.15, 0.15, 1), contype="0", conaffinity="0")
-        for side in SIDES:                               # the hands: Dex1-1 grippers (rfo.realhand), no weld
-            sc.real_hands[side] = "dex1"
+        for side in SIDES:                               # the hands: the G1's Dex3-1 (rfo.realhand), no weld
+            sc.real_hands[side] = "dex3"
         sc.camera("venue", (-6.5, -7.5, 3.2), (-0.5, 0.0, 1.3), fovy=58)
         sc.camera("box", (-3.4, -0.3, 1.5), (-0.5, 0.0, 0.2), fovy=50)
 
     def reset(self, w):
         p = self.p
         w.put("bar", (self.bar["x"], 0.0, self.bar["rest_z"]))
-        r, d = w.robot, w.d                              # the right arm hanging, the jaws closing sideways
+        r, d = w.robot, w.d                              # the right arm carrying (CARRY_ARM)
         a = w.L.ARMS.start + 7
         d.qpos[r.qadr[a:a + 7]] = CARRY_ARM
         r.arb.q_a[a:a + 7] = r.arb.q_b[a:a + 7] = CARRY_ARM
         mujoco.mj_kinematics(w.m, d)
-        c, _ = w.jaw_frame("right")                      # the pole level along +x across the jaws, at its middle
-        w.put("pole", c)
+        c, R = w.grasp_frame("right")                    # the pole across the palm (the grasp frame's y), at its
+        ax = R[:, 1] if R[0, 1] >= 0.0 else -R[:, 1]     # middle, its tip (+x of its body) forwards
+        up = np.array([0.0, 0.0, 1.0]) - ax[2] * ax
+        up /= np.linalg.norm(up)
+        q = np.zeros(4)
+        mujoco.mju_mat2Quat(q, np.c_[ax, np.cross(up, ax), up].ravel())
+        w.put("pole", c, quat=q)
         w.close_on("right", "pole")
 
     # ------------------------------------------------------------------ the referee
@@ -400,7 +407,7 @@ class Task(TaskBase):
                               "run_up_m_s": round(float(tr["vx"].mean()), 3)}
         tr["vx"][tr["vx_i"] % len(tr["vx"])] = float(w.d.qvel[w.robot.fv])    # (the free base's velocity: world
         tr["vx_i"] += 1                                                         # frame; a ring of the last steps)
-        for s in SIDES:                                  # where each gripper is on the pole now (a gripper that slides
+        for s in SIDES:                                  # where each hand is on the pole now (a hand that slides
             tr["grip"][s] = (round(self.grip_from_tip(w, s), 4)      # up it climbs as one that lets go and closes
                              if w.held[s] == "pole" else None)        # higher: TR 28.2(c))
         grips = [tr["grip"][s] for s in SIDES if tr["grip"][s] is not None]

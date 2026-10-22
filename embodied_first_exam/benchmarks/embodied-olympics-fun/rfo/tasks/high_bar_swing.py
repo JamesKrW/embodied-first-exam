@@ -16,18 +16,27 @@ The hand on the fixed bar: the bar does not turn (as the norm's does not); a han
 sliding round the bar or by the wrist's joints (5 N m in pitch and yaw). The body's extension over the top is judged
 from the wrists (declared), so that a hand folding at the wrist on the bar is not a tuck.
 
-The bar's and the venue's block (build_bar, swing_state, wrist_radius, BarGrip) is shared, identically, with
-toes-to-bar (a task directory holds one module)."""
+The bar's and the venue's block (build_bar, swing_state, wrist_radius, bar_contacts, hang, BarGrip) is shared,
+identically, with toes-to-bar (a task directory holds one module); hang() is not used here (the robot starts on the
+block)."""
 import math
 
+import mujoco
 import numpy as np
 
+from rfo import realhand
 from rfo.task import TaskBase
 
 # ------------------------------------------------------------------------------------------- the bar and the grip
 # (shared, identically, by high-bar-swing and toes-to-bar)
 MAT = 0.20                    # FIG landing mats under the bar (m)
 SIDES = ("left", "right")
+# The catch / hang pose of the G1's left arm (shoulder pitch, roll, yaw, elbow, wrist roll, pitch, yaw; the right arm
+# mirrors the roll and the yaws): straight up, the fingers up, the palm forwards (+x), the finger joints' axes along
+# the bar.
+CATCH_ARM = np.array([-2.81, 0.72, 0.3583, 1.3808, 1.8, -0.2208, 0.1125])
+MIRROR = np.array([1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0])
+ARMS = slice(15, 29)
 
 
 def build_bar(sc, height, length, diameter, grip_scale):
@@ -64,6 +73,69 @@ def wrist_radius(w):
     d, m = w.d, w.m
     mid = 0.5 * (d.xpos[m.body("left_wrist_pitch_link").id] + d.xpos[m.body("right_wrist_pitch_link").id])
     return float(np.linalg.norm(w.com() - mid))
+
+
+def bar_contacts(w, side):
+    """(the bar touches the hand's fingers, the bar touches its thumb or palm) now, by contact."""
+    m, d = w.m, w.d
+    bar = m.geom("bar").id
+    fing = set(w.hands.group_geoms(w, side, "fingers"))
+    tp = set(w.hands.group_geoms(w, side, "thumb_palm"))
+    a = b = False
+    for c in d.contact[:d.ncon]:
+        g1, g2 = int(c.geom[0]), int(c.geom[1])
+        o = g2 if g1 == bar else g1 if g2 == bar else None
+        if o is None or c.dist > 0.0:
+            continue
+        a, b = a or o in fing, b or o in tp
+    return a, b
+
+
+def hang(w, height, settle_s=0.4):
+    """At t = 0: the robot under the bar in the hang pose (CATCH_ARM), each hand's grasp centre on the bar's axis, and
+    both hands closed on the bar with the rest of the world held still (as realhand's close_on, which takes free bodies
+    only: the bar is fixed): the hands close at their drives' speed until every drive has stalled on the bar or
+    reached its target and both hands grasp it, then settle_s more. The robot is let go at t = 0 (deterministic: a
+    function of the state). Raises if a hand does not grasp the bar."""
+    r, d, m, hands = w.robot, w.d, w.m, w.hands
+    pose = np.r_[CATCH_ARM, CATCH_ARM * MIRROR]
+    d.qpos[r.qadr[ARMS]] = pose
+    r.arb.q_a[ARMS] = r.arb.q_b[ARMS] = pose
+    mujoco.mj_kinematics(m, d)
+    c = 0.5 * (d.site_xpos[m.site("left_grasp").id] + d.site_xpos[m.site("right_grasp").id])
+    d.qpos[r.fq] += 0.0 - c[0]
+    d.qpos[r.fq + 2] += height - c[2]
+    keep_q = np.ones(m.nq, dtype=bool)
+    keep_v = np.ones(m.nv, dtype=bool)
+    for s in SIDES:
+        hands.cmd[s] = 1.0
+        keep_q[hands.hq[s]] = keep_v[hands.hv[s]] = False
+    mujoco.mj_forward(m, d)
+    q0 = d.qpos.copy()
+    arm0 = m.dof_armature.copy()
+    m.dof_armature[keep_v] = realhand.FREEZE_ARMATURE
+    n_settle = int(round(settle_s / m.opt.timestep))
+    held_at, still = None, 0
+    try:
+        for k in range(int(round(2.0 / m.opt.timestep))):
+            sp0 = hands._sp.copy()
+            hands.substep()
+            mujoco.mj_step(m, d)
+            d.qpos[keep_q] = q0[keep_q]
+            d.qvel[keep_v] = 0.0
+            still = still + 1 if np.allclose(hands._sp, sp0, atol=1e-9) else 0
+            if held_at is None and still >= 20 and all(bar_contacts(w, s) == (True, True) for s in SIDES):
+                held_at = k
+            if held_at is not None and k - held_at >= n_settle:
+                break
+    finally:
+        m.dof_armature[:] = arm0
+    for s in SIDES:
+        d.qvel[hands.hv[s]] = 0.0
+    hands._vs[:] = 0.0
+    mujoco.mj_forward(m, d)
+    if held_at is None:
+        raise RuntimeError("the hands did not close on the bar")
 
 
 class BarGrip:
@@ -113,11 +185,6 @@ class BarGrip:
         return False
 # ------------------------------------------------------------------------------- (end of the shared bar block)
 
-# The catch pose of the G1's left arm (shoulder pitch, roll, yaw, elbow, wrist roll, pitch, yaw; the right arm mirrors
-# the roll and the yaws): straight up, the fingers up, the palm forwards (+x), the finger joints' axes along the bar.
-CATCH_ARM = np.array([-2.81, 0.72, 0.3583, 1.3808, 1.8, -0.2208, 0.1125])
-MIRROR = np.array([1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0])
-ARMS = slice(15, 29)
 GRIP_SCALE = 5.0              # the Dex3-1 drives x this (declared): the measured need (4.5 lets go, 5 holds; see
 #                               deviations); an owner-approved exception to the families' 2 x cap
 
@@ -139,7 +206,7 @@ class Task(BarGrip, TaskBase):
         "the grip force: the hands' drives are {grip_scale} times the Dex3-1's (closing 0.49 N m, back-driven 1.37 N m "
         "per finger joint; the thumb's rotation 0.86 / 3.1 N m), because with the device's torques the two hands hold "
         "about one body weight on the bar (measured: torn off by the catch itself; 1.5 times: 1.55, 2 times: 2.05 body "
-        "weights) while the bottom of a giant swing pulls about four or more (4.6 to 5.0 measured here; gymnasts 3.5 "
+        "weights) while the bottom of a giant swing pulls about four or more (up to 8.6 in 10 ms here; gymnasts 3.5 "
         "to 3.7, Kopp & Reid 1980); in this venue's magic-action giant swing 4.5 times the device's lets go and "
         "{grip_scale} times holds, forwards and backwards (measured). No Unitree hand is this strong",
         "the grip (the hands stay on the bar): defined by contact: the catch is both hands grasping the bar (the bar "

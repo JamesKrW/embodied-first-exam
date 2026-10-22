@@ -1,36 +1,21 @@
 """Toes-to-bar on the FIG horizontal bar (CrossFit Games movement standard): from a dead hang, five toes-to-bar (both
-feet touch the bar between the hands, then back to the full hang, each time). Nothing is welded: both hands are
-Unitree's Dex1-1 two-finger grippers clamped on the bar, and the robot hangs from it by the friction of the jaws alone,
-so the bar can slide along the jaws and out of them. The bar is fixed in its uprights, as a real one is: it does not
-turn; a hand turns on it only by its pads sliding round it, or by the wrist's joints.
+feet touch the bar between the hands, then back to the full hang, each time). Nothing is welded: both hands are the
+G1's own Dex3-1 three-finger hands (rfo.realhand, "dex3"), closed round the bar, and the robot hangs from it by the
+contact and friction of the fingers, the thumb and the palm alone: the bar can be torn out of a hand. The bar is fixed
+in its uprights, as a real one is: it does not turn; a hand turns on it only by sliding round it, or by the wrist's
+joints.
 
 Official setting: the FIG horizontal bar (2.80 m high, 2.40 m between the uprights, 28 mm) over 0.20 m mats; the
 CrossFit standard's rules. Nothing is scaled to the robot.
 
-The hold (measured in the simulator image, the core's Dex1-1 model, rfo.realhand: pads of friction 1.0, at most 120 N
-per jaw, elliptic cones, impratio 100; nothing raised): each gripper closes fore and aft across the bar, the fingers
-up along the forearm, the bar's axis 15 mm from the gripper's body: the only hold whose pull goes straight through
-the 5 N m wrists, carried by friction (any other has the pull's lever arm on a wrist: hanging the 34.4 kg robot on a
-jaw as on a hook, the bar 0.20 m from the wrist pitch joint along the fingers, would ask 34 N m of that 5 N m
-joint). Two pads at 120 N with friction 1.0 hold 240 N of shear per hand: 476 N for both = 1.41 times the weight
-of the robot with its grippers (34.4 kg, 338 N; tests/test_toes_to_bar.py measures it). Whatever slips is lost: the
-pull is always away from the gripper's body, so the bar never slides back in, and it leaves the 80 mm jaws at about
-0.08 m. On the fixed bar a torque about the bar's axis is carried by the same friction (the pads sliding round the
-28 mm bar give at about 2 x 240 N x 14 mm = 3.4 N m), so wrists that hold a pose against the hang's pull use up the
-grip: with the wrists on their default gains the reference solution below loses the bar on the third repetition;
-with limp wrists (no stiffness, a little damping: the gripper turns with the pull) it slides about 7 mm per
-repetition.
-What the movement needs: a kipped snap (the feet thrown onto the bar in about 0.3 s) pulls far more than 476 N and
-tears the bar out of the jaws (tests/test_toes_to_bar.py); what the feet push the bar with is carried by the
-grippers on top of the body's weight. A slow, strict toes-to-bar fits: the reference solution (oracles/toes-to-bar,
-`lowcmd` rows, limp wrists) folds in about 3 s, touches the bar gently, lowers the legs over 6 s and calms the swing
-before the next one; it slides the bar from 19 mm to about 56 mm along the jaws in five repetitions and takes about
-43 s of the 60 s (10 of 10 variations of its own parameters succeed, 40 to 45 s).
+THE GRIP FORCE (measured in the simulator image): the two Dex3-1 hold about one body weight on the bar at the device's
+drive torques (the dead hang slips out within 3 s), 1.55 at 1.5 times, 2.05 at 2 times. The strict toes-to-bar of
+the reference solution needs 1.4 times (1.3 lets go in the fifth repetition); GRIP_SCALE = 1.5 (realhand's
+grip_scale: the drives' active and passive limits, kp and kd), declared in the deviations.
 
-The bar's and the venue's block (build_bar, hang, clamp_bar, jaws_on, bar_in_jaws, swing_state, BarGrip) is shared
-with high-bar-swing, copied byte for byte (a task directory holds one module)."""
+The bar's and the venue's block (build_bar, swing_state, wrist_radius, bar_contacts, hang, BarGrip) is shared,
+identically, with high-bar-swing (a task directory holds one module)."""
 import math
-import xml.etree.ElementTree as ET
 
 import mujoco
 import numpy as np
@@ -38,23 +23,23 @@ import numpy as np
 from rfo import realhand
 from rfo.task import TaskBase
 
-# ------------------------------------------------------------------------------------------- the bar and the hang
+# ------------------------------------------------------------------------------------------- the bar and the grip
 # (shared, identically, by high-bar-swing and toes-to-bar)
-# The hanging pose of the G1's left arm (shoulder pitch, roll, yaw, elbow, wrist roll, pitch, yaw; the right arm
-# mirrors the roll and the yaws): high-bar-swing's, straight up, with the wrist rolled 0.97 rad so that the gripper's
-# closing axis lies along x (across the bar, horizontal) and the fingers point up along the forearm.
-HANG_ARM = np.array([-3.06, 0.57, 1.0, 1.4, 0.97, 0.0, 0.0])
-MIRROR = np.array([1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0])
-ARMS = slice(15, 29)
 MAT = 0.20                    # FIG landing mats under the bar (m)
 SIDES = ("left", "right")
+# The catch / hang pose of the G1's left arm (shoulder pitch, roll, yaw, elbow, wrist roll, pitch, yaw; the right arm
+# mirrors the roll and the yaws): straight up, the fingers up, the palm forwards (+x), the finger joints' axes along
+# the bar.
+CATCH_ARM = np.array([-2.81, 0.72, 0.3583, 1.3808, 1.8, -0.2208, 0.1125])
+MIRROR = np.array([1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0])
+ARMS = slice(15, 29)
 
 
-def build_bar(sc, height, length, diameter):
-    """The horizontal bar along y at (0, 0, height) between two uprights `length` apart, over the landing mats; a
-    Dex1-1 gripper on each wrist. The bar is fixed in the world, as the real one is fixed in its uprights: it does not
-    turn (a hand turns round it only by its pads sliding round the bar, or by the wrist's joints). Nothing is grippable
-    (no weld): the bar meets every collision geom of the robot, the grippers' jaws and bodies included. Steel on the
+def build_bar(sc, height, length, diameter, grip_scale):
+    """The horizontal bar along y at (0, 0, height) between two uprights `length` apart, over the landing mats; the
+    G1's Dex3-1 on each wrist, its drives x grip_scale. The bar is fixed in the world, as the real one is fixed in its
+    uprights: it does not turn (a hand turns round it only by sliding round it, or by the wrist's joints). Nothing is
+    grippable (no weld): the bar meets every collision geom of the robot, the hands included. Steel on the finger
     pads: the pads' contact parameters win (priority 2, realhand.py); the bar's own friction 0.8 meets the hulls."""
     half, r = length / 2, diameter / 2
     grey = (0.3, 0.3, 0.33, 1)
@@ -66,98 +51,9 @@ def build_bar(sc, height, length, diameter):
     sc.geom(sc.wb, "bar", type="capsule", fromto=(0, -half, height, 0, half, height), size=(r,),
             rgba=(0.85, 0.85, 0.88, 1), contype="0", conaffinity="12", friction=(0.8, 0.005, 0.0001))
     for s in SIDES:
-        sc.real_hands[s] = "dex1"
-
-
-def hang(w, height, bar_depth):
-    """Put the robot under the bar, arms straight up, the bar between each gripper's open jaws with its axis
-    `bar_depth` m from the gripper's body along the fingers; then both grippers close on it."""
-    r, d, m = w.robot, w.d, w.m
-    pose = np.r_[HANG_ARM, HANG_ARM * MIRROR]
-    d.qpos[r.qadr[ARMS]] = pose
-    r.arb.q_a[ARMS] = r.arb.q_b[ARMS] = pose
-    mujoco.mj_kinematics(m, d)
-    off = (2 * realhand.HOUSING[2] + bar_depth) - realhand.CENTRE_Z      # from the jaws' centre along the fingers
-    pts = []
-    for s in SIDES:
-        k = m.site(f"{s}_jaw_centre").id
-        pts.append(d.site_xpos[k] + off * d.site_xmat[k].reshape(3, 3)[:, 2])
-    mid = 0.5 * (pts[0] + pts[1])
-    d.qpos[r.fq] += 0.0 - mid[0]
-    d.qpos[r.fq + 2] += height - mid[2]
-    clamp_bar(w)
-
-
-def clamp_bar(w, closure=1.0, extra_s=0.05):
-    """Close both grippers on the bar with the rest of the world held still: realhand.close_on's procedure (which
-    takes free bodies only; the bar is fixed in the world): the jaws close at their speed limit until both jaws of
-    both hands touch the bar and the servos' setpoints are at the command, then extra_s more for the pads to take the
-    clamp. The robot is let go at t = 0 (deterministic: a function of the state). Raises if a hand does not hold it."""
-    hands, m, d = w.hands, w.m, w.d
-    keep_q = np.ones(m.nq, dtype=bool)
-    keep_v = np.ones(m.nv, dtype=bool)
-    for s in SIDES:
-        hands.cmd[s] = closure
-        keep_q[hands.jq[s]] = keep_v[hands.jv[s]] = False
-    mujoco.mj_forward(m, d)
-    q0 = d.qpos.copy()
-    arm0 = m.dof_armature.copy()
-    m.dof_armature[keep_v] = realhand.FREEZE_ARMATURE
-    bar = m.geom("bar").id
-    n_close = int(math.ceil((realhand.HALF / (realhand.SPEED / 2) + 0.05) / m.opt.timestep))
-    n_extra = int(round(extra_s / m.opt.timestep))
-    on_since = None
-    try:
-        for k in range(n_close + n_extra):
-            hands.substep()
-            mujoco.mj_step(m, d)
-            d.qpos[keep_q] = q0[keep_q]
-            d.qvel[keep_v] = 0.0
-            if on_since is None and all(jaws_on(w, s, bar) == (True, True) for s in SIDES) and all(
-                    abs(hands.setpoint[s] - realhand.HALF * closure) < 1e-12 for s in SIDES):
-                on_since = k
-            if on_since is not None and k - on_since >= n_extra:
-                break
-    finally:
-        m.dof_armature[:] = arm0
-    for s in SIDES:
-        d.qvel[hands.jv[s]] = 0.0
-    mujoco.mj_forward(m, d)
-    if on_since is None:
-        raise RuntimeError("the grippers did not close on the bar")
-
-
-def jaws_on(w, side, bar):
-    """(jaw a touches the bar, jaw b touches the bar) now, by contact (penetrating: dist <= 0)."""
-    m, d, hands = w.m, w.d, w.hands
-    n = d.ncon
-    if not n:
-        return (False, False)
-    g = d.contact.geom[:n]
-    keep = d.contact.dist[:n] <= 0.0
-    i = 1 + 2 * hands.sides.index(side)
-    out = [False, False]
-    for a, b in g[keep]:
-        o = b if a == bar else a if b == bar else None
-        if o is None:
-            continue
-        c = int(hands.jaw_code[o])
-        if c in (i, i + 1):
-            out[c - i] = True
-    return tuple(out)
-
-
-def bar_in_jaws(w, height):
-    """Per hand: where the bar's axis is in the gripper (m): along the fingers from the face of the gripper's body (the
-    jaws' pads run from 0 to 0.08), and off the jaws' centre line along the closing axis."""
-    m, d = w.m, w.d
-    out = {}
-    for s in SIDES:
-        k = m.site(f"{s}_jaw_centre").id
-        c, R = d.site_xpos[k], d.site_xmat[k].reshape(3, 3)
-        rel = np.array([0.0, c[1], height]) - c
-        out[s] = (float(R[:, 2] @ rel) + realhand.CENTRE_Z - 2 * realhand.HOUSING[2], float(R[:, 0] @ rel))
-    return out
+        sc.real_hands[s] = "dex3"
+        if grip_scale != 1.0:
+            sc.real_hand_options[s] = {"grip_scale": grip_scale}
 
 
 def swing_state(w, height):
@@ -167,43 +63,126 @@ def swing_state(w, height):
     return math.atan2(dx, dz), math.hypot(dx, dz)
 
 
+def wrist_radius(w):
+    """The distance from the midpoint of the two wrists (the wrist pitch joints) to the centre of mass: the body's
+    extension, whatever the hands and the wrists do on the bar."""
+    d, m = w.d, w.m
+    mid = 0.5 * (d.xpos[m.body("left_wrist_pitch_link").id] + d.xpos[m.body("right_wrist_pitch_link").id])
+    return float(np.linalg.norm(w.com() - mid))
+
+
+def bar_contacts(w, side):
+    """(the bar touches the hand's fingers, the bar touches its thumb or palm) now, by contact."""
+    m, d = w.m, w.d
+    bar = m.geom("bar").id
+    fing = set(w.hands.group_geoms(w, side, "fingers"))
+    tp = set(w.hands.group_geoms(w, side, "thumb_palm"))
+    a = b = False
+    for c in d.contact[:d.ncon]:
+        g1, g2 = int(c.geom[0]), int(c.geom[1])
+        o = g2 if g1 == bar else g1 if g2 == bar else None
+        if o is None or c.dist > 0.0:
+            continue
+        a, b = a or o in fing, b or o in tp
+    return a, b
+
+
+def hang(w, height, settle_s=0.4):
+    """At t = 0: the robot under the bar in the hang pose (CATCH_ARM), each hand's grasp centre on the bar's axis, and
+    both hands closed on the bar with the rest of the world held still (as realhand's close_on, which takes free bodies
+    only: the bar is fixed): the hands close at their drives' speed until every drive has stalled on the bar or
+    reached its target and both hands grasp it, then settle_s more. The robot is let go at t = 0 (deterministic: a
+    function of the state). Raises if a hand does not grasp the bar."""
+    r, d, m, hands = w.robot, w.d, w.m, w.hands
+    pose = np.r_[CATCH_ARM, CATCH_ARM * MIRROR]
+    d.qpos[r.qadr[ARMS]] = pose
+    r.arb.q_a[ARMS] = r.arb.q_b[ARMS] = pose
+    mujoco.mj_kinematics(m, d)
+    c = 0.5 * (d.site_xpos[m.site("left_grasp").id] + d.site_xpos[m.site("right_grasp").id])
+    d.qpos[r.fq] += 0.0 - c[0]
+    d.qpos[r.fq + 2] += height - c[2]
+    keep_q = np.ones(m.nq, dtype=bool)
+    keep_v = np.ones(m.nv, dtype=bool)
+    for s in SIDES:
+        hands.cmd[s] = 1.0
+        keep_q[hands.hq[s]] = keep_v[hands.hv[s]] = False
+    mujoco.mj_forward(m, d)
+    q0 = d.qpos.copy()
+    arm0 = m.dof_armature.copy()
+    m.dof_armature[keep_v] = realhand.FREEZE_ARMATURE
+    n_settle = int(round(settle_s / m.opt.timestep))
+    held_at, still = None, 0
+    try:
+        for k in range(int(round(2.0 / m.opt.timestep))):
+            sp0 = hands._sp.copy()
+            hands.substep()
+            mujoco.mj_step(m, d)
+            d.qpos[keep_q] = q0[keep_q]
+            d.qvel[keep_v] = 0.0
+            still = still + 1 if np.allclose(hands._sp, sp0, atol=1e-9) else 0
+            if held_at is None and still >= 20 and all(bar_contacts(w, s) == (True, True) for s in SIDES):
+                held_at = k
+            if held_at is not None and k - held_at >= n_settle:
+                break
+    finally:
+        m.dof_armature[:] = arm0
+    for s in SIDES:
+        d.qvel[hands.hv[s]] = 0.0
+    hands._vs[:] = 0.0
+    mujoco.mj_forward(m, d)
+    if held_at is None:
+        raise RuntimeError("the hands did not close on the bar")
+
+
 class BarGrip:
-    """The grip rules: a hand holds the bar while the bar touches both of its gripper's jaws; a break longer than
-    params["off_bar_s"] is letting go (no re-grip). Only the grippers (their jaws and bodies) and the parts in
-    `bar_ok` may touch the bar."""
+    """The grip rules: a hand grasps the bar while the bar touches its fingers (index or middle) and its thumb or palm
+    (holding: the catch); after the catch a hand is on the bar while the bar touches any part of it (fingers, thumb or
+    palm: a hook grip of the fingers alone counts, as in gymnastics); a hand off the bar for longer than
+    params["off_bar_s"] has let go (no re-grip). Only the hands and the parts in `bar_ok` may touch the bar."""
     bar_ok: tuple = ()
 
     def grip_reset(self, w, ref):
         self.bar_g = ref.geoms(names=["bar"])
-        self.jaws = {s: (ref.geoms(body=f"{s}_hand_jaw_a"), ref.geoms(body=f"{s}_hand_jaw_b")) for s in SIDES}
-        allowed = ref.geoms(body="left_mount") | ref.geoms(body="right_mount")      # the grippers: body and jaws
+        ng = w.m.ngeom
+        mask = lambda ids: np.isin(np.arange(ng), ids)  # noqa: E731
+        self.fingers = {s: mask(w.hands.group_geoms(w, s, "fingers")) for s in SIDES}
+        self.thumb_palm = {s: mask(w.hands.group_geoms(w, s, "thumb_palm")) for s in SIDES}
+        self.hand_g = {s: self.fingers[s] | self.thumb_palm[s] for s in SIDES}
+        allowed = ref.part("hands")
         if self.bar_ok:
             allowed |= ref.part(*self.bar_ok)
         self.not_on_bar = ref.part("robot") & ~allowed
         self.trackers["on_t"] = {s: 0.0 for s in SIDES}
 
     def holding(self, ref):
-        return [s for s in SIDES if ref.touching(self.bar_g, self.jaws[s][0]) and ref.touching(self.bar_g, self.jaws[s][1])]
+        return [s for s in SIDES if ref.touching(self.bar_g, self.fingers[s])
+                and ref.touching(self.bar_g, self.thumb_palm[s])]
+
+    def on_bar(self, ref):
+        return [s for s in SIDES if ref.touching(self.bar_g, self.hand_g[s])]
 
     def grip_substep(self, w, ref) -> bool:
         """The grip rules on this physics step; True if one was broken (the attempt has failed)."""
         p, on = self.p, self.trackers["on_t"]
-        held = self.holding(ref)
+        held = self.on_bar(ref)
         for s in SIDES:
             if s in held:
                 on[s] = round(ref.time, 4)
                 continue
             gap = round(ref.time - on[s], 4)
             if gap > ref.metrics.get("grip_break_max_s", 0.0):
-                ref.metrics["grip_break_max_s"] = gap   # (reported: the longest break of a hand's two-jaw contact)
+                ref.metrics["grip_break_max_s"] = gap   # (reported: the longest time a hand was off the bar)
             if gap > p["off_bar_s"] + 1e-9:
                 ref.fail("let go of the bar", hand=s, off_s=gap)
                 return True
         if ref.touching(self.not_on_bar, self.bar_g):
-            ref.fail("held the bar with a part other than the grippers", parts=sorted(ref.parts_touching(self.bar_g)))
+            ref.fail("held the bar with a part other than the hands", parts=sorted(ref.parts_touching(self.bar_g)))
             return True
         return False
 # ------------------------------------------------------------------------------- (end of the shared bar block)
+
+
+GRIP_SCALE = 1.5              # the Dex3-1 drives x this (declared): the measured need is 1.4 (see deviations)
 
 
 class Task(BarGrip, TaskBase):
@@ -216,76 +195,71 @@ class Task(BarGrip, TaskBase):
                 "bar is the FIG horizontal bar (FIG Apparatus Norms: 2.80 m above the floor, 2.40 m between the "
                 "uprights, 28 mm in diameter) over 0.20 m mats")
     deviations = [
-        "the grip (the hands on the bar): each hand is a two-finger gripper, Unitree's Dex1-1 (90 mm stroke, 80 mm "
-        "jaws with rubber pads, at most 120 N; sold for the G1), closed across the bar; it holds the bar by the jaws' "
-        "friction alone, nothing is welded, and the bar can slide along the jaws and out of them. Flat jaws clamp the "
-        "bar but cannot wrap round it: the bar is fixed, as the norm's is, and a hand turns on it only by its pads "
-        "sliding round the bar (as a gymnast's palms slide round it) or by the wrist's joints. The Dex1-1's own "
-        "rating is a 5 kg friction-grasp load; the model's pads hold some five times that",
-        "the grip (the hands stay on the bar): defined by contact: a hand holds the bar while the bar touches both of "
-        "its gripper's jaws; a break of up to {off_bar_s} s (the pads' contact flickering under a load; measured "
-        "breaks last 1 to 3 ms) is not letting go",
+        "the grip (the hands on the bar): each hand is the G1's own Dex3-1 three-finger hand (thumb 3 joints, index "
+        "and middle 2 each, one motor per joint: 0.49 N m closing, 1.37 N m back-driven per finger joint), closed "
+        "round the bar; it holds the bar by its fingers' contact and friction alone, nothing is welded, and the bar "
+        "can be torn out of the hand; the bar is fixed, as the norm's is, and a hand turns on it only by sliding round "
+        "it or by the wrist's joints",
+        "the grip (the hands stay on the bar): defined by contact: a hand is on the bar while the bar touches any part "
+        "of it (fingers, thumb or palm: a hook grip counts); a break of up to {off_bar_s} s (contacts flickering "
+        "under a load) is not letting go",
+        "the grip force: the hands' drives are {grip_scale} times the Dex3-1's, because at the device's torques the "
+        "two hands hold about one body weight on the bar (measured: the dead hang itself slips out within 3 s), and "
+        "the strict toes-to-bar of the reference solution needs 1.4 times (1.3 times lets go in the fifth "
+        "repetition, measured); {grip_scale} keeps a margin. No Unitree hand is rated for this",
         "CrossFit standard (the full hang is judged by eye: arms extended, heels behind the bar): the hang is judged "
         "by where the feet are (both feet's centres at least {hang_feet_below_bar_m} m below the bar, about "
-        "nine tenths of the dead hang's 1.59 m, and behind the bar), because the referee has positions, not a "
-        "judge's eye",
+        "nine tenths of the dead hang's, and behind the bar), because the referee has positions, not a judge's eye",
         "FIG Apparatus Norms, horizontal bar (elasticity): the bar is rigid, because the simulator has rigid bodies "
         "only",
     ]
     time_limit_s = 60.0
-    start = (-0.011, 0.0, 0.0)
+    start = (0.0, 0.0, 0.0)
     stages = ["rep 1", "rep 2", "rep 3", "rep 4", "rep 5"]
     fall_rule = False                # the robot hangs: the task's own rules judge the ground and the grip
     bar_ok = ("legs",)               # the feet (and shins, knees, thighs) may touch the bar; arms, trunk, head not
     params = dict(bar_height_m=2.80, bar_length_m=2.40, bar_diameter_m=0.028, reps=5, hang_feet_below_bar_m=1.40,
-                  bar_depth_m=0.015, off_bar_s=0.05)
+                  off_bar_s=0.05, grip_scale=GRIP_SCALE)
 
-    sentence = ("Hanging from the high bar by the two grippers that are your hands, do five toes-to-bar: bring both "
-                "feet up to touch the bar between your hands, and come back to the full hang each time, without "
-                "letting go.")
+    sentence = ("Hanging from the high bar by your two hands, do five toes-to-bar: bring both feet up to touch the bar "
+                "between your hands, and come back to the full hang each time, without letting go.")
     rules = ("The bar is {bar_diameter_m} m thick, {bar_height_m} m above the floor, {bar_length_m} m long between its "
-             "two uprights, along the y axis; it is fixed and does not turn. Your hands are two-finger grippers, "
-             "and at the start each is closed on the bar; they hold it by the friction of their jaws only, so the bar "
-             "can slide along the jaws and out of them. A hand holds the bar while the bar touches both of that "
-             "gripper's jaws; when for more than {off_bar_s} s a hand has not held it, you have let go (whether you "
-             "opened the gripper or the bar slipped out), and there is no re-grip. Besides the grippers only your "
-             "legs may touch the bar: an arm, the trunk or the head on it fails. A repetition has two parts, in this "
-             "order. The touch: both feet touch the bar at the same moment, each at a point between your two hands "
-             "(the jaws' centres; shins, knees or anything else of the legs on the bar is not a touch, and does not "
-             "fail). The hang: afterwards the centres of both feet are at least {hang_feet_below_bar_m} m below the "
-             "bar and behind it (x less than the bar's; the heels back behind the bar), both at the same moment (in "
-             "your dead hang they are 1.59 m below it). You succeed when the hang of repetition {reps} is reached. "
-             "Swinging is allowed (a kip is legal), as is bending the knees on the way. You fail the moment you let "
-             "go of the bar, an arm, the trunk or the head touches the bar, any part of you touches the uprights, the "
-             "mats or the floor, or after {time_limit_s} s.")
+             "two uprights, along the y axis; it is fixed and does not turn. Your hands are three-finger hands (a "
+             "thumb, an index and a middle finger; their drives {grip_scale} times the stock hand's torques), and at the start each is closed round the bar; they hold it by "
+             "their fingers' contact and friction only, so the bar can be torn out of a hand. A hand is on the bar "
+             "while the bar touches any part of it (fingers, thumb or palm); when for more than {off_bar_s} s a hand "
+             "has not been on it, you have let go (whether you opened the hand or the bar was torn out), and there is "
+             "no re-grip. Besides the hands only your legs may touch the bar: an arm, the trunk or the head on it "
+             "fails. A repetition has two parts, in this order. The touch: both feet touch the bar at the same "
+             "moment, each at a point between your two hands (their grasp centres; shins, knees or anything else of "
+             "the legs on the bar is not a touch, and does not fail). The hang: afterwards the centres of both feet "
+             "are at least {hang_feet_below_bar_m} m below the bar and behind it (x less than the bar's; the heels "
+             "back behind the bar), both at the same moment. You succeed when the hang of repetition {reps} is "
+             "reached. Swinging is allowed (a kip is legal), as is bending the knees on the way. You fail the moment "
+             "you let go of the bar, an arm, the trunk or the head touches the bar, any part of you touches the "
+             "uprights, the mats or the floor, or after {time_limit_s} s.")
     venue = ("At t = 0 you hang still under the middle of the bar, facing +x: both arms straight up, the wrists turned "
-             "so that each gripper's jaws close fore and aft on the bar, the fingers pointing up and the bar between "
-             "them {bar_depth_m} m from the gripper's body (1 mm clear of it; the jaws are 0.08 m long beyond it), "
-             "the jaws' centres at y = +0.207 and -0.207 m, your legs in the standing posture, your pelvis 0.84 m "
-             "below the bar, your feet 1.59 m below it and 0.03 m behind it, your soles about 1.21 m above the floor "
-             "(1.01 m above the 0.20 m mats under the bar). Your feet are 0.24 m apart, each 0.08 m wide. Both grip "
-             "values are 1: the clamp's full 120 N on each jaw. A grip value is that gripper's closure command (0 "
-             "open, 1 closed): on the 28 mm bar, about 0.82 or more clamps at 120 N, less clamps more lightly (10 N "
-             "per mm that the commanded opening, 90 mm times one less the value, is below 28 mm), and below about "
-             "0.69 the jaws no longer clamp it. The bar is not a free body: the `held` flags of your state stay empty "
-             "for it; the grip is judged as the rules say. Nothing holds the legs up here: the `stand` action keeps "
-             "the legs in the stance with a feed-forward meant for standing on the ground; `joints` or `lowcmd` rows "
-             "drive every joint. The uprights stand at the two ends of the bar, 1.2 m to either side of you.")
-    difficulty = ("The grippers' friction holds about 1.4 times your weight in all, and the bar never slides back in: "
-                  "a kip or a quick snap of the legs, and the feet striking the bar, pull harder than that, so the "
-                  "feet have to be brought up and lowered with little more than your weight on the bar. The bar is "
-                  "0.84 m above your pelvis and your legs are 0.75 m long: hip flexion alone does not bring the toes "
-                  "to the bar, the trunk has to lean back as well, against shoulders of 25 N m, five times within the "
-                  "time. The bar does not turn, so a twist of the grippers on it is resisted by the same friction "
-                  "that holds you up.")
+             "so that the palms face forwards and the fingers point up, each hand closed round the bar (grip values "
+             "1), your legs in the standing posture. A grip value is that hand's closure command (0 open, 1 every "
+             "finger and thumb joint closing towards its closed angle; a finger stops on what it touches). The bar "
+             "is not a free body: the `held` flags of your state stay empty for it; the grip is judged as the rules "
+             "say. Nothing holds the legs up here: the `stand` action keeps the legs in the stance with a "
+             "feed-forward meant for standing on the ground; `joints` or `lowcmd` rows drive every joint. The "
+             "uprights stand at the two ends of the bar, 1.2 m to either side of you.")
+    difficulty = ("The hands hold little more than your weight on the bar: a kip or a quick snap of the legs, and the "
+                  "feet striking the bar, pull harder than that, so the feet have to be brought up and lowered with "
+                  "little more than your weight on the bar. The bar is high above your pelvis and your legs are short: "
+                  "hip flexion alone does not bring the toes to the bar, the trunk has to lean back as well, against "
+                  "shoulders of 25 N m, five times within the time. The bar does not turn, so a twist of the hands on "
+                  "it is resisted by the same friction that holds you up.")
 
     def build(self, sc):
         p = self.p
-        build_bar(sc, p["bar_height_m"], p["bar_length_m"], p["bar_diameter_m"])
+        build_bar(sc, p["bar_height_m"], p["bar_length_m"], p["bar_diameter_m"], float(p["grip_scale"]))
         sc.camera("venue", (3.6, -4.6, 2.3), (0.0, 0.0, 1.75), fovy=50)
 
     def reset(self, w):
-        hang(w, self.p["bar_height_m"], self.p["bar_depth_m"])
+        hang(w, self.p["bar_height_m"])
 
     def referee_reset(self, w, ref):
         self.robot = ref.part("robot")
@@ -300,7 +274,7 @@ class Task(BarGrip, TaskBase):
         return {s: (H - float(d.site_xpos[r.foot_site[s]][2]), float(d.site_xpos[r.foot_site[s]][0])) for s in SIDES}
 
     def toes_on_bar(self, w, ref) -> bool:
-        """Both feet on the bar now, each at a point between the hands (the jaws' centres)."""
+        """Both feet on the bar now, each at a point between the hands (their grasp centres)."""
         d, r = w.d, w.robot
         y0, y1 = sorted(float(d.site_xpos[r.palm[s]][1]) for s in SIDES)
         for s in SIDES:
@@ -343,5 +317,5 @@ class Task(BarGrip, TaskBase):
                 "feet_below_bar_m": {s: v[0] for s, v in self.feet(w).items()},
                 "feet_ahead_of_bar_m": {s: v[1] for s, v in self.feet(w).items()},
                 "reps": self.trackers.get("reps", 0), "touched": self.trackers.get("touched", False),
-                "holding": self.holding(w.ref),
-                "bar_in_jaws_m": {k: v[0] for k, v in bar_in_jaws(w, self.p["bar_height_m"]).items()}}
+                "holding": self.on_bar(w.ref),
+                "grasp_centres": {s: w.hands.grasp_frame(s)[0].tolist() for s in SIDES}}
