@@ -52,18 +52,18 @@
  "rulebook": "ITF Rules of Tennis 2024: Rule 1 (the court), Rule 3 and Appendix I (the ball), Rule 4 and Appendix II (the racket), Rule 12 (a ball on a line), Rules 24 and 25 (losing the point, a good return)",
  "deviations": [
   "Rules 16-21 (the service): the server is a ball machine, not a player: a two-wheel machine on a stand behind the far baseline throws the serve from the server's strike point (2.7 m up) at about 3.0 s; there is no opponent, the attempt ends when your return lands",
-  "Rule 4 (the racket held in the hand): the hand is a two-finger gripper, Unitree's Dex1-1 (90 mm stroke, 80 mm jaws, at most 120 N; Unitree sells it for the G1, the H2 and the R1, not the H1-2: here it sits on the H1-2's wrist where the palm ends); the handle lies along its jaws, and the racket is held by their friction alone, as a hand holds it",
-  "Rules 4 and 24 (the ball hit with the racket held in the hand; a thrown racket does not play the ball): \"in the hand\" is defined by contact: the racket's handle touches both of the gripper's jaws; a break of up to 0.05 s (the jolt of an impact or a hard swing; measured breaks last 2 to 10 ms) is not a release",
+  "Rule 4 (the racket held in the hand): the hand is the H1-2's own Inspire five-finger hand (six drives, fingertip forces 10 N, the thumb 15 N), closed by one command; the handle lies across the palm, and the racket is held by the fingers' contact and friction alone, as a hand holds it",
+  "Rules 4 and 24 (the ball hit with the racket held in the hand; a thrown racket does not play the ball): \"in the hand\" is defined by contact: the racket's handle touches the hand's fingers and its thumb or palm; a break of up to 0.05 s (the jolt of an impact or a hard swing) is not a release",
   "Rule 12 (a ball touching a line is in): the ball's footprint is one point, the point under its centre at its first contact with the ground (a real ball's footprint is about 5 cm across)",
   "Rule 24 f (deliberately touching the ball twice, carrying it): intention cannot be judged: racket contacts less than 0.05 s apart are one hit, a later one is a second hit, and a contact longer than 0.05 s is a carry",
   "Rule 1 (the net): the net is 4 panels a side, each a 2 cm thick plate that gives way across the net on a spring and a damper (the stiffness of a cable at 2000.0 N between the posts, an estimate: the rule sets the heights, not the tension; the net 6.0 kg in all) instead of a mesh of cord; each moves as one plate (a real net's mesh gives locally), and a fast ball that meets it comes back at about a tenth of its speed",
   "wind and weather: none; the air is still (sea level, 15 C)"
  ],
  "texts": {
-  "sentence": "Return the serve: after the tennis ball has bounced once in your service box, hit it with the racket held in your right hand's gripper back over the net so that it lands in the singles court on the far side, without letting go of the racket.",
-  "rules": "The court is the ITF singles court: 23.77 m long and 8.23 m wide, measured to the outside of the lines, with a service line 6.4 m from the net on each side. The net stands across the middle, 0.914 m high at its centre and rising in a straight line to 1.07 m at the posts, which stand 0.914 m outside the sidelines. The ball is the ITF ball (radius 0.0335 m, 0.0577 kg, with air drag and spin lift). The racket is a separate body, 0.685 m long and 0.3 kg, balanced 0.33 m from the butt, with a strung surface 0.33 m by 0.25 m and an octagonal handle 0.0335 m across its flats and 0.19 m long; at the start its handle is closed in your right hand's two-finger gripper, which holds it by friction only: it can slip, turn in the gripper and fall. The racket is in your hand while its handle touches both of the gripper's jaws; it has left your hand when for more than 0.05 s the handle has not touched both jaws. About 3.0 s after the start a ball machine behind the far baseline serves the ball at 30.0 m/s into your right service box; it is served when it has left the machine's wheels. In order: the ball bounces once on your side; the racket, in your hand, hits it (the strings, the frame or any other part of the racket counts); its centre passes the net's plane from your side to the far side, above the net's top edge or outside a post (it may touch the net or a post on the way); and its first contact with the ground after that is inside the far half of the singles court, the lines included (the point under the ball's centre decides; ground contacts less than 0.02 s apart are one bounce): that is the success. You fail if the racket leaves your hand at any time (dropped, thrown or slipped out of the gripper), if the racket touches the ball before its bounce (a volley), if the ball bounces a second time on your side before your hit, if after your hit the ball touches the ground on your side or outside the far court, if the ball touches any part of you (the gripper included) at any time after the serve, if the racket touches the ball a second time (contacts less than 0.05 s apart are one hit) or stays on it longer than 0.05 s, if the ball passes the net's plane between the posts below the net's top edge, if any part of you or the racket touches the net or a post, or the ground beyond the net's plane, if you or the racket touch the ball before it is served, if you fall, or after 10 s. A fall is: your pelvis lower than 0.35 m above the ground, or any part of you other than your feet touching the ground; the racket may touch the ground on your side as long as it stays in your hand.",
-  "venue": "You stand as the receiver: 2.75 m to the right of the court's centre line, your pelvis 0.5 m behind your baseline, facing the net (+x), which is 12.385 m ahead of you. Painted on the court, all 0.05 m wide and inside the measurements: the two baselines, the two singles sidelines, the two service lines, the centre service line between them and a 0.10 m centre mark on each baseline; there are no doubles lines. The far baseline is 23.77 m beyond yours. The server is a ball machine on a stand: the ball leaves its two wheels where a server strikes it, 2.7 m above the ground, 0.2 m behind the far baseline and 0.8 m to the server's right of the centre mark (your left of the centre line). The net gives a little when something meets it. The serve is flat, with a little topspin; it bounces in your right service box, the one between the centre line and the right sideline, and reaches your baseline about a second after it was struck. The racket's handle is closed in your right gripper along its two fingers, the butt just short of the gripper's body and the rest of the handle reaching beyond the fingertips; the strings face the way the jaws close (your palm's side), and the racket points ahead along your forearm.",
-  "difficulty": "The ball crosses the whole court in about a second and is still moving at more than 15 m/s when it reaches you, so the racket has to be in a path a few centimetres wide at an instant you must predict, and a robot that only walks cannot go far to meet it. The racket is held only by a two-finger gripper's friction: a hard swing and the ball's impact twist it in the grip, so the face the ball meets is not where the arm put it, and a swing strong enough to return the ball over the net must not fling the racket out of the hand."
+  "sentence": "Return the serve: after the tennis ball has bounced once in your service box, hit it with the racket held in your right hand back over the net so that it lands in the singles court on the far side, without letting go of the racket.",
+  "rules": "The court is the ITF singles court: 23.77 m long and 8.23 m wide, measured to the outside of the lines, with a service line 6.4 m from the net on each side. The net stands across the middle, 0.914 m high at its centre and rising in a straight line to 1.07 m at the posts, which stand 0.914 m outside the sidelines. The ball is the ITF ball (radius 0.0335 m, 0.0577 kg, with air drag and spin lift). The racket is a separate body, 0.685 m long and 0.3 kg, balanced 0.33 m from the butt, with a strung surface 0.33 m by 0.25 m and an octagonal handle 0.0335 m across its flats and 0.19 m long; at the start its handle is closed in your right hand (a five-finger hand), which holds it by contact and friction only: it can slip, turn in the hand and fall. The racket is in your hand while its handle touches the hand's fingers and its thumb or palm; it has left your hand when for more than 0.05 s it has not. About 3.0 s after the start a ball machine behind the far baseline serves the ball at 30.0 m/s into your right service box; it is served when it has left the machine's wheels. In order: the ball bounces once on your side; the racket, in your hand, hits it (the strings, the frame or any other part of the racket counts); its centre passes the net's plane from your side to the far side, above the net's top edge or outside a post (it may touch the net or a post on the way); and its first contact with the ground after that is inside the far half of the singles court, the lines included (the point under the ball's centre decides; ground contacts less than 0.02 s apart are one bounce): that is the success. You fail if the racket leaves your hand at any time (dropped, thrown or slipped out of the hand), if the racket touches the ball before its bounce (a volley), if the ball bounces a second time on your side before your hit, if after your hit the ball touches the ground on your side or outside the far court, if the ball touches any part of you (the hand included) at any time after the serve, if the racket touches the ball a second time (contacts less than 0.05 s apart are one hit) or stays on it longer than 0.05 s, if the ball passes the net's plane between the posts below the net's top edge, if any part of you or the racket touches the net or a post, or the ground beyond the net's plane, if you or the racket touch the ball before it is served, if you fall, or after 10 s. A fall is: your pelvis lower than 0.35 m above the ground, or any part of you other than your feet touching the ground; the racket may touch the ground on your side as long as it stays in your hand.",
+  "venue": "You stand as the receiver: 2.75 m to the right of the court's centre line, your pelvis 0.5 m behind your baseline, facing the net (+x), which is 12.385 m ahead of you. Painted on the court, all 0.05 m wide and inside the measurements: the two baselines, the two singles sidelines, the two service lines, the centre service line between them and a 0.10 m centre mark on each baseline; there are no doubles lines. The far baseline is 23.77 m beyond yours. The server is a ball machine on a stand: the ball leaves its two wheels where a server strikes it, 2.7 m above the ground, 0.2 m behind the far baseline and 0.8 m to the server's right of the centre mark (your left of the centre line). The net gives a little when something meets it. The serve is flat, with a little topspin; it bounces in your right service box, the one between the centre line and the right sideline, and reaches your baseline about a second after it was struck. The racket's handle lies across your right palm near its butt, held by the closed fingers and thumb, the butt just beyond your little finger; the strings face the way your palm faces, and the racket points up, square to your forearm.",
+  "difficulty": "The ball crosses the whole court in about a second and is still moving at more than 15 m/s when it reaches you, so the racket has to be in a path a few centimetres wide at an instant you must predict, and a robot that only walks cannot go far to meet it. The racket is held only by a hand's friction: a hard swing and the ball's impact twist it in the grip, so the face the ball meets is not where the arm put it, and a swing strong enough to return the ball over the net must not fling the racket out of the hand."
  },
  "robot": "unitree_h1",
  "sim": {
@@ -71,7 +71,7 @@
   "mujoco": "3.3.7"
  },
  "t0": {
-  "state_sha": "d67081c33c8f258d2ba4d54c75a53e0a63f2ab4f41719aa8948bfecb56b7db6e",
+  "state_sha": "ae1b2a0361c6a37ad1add509793857caa44800318934f312be7fe6d45ac75dac",
   "control_dt": 0.01,
   "horizon_steps": 1000,
   "raw_dim": 141,
@@ -135,7 +135,7 @@
      1.0,
      1.0
     ],
-    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad) (grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
+    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad) (grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    },
    "walk": {
     "dim": 20,
@@ -205,7 +205,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
+    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    },
    "joints": {
     "dim": 29,
@@ -302,7 +302,7 @@
      1.0,
      1.0
     ],
-    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward (grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
+    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward (grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    },
    "lowcmd": {
     "dim": 137,
@@ -500,31 +500,31 @@
      -31.4,
      -31.4,
      -31.4,
+     -360.0,
+     -360.0,
+     -360.0,
+     -360.0,
+     -66.88,
+     -40.0,
+     -360.0,
+     -360.0,
+     -360.0,
+     -360.0,
+     -66.88,
+     -40.0,
      -200.0,
-     -200.0,
-     -200.0,
-     -300.0,
+     -130.0,
      -60.0,
-     -40.0,
-     -200.0,
-     -200.0,
-     -200.0,
-     -300.0,
      -60.0,
-     -40.0,
-     -200.0,
-     -40.0,
-     -40.0,
-     -18.0,
-     -18.0,
+     -60.0,
+     -60.0,
      -19.0,
      -19.0,
-     -19.0,
-     -40.0,
-     -40.0,
-     -18.0,
-     -18.0,
-     -19.0,
+     -130.0,
+     -60.0,
+     -60.0,
+     -60.0,
+     -60.0,
      -19.0,
      -19.0,
      0.0,
@@ -639,31 +639,31 @@
      31.4,
      31.4,
      31.4,
+     360.0,
+     360.0,
+     360.0,
+     360.0,
+     66.88,
+     40.0,
+     360.0,
+     360.0,
+     360.0,
+     360.0,
+     66.88,
+     40.0,
      200.0,
-     200.0,
-     200.0,
-     300.0,
+     130.0,
      60.0,
-     40.0,
-     200.0,
-     200.0,
-     200.0,
-     300.0,
      60.0,
-     40.0,
-     200.0,
-     40.0,
-     40.0,
-     18.0,
-     18.0,
+     60.0,
+     60.0,
      19.0,
      19.0,
-     19.0,
-     40.0,
-     40.0,
-     18.0,
-     18.0,
-     19.0,
+     130.0,
+     60.0,
+     60.0,
+     60.0,
+     60.0,
      19.0,
      19.0,
      1500.0,
@@ -723,7 +723,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz (grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
+    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz (grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    }
   },
   "hold": {
@@ -884,9 +884,21 @@
    "cmd_vy",
    "cmd_wz",
    "time_s",
-   "jaw_opening_right",
-   "jaw_speed_right",
-   "jaw_force_right"
+   "hand_closure_right",
+   "hand_closure_speed_right",
+   "hand_force_right",
+   "right_hand_thumb_yaw_pos",
+   "right_hand_thumb_pitch_pos",
+   "right_hand_index_pos",
+   "right_hand_middle_pos",
+   "right_hand_ring_pos",
+   "right_hand_pinky_pos",
+   "right_hand_thumb_yaw_torque",
+   "right_hand_thumb_pitch_torque",
+   "right_hand_index_torque",
+   "right_hand_middle_torque",
+   "right_hand_ring_torque",
+   "right_hand_pinky_torque"
   ],
   "cameras": {
    "head_left": {
@@ -966,7 +978,7 @@
    "name": "unitree_h1",
    "title": "Unitree H1-2",
    "revision": "h1-4",
-   "model": "Unitree H1-2, 27 joints, 1.78 m, 68 kg (RoboOlympics robot library h1-4: Unitree's own h1_2 model with its joint, speed and torque limits; its motor torque-speed curves are estimates)",
+   "model": "Unitree H1-2, 27 joints, 1.78 m, 67 kg (RoboOlympics robot library h1-4: the H1-2 body (Unitree's own h1_2 model, its joint ranges and speed limits) with Unitree H2 / H2-X-class leg actuators from the H2's official URDF (hips and knees 360 N m, ankle pitch 66.88 N m; curves of Unitree's M107 shape, 2.5 kW peak per joint) and H2-class arm actuators from the same URDF (shoulder pitch 130 N m; shoulder roll and yaw, elbow, forearm roll 60 N m; curves of Unitree's N7520 / N5020 shapes); the H1-2's own torso (M107-15, 200 N m), ankle roll and wrist pitch / yaw (estimates))",
    "joints": [
     "left_hip_yaw",
     "left_hip_pitch",
@@ -1139,31 +1151,31 @@
     31.4
    ],
    "torque_limit_nm": [
+    360.0,
+    360.0,
+    360.0,
+    360.0,
+    66.88,
+    40.0,
+    360.0,
+    360.0,
+    360.0,
+    360.0,
+    66.88,
+    40.0,
     200.0,
-    200.0,
-    200.0,
-    300.0,
+    130.0,
     60.0,
-    40.0,
-    200.0,
-    200.0,
-    200.0,
-    300.0,
     60.0,
-    40.0,
-    200.0,
-    40.0,
-    40.0,
-    18.0,
-    18.0,
+    60.0,
+    60.0,
     19.0,
     19.0,
-    19.0,
-    40.0,
-    40.0,
-    18.0,
-    18.0,
-    19.0,
+    130.0,
+    60.0,
+    60.0,
+    60.0,
+    60.0,
     19.0,
     19.0
    ],
@@ -1314,7 +1326,7 @@
     0.0,
     0.0
    ],
-   "mass_kg": 67.87,
+   "mass_kg": 67.37,
    "height_m": 1.78,
    "pelvis_height_standing_m": 1.035,
    "control_dt_s": 0.01,
@@ -1334,33 +1346,120 @@
     ]
    },
    "real_hands": {
-    "kind": "dex1",
-    "model": "Unitree Dex1-1 two-finger parallel gripper (modelled: 0.55 kg, jaws 80 mm long, 90 mm stroke, rubber pads)",
+    "kind": "inspire",
     "sides": [
      "right"
     ],
-    "stroke_m": 0.09,
-    "jaw_length_m": 0.08,
-    "force_limit_n": 120.0,
-    "setpoint_opening_speed_m_s": 0.375,
-    "jaw_speed_note": "the limit is the servo setpoint's; the jaws can move briefly up to about 0.45 m/s when a clamp springs open",
-    "servo": {
-     "kp_n_per_m": 20000.0,
-     "kd_n_s_per_m": 80.0,
-     "rule": "each jaw: a setpoint moves towards 45 mm x closure at most half setpoint_opening_speed_m_s (opening, it starts from the jaws' position); force = clip(kp (setpoint - q) - kd dq, -force_limit_n, force_limit_n); the clamp on an object is min(force_limit_n, 10 N per mm that the commanded opening 90 mm x (1 - closure) is below the object's width)"
-    },
-    "pad": {
-     "friction": [
-      1.0,
-      0.005,
-      0.0001
-     ],
-     "condim": 4
-    },
-    "start": {
+    "hands": {
      "right": {
-      "closure": 1.0,
-      "holding": "racket"
+      "kind": "inspire",
+      "model": "the H1-2's Inspire RH56DFX five-finger hand (6 self-locking linear drives for 12 joints: the thumb's rotation and flexion, one drive per finger with its two joints coupled; Unitree's h1_2 kinematics) with H2-class fingertip forces: 20 N per finger and 30 N the thumb, 2 x the RH56DFX's 10 / 15 N (Unitree's H2 Plus offers 20 N Sharpa Wave hands; Inspire's RH56E2 gives 28 / 30 N)",
+      "grip_scale": 1.0,
+      "drives": [
+       {
+        "name": "thumb_yaw",
+        "joint": "thumb_proximal_yaw",
+        "open_rad": 0.0,
+        "closed_rad": 1.1,
+        "speed_rad_s": 1.8675,
+        "active_torque_nm": 1.59,
+        "passive_torque_nm": 4.1594,
+        "group": "thumb",
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "thumb_pitch",
+        "joint": "thumb_proximal_pitch",
+        "open_rad": 0.0,
+        "closed_rad": 0.5,
+        "speed_rad_s": 1.2217,
+        "active_torque_nm": 6.72,
+        "passive_torque_nm": 17.5795,
+        "group": "thumb",
+        "coupled": {
+         "thumb_intermediate": 1.6,
+         "thumb_distal": 2.4
+        },
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "index",
+        "joint": "index_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.34,
+        "passive_torque_nm": 9.1822,
+        "group": "fingers",
+        "coupled": {
+         "index_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "middle",
+        "joint": "middle_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.44,
+        "passive_torque_nm": 9.5746,
+        "group": "fingers",
+        "coupled": {
+         "middle_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "ring",
+        "joint": "ring_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.32,
+        "passive_torque_nm": 9.1037,
+        "group": "fingers",
+        "coupled": {
+         "ring_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "pinky",
+        "joint": "pinky_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.02,
+        "passive_torque_nm": 7.9265,
+        "group": "fingers",
+        "coupled": {
+         "pinky_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       }
+      ],
+      "servo": {
+       "kp_nm_per_rad": 200.0,
+       "kd_nm_s_per_rad": 0.5,
+       "rule": "each drive: a setpoint moves towards open + closure x (closed - open) at most speed_rad_s, but closing stops where kp (setpoint - q) would exceed active_torque_nm; torque = clip(kp (setpoint - q) + kd (setpoint speed - dq), -passive, passive) at every physics step; a load beyond passive_torque_nm drags the setpoint (the drive slips)"
+      },
+      "holding_rule": "a free body that touches the hand's fingers and its thumb or palm",
+      "pad_friction": [
+       1.0,
+       0.005,
+       0.0001
+      ],
+      "start": {
+       "closure": 1.0,
+       "holding": "racket"
+      }
      }
     }
    }

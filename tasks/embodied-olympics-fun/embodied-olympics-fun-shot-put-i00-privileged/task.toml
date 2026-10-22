@@ -20,8 +20,8 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
 expert_time_estimate_hours = 8.0
-oracle = "full"
-oracle_evidence = "Reference: a standing put from the open palm (no grip, with the published palm contact model): the shot leaves at 7.5 m/s from 1.92 m, pushed (0.952), lands at 6.65 m (the line is 6 m), then the robot leaves by the rear half and stands; it is open loop and on a knife edge (kp x0.98 or x1.02 and earlier walk switches fall or foul). Referee test negatives: nop (the shot stays on the palm, time), the arm lowered or taken back, the other hand, the stop board, outside the sector, short, touched after the release, a fall after the landing. Measured (make_oracles.py): success after 6.02 s of the 60 s limit, live and in a fresh replay, ending in the same state."
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_shot_put.py: No reference on the core with Unitree's actuator data. The former technique fouls: the left hand touches the shot at 0.9 s. A re-search by CMA-ES over the four key poses, their times and the legs' drive keys (about 160 generations) found legal puts of 6.1-6.8 m. Each of them, however, passes a hand through the robot's own body: the right thumb goes up to 4.7 cm into the right shoulder during the crouch, and the left hand up to 6.8 cm into the right hip in the follow-through. With a penalty for that, no clean put was found. Even the start stance already has the right thumb 2.4 cm inside the right shoulder. Positive by a declared magic action. The real parts: the stance held by the walking policy with the shot on the open right palm, then after the release the walk backwards out of the rear half and the stand. The injected part, once at 0.5 s: the shot's velocity on the palm set to 8.0 m/s at 38 deg along the robot's heading. It leaves the palm at 7.9 m/s from 1.58 m (push fraction 0.78) and lands 6.29 m from the rim; the same state hash twice. Negatives: nop (time), a 1 m/s put (touched after the release), 30 deg to the side (outside the sector); the former referee-test negatives (arm lowered or taken back, the other hand, the stop board, short, a fall after the landing) still apply.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0

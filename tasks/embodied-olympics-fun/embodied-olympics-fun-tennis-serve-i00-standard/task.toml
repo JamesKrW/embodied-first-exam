@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-tennis-serve-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics tennis-serve on the same frozen instance as embodied-olympics-fun-tennis-serve-i00-privileged. Serve: from behind your baseline, release the tennis ball from your left gripper, strike it with the racket held in your right gripper before it reaches the ground, and send it over the net into the service box diagonally opposite. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics tennis-serve on the same frozen instance as embodied-olympics-fun-tennis-serve-i00-privileged. Serve: from behind your baseline, release the tennis ball from your left hand, strike it with the racket held in your right hand before it reaches the ground, and send it over the net into the service box diagonally opposite. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "tennis-serve"]
 
@@ -33,8 +33,8 @@ protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 50
 expert_time_estimate_hours = 12.0
-oracle = "full"
-oracle_evidence = "Reference: an underarm serve with the friction-held racket: 13.27 m/s, over the net by 2.3 m into the diagonal box, success after 3.5 s. The net is a mechanism (cable beads under 1.89 kN, hanging mesh panels of a 6.4 kg net, a centre strap). Referee test (all physics but the injected ball states): balls into the net stop and drop on the server's side; a net cord at 10 m/s 2 cm over the band clips it and lands in the box (a let, replayed with the spare ball taken from its cup); negatives: a second let, the posts, the box lines, the tees, touching the net, a fall. The privileged twin's reference rows (350 control steps, success after 3.5 s) streamed through the client."
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/roboolympics/tests/test_tennis_serve.py: Reference re-found for the H1-2's own Inspire hands at the device's forces (the racket's handle across the right palm, the ball in the left hand; no weld): the earlier underarm technique with the right arm's swing keys, two key times and the release re-searched by CMA-ES; the left hand opens at 1.27 s while the robot stands at rest, the ball falls and meets the racket (the frame, rule-legal) at 3.3 m/s, leaves at 16.3 m/s, clears the net by 0.28 m and lands in the box at (15.46, 4.04); success at 2.76 s; the same state hash twice. Also a declared magic-action run (the toss moved onto the head's path, the outgoing velocity set) for the referee's details. Negatives: nop (time, the ball held), the left hand opened (the ball dropped unstruck), the right hand opened (the racket left the hand at 0.36 s); stress: random arm targets with the hands closed, the handle at most 0.43 mm into the fingers.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -74,7 +74,7 @@ sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0

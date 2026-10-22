@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-tennis-return-i00-privileged"
-description = "Embodied Olympics tennis-return (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Return the serve: after the tennis ball has bounced once in your service box, hit it with the racket held in your right hand's gripper back over the net so that it lands in the singles court on the far side, without letting go of the racket. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics tennis-return (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Return the serve: after the tennis ball has bounced once in your service box, hit it with the racket held in your right hand back over the net so that it lands in the singles court on the far side, without letting go of the racket. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "tennis-return"]
 
@@ -20,8 +20,8 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
 expert_time_estimate_hours = 10.0
-oracle = "full"
-oracle_evidence = "Reference: walks 0.7 m, then a backhand with the free racket in the right Dex1-1, the swing at 3.99 s timed for the machine's serve; the two-wheel ball machine serves at 30.3 m/s, bouncing 2 cm from its target point, and the return lands 2.3 m past the net; 10 of 10 starts moved by up to 4 cm succeed. Negatives: two bounces, dropped, thrown, the racket out of the hand in the ball's path, the gripper, the forearm, a volley, a double hit, a carry, short, long, wide, into the net, through the net, line in and out, the racket on the post, the robot in the net, the far side, touched before the serve, a fall. Measured (make_oracles.py): success after 5.93 s of the 10 s limit, live and in a fresh replay, ending in the same state."
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_tennis_return.py: The right hand is the H1-2's own Inspire five-finger hand at the device's forces (no factor), the racket across the palm (tennis-serve's grip). The earlier reference backhand does not carry over (the racket now stands square to the forearm); a parameter search over the backhand's poses, timing and spot found swings that pass the bounced ball within about 5 cm of the strings but none that meets it, so the positive is a declared magic action: real, the machine's 30.3 m/s serve and its bounce and a backhand swing with the racket held by the hand's own drives; injected, after the bounce the ball moved (its velocity kept) onto the strings' path 0.04 s ahead, and after the real hit its velocity set to (15, 1, 7) m/s; it clears the net by 3.2 m and lands at (20.1, 2.2); the racket stays in the hand through the 14.8 m/s impact; the same state hash twice. Negatives: nop (two bounces), the hand opened (the racket leaves the hand at 0.06 s), a volley, the ball onto the robot. Stress: random arm targets on the walking policy: the racket is shaken out of the hand, the handle at most 1.0 mm into the fingers. Realtime: physics RTF about 1.6 on the reference workstation (estimated from a same-process comparison on the cluster), just above 1.5.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0

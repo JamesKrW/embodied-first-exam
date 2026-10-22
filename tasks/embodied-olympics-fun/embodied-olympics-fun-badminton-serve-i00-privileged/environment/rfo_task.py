@@ -5,8 +5,8 @@ whole shuttle below 1.15 m, the racket moving forwards, over the net into the re
 Official setting: the BWF court (13.40 m x 6.10 m, the singles side lines 5.18 m apart, the short service lines 1.98 m
 from the net, 40 mm lines), the net (1.524 m at the centre, 1.55 m at the posts on the doubles side lines, 0.76 m
 deep; a net of cord hung from its tensioned top cord, a mechanism: build_net), a feathered shuttle of Law 2 that flies in the venue's air, and a racket of Law 4 as a FREE body held only by
-the friction of the right hand's real gripper (Unitree Dex1-1, rfo/realhand.py); the shuttle starts pinched by its
-skirt in the left hand's gripper. Nothing is scaled to the robot.
+the contact and friction of the right hand, the G1's own Dex3-1 three-finger hand (rfo/realhand.py, "dex3", at the
+device's joint torques); the shuttle starts held by its skirt in the left Dex3-1. Nothing is scaled to the robot.
 
 Where the numbers come from:
 * the court, the net and the posts: Law 1 (all lines are part of the area they bound; the centre line is shared by the
@@ -61,7 +61,7 @@ from rfo.task import TaskBase
 # props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
 # SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
 # robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
-# With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 48 mm into the gripper, 80 mm into the
+# With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 48 mm into the hand, 80 mm into the
 # floor (stress test 2026-10-21).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
@@ -281,13 +281,18 @@ HEAD_A, HEAD_B = 0.140, 0.110                   # the frame's centre line (a 5 m
 STRINGS_A, STRINGS_B = RACKET["strung_length_m"] / 2, RACKET["strung_width_m"] / 2
 STRINGS_HALF = 0.004                            # the strings' collision plate: 8 mm thick (a fast cork must not tunnel)
 STRINGS_SOLREF = bounce_solref(0.5, 785.0)      # 785 rad/s (4 ms on the strings), the damping for e = 0.5
-GRIP_Z = 0.040                                  # the jaws' centre on the handle (from the butt): the butt at the
-#                                                 fingers' root, the 80 mm jaws on the handle's first 80 mm
-RACKET_CLOSURE = 1.0                            # the start's grip commands: the racket clamped at the full 120 N,
-SHUTTLE_CLOSURE = 0.365                         # the skirt pinched lightly (a few newtons)
-PINCH_S = 0.060                                 # where the left jaws pinch the skirt (s from the cork's tip)
+GRIP_Z = 0.040                                  # a point on the handle (from the butt): the racket_grip site
+# Where the racket and the shuttle sit in the hands (the grasp frame, rfo.realhand: x out of the palm, z along the
+# fingers, y = z x x): the racket's handle across the right palm along y (the head beyond the index finger's side),
+# the butt racket_butt_out_m before the grasp centre, the strings' normal the palm's; the shuttle's axis along the left
+# hand's y (the cork towards the side that is lower at the start: down, the left palm facing in), held round its
+# skirt at PINCH_S from the cork's tip, its axis shuttle_palm_off_m out of the palm (a search for the hold)
+GRIP = dict(racket_butt_out_m=0.05, racket_palm_off_m=0.0, shuttle_palm_off_m=0.012)
+RACKET_CLOSURE = 1.0                            # the start's grip commands: the racket held at the full command,
+SHUTTLE_CLOSURE = 1.0                           # the shuttle's skirt too (the fingers stop on it)
+PINCH_S = 0.060                                 # where the left hand holds the skirt (s from the cork's tip)
 # the start pose of the arms (left: shoulder pitch, roll, yaw, elbow, wrist roll, pitch, yaw; right: the same)
-START_LEFT = np.array([0.0, 0.1, 0.0, 0.0, 1.5708, 0.0, 0.0])
+START_LEFT = np.array([0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0])      # (the left palm facing in: the shuttle hangs)
 START_RIGHT = np.array([0.0, -0.1, 0.0, 0.0, 0.0, 1.0, 0.0])
 
 
@@ -316,8 +321,8 @@ def build_racket(sc, pos=(0.3, -0.4, 0.8)) -> None:
             friction="0.4 0.005 0.0001", **HITTABLE, **RIGID)
     # The strings' and the frame's bounce (STRINGS_SOLREF: 785 rad/s, e = 0.5) is the shuttle's contact with them only:
     # explicit pairs (the shuttle's own contact with the racket excluded). As the geoms' own contact it also held for
-    # the gripper's jaws, the floor and the robot, where a racket twisted in the jaws took up to 160 kN and 595 J and
-    # flew off at 32 m/s (stress test 2026-10-21); everywhere else the racket is a rigid graphite frame (RIGID).
+    # the hand, the floor and the robot, where a racket twisted in the hand took up to 160 kN and 595 J and flew off
+    # at 32 m/s (stress test 2026-10-21); everywhere else the racket is a rigid graphite frame (RIGID).
     contact = sc.root.find("contact")
     ET.SubElement(contact, "exclude", body1=SHUTTLE, body2="racket")
     for g in ["racket_strings"] + [f"racket_frame{i}" for i in range(n)]:
@@ -362,9 +367,10 @@ class Task(TaskBase):
         "Law 9.1 (some part of both feet in contact with the court in a stationary position): made measurable: from "
         "the start of the service to the hit each foot touches the floor (a gap of at most {foot_gap_s} s, the "
         "chatter of a contact, still counts as touching) and moves at most {foot_move_m} m",
-        "Law 9.1 (the server lets go of the shuttle and hits it): the shuttle starts pinched by its feathers in the "
-        "left hand's two-finger gripper and is let go by opening it; it counts as let go once it has touched nothing "
-        "of yours for {clear_s} s (the release is the moment it came free), so that the jaws' last brush as they open "
+        "Law 9.1 (the server lets go of the shuttle and hits it): the shuttle starts held by its feathers in the "
+        "left hand (the G1's three-finger hand) and is let go by opening it; it counts as let go once it has touched "
+        "nothing of yours for {clear_s} s (the release is the moment it came free), so that the fingers' last brush "
+        "as they open "
         "is part of the holding; so that the hand does not throw the service, the shuttle may move at most "
         "{drop_max_speed_m_s} m/s when it reaches the racket and must leave it faster than it came; one release per "
         "service (a shuttle that has been let go may be touched by nothing of yours but the racket)",
@@ -372,8 +378,9 @@ class Task(TaskBase):
         "the racket's first contact: the cork base must be touching the racket then (the feathers may touch it in the "
         "same step)",
         "Law 9.1 (the server's racket): the racket must be held in the right hand throughout the attempt: it counts "
-        "as held while it touches both jaws of the right gripper, and a break of at most {hold_gap_s} s (the contact "
-        "chatter of a fast swing) is still held",
+        "as held while it touches the right hand's fingers and its thumb or palm, and a break of at most "
+        "{hold_gap_s} s (the contact chatter of a fast swing) is still held; the hands are the G1's own Dex3-1 "
+        "three-finger hands at the device's joint torques",
         "Law 13 ('caught and held on the racket and then slung', 'hit twice'): made measurable: racket contacts less "
         "than {retouch_gap_s} s apart are one hit, a later one is a second hit, and a contact longer than "
         "{max_touch_s} s is a carry",
@@ -419,11 +426,11 @@ class Task(TaskBase):
         "it is {net_depth_m} "
         "m deep, with open space under it. The shuttle is a feathered shuttle (5.1 g, a cork base 26 mm across, 16 "
         "feathers whose tips form a circle 64 mm across) with a shuttle's heavy air drag (it falls at 6.8 m/s at "
-        "most) that turns it to fly cork first; it starts pinched by its feathers in your left hand's gripper, cork "
-        "down. The racket (0.67 m, 85 g, strung area 0.27 m by 0.21 m) is held in your right hand's gripper by "
-        "friction alone: it can slip, turn and fall. You serve from your right service court into the receiver's "
+        "most) that turns it to fly cork first; it starts held by its feathers in your left hand. The racket (0.67 m, "
+        "85 g, strung area 0.27 m by 0.21 m) is held in your right hand by contact and friction alone: it can slip, "
+        "turn and fall. Both hands are three-finger hands (a thumb, an index and a middle finger). You serve from your right service court into the receiver's "
         "right service court, the one diagonally opposite. The racket must stay in your right hand all the time: it "
-        "touches both of the gripper's jaws, and a break of more than {hold_gap_s} s is a fault. In order: (1) the "
+        "touches the hand's fingers and its thumb or palm, and a break of more than {hold_gap_s} s is a fault. In order: (1) the "
         "release: your left hand lets the shuttle go; it is let go once it has touched nothing of yours for "
         "{clear_s} s (the release is the moment it came free; until then it is still held), and from then on nothing "
         "of yours but the racket may touch it. (2) the hit: the racket hits the shuttle before it reaches the floor. "
@@ -458,12 +465,13 @@ class Task(TaskBase):
         "the back boundary line 6.70 m from the net. The receiver's right service court, your target, is beyond the "
         "net on the other side of the centre line: from {short_service_m} m to 6.70 m beyond the net, from the centre "
         "line to the singles side line 2.59 m to the left of the centre line's middle. Your forearms point forward; "
-        "your left gripper's jaws pinch the shuttle's feathers, the shuttle hanging cork down; your right gripper's "
-        "jaws clamp the racket's handle at its butt end, the handle along the fingers, the racket pointing forward "
-        "and down from the hand, its strings facing the way the jaws close.")
+        "your left hand, its palm facing in, holds the shuttle round its feathers, the shuttle hanging cork down "
+        "across the palm; your right hand holds the "
+        "racket's handle near its butt across the palm, the fingers and the thumb closed round it, the racket "
+        "pointing out of the index finger's side, its strings facing the way your palm does.")
     difficulty = ("The shuttle must leave the strings at about 9 m/s or more, 40 to 55 degrees upwards, to clear a "
                   "1.52 m net 2 m away from a hit below 1.15 m, and the G1 meets it only in the lower part of a swing "
-                  "whose racket is held by friction in a parallel gripper; the left gripper's reach and the racket's "
+                  "whose racket is held by friction in a three-finger hand; the left hand's reach and the racket's "
                   "path barely overlap, and the shuttle falls through it in a few hundredths of a second. The swing "
                   "must leave the feet where they stand and the robot on them, on a stand without balance feedback.")
 
@@ -509,15 +517,15 @@ class Task(TaskBase):
                   NET_AREA_DENSITY, 0.0, NET_TENSION, 0.0, NET_BAND_M, NET_SOLIDITY)
         build_shuttle(sc)
         build_racket(sc)
-        sc.real_hands["right"] = sc.real_hands["left"] = "dex1"
+        sc.real_hands["right"] = sc.real_hands["left"] = "dex3"
         sc.camera("venue", (-3.2, -3.4, 2.6), (nx + 1.0, cy + 0.6, 0.6), fovy=60)
 
-    # ------------------------------------------------------------------ the hands (Unitree Dex1-1, realhand.py)
+    # ------------------------------------------------------------------ the hands (the G1's Dex3-1, realhand.py)
     def may_grip(self, w, side, name):
-        return False                            # (both hands are grippers: nothing is grippable)
+        return False                            # (both hands are real hands: nothing is grippable)
 
     def _racket_in_hand(self, w, ref) -> bool:
-        """The racket has touched both jaws of the right hand within the last hold_gap_s (a swing's contact chatter
+        """The right hand has held the racket within the last hold_gap_s (a swing's contact chatter
         of a few milliseconds is not a release)."""
         t = self.trackers.get("racket_held")
         return t is not None and ref.time - t <= self.p["hold_gap_s"] + 1e-9
@@ -532,21 +540,22 @@ class Task(TaskBase):
         mujoco.mj_kinematics(w.m, d)
 
     def place(self, w):
-        """The racket's handle along the right hand's fingers (its butt at their root, the strings' normal on the
-        closing axis), the shuttle's skirt pinched across the left hand's jaws, cork down."""
-        c, R = w.jaw_frame("right")
+        """The racket's handle across the right palm (GRIP), the shuttle's skirt across the left palm, the cork
+        towards the lower side."""
+        c, R = w.grasp_frame("right")
+        Rr = np.c_[R[:, 0], -R[:, 2], R[:, 1]]          # racket x = the palm's normal, z = the handle = grasp y
         q = np.zeros(4)
-        mujoco.mju_mat2Quat(q, R.ravel())
-        w.put("racket", c - R[:, 2] * (GRIP_Z - 0.002 + 0.0), q)
-        c, R = w.jaw_frame("left")
-        # the shuttle's axis along the jaws' across-axis (R[:,1]) pointing down (the cork), the pinch at s = PINCH_S
+        mujoco.mju_mat2Quat(q, Rr.ravel())
+        w.put("racket", c - R[:, 1] * GRIP["racket_butt_out_m"] + R[:, 0] * GRIP["racket_palm_off_m"], q)
+        c, R = w.grasp_frame("left")
+        # the shuttle's +z (towards the cork) along the left hand's y, the lower way; held at s = PINCH_S
         down = R[:, 1] if R[2, 1] < 0 else -R[:, 1]
         x = R[:, 0]
         y = np.cross(down, x)
         Rs = np.c_[x, y, down]
         qs = np.zeros(4)
         mujoco.mju_mat2Quat(qs, Rs.ravel())
-        w.put(SHUTTLE, c - down * z_of(PINCH_S), qs)
+        w.put(SHUTTLE, c + R[:, 0] * GRIP["shuttle_palm_off_m"] - down * z_of(PINCH_S), qs)
 
     def reset(self, w):
         self.start_pose(w)

@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-clean-and-jerk-i00-privileged"
-description = "Embodied Olympics clean-and-jerk (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Clean and jerk the barbell: lift it from the platform to your shoulders, then to locked arms overhead, and hold it there motionless until the down signal. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics clean-and-jerk (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Clean and jerk the barbell: lift it from its blocks to your shoulders, then to locked arms overhead, and hold it there motionless until the down signal. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "clean-and-jerk"]
 
@@ -19,9 +19,9 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
-expert_time_estimate_hours = 8.0
-oracle = "full"
-oracle_evidence = "Reference: a 5 kg aluminium technique bar (declared: below the IWF 21 kg minimum) lifted by a quasi-static whole-body plan (lowcmd rows): squat, grip near the jaw tips, stand, clean to the rack (11.3 s), press overhead (17.4 s), the down signal at 19.5 s; 10 of 10 timing variations succeed (19.2-22.3 s). With the 15 kg women's bar the turnover needs 1.08-1.17x the elbow and shoulder torques; with 5 kg 0.54 (0.78 at most along the path). The friction hold keeps 49 N and lets 449 N slide out. Referee test negatives: one hand (a real run), let go, down before the signal, put down below the knee (no fault), no clean, bent elbows or knees, split feet, another part on the platform, off the platform. Measured (make_oracles.py): success after 19.59 s of the 60 s limit, live and in a fresh replay, ending in the same state."
+expert_time_estimate_hours = 14.0
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_clean_and_jerk.py: Both hands are the H1-2's own Inspire five-finger hands at the device's forces (no factor); a hand holds the bar while its fingers touch the 25 mm grip section. The 5 kg technique bar now rests by its sleeves on two 0.20 m lifting blocks (its axis at 0.225 m, a competition bar's height on its discs): on its collars 0.04 m above the platform the closing fingers touch the platform. Reference (real, lowcmd rows, a quasi-static whole-body plan): squats, closes both hands round the bar palms down, stands up with the bar's path 4 cm ahead (clear of the shins), cleans to the shoulders (11.3 s), presses overhead (17.5 s) and holds to the down signal: success at 20.5 s, the bar held by the hands' own drives throughout; 4 of 4 variations of its timing (x 0.9 to 1.1) succeed; the same state hash twice. Negatives: nop (time), the right hand never closed (the bar never comes up), both hands opened above knee height (let go), pushed over backwards (a body part on the platform), off the platform, the barbell on the floor, a foot on a block. Stress: random arm targets at the rack, the bar at most 0.6 mm into the hands. A heavier load is out: 10 kg (the bar on two 2.5 kg technique discs) topples the robot at the turnover; each hand holds a 25 mm bar against about 73 N along its fingers.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0

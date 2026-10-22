@@ -1,5 +1,6 @@
 """Rope skipping (the one-minute rope skipping test of the Chinese National Student Physical Fitness Standard): the
-robot turns a beaded rope by its two handles, held in its grippers, and jumps it, forwards, both feet together."""
+robot turns a beaded rope by its two handles, held in its own Dex3-1 hands (rfo.realhand, "dex3": a thumb, an index
+and a middle finger, contact and friction only), and jumps it, forwards, both feet together."""
 import math
 import xml.etree.ElementTree as ET
 
@@ -19,6 +20,8 @@ SIDES = ("left", "right")
 FLOOR = (0.80, 0.62, 0.40, 1)           # a sports hall's wooden floor (looks.py dresses it as wood)
 ROPE_RGBA = ((0.85, 0.15, 0.15, 1), (0.95, 0.95, 0.95, 1))     # beads alternate in two colours
 HANDLE_RGBA = (0.10, 0.25, 0.75, 1)
+HANDLE_ALONG_FINGERS_M = -0.01  # the handle's axis this far from the hand's grasp centre towards the wrist (a search
+#                                 over placements: where the closed fingers and thumb hold it)
 ROPE_SELF_COLLISION = True      # the rope's segments collide with each other (a rope that crosses itself does not
 #                                 pass through; not a segment with its tied neighbours, which it overlaps at the pivot)
 
@@ -96,8 +99,9 @@ class Task(TaskBase):
         "feels the air's drag and collides with itself, the floor and the robot. Its two plastic handles are "
         "{handle_length_m} m long and {handle_mass_kg} kg each, "
         "with the rope on a swivel at their far ends.",
-        "Hands: the robot's hands are Unitree Dex1-1 two-finger grippers. Each handle is held between the jaws "
-        "only by their friction, so it can slip out or be dropped.",
+        "Hands: the robot's hands are its own Unitree Dex3-1 three-finger hands (1.37 N m back-driven per finger "
+        "joint, at the device's torques). Each handle lies across the palm, the fingers and the thumb closed round "
+        "it, held only by their contact and friction, so it can slip out or be dropped.",
         "Judging: a judge's eye is replaced by geometry, checked at every 1 ms physics step. The rope passes under a "
         "foot when its point at that foot's sideways position crosses, from front to back, the upright plane "
         "across the robot's heading through the foot, lower than the foot's lowest point (plus the rope's "
@@ -106,7 +110,7 @@ class Task(TaskBase):
         "leaves to the judge's eye: the rope must move backwards at {min_rope_speed_m_s} m/s or more as it passes "
         "(a turning rope, not a hop over a still one), under the second foot within {pass_window_s} s of the first, "
         "and both feet must leave the floor within {two_foot_window_s} s of each other (a two-foot jump).",
-        "Timing: the minute runs from t = 0, with the robot standing, a handle in each gripper and the rope on the "
+        "Timing: the minute runs from t = 0, with the robot standing, a handle in each hand and the rope on the "
         "floor behind its heels. The attempt ends with success once the robot has landed on its feet after the "
         "{count}th jump and stood still for {stand_s} s (the families' land-and-stand rule), without waiting for "
         "the end of the minute.",
@@ -116,13 +120,13 @@ class Task(TaskBase):
     stages = [f"jump {i + 1}" for i in range(17)] + ["stand"]
     params = dict(count=17, rope_length_m=2.13, rope_mass_kg=0.10, n_seg=28, rope_radius_m=0.00475,
                   rope_twist_inertia=2e-6, rope_tie_solref_s=0.004, rope_solref_s=0.004, rope_friction=0.4,
-                  handle_length_m=0.15, handle_radius_m=0.014, handle_mass_kg=0.04, handle_inside_m=0.033, closure=1.0,
+                  handle_length_m=0.15, handle_radius_m=0.014, handle_mass_kg=0.04, handle_inside_m=0.05, closure=1.0,
                   rope_drag_cd=1.2, rope_behind_m=0.25, two_foot_window_s=0.10, pass_window_s=0.15, min_rope_speed_m_s=1.0,
                   release_s=0.05, stand_s=1.0, fall_z_m=0.35)
 
     sentence = ("Skip rope: turn the rope forwards with both hands, over your head and under your feet, and jump it "
                 "with both feet together, {count} times within one minute.")
-    rules = ("You hold a skipping rope by its two handles, one in each of your two-finger grippers. Turn it forwards: "
+    rules = ("You hold a skipping rope by its two handles, one in each of your three-finger hands. Turn it forwards: "
              "over your head from back to front, then down in front of you and under your feet from front to back. "
              "A jump counts when the rope, after passing over your head, passes under both feet while nothing of you "
              "touches the floor, and your take-off was two-footed: both feet left the floor within "
@@ -140,18 +144,18 @@ class Task(TaskBase):
              "over your head again before the next jump. After your {count}th counted jump you must land on your "
              "feet (the first thing of you to touch the floor) and then stand for {stand_s} s without a break: only "
              "your feet on the floor, your torso within about 20 degrees of vertical, your pelvis slower than "
-             "0.35 m/s; then you succeed. You fail if you let go of a handle (a handle out of its gripper's jaws for "
-             "more than {release_s} s, or a handle touching the floor), if the last landing is not on your feet, if "
+             "0.35 m/s; then you succeed. You fail if you let go of a handle (a handle out of its hand for more than "
+             "{release_s} s: not touching that hand's fingers and its thumb or palm; or a handle touching the floor), if the last landing is not on your feet, if "
              "you fall (your pelvis lower than {fall_z_m} m, or any part of you other than your feet on the floor), "
              "or after {time_limit_s} s.")
-    venue = ("You stand facing +x on the level wooden floor of a sports hall. In each gripper you hold a handle "
-             "({handle_length_m} m long, 0.028 m thick) along the fingers, its far end about 0.08 m beyond the finger "
-             "tips, where the rope is attached on a swivel. The rope is {rope_length_m} m long and {rope_mass_kg} kg, "
+    venue = ("You stand facing +x on the level wooden floor of a sports hall. In each hand you hold a handle "
+             "({handle_length_m} m long, 0.028 m thick) across the palm, the fingers closed round it, its far end "
+             "about 0.07 m beyond the index finger's side, where the rope is attached on a swivel. The rope is {rope_length_m} m long and {rope_mass_kg} kg, "
              "made of plastic beads 9.5 mm thick. It hangs from each handle straight down to the floor and lies on "
              "the floor behind your heels in a bow whose middle is about {rope_behind_m} m behind your pelvis or "
              "further. Nothing else is near you.")
     difficulty = ("Every jump needs two skills at once. The arms must keep a light, floppy rope turning at a steady "
-                  "speed through grippers that hold it only by friction. The legs must make a two-footed hop, about "
+                  "speed through hands that hold it only by friction. The legs must make a two-footed hop, about "
                   "0.1 m high and timed to within a tenth of a second, to the rope coming under the feet. Then the "
                   "robot must land and do it again {count} times without falling. Neither built-in gait can hop, "
                   "and a rope that stops on a shin or a toe has to be started again from behind.")
@@ -178,8 +182,8 @@ class Task(TaskBase):
         hl, hr, hm = p["handle_length_m"], p["handle_radius_m"], p["handle_mass_kg"]
         N, l, r = int(p["n_seg"]), self.seg_len(), p["rope_radius_m"]
         mseg = p["rope_mass_kg"] / N
-        for s in SIDES:                               # Unitree's Dex1-1 grippers: the handles are held by friction
-            sc.real_hands[s] = "dex1"
+        for s in SIDES:                               # the G1's Dex3-1 hands: the handles are held by friction
+            sc.real_hands[s] = "dex3"
         # qpos0 is only a reference (reset() places everything): the handles high above the floor, side by side
         for s, y in (("left", 0.6), ("right", -0.6)):
             b = sc.body(f"handle_{s}", (0.0, y, 1.8), free=True)
@@ -218,12 +222,14 @@ class Task(TaskBase):
         sc.camera("side", (0.0, -3.2, 0.8), (0.0, 0.0, 0.7), fovy=45)
 
     # ------------------------------------------------------------------ t = 0
-    def handle_in_jaws(self, w, side):
-        """(position, quaternion) of a handle between the jaws at t = 0: along the fingers (its axis on the jaws'
-        centre line), its inner end handle_inside_m from the jaws' centre towards the wrist, the swivel end beyond the
-        finger tips."""
-        c, R = w.jaw_frame(side)
-        ax = R[:, 2]
+    def handle_in_hand(self, w, side):
+        """(position, quaternion) of a handle in the hand at t = 0: across the palm (its axis the hand's grasp frame's
+        y through the grasp centre), its inner end handle_inside_m beyond the grasp centre on the middle finger's
+        side, the swivel end beyond the index finger's side (the grasp frame's y points to the middle finger on the
+        left hand, to the index finger on the right)."""
+        c, R = w.grasp_frame(side)
+        c = c + R[:, 2] * HANDLE_ALONG_FINGERS_M
+        ax = R[:, 1] * (-1.0 if side == "left" else 1.0)
         centre = c + ax * (self.p["handle_length_m"] / 2 - self.p["handle_inside_m"])
         q, _ = _quat_from_x(ax)                                 # a frame with x = the handle's axis ...
         q = _qmul(q, np.array([math.cos(math.pi / 4), 0, math.sin(math.pi / 4), 0]))   # ... its z the axis
@@ -264,7 +270,7 @@ class Task(TaskBase):
         hl = self.p["handle_length_m"]
         sw = {}
         for s in SIDES:
-            c, q = self.handle_in_jaws(w, s)
+            c, q = self.handle_in_hand(w, s)
             w.put(f"handle_{s}", c, q)
             R = np.zeros(9)
             mujoco.mju_quat2Mat(R, q)
@@ -302,7 +308,7 @@ class Task(TaskBase):
             "prev": {"left": None, "right": None, "head": None},   # signed distance of the rope's point past the plane
             "under": {},                # the feet the rope has passed under since its last pass over the head
             "on_ground": {"left": 0.0, "right": 0.0},              # when each foot last touched the ground
-            "unheld": {"left": None, "right": None},               # since when a handle has not been in its jaws
+            "unheld": {"left": None, "right": None},               # since when a handle has not been in its hand
             "turns": 0.0, "angle": None, "landing": False, "landed": False,
         }
 
@@ -382,7 +388,7 @@ class Task(TaskBase):
             if ref.touching(self._feet[s], ground):
                 tr["on_ground"][s] = t
         airborne = not ref.touching(self._robot, ground)
-        for s in SIDES:                                  # a handle out of its jaws (or on the ground)
+        for s in SIDES:                                  # a handle out of its hand (or on the ground)
             if ref.touching(self._handles[s], ground):
                 return ref.fail("let go of a handle", hand=s, why="the handle touched the ground")
             if w.held[s] == f"handle_{s}":

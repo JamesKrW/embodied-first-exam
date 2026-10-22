@@ -11,7 +11,9 @@ the down rule, the finish), with the hurdle's plane and top defined for a hurdle
 its standing pose on its mark (the plane of its top bar there, its top's height), wherever it is now; it may leave its
 standing pose only by a legal knock (a leg on its top bar while the robot is in the air or its pelvis is already over),
 never pushed, kicked or shoved along the track first, never by hand or body; and the robot may not climb on it (the
-hurdle carrying it, measured by the contact force)."""
+hurdle carrying it, measured by the contact force). One rule is stricter than TR 22.6: at least one hurdle must be
+cleared cleanly (gone over and still in its standing pose at the finish); knocking down every hurdle fails, the
+moment the last one leaves its standing pose."""
 import math
 
 import mujoco
@@ -140,6 +142,11 @@ class Task(TaskBase):
         "top bar, or its pelvis is over the hurdle's plane); any other displacement before "
         "the hurdle is gone over (pushed, kicked or shoved along the track first, from the ground) is a failure: "
         "the athlete did not go over that hurdle as it stood",
+        "TR 22.6 / 22.7 (knocking hurdles down with the legs is no offence): stricter here in one way only: an "
+        "attempt in which every hurdle is knocked down (each leaves its standing pose, a point of its top bar more "
+        "than {displaced_m} m from where it stood) fails at the moment the last one does, so at least one hurdle "
+        "is cleared cleanly (gone over and still standing on its mark at the finish); a race that only knocks the "
+        "hurdles over is not judged a hurdle clearance for a robot that cannot be watched for intent",
         "TR 17.3 (lanes): the lane is judged by the pelvis (its centre more than half a lane width from the "
         "lane's centre line); TR 22.6.1 is judged on the centres of the legs' collision bodies within "
         "{beside_m} m of the hurdle's plane",
@@ -166,7 +173,8 @@ class Task(TaskBase):
                   strike_s=0.15, beside_m=0.10, down_z_m=0.40, down_limit_s=10.0)
 
     sentence = ("Run the 50 m hurdles over four free-standing hurdles: go over each one in your lane, never beside "
-                "it, under its top, or after pushing it away, and bring your torso to the finish line.")
+                "it, under its top, or after pushing it away, leave at least one of them standing, and bring your "
+                "torso to the finish line.")
     rules = ("World Athletics rules for the hurdles, at the indoor distance of 50 m. The lane runs along +x, "
              "{lane_width_m} m wide, centred on y = 0; the start line ({start_line_m} m wide) has its far edge at "
              "x = 0, the finish line is x = {distance_m} m. {hurdles} hurdles stand across the lane, the face of "
@@ -193,7 +201,8 @@ class Task(TaskBase):
              "you touch nothing else but that hurdle's top bar (in the air) or once your pelvis is over the "
              "hurdle's plane; a hurdle tipped more than "
              "{knocked_deg} degrees is counted as down, without a fault. Where a hurdle comes to rest after that "
-             "does not matter. You finish at the moment the leading point of your torso (the "
+             "does not matter. But at least one hurdle must be cleared cleanly: if every hurdle has left its "
+             "standing pose (knocked, also legally), you fail at the moment the last one does. You finish at the moment the leading point of your torso (the "
              "trunk and head hull; not the arms, legs or feet) reaches the finish line, with all hurdles gone "
              "over. You succeed with a finish within {time_limit_s} s of robot time. A fall does not end the race: "
              "you are down while your pelvis is below {down_z_m} m, you may get up and go on, but {down_limit_s} s "
@@ -211,7 +220,7 @@ class Task(TaskBase):
              "have not yet gone over leaves its standing pose in any other way than the legal knock above "
              "(pushed, kicked or shoved along the track before you went over it); if your pelvis is more than "
              "half the lane's width from y = 0; if your torso reaches the finish line before every hurdle is gone "
-             "over; when down for {down_limit_s} s; or "
+             "over; if you knock down every hurdle; when down for {down_limit_s} s; or "
              "after {time_limit_s} s.")
     venue = ("You stand in your lane facing the finish (+x), the front ends of your feet {toe_gap_m} m behind the "
              "start line, your pelvis 0.23 m behind it. The lane lines are white on a red track; the hurdles' top "
@@ -222,7 +231,8 @@ class Task(TaskBase):
                   "whole pelvis above 1.067 m and each foot lifted a metre, on a body of 67 kg whose only built-in "
                   "gait walks at 0.7 m/s and drifts in heading. The hurdles are loose: a clipped bar tips one into "
                   "the landing, where it lies as an obstacle, and walking up to one shoves it away, which is a "
-                  "failure.")
+                  "failure. Knocking a hurdle down is allowed, but not all four: at least one must be jumped "
+                  "cleanly.")
 
     # ------------------------------------------------------------------ the venue
     def hurdle_x(self):
@@ -283,7 +293,8 @@ class Task(TaskBase):
         for i, x in enumerate(self.hurdle_x()):
             self._hurdle(sc, f"hurdle{i + 1}", x)
         sc.camera("venue", (D / 2, -(6.0 + 0.36 * D), 3.0 + 0.14 * D), (D / 2, 0.0, 0.0), fovy=62)
-        sc.camera("first_hurdle", (11.0, -3.2, 1.6), (13.9, 0.0, 0.55), fovy=55)
+        x1 = self.hurdle_x()[0]                          # the first hurdle from the side, behind the robot's lane
+        sc.camera("first_hurdle", (round(x1 - 2.72, 2), -3.2, 1.6), (round(x1 + 0.18, 2), 0.0, 0.55), fovy=55)
 
     def reset(self, w):
         for i, x in enumerate(self.hurdle_x()):          # each hurdle on its mark, standing, at rest
@@ -470,6 +481,8 @@ class Task(TaskBase):
                 return ref.fail(f"displaced the {ORD[i]} hurdle before going over it", **info)
             tr["moved"] = sorted(tr["moved"] + [i])
             ref.event("hurdle_knocked", hurdle=i + 1, **info)
+            if len(tr["moved"]) == self.n_hurdles:       # stricter than TR 22.6: at least one hurdle cleared cleanly
+                return ref.fail("knocked down every hurdle: none cleared cleanly", hurdles=self.n_hurdles)
         if len(tr["down"]) < self.n_hurdles:
             up = w.d.xmat[self.hbody, 8]
             for i in np.flatnonzero(up < math.cos(math.radians(p["knocked_deg"]))):
@@ -485,7 +498,7 @@ class Task(TaskBase):
             dt = w.m.opt.timestep
             t = ref.time - 2 * dt + (D - f0) / (f1 - f0) * dt
             ref.metrics["time_s"] = round(t, 3)
-            if ref.stage("finish", time_s=round(t, 3)):
+            if ref.stage("finish", time_s=round(t, 3), hurdles_clean=self.n_hurdles - len(tr["moved"])):
                 ref.succeed()
 
     def step(self, w, ref):

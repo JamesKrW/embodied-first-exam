@@ -20,8 +20,8 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
 expert_time_estimate_hours = 4.0
-oracle = "full"
-oracle_evidence = "Reference: a straight punch from the guard with the trunk's turn behind it, the wrist pitched so that the end of the fist leads, then the walking policy at zero command; the bag receives 15.5 N s (12 required) at 1.28 m in a 0.056 s touch and the fist is back at the guard at 4.0 s. All 10 variations tried around it score (13.0-16.8 N s: trunk angles, punch timing, wrist angle, the bag 1.5 cm nearer or farther), but the working region is narrow: in a wider grid of timing, trunk turn and wrist angle 26 of 36 settings score (the others touch with the hand first, land below the band or are too weak). Measured (make_oracles.py): success after 4.03 s of the 15 s limit, live and in a fresh replay, ending in the same state."
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_boxing.py: Reference: a straight punch from the guard with the trunk's turn behind it, the wrist pitched so that the end of the fist leads, then the walking policy at zero command; the bag receives 15.5 N s (12 required) at 1.28 m in a 0.056 s touch and the fist is back at the guard at 4.0 s. All 10 variations tried around it score (13.0-16.8 N s: trunk angles, punch timing, wrist angle, the bag 1.5 cm nearer or farther), but the working region is narrow: in a wider grid of timing, trunk turn and wrist angle 26 of 36 settings score (the others touch with the hand first, land below the band or are too weak).; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0

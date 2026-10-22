@@ -1,15 +1,15 @@
 """Juggle three balls: the three-ball cascade (each ball thrown from one hand in an arc to the other; ten catches in a
-row in the cascade's order, no ball on the ground). Both hands of the Unitree G1 are Unitree Dex1-1 two-jaw grippers
-(rfo/realhand.py, sold for the G1) and nothing is welded: a catch is the jaws of a gripper closing on the ball (70 mm:
-it fits the 90 mm stroke) and holding it for clamp_s, a ball is thrown by opening the jaws and moving the hand, and a
-ball in a hand is held only by the pads' friction and the gripper it rests on; it touches nothing of you but that
-gripper. The start pose has the jaws pointing up (a cup).
+row in the cascade's order, no ball on the ground). Both hands are the G1's own Unitree Dex3-1 three-finger hands
+(rfo/realhand.py, "dex3") and nothing is welded: a catch is the hand closing on the ball (70 mm) so that its thumb and
+its fingers hold it from opposite sides for clamp_s, a ball is thrown by opening the hand and moving the arm, and a
+ball in a hand is held only by the contact and friction of that hand; it touches nothing of you but that hand. The
+start pose has the palms up and the fingers forwards (a cup).
 
-A gripper holds one ball, so the cascade's start (two balls in one hand) is modelled: the third ball (red) is thrown
-into the left gripper by a small two-wheel ball machine on the ground in front of the robot (the shared ball machine
-block below, preset "juggling": wheels on speed-controlled, torque-limited motors, the ball fed by a gate and a
-force-limited ram; nothing pinned, no velocity written), on a lob that comes down on where the left gripper's jaw
-centre is at the start (its aim trimmed in this world: machine_* params, tests/test_juggle_three.py)."""
+The robot holds one ball per hand, so the cascade's start (two balls in one hand) is modelled: the third ball (red)
+is thrown into the left hand by a small two-wheel ball machine on the ground in front of the robot (the shared ball
+machine block below, preset "juggling": wheels on speed-controlled, torque-limited motors, the ball fed by a gate and
+a force-limited ram; nothing pinned, no velocity written), on a lob that comes down on where the left hand's grasp
+centre is at the start (the machine's aim trimmed for that point: machine_* params)."""
 import math
 
 import mujoco
@@ -748,13 +748,12 @@ COLOURS = ((0.90, 0.20, 0.20, 1), (0.20, 0.55, 0.90, 1), (0.95, 0.80, 0.15, 1))
 OTHER = {"left": "right", "right": "left"}
 SIDES = ("left", "right")
 G = 9.81
-# the start pose: forearms forward, a little below level, the wrists turned so that the jaws point up and close
-# across the body (left-right); the jaw centres about 0.24 m in front of the pelvis, 0.37 m apart, 1.08 m high
-# (found by a search over the arm's joints: the jaw axis within 2 degrees of vertical)
-CUP = {"right": dict(right_shoulder_pitch=-0.207, right_shoulder_roll=-0.04, right_shoulder_yaw=-0.218,
-                     right_elbow=0.198, right_wrist_roll=-1.565, right_wrist_pitch=-0.163, right_wrist_yaw=-1.534),
-       "left": dict(left_shoulder_pitch=-0.228, left_shoulder_roll=-0.056, left_shoulder_yaw=0.39,
-                    left_elbow=0.181, left_wrist_roll=-1.45, left_wrist_pitch=0.309, left_wrist_yaw=-1.534)}
+# the start pose: forearms forward, a little below level, the palms up and the fingers forwards; the hands' grasp
+# centres about 0.24 m in front of the pelvis, 0.37 m apart, 1.08 m high (found by inverse kinematics on the arms)
+CUP = {"right": dict(right_shoulder_pitch=-0.1127, right_shoulder_roll=-0.0526, right_shoulder_yaw=-0.2787,
+                     right_elbow=-0.8567, right_wrist_roll=1.7924, right_wrist_pitch=0.122, right_wrist_yaw=-0.9866),
+       "left": dict(left_shoulder_pitch=-0.0513, left_shoulder_roll=0.5046, left_shoulder_yaw=-0.0391,
+                    left_elbow=-0.8567, left_wrist_roll=-1.8805, left_wrist_pitch=-0.4081, left_wrist_yaw=0.835)}
 
 
 def set_arm(w, **angles) -> None:
@@ -767,19 +766,9 @@ def set_arm(w, **angles) -> None:
     mujoco.mj_kinematics(w.m, d)
 
 
-def pinched(w, ball: int, pads, centre: int, cos_max: float) -> bool:
-    """Both jaws' pads (two geom masks) touch the geom `ball` with a contact normal within acos(cos_max) of the
-    closing axis of the jaw frame (the site `centre`), in this physics step's contacts."""
-    d = w.d
-    n = d.ncon
-    g = d.contact.geom[:n]
-    keep = d.contact.dist[:n] <= 0.0
-    x = d.site_xmat[centre].reshape(3, 3)[:, 0]
-    for pad in pads:
-        sel = keep & (((g[:, 0] == ball) & pad[g[:, 1]]) | ((g[:, 1] == ball) & pad[g[:, 0]]))
-        if not np.any(np.abs(d.contact.frame[:n][sel, :3] @ x) >= cos_max):
-            return False
-    return True
+# the ball in a closed hand at the start: its centre from the hand's grasp centre along the palm's normal and
+# along the fingers (m; a search: the hand closes on it and holds it standing)
+BALL_IN_HAND = (0.02, 0.02)
 
 
 class Task(TaskBase):
@@ -792,21 +781,20 @@ class Task(TaskBase):
                 "other, the hands throw in turn, the balls follow one another in a fixed order; a run ends with a "
                 "drop")
     deviations = [
-        "The hands are Unitree's Dex1-1 two-jaw grippers (90 mm stroke, jaws 80 mm long and 34 mm wide with rubber "
-        "pads, at most 120 N of grip, opening and closing at most 375 mm/s); nothing is welded. A gripper holds one "
-        "ball between its jaws, so \"two balls in one hand at the start\" is modelled: the third ball (the red one) is "
-        "thrown into the left gripper by a small two-wheel ball machine on the ground {machine_x_m} m in front of you "
-        "at about t = {launch_time_s} s, on a lob about {lob_apex_m} m above the jaws that comes down on where the "
-        "left gripper's jaw centre is at the start; its first catch counts as a catch of a ball thrown by the right "
-        "hand. Until it is thrown it may not be touched.",
-        "A catch is the pads of both jaws of the catching gripper pressing on the ball from its two sides (each with "
-        "a contact within {max_contact_angle_deg} degrees of the jaws' closing direction) for {clamp_s} s without a "
-        "break, the clamp beginning at the latest {catch_window_s} s after the ball first touched you again; a ball "
-        "is in a hand from its catch until it has touched nothing of that gripper for {release_s} s (released, at its "
-        "last contact: a ball that rattles in the jaws is not released), and it may touch nothing of you but that "
-        "gripper.",
+        "The hands are the G1's own Dex3-1 three-finger hands (a thumb, an index and a middle finger; 1.37 N m "
+        "back-driven per finger joint, at the device's torques); nothing is welded. The robot holds one ball per hand, "
+        "so \"two balls in one hand at the start\" is modelled: the third ball (the red one) is thrown into the left "
+        "hand by a small two-wheel ball machine on the ground {machine_x_m} m in front of you at about t = "
+        "{launch_time_s} s, on a lob about {lob_apex_m} m above the hand that comes down on where the left hand's "
+        "grasp centre is at the start; its first catch counts as a catch of a ball thrown by the right hand. Until it "
+        "is thrown it may not be touched.",
+        "A catch is the catching hand holding the ball between its thumb and its fingers (the ball touching the "
+        "thumb and the index or middle finger) for {clamp_s} s without a break, the hold beginning at the latest "
+        "{catch_window_s} s after the ball first touched you again; a ball is in a hand from its catch until it has "
+        "touched nothing of that hand for {release_s} s (released, at its last contact: a ball that rattles in the "
+        "hand is not released), and it may touch nothing of you but that hand.",
         "A throw is a release after which the ball, touching nothing, rises at least {min_rise_m} m above where it "
-        "left the gripper; a hand-to-hand pass is not a throw. So that a ball laid on the other hand and lifted is "
+        "left the hand; a hand-to-hand pass is not a throw. So that a ball laid on the other hand and lifted is "
         "not one, the rise counts only until the ball first touches you again.",
         "The balls are spheres of a juggling ball's size and mass with a soft bounce; they fly in air (MuJoCo's "
         "ellipsoid fluid model: drag, a quasi-steady model), still air.",
@@ -818,60 +806,58 @@ class Task(TaskBase):
                   machine_x_m=1.0, machine_y_m=0.185, machine_z_m=0.55, machine_speed_m_s=4.5454,
                   machine_elevation_deg=76.0, machine_azimuth_deg=0.1024, feed_lead_s=0.13, lob_apex_m=0.4,
                   retouch_grace_s=0.10, catch_window_s=0.15,
-                  clamp_s=0.05, release_s=0.02, max_contact_angle_deg=45.0, fall_pelvis_m=0.35)
+                  clamp_s=0.05, release_s=0.02, fall_pelvis_m=0.35)
 
-    sentence = ("Juggle three balls in a cascade: throw each ball from one gripper in an arc to the other, the hands in "
-                "turn, catching each between the jaws, until {catches} catches have been made in a row.")
-    rules = ("Three balls ({ball_diameter_m} m across, {ball_mass_kg} kg). Both your hands are two-jaw grippers (90 mm "
-             "stroke, jaws 80 mm long with rubber pads on their inner faces, at most 120 N of grip) that hold things "
-             "only by friction. At the start your forearms point forwards and your grippers' jaws point up; the blue "
-             "ball is held between the jaws of your left gripper, the yellow ball between those of your right "
-             "gripper, and the red ball rests in a small ball machine on the ground {machine_x_m} m in front of you: "
-             "it stands for the second ball of the right hand and is thrown for you at about t = {launch_time_s} s "
-             "(it is thrown when it has left the machine's wheels), on a lob about {lob_apex_m} m above your jaws "
-             "that comes down on where the centre of your left gripper's jaws is at the start. Before that it may not "
-             "be touched (by you or by a ball you hold). A catch: the pads of "
-             "both jaws of a gripper press on a ball from its two sides (each with a contact whose direction is "
-             "within {max_contact_angle_deg} degrees of the jaws' closing direction: a ball lying on the jaws' tips "
-             "or edges is not caught) for {clamp_s} s without a break, on a ball that has been thrown by the other "
-             "hand (the red ball's first throw counts as the right hand's), the clamp beginning at the latest "
-             "{catch_window_s} s after the ball first touched you again. A ball is in a hand from its catch (the "
-             "blue and the yellow ball from the start) until it has touched nothing of that gripper for {release_s} s: "
-             "its release, at its last contact with the gripper; "
-             "a ball in a hand may touch nothing of you but that gripper. A throw: after the release the ball, "
-             "touching nothing but air, rises at least {min_rise_m} m above the point where it left the gripper; "
+    sentence = ("Juggle three balls in a cascade: throw each ball from one hand in an arc to the other, the hands in "
+                "turn, catching each in the hand, until {catches} catches have been made in a row.")
+    rules = ("Three balls ({ball_diameter_m} m across, {ball_mass_kg} kg). Both your hands are three-finger hands (a "
+             "thumb, an index and a middle finger) that hold things only by contact and friction. At the start your "
+             "forearms point forwards, your palms up; the blue ball is held in your left hand, the yellow ball in "
+             "your right hand, and the red ball rests in a small ball machine on the ground {machine_x_m} m in front "
+             "of you: it stands for the second ball of the right hand and is thrown for you at about t = "
+             "{launch_time_s} s (it is thrown when it has left the machine's wheels), on a lob about {lob_apex_m} m "
+             "above your hand that comes down on where the centre of your left hand's grasp is at the start. Before "
+             "that it may not be touched (by you or by a ball you hold). A catch: a hand holds a ball between its "
+             "thumb and its fingers (the ball touches the thumb and the index or middle finger: a ball lying on the "
+             "palm or on the fingers alone is not caught) for {clamp_s} s without a break, on a ball that has been "
+             "thrown by the other hand (the red ball's first throw counts as the right hand's), the hold beginning at "
+             "the latest {catch_window_s} s after the ball first touched you again. A ball is in a hand from its "
+             "catch (the blue and the yellow ball from the start) until it has touched nothing of that hand for "
+             "{release_s} s: its release, at its last contact with the hand; "
+             "a ball in a hand may touch nothing of you but that hand. A throw: after the release the ball, "
+             "touching nothing but air, rises at least {min_rise_m} m above the point where it left the hand; "
              "only the rise before the ball first touches you again counts. The cascade's order: the catches "
              "alternate between the hands, the left hand first, and take the balls in the order red, blue, yellow, "
              "red, ... You succeed at the {catches}th catch. You fail if a ball touches the ground; if a ball in a "
-             "hand touches any part of you other than that gripper (the other gripper included); if a ball in flight "
-             "touches any part of you other than a gripper, or still touches the gripper that released it later than "
-             "{retouch_grace_s} s after the release; if a ball is caught by the gripper that released it, or before "
-             "it has risen {min_rise_m} m; if a ball that has touched a gripper again is not clamped within "
-             "{catch_window_s} s (it rests on the gripper or bounces off it); if a catch is out of the cascade's "
+             "hand touches any part of you other than that hand (the other hand included); if a ball in flight "
+             "touches any part of you other than a hand, or still touches the hand that released it later than "
+             "{retouch_grace_s} s after the release; if a ball is caught by the hand that released it, or before "
+             "it has risen {min_rise_m} m; if a ball that has touched a hand again is not held within "
+             "{catch_window_s} s (it rests on the hand or bounces off it); if a catch is out of the cascade's "
              "order (the wrong hand or the wrong ball); if the waiting ball is touched before its launch; if you fall "
              "(your pelvis lower than {fall_pelvis_m} m above the ground, or any part of you other than your feet on "
              "the ground); or after {time_limit_s} s.")
-    venue = ("You stand on level ground, nothing around you. Your forearms point forwards, the grippers' jaws point up "
-             "and close across your body (left-right), their centres about 0.37 m apart and 1.1 m above the ground; a "
-             "ball is held between the jaws of each, and the red ball waits in a small two-wheel ball machine on the "
-             "ground {machine_x_m} m in front of you, which lobs it onto your left gripper. A gripper's closure command closes its jaws; "
-             "with them open, a ball rests on the gripper's housing between the jaws.")
-    difficulty = ("Each throw has to come down between jaws that leave 10 mm on each side of the ball, 0.4 m away, "
-                  "about 0.6 s later, the jaws must close on it within a few hundredths of a second before it "
-                  "bounces off, and the catching gripper must have thrown its own ball before: three balls, two "
-                  "hands, never two in one. A throw is the gripper opening while the arm moves, and errors add up "
+    venue = ("You stand on level ground, nothing around you. Your forearms point forwards, your palms up and your "
+             "fingers forwards, the hands' grasp centres about 0.37 m apart and 1.1 m above the ground; a ball is "
+             "held in each hand, and the red ball waits in a small two-wheel ball machine on the ground "
+             "{machine_x_m} m in front of you, which lobs it onto your left hand. A hand's closure command closes "
+             "its fingers and thumb; with the hand open, a ball rests on its palm.")
+    difficulty = ("Each throw has to come down into a palm that is hardly wider than the ball, 0.4 m away, about "
+                  "0.6 s later, the fingers must close on it within a few hundredths of a second before it "
+                  "bounces off, and the catching hand must have thrown its own ball before: three balls, two "
+                  "hands, never two in one. A throw is the hand opening while the arm moves, and errors add up "
                   "from throw to throw, because a ball is thrown from wherever it was caught.")
 
     def build(self, sc):
         p = self.p
         self.fall_z = p["fall_pelvis_m"]
-        sc.real_hands["left"] = sc.real_hands["right"] = "dex1"
+        sc.real_hands["left"] = sc.real_hands["right"] = "dex3"
         sc.box("mat", (0.2, 0, 0.0003), (1.2, 1.2, 0.0003), rgba=(0.25, 0.35, 0.55, 1))
         self.machine = BallMachine("tosser", "juggling", (p["machine_x_m"], p["machine_y_m"], p["machine_z_m"]),
                                    p["machine_speed_m_s"], p["machine_elevation_deg"], 180.0 + p["machine_azimuth_deg"],
                                    ball="ball_a")
         self.machine.build(sc)
-        for k, (name, rgba) in enumerate(zip(BALLS, COLOURS)):   # nothing grippable: held only by the jaws' friction
+        for k, (name, rgba) in enumerate(zip(BALLS, COLOURS)):   # nothing grippable: held only by the hands
             at = self.machine.rest_pos() if name == "ball_a" else (0.3, 0.3 * k, 0.5)
             sc.ball(name, "baseball", at, radius=p["ball_diameter_m"] / 2, mass=p["ball_mass_kg"],
                     bounce=0.30, drag=0.47, rgba=rgba)
@@ -882,10 +868,10 @@ class Task(TaskBase):
         set_arm(w, **CUP["left"], **CUP["right"])
         centres = {}
         for side, name in (("left", "ball_b"), ("right", "ball_c")):
-            c, _ = w.jaw_frame(side)
-            w.put(name, c)
+            c, R = w.grasp_frame(side)
+            w.put(name, c + R[:, 0] * BALL_IN_HAND[0] + R[:, 2] * BALL_IN_HAND[1])
             w.close_on(side, name, closure=1.0)
-            centres[side] = w.jaw_frame(side)[0]
+            centres[side] = w.grasp_frame(side)[0]
         self.target = centres["left"]                      # where the machine's lob comes down
         self.machine.reset(w)
         self.machine.feed(p["launch_time_s"] - p["feed_lead_s"])
@@ -898,9 +884,11 @@ class Task(TaskBase):
         self.hands = {s: ref.part(f"{s}_hand") for s in SIDES}
         self.not_hands = self.robot & ~ref.part("hands")
         self.not_hand = {s: self.robot & ~self.hands[s] for s in SIDES}
-        self.pads = {s: (ref.geoms(prefix=f"{s}_hand_pad_a"), ref.geoms(prefix=f"{s}_hand_pad_b")) for s in SIDES}
+        ng = w.m.ngeom
+        thumb = lambda s: [g for g in w.hands.group_geoms(w, s, "thumb_palm") if w.m.geom(g).name != f"{s}_hand_palm"]  # noqa: E731
+        self.grip = {s: (np.isin(np.arange(ng), thumb(s)), np.isin(np.arange(ng), w.hands.group_geoms(w, s, "fingers")))
+                     for s in SIDES}                         # per hand: (its thumb, its fingers)
         self.machine_g = ref.geoms(body="tosser")
-        self.cos_max = math.cos(math.radians(self.p["max_contact_angle_deg"]))
         # per ball: where it is ("waiting", "held", "flight"), who holds or released it, the release height and time,
         # its rise, when it met you again, when the clamp by the other hand began
         def ball(at, by):
@@ -910,11 +898,10 @@ class Task(TaskBase):
                          "ball_b": ball("held", "left"), "ball_c": ball("held", "right")}
 
     def clamped(self, w, ref, name, side) -> bool:
-        a, b = self.pads[side]
+        """The hand holds the ball between its thumb and its fingers (both touch it now)."""
+        thumb, fingers = self.grip[side]
         g = self.geom[name]
-        if not (ref.touching(g, a) and ref.touching(g, b)):
-            return False
-        return pinched(w, self.gid[name], (a, b), w.hands.centre[side], self.cos_max)
+        return ref.touching(g, thumb) and ref.touching(g, fingers)
 
     def before_step(self, w):
         self.machine.write(w, w.t)
@@ -941,7 +928,7 @@ class Task(TaskBase):
                     return ref.fail("a ball in a hand touched another part of you", ball=name, hand=by,
                                     parts=sorted(ref.parts_touching(g) - {f"{by}_hand"}))
                 if ref.touching(g, self.hands[by]):
-                    st.update(t0=round(ref.time, 4), z0=z)    # (its last contact with the gripper)
+                    st.update(t0=round(ref.time, 4), z0=z)    # (its last contact with the hand)
                 elif ref.time - st["t0"] >= p["release_s"] - 1e-9:   # away from it for release_s: the release, at
                     st.update(at="flight", rise=0.0, met=None, clamp=None)   # its last contact: a throw begins
                     ref.event("release", ball=name, hand=by, at_t=st["t0"])
@@ -951,9 +938,9 @@ class Task(TaskBase):
                 return ref.fail("a ball in flight touched the body", ball=name,
                                 parts=sorted(ref.parts_touching(g) - {"left_hand", "right_hand"}))
             if self.clamped(w, ref, name, by):
-                return ref.fail("a ball was caught by the gripper that released it", ball=name, hand=by)
+                return ref.fail("a ball was caught by the hand that released it", ball=name, hand=by)
             if ref.time - st["t0"] > p["retouch_grace_s"] and ref.touching(g, self.hands[by]):
-                return ref.fail("a ball in flight was touched again by the gripper that released it", ball=name)
+                return ref.fail("a ball in flight was touched again by the hand that released it", ball=name)
             # met: when the ball first touched you again (after the release's grace): its flight is over
             if st["met"] is None:
                 if not ref.touching(g, self.robot):
@@ -985,7 +972,7 @@ class Task(TaskBase):
                 continue
             st["clamp"] = None
             if st["met"] is not None and ref.time - st["met"] > p["catch_window_s"]:
-                return ref.fail("a ball that came down on a gripper was not caught", ball=name,
+                return ref.fail("a ball that came down on a hand was not caught", ball=name,
                                 rise_m=round(st["rise"], 3))
 
     def privileged(self, w):
@@ -996,4 +983,4 @@ class Task(TaskBase):
                 "next_hand": "left" if (tr["catches"] + 1) % 2 else "right",
                 "launch_time_s": self.p["launch_time_s"], "lob_target": self.target.tolist(),
                 "machine": self.machine.facts(),
-                "grippers": w.hands.state() if w.hands else {}}
+                "hands": w.hands.state() if w.hands else {}}

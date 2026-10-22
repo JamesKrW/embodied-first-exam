@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md ย
 instance_seed = 0
 expert_time_estimate_hours = 2.0
 oracle = "full"
-oracle_evidence = "Reference: stand through the start procedure, react to the gun, then the running policy at 3.5 m/s steered to the lane's centre; 9 of 10 perturbed runs at 2.5 to 4.0 m/s finished when it was written. Measured: success after 19.59 s of the 34.2 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "Reference: stand through the start procedure, react to the gun, then the running policy at 3.5 m/s steered to the lane's centre; 9 of 10 perturbed runs at 2.5 to 4.0 m/s finished when it was written. Measured (make_oracles.py): success after 19.54 s of the 34.2 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md ยง2.9)

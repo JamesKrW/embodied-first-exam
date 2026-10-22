@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-free-throw-i00-privileged"
-description = "Embodied Olympics free-throw (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Shoot a free throw: from behind the free-throw line, shoot the basketball you hold pressed between your two palms so that it enters the basket from above. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics free-throw (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Shoot a free throw: from behind the free-throw line, shoot the basketball you hold in your two hands so that it enters the basket from above. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "free-throw"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 8.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_free_throw.py: positive by injection (a real two-handed underhand swing with the ball held only by palm friction, squeeze kept on the shoulder roll, a real release by rolling both arms out at 5.0 m/s; the ball's velocity set at the release to the 58-degree shot: a real flight and ring); bank shot by injection; negatives: not released in 5 s (nop holds it 5 s), grip columns hold nothing, one palm alone drops it, a too-weak squeeze slips out, the real swing falls short, let go and taken back, ball pulled against the chest (body), the line, the semi-circle, beyond the line on a drop-in, from below, a fall. The two-palm shot is capped near 5.4 m/s by the shoulder pitch speed (9 rad/s); the ring needs about 8 m/s; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_free_throw.py: The H1-2's own Inspire hands at the core's default forces (20 N fingertips, 30 N thumb; grip factor 1), H2-class arms (no weld): the ball starts between the two palms, the fingers closed over it and the arms squeezing it (held 5 s at rest, the ball settling onto the thumbs and the palms' heels; one hand alone cannot hold the 0.24 m ball). Positive by a declared magic action: real hold, real opening of both hands with the arms moving out of the squeeze; injected at that step: the ball moved 0.15 m up and given the 58-degree shot's velocity (about 8 m/s) to the ring; the flight, the ring and the referee are real; the same state hash twice; a bank shot (injected) is also a goal. Negatives: nop (not released within 5 s), the hands opened (the ball drops to the floor), taken back after the release, the ball on the chest, walking onto the line, leaving the semi-circle, beyond the line while the ball drops in (and the same drop from behind the line is a goal), up through the ring from below, a fall. Stress: random arm targets with the ball held: it presses at most 0.4 mm into the hands.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
