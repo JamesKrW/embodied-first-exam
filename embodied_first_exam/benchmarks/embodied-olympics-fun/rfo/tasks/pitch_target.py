@@ -1,7 +1,8 @@
-"""Baseball pitch (Official Baseball Rules): the baseball starts held between the jaws of the right hand's Unitree
-Dex1-1 two-jaw gripper (the core's rfo.realhand) by their friction only: it can slip, roll out and drop. The release
-is the ball leaving the hand: the jaws must open (at most 375 mm/s, from the clamp: when they let go is the pitcher's
-timing, not a switch) and the ball touch nothing of the pitcher any more. From the pitcher's plate on the mound, with
+"""Baseball pitch (Official Baseball Rules): the baseball starts held in the H1-2's own right hand, its Inspire
+five-finger hand (the core's rfo.realhand, "inspire"), by the contact and friction of its fingers, thumb and palm only:
+it can slip, roll out and drop. The release is the ball leaving the hand: the fingers must open (at most 260 deg/s,
+from the grasp: when they let go is the pitcher's timing, not a switch) and the ball touch nothing of the pitcher any
+more. From the pitcher's plate on the mound, with
 a foot on the plate at that release, throw the baseball through the strike zone over home plate, 18.44 m away, on the
 fly.
 
@@ -9,8 +10,8 @@ The venue: the official mound, plate distance, strike zone and ball, its flight 
 Unitree H1-2.
 
 The hand and the judging:
-* the right hand is the Dex1-1 (the core's model): the ball (73 mm) sits at the centre of its jaws (90 mm stroke) and
-  the jaws close on it at reset (close_on: the full 120 N clamp), the forearm level and pointing forwards;
+* the right hand is the Inspire hand at the device's forces (the core's model): the ball (73 mm) rests against the
+  palm, the fingers and thumb close round it at reset (close_on), the forearm level and pointing forwards;
 * the release, the ball before it and no re-grip are judged from contacts (below), not from a grip switch;
 * the ball may not touch the ground at any time, also before the release (a ball that is still being held can reach
   it).
@@ -32,6 +33,8 @@ IN, FT = 0.0254, 0.3048
 LEVEL_FRONT, LEVEL_BACK, LEVEL_HALF = 6 * IN, 28 * IN, 2.5 * FT
 CIRCLE_AHEAD = 18 * IN
 DIRT, CHALK = (0.66, 0.47, 0.30, 1), (0.97, 0.97, 0.95, 1)
+BALL_IN_HAND_M = (0.020, 0.030)                # the ball's centre from the hand's grasp centre: out of the palm, along
+#                                                the fingers (it rests on the palm, the fingers round it; a search)
 
 
 def set_arm(w, **angles) -> None:
@@ -54,11 +57,11 @@ class Task(TaskBase):
                 "5.07(a) (the pivot foot in contact with the plate), 5.07(c) (the 15 s pitch timer), Definitions of "
                 "Terms: \"strike zone\", \"in flight\"")
     deviations = [
-        "3.01 (the ball in the pitcher's hand): the hand is a two-jaw gripper, Unitree's Dex1-1 (90 mm stroke, 80 mm "
-        "jaws, at most 120 N of clamp, opening at most 375 mm/s; Unitree sells it for the G1, the H2 and the R1, not "
-        "the H1-2: here it sits on the H1-2's right wrist where the palm ends); the ball starts held between its jaws "
-        "by their friction only (no fingers, no seams: no grip-made spin beyond what the jaws' motion gives). The "
-        "release is the moment the ball last touched you before it had touched nothing of you for {release_s} s.",
+        "3.01 (the ball in the pitcher's hand): the hand is the H1-2's own Inspire five-finger hand (six drives for "
+        "four fingers and a thumb, fingertip forces 10 N, the thumb 15 N, one closure command for the whole hand); "
+        "the ball starts held against its palm by the fingers' and thumb's contact and friction only (no seams: no "
+        "grip-made spin beyond what the fingers' motion gives). The release is the moment the ball last touched you "
+        "before it had touched nothing of you for {release_s} s.",
         "Definitions (strike zone): there is no batter, so the zone's height is fixed, {zone_low_m} m to "
         "{zone_high_m} m above home plate (the hollow of the knee to the midpoint of the torso of a 1.8 m batter). A "
         "strike is called when the ball's centre crosses the zone's front plane (home plate's front edge) inside "
@@ -82,10 +85,10 @@ class Task(TaskBase):
                   zone_high_m=1.07, release_limit_s=15.0, release_s=0.02, retouch_grace_s=0.20, fall_pelvis_m=0.75)
 
     sentence = ("Pitch a strike: from the pitcher's plate on the mound, with a foot on the plate, throw the baseball "
-                "held in your right gripper through the strike zone over home plate, on the fly.")
+                "held in your right hand through the strike zone over home plate, on the fly.")
     rules = ("The baseball (" + f"{2 * BALL['radius']:.3f} m across, {BALL['mass']:.3f} kg" + ", it flies in air with "
-             "drag and spin lift) starts held between the two jaws of your right hand, a two-jaw gripper that holds "
-             "only by friction: the ball can slip or roll out and drop. You stand on the pitcher's plate (a slab "
+             "drag and spin lift) starts held in your right hand, a five-finger hand that holds only by "
+             "contact and friction: the ball can slip or roll out and drop. You stand on the pitcher's plate (a slab "
              "{pitchers_plate_width_m} m wide and {pitchers_plate_depth_m} m deep, level with the mound's top) on a "
              "mound {mound_diameter_m} m across whose top is {mound_height_m} m above home plate; in front of the "
              "plate the mound falls 1 in 12. The front edge of the pitcher's plate is {plate_distance_m} m from the "
@@ -96,8 +99,8 @@ class Task(TaskBase):
              "still in your hand, wherever it rests on you). There is one release: within {release_limit_s} s of "
              "the start, and at that moment at least one of your feet is in contact with the pitcher's plate (it "
              "touches the mound and part of its sole is over the plate). After the release no part of you may touch "
-             "the ball and your gripper may not hold it again (both jaws on it), except that your right arm and its "
-             "gripper may still brush it during the first {retouch_grace_s} s. You succeed when the ball's centre "
+             "the ball and your right hand may not hold it again (its fingers and its thumb or palm on it), except "
+             "that your right arm and its hand may still brush it during the first {retouch_grace_s} s. You succeed when the ball's centre "
              "then crosses the plane of the zone inside the zone, before the ball has touched the ground. You fail "
              "if no foot is on the plate at the release; if the ball is not released in time; if it touches the "
              "ground (the mound included) at any time before home plate, also before the release; if it crosses the "
@@ -108,14 +111,14 @@ class Task(TaskBase):
              "its middle; home plate's front edge is 18.1 m ahead and {mound_height_m} m below the plate you stand "
              "on. The mound's level top reaches 0.15 m in front of the pitcher's plate, 0.56 m behind it and 0.76 m "
              "to each side. A backstop stands 3 m behind home plate. Your right forearm is level and points "
-             "forwards, the gripper's fingers forwards and its jaws closed on the ball (they close along the palm's "
-             "normal, sideways: one jaw on each side of the ball). Still air. The jaws open when your right grip "
-             "command goes to 0 (at most 375 mm/s).")
+             "forwards, the hand's fingers forwards and closed round the ball, which rests against the palm (the palm "
+             "faces your left). Still air. The hand opens when your right grip command goes to 0 (the fingers at "
+             "most 260 deg/s).")
     difficulty = ("From 18.44 m the ball needs more than 13 m/s even on a high arc, and the zone is 0.43 m wide: "
                   "a release direction right to about one degree. The H1-2 has no throwing motion; the speed has to "
                   "come from the trunk and the whole arm while a foot stays on the plate and the body on the mound, "
-                  "and two jaws that open no faster than 375 mm/s have to let the ball go at the right hundredth of "
-                  "a second.")
+                  "and fingers that open no faster than 260 deg/s have to let the ball go at the right "
+                  "hundredth of a second.")
 
     # ------------------------------------------------------------------ the venue
     def geometry(self):
@@ -126,7 +129,7 @@ class Task(TaskBase):
     def build(self, sc):
         p, g = self.p, self.geometry()
         self.fall_z = p["fall_pelvis_m"]
-        sc.real_hands["right"] = "dex1"
+        sc.real_hands["right"] = "inspire"
         H, R = g["top"], g["radius"]
         sc.root.find("option").append(sc.root.makeelement("flag", dict(multiccd="enable")))   # feet (hulls) on the mound
         # the mound: the convex hull of its level top and its base circle; in front that is the 1 in 12 slope
@@ -169,8 +172,8 @@ class Task(TaskBase):
         m, d = w.m, w.d
         d.qpos[w.robot.fq + 2] += self.p["mound_height_m"]    # the robot stands on the mound's top
         mujoco.mj_kinematics(m, d)
-        c, _ = w.jaw_frame("right")                           # the ball at the jaws' centre
-        w.put("ball", c)
+        c, R = w.grasp_frame("right")                         # the ball against the palm, the fingers round it
+        w.put("ball", c + R[:, 0] * BALL_IN_HAND_M[0] + R[:, 2] * BALL_IN_HAND_M[1])
         w.close_on("right", "ball")
 
     # ------------------------------------------------------------------ the referee
@@ -180,7 +183,8 @@ class Task(TaskBase):
         self.robot = ref.part("robot")
         self.arm = ref.part("right_arm")
         self.not_arm = self.robot & ~self.arm
-        self.jaws = [ref.geoms(body=f"right_hand_jaw_{j}") for j in ("a", "b")]
+        ng = w.m.ngeom
+        self.grips = [np.isin(np.arange(ng), w.hands.group_geoms(w, "right", g)) for g in ("fingers", "thumb_palm")]
         self.soles = {s: w.m.geom(f"{s}_foot_strike").id for s in ("left", "right")}
         # free: (time, speed, height, feet on the plate) of the ball's first step touching nothing of you, while the
         # release is not yet confirmed
@@ -211,7 +215,7 @@ class Task(TaskBase):
         return out
 
     def _held(self, ref) -> bool:
-        return all(ref.touching(j, self.ball) for j in self.jaws)
+        return all(ref.touching(g, self.ball) for g in self.grips)
 
     def substep(self, w, ref):
         tr, p = self.trackers, self.p
