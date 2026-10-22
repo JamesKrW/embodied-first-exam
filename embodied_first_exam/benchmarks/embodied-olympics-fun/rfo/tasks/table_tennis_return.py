@@ -1,6 +1,7 @@
 """Table tennis: return a legal service (ITTF Laws 2.5-2.7, 2.10): the service returned after its bounce on your
-court onto the opponent's court. The paddle is a free 0.14 kg racket held only by the friction of the right hand's
-two-finger gripper (Unitree Dex1-1): it can slip, turn in the jaws when it meets the ball, and be dropped.
+court onto the opponent's court. The paddle is a free 0.14 kg racket held only by the contact and friction of the
+right hand, the G1's own Dex3-1 three-finger hand: it can slip, turn in the hand when it meets the ball, and be
+dropped.
 
 The parts:
 * the service: entry 221 of RoboOlympics' serve library (below), thrown by a table-tennis ball machine (the shared
@@ -15,12 +16,13 @@ The parts:
 * the paddle (FREE_PADDLE; the block is shared, byte for byte, with paddle-bounce): a blade (a rigid 15 x 15 x 1.5 cm
   box, 0.09 kg) on a straight handle of a real racket's size, 100 mm long, 32 mm wide and 25 mm thick, 0.14 kg in
   all, as a free body;
-* the hand: the core's Dex1-1 (rfo.realhand: 90 mm stroke, 80 mm jaws, 5-120 N); the handle lies along the jaws (75 mm
-  of the 80 mm pads on it), its broad faces against the pads, so the blade's faces look along the closing axis; the
-  butt 5 mm from the gripper's body; the closure command 1 (120 N). The blade's centre is 0.243 m from the wrist
-  mount. "In the hand" = the handle touches both jaws; a break of at most out_of_hand_s (0.05 s) is not a release;
-* the racket hand (Law 2.5.5, the hand carrying the racket) is the right gripper: striking with it below the wrist is
-  legal (Law 2.5.7); the paddle may touch nothing of the robot but that gripper;
+* the hand: the G1's Dex3-1 (rfo.realhand "dex3": thumb 3 joints, index and middle 2 each, the device's torques); a
+  shakehand grip as in paddle-bounce (GRIP: the handle across the palm, along the hand's grasp frame's y, the blade
+  beyond the index finger's side, its faces looking along the palm's normal); the closure command 1. "In the hand" =
+  the handle touches the hand's fingers and its thumb or palm; a break of at most out_of_hand_s (0.05 s) is not a
+  release;
+* the racket hand (Law 2.5.5, the hand carrying the racket) is the right hand: striking with it below the wrist is
+  legal (Law 2.5.7); the paddle may touch nothing of the robot but that hand;
 * the simulator's options: DeepMind's pair was identified with impratio 10; a world with a real hand needs impratio 100
   (realhand.IMPRATIO: with 10 a clamped handle creeps under a steady torque), and this module leaves it at 100.
 
@@ -800,7 +802,7 @@ FREE_PADDLE = dict(blade_m=0.15, blade_thickness_m=0.015, blade_kg=0.09, blade_c
 
 def build_free_paddle(sc, pos, quat=(1, 0, 0, 0), name="paddle"):
     """The paddle as a free body at pos/quat (its butt). Geoms <name>_handle (a box) and <name>_blade (a box), both
-    colliding like a prop (HITTABLE): with the jaws, the robot, the floor, the table, the net, the ball."""
+    colliding like a prop (HITTABLE): with the hands, the robot, the floor, the table, the net, the ball."""
     P = FREE_PADDLE
     b = sc.body(name, pos, quat=quat, free=True)
     L = P["handle_length_m"]
@@ -815,7 +817,10 @@ def build_free_paddle(sc, pos, quat=(1, 0, 0, 0), name="paddle"):
 
 
 HAND = "right"                     # the racket hand
-BUTT_FROM_JAW_CENTRE_M = 0.035     # the butt 5 mm out from the gripper's housing: the handle along the 80 mm jaws
+# where the handle sits in the hand (the grasp frame, rfo.realhand: x out of the palm, z along the fingers, y = z x x,
+# on the right hand towards the index finger): the handle's axis along y, the butt butt_out_m before the grasp centre,
+# the handle's centre palm_off_m out of the palm and finger_off_m along the fingers from it (paddle-bounce's search)
+GRIP = dict(butt_out_m=0.05, palm_off_m=0.005, finger_off_m=0.0)
 
 # DeepMind's identified ball-table pair, the net as their scene has it (the ball's undamped 1e5 N/m spring on a rigid
 # box), RoboOlympics' ball-paddle pair
@@ -885,10 +890,11 @@ class Task(TaskBase):
         "long, {handle_width_m} m wide and {handle_thickness_m} m thick, {paddle_mass_kg} kg in all (legal: the Laws "
         "set no size, shape or weight); its covering is one contact law on both faces (RoboOlympics' ball-paddle pair, "
         "hand-picked, not identified)",
-        "2.5.5 (the racket hand, the hand carrying the racket): the hand is a two-finger gripper, Unitree's Dex1-1 "
-        "(90 mm stroke, 80 mm jaws, at most 120 N); the handle lies along its jaws and the racket is held by their "
-        "friction alone, as a hand holds it; \"carrying\" is defined by contact: the handle touches both of the "
-        "gripper's jaws, and a break of up to {out_of_hand_s} s is not a release; the racket may touch nothing of the "
+        "2.5.5 (the racket hand, the hand carrying the racket): the hand is the G1's own Dex3-1 three-finger hand "
+        "(a thumb, an index and a middle finger, at the device's joint torques), closed round the handle in a "
+        "shakehand grip; the racket is held by contact and friction alone; \"carrying\" is defined by contact: the "
+        "handle touches the hand's fingers and its thumb or palm, and a break of up to {out_of_hand_s} s is not a "
+        "release; the racket may touch nothing of the "
         "player but the racket hand (the Laws do not forbid a second hand on the racket; here it would make the free "
         "hand a second racket hand)",
         "2.10.1.7 (deliberately striking the ball twice): intent cannot be judged: every contact of the blade or the "
@@ -918,7 +924,7 @@ class Task(TaskBase):
         net_panels=6, net_cord_tension_n=45.0, net_mass_kg=0.04)
 
     sentence = ("Return the service: after the table tennis ball has bounced once on your court, strike it with the "
-                "paddle held in your right hand's gripper so that it touches the opponent's court, without letting go "
+                "paddle held in your right hand so that it touches the opponent's court, without letting go "
                 "of the paddle.")
     rules = ("The table is the official one: {table_length_m} m long, {table_width_m} m wide, its playing surface "
              "{table_height_m} m above the floor, with a net {net_height_m} m high across its middle that reaches "
@@ -929,19 +935,20 @@ class Task(TaskBase):
              "lift of its spin act on it. The racket is a separate body: a rigid square blade 0.15 m wide and 0.015 m "
              "thick on a straight handle {handle_length_m} m long, {handle_width_m} m wide and {handle_thickness_m} m "
              "thick, {paddle_mass_kg} kg in all, the blade's centre {blade_centre_m} m from the butt. At the start its "
-             "handle is closed in your right hand's two-finger gripper, which holds it by friction only: it can slip, "
-             "turn in the gripper and fall. Your right hand (the gripper's jaws and body) is the racket hand, your "
-             "left hand the free hand. The racket is in your hand while its handle touches both of the gripper's "
-             "jaws; it has left your hand when for more than {out_of_hand_s} s the handle has not touched both jaws. The service is "
+             "handle is closed in your right hand (three fingers: a thumb, an index and a middle finger), which holds it "
+             "by contact and friction only: it can slip, turn in the hand and fall. Your right hand is the racket "
+             "hand, your left hand the free hand. The racket is in your hand while its handle touches the hand's "
+             "fingers and its thumb or palm; it has left your hand when for more than {out_of_hand_s} s it has not. "
+             "The service is "
              "thrown by a ball machine about {serve_time_s} s after the start (it is served when it has left the "
              "machine's wheels): a legal service, so the ball bounces first on the server's "
              "court, passes the net and bounces on your court. Then you must make a good return (Law 2.7): strike the "
              "ball, after that one bounce on your court, with the blade of the racket in your hand or with the racket "
-             "hand below the wrist (the gripper), so "
+             "hand below the wrist, so "
              "that it touches the opponent's court, directly or after touching the net; it may pass over or around the "
              "net. You succeed at the moment the ball touches the opponent's court after your strike. All contacts of "
              "the blade or the racket hand with the ball within {strike_window_s} s of the first are one strike. You "
-             "fail if the racket leaves your hand at any time (dropped, thrown or slipped out of the gripper); if the "
+             "fail if the racket leaves your hand at any time (dropped, thrown or slipped out of the hand); if the "
              "racket touches any part of you other than the racket hand; if you or the racket touch the ball before "
              "the service, or before it has bounced on your court (obstruction); if "
              "the ball bounces a second time on your court before you strike it (ball contacts with the table less "
@@ -960,17 +967,17 @@ class Task(TaskBase):
              "strikes it: {serve_x_m} m ahead of your pelvis, {serve_y_m} m to your left (negative: to your right) and "
              "{serve_z_m} m above the floor. The service reproduces one of a library of legal robot services: they leave the server's racket at 2.2 to 4.5 m/s "
              "with up to 34 rad/s of spin and bounce on your court between 0.2 and 0.8 s after the strike; short "
-             "services bounce a second time on your court if you do not strike them. The paddle's handle is closed in your "
-             "right gripper along its two fingers, the butt just short of the gripper's body and the rest of the handle "
-             "reaching beyond the fingertips; the blade's faces look the way the jaws close (your palm's side and the "
-             "back of your hand), and the paddle points ahead along your forearm, the blade's centre about 0.24 m "
-             "beyond your wrist.")
+             "services bounce a second time on your court if you do not strike them. Your arms hang; the paddle's handle lies "
+             "across your right palm in a shakehand grip, the fingers and the thumb closed round it, the blade beyond "
+             "the index finger's side and its faces looking the way your palm does (forehand) and the back of your "
+             "hand (backhand).")
     difficulty = ("The served ball is over your court for a few tenths of a second, low above a table that is as high "
                   "as your hips, and may have to be met far inside the end line: the blade, a rigid extension of a "
                   "0.5 m arm, has to be there at the right instant and angle while the body leans over the table "
                   "without touching the net. The return must clear a 15 cm net and still come down on a court 1.37 m "
-                  "long, off a ball that carries spin. The paddle sits in a two-finger gripper: the blade is where the "
-                  "jaws hold it, and a fast stroke must not fling it out of the hand.")
+                  "long, off a ball that carries spin. The paddle sits in a three-finger hand with small finger "
+                  "motors: the blade is where the fingers hold it, and a fast stroke must not fling it out of the "
+                  "hand.")
 
     def __init__(self):
         super().__init__()
@@ -1002,7 +1009,7 @@ class Task(TaskBase):
         self.machine.build(sc)
         sc.ball("ball", "tabletennis", self.machine.rest_pos())
         build_free_paddle(sc, pos=(x0 - 1.0, -1.5, 0.05))
-        sc.real_hands[HAND] = "dex1"
+        sc.real_hands[HAND] = "dex3"
         tt_physics(sc)
         sc.camera("venue", (x0 - 1.3, -2.6, 1.75), (x0 + 1.1, 0.0, 0.75), fovy=50)
 
@@ -1012,15 +1019,16 @@ class Task(TaskBase):
                 (p["serve_wx"], p["serve_wy"], p["serve_wz"]))
 
     def reset(self, w):
-        """The paddle's handle along the right gripper's fingers (its axis the fingers' axis, the blade's normal the
-        closing axis), the butt BUTT_FROM_JAW_CENTRE_M before the jaws' centre; then the jaws close on it (the full
-        command: 120 N) and the grasp settles."""
+        """The paddle's handle across the right palm (GRIP: its axis the grasp frame's y, the blade's normal the
+        palm's), then the hand closes on it (the full command) and the grasp settles."""
         self.machine.reset(w)
         self.machine.feed(self.p["serve_time_s"] - self.p["feed_lead_s"])
-        c, R = w.jaw_frame(HAND)
+        c, R = w.grasp_frame(HAND)
+        Rp = np.c_[R[:, 0], -R[:, 2], R[:, 1]]              # paddle x = the palm's normal, z = the handle = grasp y
         q = np.zeros(4)
-        mujoco.mju_mat2Quat(q, R.ravel())
-        w.put("paddle", c - BUTT_FROM_JAW_CENTRE_M * R[:, 2], quat=q)
+        mujoco.mju_mat2Quat(q, Rp.ravel())
+        w.put("paddle", c - GRIP["butt_out_m"] * R[:, 1] + GRIP["palm_off_m"] * R[:, 0] + GRIP["finger_off_m"] * R[:, 2],
+              quat=q)
         self.grasp = w.close_on(HAND, "paddle")
 
     def referee_reset(self, w, ref):
@@ -1032,12 +1040,13 @@ class Task(TaskBase):
         self.racket_hand = ref.part(f"{HAND}_hand")
         self.striker = self.blade | self.racket_hand
         self.other = (ref.robot_mask & ~self.striker) | self.handle
-        self.jaws = (ref.geoms(body=f"{HAND}_hand_jaw_a"), ref.geoms(body=f"{HAND}_hand_jaw_b"))
+        ng = w.m.ngeom
+        self.grips = tuple(np.isin(np.arange(ng), w.hands.group_geoms(w, HAND, g)) for g in ("fingers", "thumb_palm"))
         self.free_hand = ref.part("left_hand")
         self.table = ref.geoms(names=["table"])
         self.netg = ref.geoms(body="net")
         self.trackers = {"served": False, "table": Touch(ref, self.ball, self.table, gap=p["bounce_gap_s"]),
-                         "server_bounce": False, "strike_t": None, "net_touch": False, "both_jaws_t": 0.0}
+                         "server_bounce": False, "strike_t": None, "net_touch": False, "in_hand_t": 0.0}
 
     def before_step(self, w):
         self.machine.write(w, w.t)
@@ -1071,16 +1080,16 @@ class Task(TaskBase):
                    rgba=(1, 1, 1, 0.5), parent=pb)
 
     def in_hand(self, ref) -> bool:
-        return ref.touching(self.handle, self.jaws[0]) and ref.touching(self.handle, self.jaws[1])
+        return ref.touching(self.handle, self.grips[0]) and ref.touching(self.handle, self.grips[1])
 
     def substep(self, w, ref):
         p, tr = self.p, self.trackers
         if self.in_hand(ref):
-            tr["both_jaws_t"] = round(ref.time, 4)
+            tr["in_hand_t"] = round(ref.time, 4)
         else:
-            gap = round(ref.time - tr["both_jaws_t"], 4)
+            gap = round(ref.time - tr["in_hand_t"], 4)
             if gap > ref.metrics.get("grip_break_max_s", 0.0):
-                ref.metrics["grip_break_max_s"] = gap       # (reported: the longest break of the two-jaw contact)
+                ref.metrics["grip_break_max_s"] = gap       # (reported: the longest break of the hand's hold)
             if gap > p["out_of_hand_s"] + 1e-9:
                 return ref.fail(LEFT_HAND, out_s=gap)
         if ref.touching(self.paddle, ref.robot_mask & ~self.racket_hand):
@@ -1157,7 +1166,7 @@ class Task(TaskBase):
                 "ball_spin": (R @ w.d.qvel[va + 3:va + 6]).tolist(), "served": bool(self.trackers["served"]),
                 "serve_time_s": p["serve_time_s"], "paddle": FREE_PADDLE, "blade_centre": w.d.geom_xpos[g].tolist(),
                 "paddle_pos": w.pos("paddle").tolist(), "paddle_quat": w.d.xquat[w.m.body("paddle").id].tolist(),
-                "paddle_in_hand_t": self.trackers["both_jaws_t"],
+                "paddle_in_hand_t": self.trackers["in_hand_t"],
                 "blade_normal": w.d.geom_xmat[g].reshape(3, 3)[:, 0].tolist(),
                 "table": {"near_x": p["table_near_x_m"], "net_x": self.net_x, "far_x": p["table_near_x_m"] + p["table_length_m"],
                           "half_width": p["table_width_m"] / 2, "top": p["table_height_m"],
