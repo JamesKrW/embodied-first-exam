@@ -327,10 +327,10 @@ class Task(TaskBase):
     deviations = [
         "Basketball Equipment (basket): the basket is lowered: the ring's top edge is {ring_height_m} m above the "
         "floor, below FIBA Mini-Basketball's 2.60 m (FIBA's own ring: 3.05 m), set at the robot's measured reach "
-        "(H1-2 with H2-class leg actuators: the ball pressed overhead between bare palms reached a centre height of "
-        "2.58 m in its own jump; the ring plus the ball's radius plus 0.02 m of entry is 0.05 m below that; held in "
-        "its own hands, which hold it lower, it reaches at most 2.36 m in a searched jump: the dunk is out of "
-        "reach); the "
+        "(H1-2 with H2-class leg actuators, the ball squeezed between its own open hands: raised from the chest "
+        "during its own jump, the ball's centre reached 2.56 m in searched open-loop jumps, above the 2.53 m of the "
+        "ring plus the ball's radius plus 0.02 m of entry, but none brought it over the ring's axis higher than "
+        "2.42 m from start distances of 0.55 to 1.00 m: the dunk is at the limit of the robot's reach); the "
         "full-size backboard keeps its size and its height relative to the ring (lower edge {board_bottom_m} m). "
         "The ball stays the size-7 ball.",
         "Art. 3 (equipment, the hands): the hands are the H1-2's own Inspire five-finger hands (six drives: four "
