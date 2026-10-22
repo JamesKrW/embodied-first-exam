@@ -229,6 +229,10 @@ HOLD = {"right": np.array([-0.4674, 0.2556, -0.335, 1.5041, 1.3391, -0.2658, 1.0
         "left": np.array([-0.2102, 0.0481, -0.724, 0.4173, 0.0342, -0.47, 0.7949])}
 HOLD_CLOSURE = {"right": 0.3, "left": 0.0}
 PALM_FACE, PALM_PRESS = 0.0265, 0.002
+# HOLD has the right upper arm 1.8 mm inside the torso's hull (the robot's self-collision, world.py): the right arm
+# starts START_ROLL (shoulder roll) off the chest, its target stays HOLD, so the servo lays it against the chest (at
+# most 0.02 mm deep; the ball as before: tests/bb_hold2.py, 2026-10-21).
+START_ROLL = -0.02
 
 
 def ball_in_hands(w) -> None:
@@ -240,6 +244,7 @@ def ball_in_hands(w) -> None:
         d.qpos[r.qadr[a + 7 * i:a + 7 * i + 7]] = HOLD[side]
         r.arb.q_a[a + 7 * i:a + 7 * i + 7] = r.arb.q_b[a + 7 * i:a + 7 * i + 7] = HOLD[side]
         w.hands.cmd[side] = HOLD_CLOSURE[side]
+    d.qpos[r.qadr[a + 8]] += START_ROLL                 # the right shoulder roll off the chest (START_ROLL)
     mujoco.mj_kinematics(w.m, d)
     c, R = w.grasp_frame("right")
     w.put("ball", c + R[:, 0] * (BALL["radius"] - PALM_FACE + PALM_PRESS))

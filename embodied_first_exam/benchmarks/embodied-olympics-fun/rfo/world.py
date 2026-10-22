@@ -25,6 +25,7 @@ import importlib
 import json
 import math
 import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -235,6 +236,164 @@ def _shells(root: ET.Element, ground: set, skip: set = frozenset()) -> None:
     robot(pelvis)
     props(wb, "main")
     stiff(pelvis, pelvis.get("childclass") or "main")
+
+
+# Self-collision. The robot library's own pairs (bodies/selfcollision.py: body.toml [self_collision], named
+# selfcol_<i>) only cover the geoms that collide (contype 4): the G1's Menagerie hulls, the H1-2's thin thigh and shin
+# rods. The visible body around them is the shells (above: the G1's waist and shoulder housings and its rubber fists,
+# the H1-2's thighs, knees, hips, wrist housings and its Inspire fingers), and the hands are the palm pads, a task's
+# tool or a real hand, added here after the library: none of them touched the robot itself. A limb went through the
+# body: a shot-put stance with the thumb 2.3 cm inside the shoulder, a search's put 4.7 cm into it and the other hand
+# 6.8 cm into the hip, a volleyball set with the hands 5.7-6.4 cm into each other, the H1-2's arms through each other,
+# a flailing G1's knee 9 cm into its pelvis (2026-10-21).
+# Now every collision geom and every shell of the robot takes part (the shells are the visual meshes' convex hulls:
+# the visible body), by the library's parts and rules (body.toml [self_collision]: arm x body (torso, pelvis, head,
+# legs), left arm x right arm (hands, pads, tools and real hands included: hand x hand), left leg x right leg, shin x
+# foot) and two more: a link x a link of the same arm (the library's same_arm, off for its own arms: a thumb into its
+# own shoulder, a forearm folded into the upper arm) and a leg x the body (a knee into the pelvis, a thigh on the
+# chest). A hand's own parts (a finger hand's thumb x its fingers) are the hand's (realhand.py). Excluded: two geoms of
+# one rigid group or of two groups joined by one joint (the library's automatic exclusion: the joint's housing), the
+# library's declared exclusions, HAND_CARRIER and SELF_EXCLUDE (below: hulls that overlap by construction two joints
+# apart, measured at the rest pose and over random legal poses, each with its reason).
+# The contact is the shells' stiff one (SHELL_CONTACT: the robot's rigid aluminium / plastic shell on itself; the
+# library's 0.005 s on MuJoCo's default solimp let a servo at its torque limit sink a hand 1-2 cm into the body), on
+# MuJoCo's default friction 1 (the library's choice for its pairs). One explicit <pair> per geom pair, so the
+# robot's geoms keep their contype / conaffinity: props, the ground and the walking policies see the same robot.
+SELF_PAIR = dict(condim="3", solref=SHELL_CONTACT["solref"], solimp=SHELL_CONTACT["solimp"])
+# A hand (its pad, tool or real hand, the H1-2's fingers) and the wrist links that carry it: the hand's own business
+# (its fingers close into the palm, whose hull is the wrist link's; a finger hand's own pairs, realhand.py); the
+# hand against the rest of its own arm (a thumb into its shoulder) stays enabled.
+HAND_CARRIER = re.compile(r"(left|right)_wrist_(roll|pitch|yaw)_link")
+# SELF_EXCLUDE: measured (tests/sccheck2.py, 2026-10-21): every enabled body pair at the rest pose, and over 100 random
+# poses of only the joints between the two bodies (the rest at rest). Excluded are the pairs two joints apart whose
+# hulls overlap in that sample (a housing round the joint between them: the convex hull fills the recess the other
+# link turns in); every pair three or more joints apart stays (an upper arm into the chest is a real collision).
+SELF_EXCLUDE = {                           # (body regex, body regex, reason); {s}: one side (left, right)
+    "unitree_g1": [
+        ("torso_link", "{s}_shoulder_roll_link",
+         "shoulder housing (as the library's H1-2): the roll link's shell turns in the torso hull's shoulder recess, "
+         "40-48% of shoulder pitch x roll poses, up to 73 mm; the upper arm (yaw link) onwards stays enabled"),
+        ("{s}_elbow_link", "{s}_wrist_pitch_link",
+         "wrist housing: the hulls meet round the wrist roll joint in 9% of its poses, at most 1.7 mm"),
+        ("{s}_wrist_roll_link", "{s}_wrist_yaw_link",
+         "wrist housing: the hulls meet round the wrist pitch joint in 4-5% of its poses, at most 2.6 mm"),
+        ("pelvis", "{s}_hip_roll_link",
+         "hip housing: the hulls meet round the hip pitch joint in 5-10% of its poses, up to 25 mm"),
+    ],
+    "unitree_h1": [
+        ("{s}_knee_link", "{s}_ankle_roll_link",
+         "ankle housing: the shin's shell reaches down round the ankle pitch joint into the sole's hull (25.7 mm at "
+         "rest, every ankle pose)"),
+        ("pelvis", "{s}_hip_pitch_link",
+         "hip housing: the hulls meet round the hip yaw joint in 7-8% of its poses, up to 8 mm"),
+        ("{s}_hip_yaw_link", "{s}_hip_roll_link",
+         "hip housing: the hulls meet round the hip pitch joint in 29-48% of its poses, up to 42 mm"),
+        ("{s}_elbow_roll_link", "{s}_wrist_yaw_link",
+         "wrist housing: the hulls overlap round the wrist pitch joint (2.6-7.9 mm at rest, 95-100% of its poses)"),
+    ],
+}
+
+
+def _self_collision(root: ET.Element, robot: str, decl: dict, keep=()) -> dict:
+    """Replace the library's self-collision pairs by the full set (above). keep: pairs (geom1, geom2) a hand adds
+    itself (a finger hand's thumb x its fingers), left out here. Returns {"pairs": n, "excluded": [(b1, b2, why)]}."""
+    contact = root.find("contact")
+    if contact is None:
+        contact = ET.SubElement(root, "contact")
+    for p in list(contact.findall("pair")):          # the library's pairs (all inside this set)
+        if re.fullmatch(r"selfcol_\d+", p.get("name") or ""):
+            contact.remove(p)
+    defaults: dict[str, dict] = {}
+
+    def scan(el, name, inherited):
+        own = dict(inherited)
+        for g in el.findall("geom"):
+            own.update(g.attrib)
+        defaults[name] = own
+        for c in el.findall("default"):
+            scan(c, c.get("class"), own)
+
+    top = root.find("default")
+    if top is not None:
+        scan(top, "main", {})
+    parts = {k: re.compile(v) for k, v in decl["parts"].items()}
+    ignore = re.compile(decl["ignore_geoms"]) if decl.get("ignore_geoms") else None
+    rules = dict(decl.get("rules", {}))
+    ex = [(re.compile(e["bodies"][0]), re.compile(e["bodies"][1]), e["reason"]) for e in decl.get("exclude", [])]
+    ex += [(re.compile(a.format(s=s)), re.compile(b.format(s=s)), why)
+           for a, b, why in SELF_EXCLUDE.get(robot, []) for s in SIDES]
+    wb = root.find("worldbody")
+    pelvis = next(b for b in wb.findall("body") if b.get("name") == "pelvis")
+    info: dict = {}                                   # body name -> (part, hand, weld group, parent's weld group)
+    geoms: list = []                                  # (geom, body, part, hand, weld group)
+
+    def walk(b, cls, part, hand, weld, pweld):
+        name = b.get("name") or ""
+        cls = b.get("childclass") or cls
+        own = next((k for k, rx in parts.items() if rx.fullmatch(name)), None)
+        if own is not None:
+            part = own
+        # the hand: the wrist mount and all below it (pad, tool, real hand), the H1-2's Inspire fingers (L_*, R_*)
+        hand = hand or name.endswith("_mount") or name.startswith(("L_", "R_"))
+        if b.find("joint") is not None or b.find("freejoint") is not None:
+            pweld, weld = weld, name
+        info[name] = (part, hand, weld, pweld)
+        k = 0
+        for g in b.findall("geom"):
+            a = dict(defaults.get(g.get("class") or cls, {}))
+            a.update(g.attrib)
+            if int(a.get("contype", "1")) == 0 and int(a.get("conaffinity", "1")) == 0:
+                continue                              # a look
+            if g.get("name") is None:
+                g.set("name", f"{name}_sc{k}")
+                k += 1
+            if ignore is not None and ignore.fullmatch(g.get("name")):
+                continue                              # a sensing volume (the kick's strike boxes)
+            geoms.append((g.get("name"), name, part, hand, weld))
+        for c in b.findall("body"):
+            walk(c, cls, part, hand, weld, pweld)
+
+    walk(pelvis, pelvis.get("childclass") or "main", None, False, "world", None)
+    pw = {w: p for _, _, w, p in info.values()}
+    kind = lambda p: "arm" if p.endswith("arm") else "leg" if p.endswith("leg") else "body"   # noqa: E731
+    keep = {tuple(sorted(k)) for k in keep}
+    excluded, seen, out = [], set(), []
+    for i in range(len(geoms)):
+        g1, b1, p1, t1, w1 = geoms[i]
+        for j in range(i + 1, len(geoms)):
+            g2, b2, p2, t2, w2 = geoms[j]
+            if b1 == b2 or p1 is None or p2 is None or tuple(sorted((g1, g2))) in keep:
+                continue
+            k1, k2 = kind(p1), kind(p2)
+            if k1 == "arm" and k2 == "arm":
+                if p1 == p2 and t1 and t2:
+                    continue                          # one hand's parts: the hand's own pairs (realhand.py)
+                if p1 == p2 and t1 != t2 and HAND_CARRIER.fullmatch(b1 if t2 else b2):
+                    continue                          # a hand x the wrist links that carry it (its palm's hull)
+            elif k1 == "leg" and k2 == "leg":
+                if not rules.get("leg_leg" if p1 != p2 else "same_leg", False):
+                    continue
+            elif "arm" not in (k1, k2):              # a leg x the body (pelvis, waist, torso); not body x body
+                if "leg" not in (k1, k2):
+                    continue
+            if w1 == w2 or pw.get(w1) == w2 or pw.get(w2) == w1:
+                key = tuple(sorted((b1, b2)))
+                if key not in seen:
+                    seen.add(key)
+                    excluded.append((*key, "one rigid group, or two joined by one joint (the joint's housing)"))
+                continue
+            hit = next((why for ra, rb, why in ex if (ra.fullmatch(b1) and rb.fullmatch(b2))
+                        or (ra.fullmatch(b2) and rb.fullmatch(b1))), None)
+            if hit is not None:
+                key = tuple(sorted((b1, b2)))
+                if key not in seen:
+                    seen.add(key)
+                    excluded.append((*key, hit))
+                continue
+            out.append((g1, g2))
+    for i, (g1, g2) in enumerate(out):
+        ET.SubElement(contact, "pair", name=f"selfcol_{i}", geom1=g1, geom2=g2, **SELF_PAIR)
+    return {"pairs": len(out), "excluded": excluded}
 
 
 def _yaw(quat) -> float:
@@ -546,7 +705,6 @@ class World:
             ET.SubElement(sens, "framequat", name=f"orientation_{where}", objtype="site", objname=s)
             ET.SubElement(sens, "gyro", name=f"gyro_{where}", site=s)
             ET.SubElement(sens, "accelerometer", name=f"accelerometer_{where}", site=s)
-        tools: list[tuple[str, str]] = []
         for side, kind in sc.real_hands.items():
             if side not in SIDES or kind not in realhand.KINDS or side in sc.hand_tools:
                 raise ValueError(f"real_hands[{side!r}] = {kind!r}: a side, one of {realhand.KINDS}, and no hand tool there")
@@ -559,7 +717,6 @@ class World:
                 raise ValueError(f"real_hand_options[{side!r}]: only a finger hand (dex3, inspire) takes options")
         self._inspire_palm: dict[str, str] = {}
         hand_pairs: list[tuple[str, str]] = []
-        grippers: list[str] = []
         if sc.real_hands:                           # friction that holds: elliptic cones, stiff friction (realhand.py)
             opt = root.find("option")
             opt.set("cone", opt.get("cone", "elliptic"))
@@ -579,26 +736,21 @@ class World:
             if real:                                # the real hand (realhand.py): no pad, no weld
                 if kind == "dex1":
                     realhand.strip_hand(root, side, self.robot_name)
-                    geoms = realhand.build(root, mount, side, self.robot_name)
+                    realhand.build(root, mount, side, self.robot_name)
                 else:                               # a finger hand: the G1's fist goes; the H1-2's fingers get joints
                     if kind == "dex3":
                         realhand.strip_hand(root, side, self.robot_name)
                     build = realhand.build_dex3 if kind == "dex3" else realhand.build_inspire
-                    geoms, pairs = build(root, mount, side, self.robot_name, hand_opts.get(side, {}))
+                    _geoms, pairs = build(root, mount, side, self.robot_name, hand_opts.get(side, {}))
                     hand_pairs += pairs
                     if kind == "inspire":
                         self._inspire_palm[side] = realhand.inspire_palm_geom(root, side)
-                for g in geoms:
-                    tools.append((side, g))
-                    grippers.append(g)
                 continue
             if frag:
                 for i, el in enumerate(ET.fromstring(f"<x>{frag}</x>")):
                     if el.tag == "geom" and el.get("name") is None:
                         el.set("name", f"{side}_tool_g{i}")
                     mount.append(el)
-                    if el.tag == "geom" and el.get("contype", "1") != "0":
-                        tools.append((side, el.get("name")))
             else:
                 ET.SubElement(mount, "geom", name=f"{side}_palm_pad", type="box", pos="0 0 0.05", size="0.022 0.04 0.05",
                               contype="4", conaffinity="0", mass="0", group="3", rgba="0.15 0.15 0.17 1",
@@ -607,30 +759,13 @@ class World:
                 sc.grip_weld(side, name)
         _shells(root, set(sc.ground), {b for s in SIDES if sc.real_hands.get(s) == "inspire"
                                        for b in realhand.inspire_bodies(s)})
-        # A tool is part of the robot (contype 4, conaffinity 0), so like the body hulls it would pass through the
-        # robot itself: explicit pairs make it collide with every hull but those of the arm that carries it (the
-        # robot library's self-collision does the same for the bare hands).
+        # The robot's self-collision (SELF_PAIR, above): every hull, shell, palm pad, tool and real hand of the robot
+        # against the parts it can reach; a finger hand's thumb x its fingers are the hand's own pairs (realhand.py).
+        self.selfcol = _self_collision(root, self.robot_name, load_body(self.robot_name).decl["self_collision"],
+                                       keep=hand_pairs)
         contact = root.find("contact")
-        hulls = [(b.get("name"), g.get("name")) for b in root.iter("body") for g in b.findall("geom")
-                 if g.get("name") and "_sc" in g.get("name")]
-        for side, tool in tools:
-            own = (f"{side}_shoulder", f"{side}_elbow", f"{side}_wrist")
-            for body, hull in hulls:
-                if not body.startswith(own):
-                    ET.SubElement(contact, "pair", name=f"toolcol_{tool}_{hull}", geom1=tool, geom2=hull, condim="3")
-        for g1, g2 in hand_pairs:                   # a finger hand's thumb and its fingers
+        for g1, g2 in hand_pairs:                   # a finger hand's thumb and its fingers (realhand.py's own)
             ET.SubElement(contact, "pair", name=f"handcol_{g1}_{g2}", geom1=g1, geom2=g2, condim="3")
-        for g1 in grippers:                         # a gripper touches the other hand: its gripper, pad or tool
-            side = g1.split("_", 1)[0]
-            other = "right" if side == "left" else "left"
-            if other in sc.real_hands:
-                hand = [g for g in grippers if g.startswith(other + "_")] if side == "left" else []
-            elif other in sc.hand_tools:
-                hand = [t for s_, t in tools if s_ == other]
-            else:
-                hand = [f"{other}_palm_pad"]
-            for g2 in hand:
-                ET.SubElement(contact, "pair", name=f"handcol_{g1}_{g2}", geom1=g1, geom2=g2, condim="3")
         return ET.tostring(root, encoding="unicode")
 
     # ------------------------------------------------------------------ episode
