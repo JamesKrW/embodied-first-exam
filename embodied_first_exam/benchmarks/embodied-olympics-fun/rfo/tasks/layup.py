@@ -1,7 +1,8 @@
-"""Basketball layup (FIBA): the ball is held only by pressing it between the two bare palms (squeeze and friction, no
-grip); with it take at most two steps towards the basket, jump, let go of it in the air close to the ring, and it
-enters the basket from above. Official court, backboard, ring and size-7 ball; the Unitree H1-2. The court, travelling
-and two-palm hold blocks are copied byte-identically from dunk / dunk-between-legs."""
+"""Basketball layup (FIBA): the ball starts held in the H1-2's own two Inspire hands (rfo.realhand: five fingers each;
+contact and friction only, nothing welded), resting on the upturned right hand with the left hand on its side; with it
+take at most two steps towards the basket, jump, let go of it in the air close to the ring, and it enters the basket
+from above. Official court, backboard, ring and size-7 ball; the Unitree H1-2. The court, travelling and two-hand hold
+blocks are copied byte-identically from basketball-dribble."""
 import math
 import xml.etree.ElementTree as ET
 
@@ -217,60 +218,41 @@ class Travel:
 # ---- end of the travelling block ----
 
 
-# ---- the two-palm hold at the start ----
-# The H1-2's hands are the palm pads (4.4 x 8 x 10 cm boxes) on the wrist mounts; at rest their broad faces (the
-# mounts' +x) look at each other across the body, 0.294 m apart, and the ball is 0.239 m across. The start: upper
-# arms a little forward, forearms a little raised, upper arms turned in until both pads touch the ball in front of the
-# chest (HOLD, the right arm; the left one mirrored); the hold targets (the start command) are SQUEEZE further in, so
-# the shoulder servos press the ball: nothing else holds it. The arms have no gravity feed-forward, so under that
-# command they sag to SETTLED (measured: tests/test_dunk.py, 3 s of the start command): the robot starts
-# there, at rest, the ball where it then sits (BALL_OFFSET from the middle between the two pads). Rolling the upper
-# arms in does not work near the body: their hulls meet the torso's at shoulder roll 0.15 rad.
-# Measured (tests/test_dunk.py): the start command presses about 20 N on each palm (shoulder yaw 8 N m,
-# roll 5 N m) and holds the ball for the whole episode and under an extra 3.6 g; with both arms up and the shoulder
-# roll 0.12 rad (25 N m) past the touching pose the palms press about 40 N and hold an extra 1.1 g (1.6 g at the
-# roll's 40 N m); one palm alone loses the ball within about 0.1 s.
-HOLD = dict(shoulder_pitch=-0.20, shoulder_roll=0.0, shoulder_yaw=0.014, elbow_pitch=-0.30)
-SQUEEZE = dict(shoulder_yaw=0.06, shoulder_roll=0.05)
-SETTLED = dict(shoulder_pitch=-0.1708, shoulder_roll=0.0332, shoulder_yaw=0.0329, elbow_pitch=-0.2794,
-               elbow_roll=-0.0025, wrist_pitch=0.0132, wrist_yaw=-0.0625)
-BALL_OFFSET = (-0.0047, 0.0, -0.0065)
-MIRROR = ("shoulder_roll", "shoulder_yaw", "elbow_roll", "wrist_yaw")      # the joints whose sign flips on the left
-PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness and its centre along the forearm
-# The palm-ball contact. With the ball's own contact (its rule-book rebound, 0.85, a lightly damped spring) a ball
-# squeezed between two palms rattles and walks out of them in about a second, with pyramidal or elliptic friction
-# cones alike; a palm rebound of 0.42 drops it in 6 s, 0.27 lets it creep 5 mm/s. The palm is the soft part of a hand
-# and absorbs the ball: a critically damped contact (palm rebound 0.12, measured head-on at 3 m/s), with elliptic
-# friction cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py), holds a
-# still ball to 0.1 mm in 9 s. The floor, the ring and the backboard keep the ball's own contact (rebound 0.85).
-PALM_SOLREF, PALM_SOLIMP, PALM_MU, PALM_REBOUND = "0.005 1", "0.99 0.999 0.001", 0.7, 0.12
-CONE, IMPRATIO = "elliptic", 100.0
+# ---- the two-hand hold at the start (the H1-2's Inspire hands) ----
+# The ball is held as a player carries it before a play: resting on the upturned right hand, the fingers spread
+# forwards under it and curled a little round it (closure HOLD_CLOSURE), the left hand on its left side, the palm on
+# it. HOLD (each arm's joints, numeric inverse kinematics of both arms) puts the right palm under the ball and the left
+# palm on its side, each 2 mm into the ball's surface (the palm's face is PALM_FACE from the hand's grasp centre on a
+# ball this size); the start command keeps those arm targets and closures; nothing presses the ball but its weight and
+# the hands' own drives.
+HOLD = {"right": np.array([-0.4674, 0.2556, -0.335, 1.5041, 1.3391, -0.2658, 1.0833]),
+        "left": np.array([-0.2102, 0.0481, -0.724, 0.4173, 0.0342, -0.47, 0.7949])}
+HOLD_CLOSURE = {"right": 0.3, "left": 0.0}
+PALM_FACE, PALM_PRESS = 0.0265, 0.002
 
 
-def _joint(w, name: str) -> int:
-    return w.L.JOINTS.index(name + "_joint")
-
-
-def pad_face(w, side: str) -> tuple[np.ndarray, np.ndarray]:
-    """The centre of the pad's inner face (the mount's +x face) and its outward normal, in the world."""
-    d, b = w.d, w.robot.mount[side]
-    R = d.xmat[b].reshape(3, 3)
-    return d.xpos[b] + R @ np.array([PAD_HALF, 0.0, PAD_Z]), R[:, 0].copy()
-
-
-def ball_between_palms(w) -> None:
-    """t = 0: both arms settled in the hold, the ball between the pads; the targets (the start command) are HOLD +
-    SQUEEZE."""
+def ball_in_hands(w) -> None:
+    """t = 0: both arms in the hold, the ball on the upturned right palm (its centre PALM_FACE - PALM_PRESS less than a
+    ball radius out of the palm, along the palm's normal), the closures set; the start command keeps them."""
     r, d = w.robot, w.d
-    for side in ("right", "left"):
-        for jn in SETTLED:
-            s = -1.0 if side == "left" and jn in MIRROR else 1.0
-            i = _joint(w, f"{side}_{jn}")
-            d.qpos[r.qadr[i]] = s * SETTLED[jn]
-            r.arb.q_a[i] = r.arb.q_b[i] = s * (HOLD.get(jn, 0.0) + SQUEEZE.get(jn, 0.0))
+    a = w.L.ARMS.start
+    for i, side in enumerate(("left", "right")):
+        d.qpos[r.qadr[a + 7 * i:a + 7 * i + 7]] = HOLD[side]
+        r.arb.q_a[a + 7 * i:a + 7 * i + 7] = r.arb.q_b[a + 7 * i:a + 7 * i + 7] = HOLD[side]
+        w.hands.cmd[side] = HOLD_CLOSURE[side]
     mujoco.mj_kinematics(w.m, d)
-    c = [f + BALL["radius"] * n for f, n in (pad_face(w, "right"), pad_face(w, "left"))]
-    w.put("ball", (c[0] + c[1]) / 2 + np.array(BALL_OFFSET))
+    c, R = w.grasp_frame("right")
+    w.put("ball", c + R[:, 0] * (BALL["radius"] - PALM_FACE + PALM_PRESS))
+
+
+# The palm-ball contact (an explicit pair with the H1-2 model's own collision hull of the Inspire hand base, the palm:
+# PALM_GEOM). With the ball's own contact (its rule-book rebound, 0.85, a lightly damped spring) a ball on a palm
+# rattles off it. The palm is the soft part of a hand and absorbs the ball: a critically damped contact (palm rebound
+# 0.12, measured head-on at 3 m/s), with the elliptic friction cones and impratio 100 of every world with real hands
+# (rfo.realhand). The fingers' and the thumb's rubber pads keep their own contact (rfo.realhand: friction 1.0, stiff,
+# critically damped); the floor, the ring and the backboard keep the ball's own (rebound 0.85).
+PALM_SOLREF, PALM_SOLIMP, PALM_MU, PALM_REBOUND = "0.005 1", "0.99 0.999 0.001", 0.7, 0.12
+PALM_GEOM = "{side}_wrist_yaw_link_sc0"        # the hand base's hull in the H1-2 model (realhand.inspire_palm_geom)
 # ---- end of the hold ----
 
 
@@ -283,14 +265,15 @@ class Task(TaskBase):
                 "Equipment appendix (backboard, ring, size-7 ball), Art. 13 (how the ball is played), Art. 14 (control: "
                 "a player holds a live ball), Art. 16 (goal), Art. 25 (travelling)")
     deviations = [
-        "Art. 3 (equipment): the hands are flat rubber palm pads without fingers; the ball is held only by pressing it "
-        "between the two palms (friction), and it slips or drops when the arms do not press hard enough. It is let "
-        "go when no hand has been on it for {touch_gap_s} s.",
+        "the player's hands: the H1-2's own Inspire five-finger hands (six drives each: four fingers, the thumb's "
+        "flexion and rotation; fingertip forces 10 N, the thumb 15 N), each closed by one command; the ball is held "
+        "in the two hands by contact and friction alone (nothing is welded) and can slip or drop; it is let go when no "
+        "hand has been on it for {touch_gap_s} s.",
         "Art. 3 (equipment, the hand): the palm is modelled as the soft part of a hand: it absorbs the ball (a ball "
         "thrown at a still palm keeps "
         f"{PALM_REBOUND:.2f} of its speed) instead of bouncing it like the floor ({BALL['bounce']:.2f}); with the "
-        "ball's own floor rebound on the palms a squeezed ball rattles out of them within about a second. The floor, "
-        "the ring and the backboard keep the ball's rule-book rebound.",
+        "ball's own rebound a ball on a palm rattles off it. The fingers' rubber pads absorb it too (critically "
+        "damped); the floor, the ring and the backboard keep the ball's rule-book rebound.",
         "Art. 13: while the ball is in your hands it may touch no part of you but the hands (no ball held against the "
         "chest or between the forearms); intent cannot be judged.",
         "Basketball Equipment (basket): the ring is rigid (no pressure release) and the net is only drawn: it does not "
@@ -315,7 +298,7 @@ class Task(TaskBase):
                   layup_radius_m=1.25, max_steps=2, step_gap_s=0.03, foot_slide_m=0.20, air_min_s=0.05,
                   takeoff_speed_m_s=0.5, retouch_grace_s=0.05, touch_gap_s=0.03)
 
-    sentence = ("Make a layup: with the basketball pressed between your two palms take at most two steps towards the "
+    sentence = ("Make a layup: with the basketball held in your two hands take at most two steps towards the "
                 "basket, jump, and let go of the ball in the air close to the ring so that it enters the basket from "
                 "above.")
     rules = ("The official basket: a rigid ring of {ring_inner_diameter_m} m inner diameter ({ring_metal_m} m metal), "
@@ -323,9 +306,11 @@ class Task(TaskBase):
              "backboard {board_width_m} m wide and {board_height_m} m high whose lower edge is {board_bottom_m} m "
              "above the floor. The ball is a size-7 basketball (" + f"{2 * BALL['radius']:.3f} m across, "
              f"{BALL['mass']:.2f} kg, it keeps {BALL['bounce']:.2f} of its speed in a bounce on the floor" + "); it "
-             "flies in air (drag and spin lift). Your hands have no fingers and no grip: the ball starts pressed "
-             "between your two flat palms, and only the force of your arms and friction hold it; it can slip out. A "
-             "hand is the palm pad and the wrist; a hand is on the ball while it touches the ball, gaps shorter than "
+             "flies in air (drag and spin lift). Your hands are five-finger hands, each closed by its grip value (0 "
+             "open, 1 closed); they hold the ball only by contact and friction: it starts resting on your upturned "
+             "right hand, the fingers curled a little round it, your left hand on its side, and it can slip or drop. "
+             "A hand is the palm, the fingers, the thumb and the wrist; a hand is on the ball while it touches the "
+             "ball, gaps shorter than "
              "{touch_gap_s} s included; the ball is in your hands while at least one hand is on it, and you let go of "
              "it at the last touch of a hand after which no hand has been on it for {touch_gap_s} s. While the ball is "
              "in your hands it may touch no part of you but your hands, and it may not touch the floor. Travelling: "
@@ -351,15 +336,15 @@ class Task(TaskBase):
              "centre is {start_to_ring_m} m ahead of your pelvis, the backboard's face {ring_centre_to_board_m} m "
              "beyond it. Painted on the floor: the restricted area, the free-throw line and circle behind you, and "
              "the no-charge semi-circle ({layup_radius_m} m round the point under the ring, open towards the end "
-             "line). The ball is pressed between your two palms in front of your chest, its centre about 1.3 m above "
-             "the floor and 0.45 m ahead of your pelvis: your upper arms are a little forward, your forearms a little "
-             "raised and turned in so that the palms squeeze it; the start command keeps that squeeze (the joint "
-             "table's start angles are a little further in than the arms stand: the difference is the squeeze). Your "
-             "hands have no grip: the grip columns of the action rows do nothing in this task.")
-    difficulty = ("Two steps and a jump have to carry a 67 kg body almost two metres while the arms keep squeezing the "
-                  "ball through every footfall, and the release comes in the air, about a metre below a ring that is "
-                  "0.21 m wider than the ball: the palms have to open so that the ball leaves them with the speed of "
-                  "the arms' own push, since a palm does not bounce it. The robot has a walking gait and nothing that "
+             "line). The ball rests on your upturned right hand in front of your chest, its centre about 1.1 m above "
+             "the floor, 0.39 m ahead of your pelvis and 0.06 m to its right; the right hand's fingers point forwards "
+             "under it, curled a little round it (grip value 0.3), the left hand's palm is on its left side, open "
+             "(grip value 0); the start command keeps that hold. A grip value is that hand's closure command: 0 opens "
+             "the fingers, 1 closes every finger and the thumb until they meet something.")
+    difficulty = ("Two steps and a jump have to carry a 67 kg body almost two metres while the hands keep the ball "
+                  "through every footfall, and the release comes in the air, about a metre below a ring that is "
+                  "0.21 m wider than the ball: the hands have to let it go with the speed of the arms' own push, "
+                  "since a hand does not bounce it. The robot has a walking gait and nothing that "
                   "jumps or lands; the built-in walking gait steps on the spot even at a zero command, so while the "
                   "ball is in your hands its steps are counted like any others.")
 
@@ -367,19 +352,17 @@ class Task(TaskBase):
         p = self.p
         hx = p["start_to_ring_m"]
         self.hoop = build_court(sc, hx, 0.0, p)
-        sc.ball("ball", "basketball", (0.42, 0.0, 1.28))         # no grip: the ball is not grippable
-        opt = sc.root.find("option")
-        opt.set("cone", CONE)
-        opt.set("impratio", f"{IMPRATIO:g}")
+        sc.ball("ball", "basketball", (0.42, 0.0, 1.28))         # nothing is grippable: the hands hold it
+        sc.real_hands["left"] = sc.real_hands["right"] = "inspire"   # the H1-2's own hands (rfo.realhand)
         for side in ("left", "right"):
             ET.SubElement(sc.root.find("contact"), "pair", name=f"palm_ball_{side}", geom1="ball",
-                          geom2=f"{side}_palm_pad", condim="6",
+                          geom2=PALM_GEOM.format(side=side), condim="6",
                           friction=f"{PALM_MU} {PALM_MU} 0.003 {BALL['roll']} {BALL['roll']}", solref=PALM_SOLREF,
                           solimp=PALM_SOLIMP)
         sc.camera("venue", (hx - 3.4, -4.6, 2.6), (hx - 0.8, 0.0, 1.7), fovy=55)
 
     def reset(self, w):
-        ball_between_palms(w)
+        ball_in_hands(w)
 
     def referee_reset(self, w, ref):
         p, h = self.p, self.hoop
@@ -438,6 +421,11 @@ class Task(TaskBase):
                     ref.stage("approach")
                 return
             last = tr["last"]
+            if last is None:                          # (no hand has touched it since the start: it left them now)
+                air = fl.air and fl.cur is not None
+                last = {"t": round(ref.time, 4), "ball": [round(float(v), 4) for v in b],
+                        "air_s": round(ref.time - fl.cur["t0"], 4) if air else None,
+                        "takeoff_vz": tr["takeoff_vz"] if air else None}
             tr["released"] = last["t"]
             bad = tr["travel"].stop()
             if bad:
