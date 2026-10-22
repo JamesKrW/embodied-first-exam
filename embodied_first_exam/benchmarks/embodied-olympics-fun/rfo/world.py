@@ -49,14 +49,17 @@ from .referee import Referee  # noqa: E402
 from .scene import Scene  # noqa: E402
 
 # The robots of the library a task may use (Task.robot): the Unitree G1 (1.32 m, 33 kg, 29 joints; a walking and a running
-# policy) and the Unitree H1-2 (1.78 m, 67 kg, 27 joints; a walking policy), each with its real limits and motor curves.
+# policy) and the Unitree H1-2 (1.78 m, 67 kg, 27 joints; a walking policy; H2-class leg actuators, below), each
+# with its real limits and motor curves.
 ROBOTS = {
     "unitree_g1": dict(title="Unitree G1", height_m=1.32, run=True, walkers=True,
                        source="MuJoCo Menagerie's unitree_g1 with Unitree's joint, speed and torque limits and motor "
                               "torque-speed curves"),
     "unitree_h1": dict(title="Unitree H1-2", height_m=1.78, run=False, walkers=False,
-                       source="Unitree's own h1_2 model with its joint, speed and torque limits; Unitree's M107 "
-                              "torque-speed curves on the hips, torso and knees, estimates on the ankles and arms"),
+                       source="the H1-2 body (Unitree's own h1_2 model, its joint ranges and speed limits) with Unitree "
+                              "H2 / H2-X-class leg actuators from the H2's official URDF (hips and knees 360 N m, "
+                              "ankle pitch 66.88 N m; curves of Unitree's M107 shape, 2.5 kW peak per joint); "
+                              "Unitree's M107-15 curve on the torso, estimates on the ankle roll and the arms"),
 }
 BODY = load_body("unitree_g1")
 ROBOT_REVISION = BODY.revision
@@ -284,7 +287,72 @@ def unitree_actuators(m, robot) -> None:
         if "X1" in c:
             X1[i], X2[i] = c["X1"], c["X2"]
             Y1[i], Y2[i] = min(c["Y1"], a.tau_max[i]), min(c["Y2"], a.tau_max[i])
+    if robot.name == "unitree_h1":
+        h2x_legs(m, robot, keys, X1, X2, Y1, Y2)
     a._env = a.act.env = (X1, X2, Y1, Y2)
+
+
+# The H1-2 body with Unitree H2 / H2-X-class leg actuators, from the H2's official URDF (owner 2026-10-21: the H2-X is
+# shown with "high-torque joints"; Unitree publishes no H2 / H2-X motor data, so its legs are inferred from what is
+# published). Torque limits (the hard cap, as the URDF effort is for every Unitree robot): Unitree's H2.urdf
+# (unitreerobotics/unitree_ros robots/h2_description/H2.urdf, last commit 2026-07-08; unitree_mujoco h2_mujoco.xml has
+# the same actuatorfrcrange): hip yaw / pitch / roll 360 N m, knee 360 N m, ankle pitch 66.88 N m (its ankle roll, 19
+# N m, is weaker than the H1-2's 40: the H1-2's 40 N m stays); the H2 product page (unitree.com/H2): "max leg joint
+# torque 360 N m". Torque-speed curve: none is published, so each hip and knee motor takes the measured shape of the
+# M107 it replaces (UNITREE_ACTUATORS: M107_15 for the hips, M107_24 for the knee), scaled on both axes:
+#   torque: the curve's peak (its braking torque Y2) = the URDF effort 360 N m, Y1 = 360 / (Y2 / Y1 of the M107:
+#     182.8 / 150 = 1.2187 hips, 292.5 / 240 = 1.2188 knee) = 295.4 N m driving (Unitree's G1 has the same order:
+#     knee Y1 111 < Y2 131 < URDF 139);
+#   speed: the corner X1 so that the peak driving power Y1 x X1 is H2X_CORNER_W, the no-load X2 = X1 x (X2 / X1 of the
+#     M107: 25.6 / 14.0 = 1.829 hips, 16.0 / 8.8 = 1.818 knee); with that shape the power along the falling side never
+#     exceeds the corner's.
+# H2X_CORNER_W = 2.5 kW: the top of the sourced range of a real humanoid leg joint's peak power: Unitree's M107 curves
+# 2.10 / 2.11 kW at the corner (150 x 14.0, 240 x 8.8), BIT's BHR8-J1 knee measured 1.5 kW in a 0.5 m box jump (arXiv
+# 2506.12314, 2025); a flat 360 N m to the H2's URDF velocity of 20 rad/s would be 7.2 kW per joint. So: hips X1 8.46,
+# X2 15.5 rad/s; knee X1 8.46, X2 15.4 rad/s (the M107_24 had 8.8 / 16.0). The ankle pitch: 66.88 N m driving and
+# braking on the H1-2's own estimated speeds (body.toml [motors] ankle_pitch X1 6, X2 10 rad/s: 0.40 kW). Rotor inertia
+# and friction stay the M107's (UNITREE_ACTUATORS), the ankles' the model's. The H1-2's own URDF speed limits (hips 23,
+# knee 14, ankles 9 rad/s) still bound the joint targets.
+H2X_CORNER_W = 2500.0
+H2X_LEGS = {                                    # joint key: (URDF effort N m, the M107 class whose shape it takes)
+    "hip_yaw": (360.0, "M107_15"), "hip_pitch": (360.0, "M107_15"), "hip_roll": (360.0, "M107_15"),
+    "knee": (360.0, "M107_24"), "ankle_pitch": (66.88, None),
+}
+
+
+def h2x_legs(m, robot, keys, X1, X2, Y1, Y2) -> None:
+    """H2X_LEGS on the H1-2's legs: the torque limits everywhere the motor is clamped, and the curves (in place)."""
+    a = robot.arb
+    for i, k in enumerate(keys):
+        if k not in H2X_LEGS:
+            continue
+        eff, cls = H2X_LEGS[k]
+        if cls is None:
+            Y1[i] = Y2[i] = eff
+        else:
+            c = UNITREE_ACTUATORS[cls]
+            Y2[i] = eff
+            Y1[i] = eff / (c["Y2"] / c["Y1"])
+            X1[i] = H2X_CORNER_W / Y1[i]
+            X2[i] = X1[i] * (c["X2"] / c["X1"])
+        aid = int(a.aid[i])
+        jid = int(m.actuator_trnid[aid, 0])
+        m.actuator_ctrlrange[aid] = (-eff, eff)
+        if m.actuator_forcelimited[aid]:
+            m.actuator_forcerange[aid] = (-eff, eff)
+        if m.jnt_actfrclimited[jid]:
+            m.jnt_actfrcrange[jid] = (-eff, eff)
+        a.tau_max[i] = eff
+        a.act.tau_max[i] = eff
+        rig = robot.rig
+        if hasattr(rig, "laid") and hasattr(rig, "ltau"):
+            for n, la in enumerate(rig.laid):
+                if int(la) == aid:
+                    rig.ltau[n] = eff
+        if hasattr(rig, "aid") and hasattr(rig, "tau_lim"):
+            for n, la in enumerate(rig.aid):
+                if int(la) == aid:
+                    rig.tau_lim[n] = eff
 
 
 class Robot:
