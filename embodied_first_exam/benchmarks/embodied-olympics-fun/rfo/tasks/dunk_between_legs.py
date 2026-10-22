@@ -9,7 +9,6 @@ import xml.etree.ElementTree as ET
 import mujoco
 import numpy as np
 
-from rfo import realhand
 from rfo.referee import Crossing, HoopPass, Touch
 from rfo.scene import HITTABLE, OFFICIAL, VISUAL, bounce_solref
 from rfo.task import TaskBase
@@ -221,26 +220,27 @@ class Travel:
 
 # ---- the two-hand hold (the H1-2's own Inspire hands, rfo.realhand "inspire"; the same in free-throw,
 # catch-and-shoot, dunk and dunk-between-legs) ----
-# A two-handed hold as for a chest pass or a two-handed set shot: the palms on the ball's two sides, the fingers spread
-# up and forwards over it, both hands closed on it (a finger stops on what it touches), and the arms pressing the
-# palms in: the hold targets (the start command) turn the shoulders SQUEEZE_RAD further in (roll and yaw) than the
-# pose the arms stand in, so the shoulder servos squeeze the ball; nothing else holds it but the hands' contact and
-# friction (measured with the core of 10-21, H2-class arms and the Inspire at its 20 / 30 N defaults: held at 0.06
-# rad, the ball settling about 8 cm in the first 0.3 s onto the two thumbs and the palms' heels; with 0.03 rad, no
-# squeeze, or the fingers straight forwards or up, it drops within a second; one hand alone cannot hold it: the
-# Inspire spans about 0.2 m, the ball 0.24 m). HOLD_LEFT / HOLD_RIGHT: the arms' 7 joints (shoulder pitch, roll, yaw,
-# elbow pitch, roll, wrist pitch, yaw), from numerical inverse kinematics on the hands' grasp frames (each palm 1 cm
-# clear of the ball, the ball's centre BALL_AT ahead of and above the pelvis' start).
-BALL_AT = (0.40, 0.0, 1.20)
-HOLD_LEFT = (-0.43, 0.3529, -1.0318, 0.4546, 0.2074, -0.44, 1.24)
-HOLD_RIGHT = (-0.4301, -0.3529, 1.0321, 0.4546, -0.2073, -0.44, -1.24)
-SQUEEZE_RAD = 0.06
-HAND_CLOSED = {}                             # the hands' synergy: where each drive closes to (realhand's "closed")
+# A two-handed hold as for a chest pass or a two-handed set shot, the hands open (the fingers straight): the palms on
+# the ball's two sides, the fingers up and forwards beside it, and the arms pressing the palms in: the start command
+# (hold_targets) turns the shoulders SQUEEZE_RAD further in (roll and yaw) than TOUCH_LEFT / TOUCH_RIGHT, the pose in
+# which the palms just clear the ball, so the shoulder servos squeeze it; nothing else holds it but the hands' contact
+# and friction. On the Inspire the open thumb lies a little proud of the palm, so the ball bears on the two thumbs'
+# proximal and middle links (measured with the core of 10-22, H2-class arms, self-collision on: about 57 N normal per
+# hand, half the friction used, the elbows 8.6 cm off the torso; with the fingers closed over the ball it rests on
+# the thumbs alone, about 8 cm lower). HOLD_LEFT / HOLD_RIGHT: where the arms stand under that squeeze with the
+# ball's centre at BALL_AT (ahead of and above the pelvis' start): the settled hold, measured, so the start is at
+# rest. The arms' 7 joints: shoulder pitch, roll, yaw, elbow pitch, roll, wrist pitch, yaw.
+BALL_AT = (0.39, 0.0, 1.13)
+TOUCH_LEFT = (-0.43, 0.3529, -1.0318, 0.4546, 0.2074, -0.44, 1.24)
+TOUCH_RIGHT = (-0.4301, -0.3529, 1.0321, 0.4546, -0.2073, -0.44, -1.24)
+HOLD_LEFT = (-0.3867, 0.3303, -1.0768, 0.5032, 0.1042, -0.4638, 1.2792)
+HOLD_RIGHT = (-0.3867, -0.3303, 1.0768, 0.5032, -0.1042, -0.4638, -1.2792)
+SQUEEZE_RAD = 0.10
 
 
 def hold_targets(side: str) -> np.ndarray:
-    """The squeezing targets of an arm: its hold pose with the shoulder's roll and yaw SQUEEZE_RAD further in."""
-    q = np.array(HOLD_RIGHT if side == "right" else HOLD_LEFT, float)
+    """The squeezing targets of an arm: the touching pose with the shoulder's roll and yaw SQUEEZE_RAD further in."""
+    q = np.array(TOUCH_RIGHT if side == "right" else TOUCH_LEFT, float)
     s = 1.0 if side == "right" else -1.0
     q[1] += s * SQUEEZE_RAD
     q[2] += s * SQUEEZE_RAD
@@ -248,8 +248,8 @@ def hold_targets(side: str) -> np.ndarray:
 
 
 def ball_in_hands(w, arms_only: bool = False) -> None:
-    """The arms in the hold (the start command: the squeezing targets) and, unless arms_only, the ball between the
-    palms with both hands closed on it, the rest of the world held still while they close (realhand's close_on)."""
+    """The arms in the settled hold, the start command the squeezing targets, the hands open, and, unless arms_only,
+    the ball between the palms where the squeeze holds it."""
     r, d = w.robot, w.d
     a = w.L.ARMS.start
     for idx, side in ((slice(a, a + 7), "left"), (slice(a + 7, a + 14), "right")):
@@ -259,58 +259,7 @@ def ball_in_hands(w, arms_only: bool = False) -> None:
     if arms_only:
         return
     w.put("ball", BALL_AT)
-    close_both(w)
-
-
-def close_both(w, settle_s: float = 0.3) -> None:
-    """Both hands closed on the ball together, the rest of the world held still (realhand's close_on for two hands):
-    the ball held in place while the fingers close at their drives' speeds until every drive has stalled or reached
-    its target, then let go to settle between the hands for settle_s. Raises unless both hands then touch it."""
-    m, d, hands = w.m, w.d, w.hands
-    qa, va = w.free["ball"]
-    keep_q = np.ones(m.nq, dtype=bool)
-    keep_v = np.ones(m.nv, dtype=bool)
-    for s_ in ("left", "right"):
-        hands.cmd[s_] = 1.0
-        keep_q[hands.hq[s_]] = keep_v[hands.hv[s_]] = False
-    mujoco.mj_forward(m, d)
-    q0 = d.qpos.copy()
-    arm0 = m.dof_armature.copy()
-    m.dof_armature[keep_v] = realhand.FREEZE_ARMATURE
-    m.dof_armature[va:va + 6] = arm0[va:va + 6]
-    free, still, settled = False, 0, 0
-    try:
-        for _ in range(int(round(2.0 / m.opt.timestep))):
-            sp0 = hands._sp.copy()
-            hands.substep()
-            mujoco.mj_step(m, d)
-            d.qpos[keep_q] = q0[keep_q]
-            d.qvel[keep_v] = 0.0
-            if not free:
-                d.qpos[qa:qa + 7] = q0[qa:qa + 7]
-                d.qvel[va:va + 6] = 0.0
-                still = still + 1 if np.allclose(hands._sp, sp0, atol=1e-9) else 0
-                if still >= 20:
-                    free = True
-                    keep_q[qa:qa + 7] = False
-                    keep_v[va:va + 6] = False
-            else:
-                settled += 1
-                if settled * m.opt.timestep >= settle_s:
-                    break
-    finally:
-        m.dof_armature[:] = arm0
-    for s_ in ("left", "right"):
-        d.qvel[hands.hv[s_]] = 0.0
-    d.qvel[va:va + 6] = 0.0
-    hands._vs[:] = 0.0
-    mujoco.mj_forward(m, d)
-    hands.update_held()
-    ball = set(np.flatnonzero(m.geom_bodyid == m.body("ball").id))
-    for s_ in ("left", "right"):
-        g = set(hands.group_geoms(w, s_, "hand"))
-        if not any((c.geom1 in g and c.geom2 in ball) or (c.geom2 in g and c.geom1 in ball) for c in d.contact[:d.ncon]):
-            raise RuntimeError(f"the {s_} hand does not touch the ball after closing")
+    mujoco.mj_forward(w.m, d)
 # ---- end of the hold ----
 
 
@@ -386,7 +335,7 @@ class Task(TaskBase):
         "The ball stays the size-7 ball.",
         "Art. 3 (equipment, the hands): the hands are the H1-2's own Inspire five-finger hands (six drives: four "
         "fingers, the thumb's flexion and rotation), closed by one command per hand; the ball is held by the hands' "
-        "contact and friction alone (the palms pressed on its sides by the arms, the fingers closed over it) and "
+        "contact and friction alone (the open palms pressed on its sides by the arms) and "
         "slips or drops when they do not hold it. It is dribbled by pushing it with a hand (the palm and the "
         "fingers).",
         "Art. 24.1.2 (the ball 'comes to rest' in a hand) is read as: a touch of one hand that lasts longer than "
@@ -439,7 +388,7 @@ class Task(TaskBase):
              "{board_width_m} m wide and {board_height_m} m high whose lower edge is {board_bottom_m} m above the "
              "floor. The ball is a size-7 basketball (" + f"{2 * BALL['radius']:.3f} m across, {BALL['mass']:.2f} kg, "
              f"it keeps {BALL['bounce']:.2f} of its speed in a bounce on the floor" + "). Your hands are five-finger "
-             "hands: the ball starts held between them, the palms pressed on its sides and the fingers closed over it, "
+             "hands: the ball starts held between them, the palms pressed on its sides and the hands open, "
              "and only the hands' contact and friction hold it; it can slip out. A hand is the palm, the fingers and "
              "the wrist; a hand is on the ball while it touches the ball, gaps shorter than {touch_gap_s} s included; the ball is in your hands while at least "
              "one hand is on it. "
@@ -506,9 +455,9 @@ class Task(TaskBase):
              "you. The ring's top edge is {ring_height_m} m above the floor. Painted on the floor: the boundary "
              "lines, the restricted area, the free-throw line and circle, the three-point line, the no-charge "
              "semi-circle, the centre line and circle. The ball is held between your two hands in front of your "
-             "chest, its centre 1.20 m above the floor and 0.40 m ahead of your pelvis: the palms on its two sides, "
-             "the fingers spread up and forwards over it and closed on it (grip values 1), and the arms pressing "
-             "the palms in (the start command's shoulder roll and yaw are a little further in than the arms stand: "
+             "chest, its centre 1.13 m above the floor and 0.39 m ahead of your pelvis: the hands open (grip values 0, "
+             "the fingers straight), the palms on its two sides (on these hands it bears on the two thumbs, which "
+             "lie a little proud of the palms), and the arms pressing the palms in (the start command's shoulder roll and yaw are a little further in than the arms stand: "
              "the difference is the squeeze). A grip value is that hand's closure command (0 open, 1 every finger "
              "and thumb joint closing towards its closed angle; a finger stops on what it touches).")
     difficulty = ("Every touch of the dribble has to push the ball down with a hand, and one bounce has to go "
