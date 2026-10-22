@@ -393,7 +393,8 @@ class RealHands:
 # the mount's pose; the rubber fist it replaces goes (its mass stays in the wrist link: about 0.1 kg, not separable).
 #
 # THE INSPIRE RH56DFX ("inspire", the H1-2). The H1-2's own five-finger hand (Inspire Robots RH56DFX: 6 DoF, 12
-# joints, 6 linear servo drives, self-locking; fingertip force 10 N per finger, 15 N the thumb; four-finger flexion
+# joints, 6 linear servo drives, self-locking; fingertip force 10 N per finger, 15 N the thumb, here 2 x that: H2-class,
+# INSPIRE_TIP_N; four-finger flexion
 # 260 deg/s, thumb rotation 107 deg/s, thumb flexion 70 deg/s, closing 0.8 s; 540 g; passive load 8 kg per finger;
 # the maker's listing via Knoxlabs, 2026-10). The H1-2's model already carries its finger links (Unitree unitree_rl_gym
 # h1_2.xml, commit 276801e, and unitree_ros h1_2.urdf: their frames, meshes, masses, inertias), fixed there: here they
@@ -465,13 +466,20 @@ DEX3_THUMB = ("thumb_0", "thumb_1", "thumb_2")
 
 # --- the Inspire RH56DFX (Unitree's h1_2 joints; L_ / R_ bodies of the H1-2 model)
 # drive: (name, driven joint, coupled joints [(joint, ratio)], open, closed, speed rad/s, fingertip force N, group)
+# The fingertip forces are H2-class (owner 2026-10-21: the H1-2 made H2-class): 2 x the RH56DFX's 10 N per finger and
+# 15 N the thumb, i.e. 20 N and 30 N. Basis: Unitree's H2 Plus is offered with Sharpa Wave hands of 20 N fingertip
+# force; Inspire's own RH56E2 gives 28 / 30 N; the hands of this size in the humanoid-specs survey are 2-3 x the
+# RH56DFX (/data/kangrui/tmp/eo1020/humanoid-specs/table.md). The kinematics, speeds, the self-locking passive load
+# (8 kg per finger) and the mass stay the RH56DFX's. A family's grip_scale multiplies these defaults.
+INSPIRE_TIP_N = {"thumb": 30.0, "fingers": 20.0}
+INSPIRE_TIP_DEVICE_N = {"thumb": 15.0, "fingers": 10.0}  # the RH56DFX itself (the maker's listing)
 INSPIRE_FINGERS = ("index", "middle", "ring", "pinky")
 INSPIRE_DRIVES = [
-    ("thumb_yaw", "thumb_proximal_yaw", [], 0.0, 1.10, math.radians(107.0), 15.0, "thumb"),
+    ("thumb_yaw", "thumb_proximal_yaw", [], 0.0, 1.10, math.radians(107.0), INSPIRE_TIP_N["thumb"], "thumb"),
     ("thumb_pitch", "thumb_proximal_pitch", [("thumb_intermediate", 1.6), ("thumb_distal", 2.4)], 0.0, 0.5,
-     math.radians(70.0), 15.0, "thumb"),
-] + [(f, f"{f}_proximal", [(f"{f}_intermediate", 1.0)], 0.0, 1.7, math.radians(260.0), 10.0, "fingers")
-     for f in INSPIRE_FINGERS]
+     math.radians(70.0), INSPIRE_TIP_N["thumb"], "thumb"),
+] + [(f, f"{f}_proximal", [(f"{f}_intermediate", 1.0)], 0.0, 1.7, math.radians(260.0), INSPIRE_TIP_N["fingers"],
+      "fingers") for f in INSPIRE_FINGERS]
 # joint: (body, axis left, axis right, range)
 INSPIRE_JOINTS = {
     "thumb_proximal_yaw": ("thumb_proximal_base", "0 0 1", "0 0 -1", (-0.1, 1.3)),
@@ -917,7 +925,9 @@ class FingerHands:
                      "motor; MuJoCo Menagerie g1_with_hands kinematics)" if kind == "dex3" else
                      "the H1-2's Inspire RH56DFX five-finger hand (6 self-locking linear drives for 12 joints: the "
                      "thumb's rotation and flexion, one drive per finger with its two joints coupled; Unitree's "
-                     "h1_2 kinematics)")
+                     "h1_2 kinematics) with H2-class fingertip forces: 20 N per finger and 30 N the thumb, 2 x the "
+                     "RH56DFX's 10 / 15 N (Unitree's H2 Plus offers 20 N Sharpa Wave hands; Inspire's RH56E2 gives "
+                     "28 / 30 N)")
             out["hands"][s] = {
                 "kind": kind, "model": model, "grip_scale": k,
                 "drives": drives,
