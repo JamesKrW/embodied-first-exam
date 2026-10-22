@@ -1,7 +1,8 @@
 """Catch a fly ball: a baseball thrown from 40 m away on a high arc that comes down within 3 m of you. Both hands of
-the Unitree H1-2 are Unitree Dex1-1 two-jaw grippers (rfo/realhand.py): a catch is the jaws of one gripper closing on
-the ball (the baseball, 73 mm, fits the 90 mm stroke), and the ball is held only by the friction of the jaws' pads,
-so it can slip out, turn and drop. A real fly ball (official ball, drag and lift in air).
+the Unitree H1-2 are its own Inspire five-finger hands (rfo/realhand.py, "inspire": six self-locking drives, the
+fingers moving): a catch is one hand's fingers and its thumb or palm closing on the ball from its two sides, and the
+ball is held only by their contact and friction, so it can slip out, turn and drop. A real fly ball (official ball,
+drag and lift in air).
 
 The fly ball is thrown by a machine, as fly-ball practice is: a two-wheel pitching machine (the shared ball machine
 block below, preset "baseball": JUGS-type pneumatic wheels on speed-controlled, torque-limited motors; the ball fed
@@ -746,19 +747,28 @@ LEGAL = {"left_hand", "right_hand", "left_forearm", "right_forearm"}
 SIDES = ("left", "right")
 
 
-def pinched(w, ball: int, pads, centre: int, cos_max: float) -> bool:
-    """Both jaws' pads (two geom masks) touch the geom `ball` with a contact normal within acos(cos_max) of the
-    closing axis of the jaw frame (the site `centre`), in this physics step's contacts."""
+def enclosed(w, ball: int, groups, cos_max: float) -> bool:
+    """The hand's two groups (geom masks: its fingers; its thumb and palm) both touch the geom `ball`, pressing on it
+    from opposite sides: the mean direction of the fingers' contacts and that of the thumb's and palm's contacts (each
+    pointing from the hand into the ball) are at least acos(cos_max) apart, in this physics step's contacts. A ball
+    lying on an open hand (palm and fingers pushing it the same way) is not enclosed."""
     d = w.d
     n = d.ncon
     g = d.contact.geom[:n]
     keep = d.contact.dist[:n] <= 0.0
-    x = d.site_xmat[centre].reshape(3, 3)[:, 0]
-    for pad in pads:
-        sel = keep & (((g[:, 0] == ball) & pad[g[:, 1]]) | ((g[:, 1] == ball) & pad[g[:, 0]]))
-        if not np.any(np.abs(d.contact.frame[:n][sel, :3] @ x) >= cos_max):
+    nrm = d.contact.frame[:n, :3]
+    dirs = []
+    for grp in groups:
+        a = keep & (g[:, 1] == ball) & grp[g[:, 0]]        # the normal points from geom 1 (the hand) to the ball
+        b = keep & (g[:, 0] == ball) & grp[g[:, 1]]        # ... or from the ball to the hand: flipped
+        if not (a.any() or b.any()):
             return False
-    return True
+        v = nrm[a].sum(axis=0) - nrm[b].sum(axis=0)
+        nv = float(np.linalg.norm(v))
+        if nv < 1e-9:
+            return False
+        dirs.append(v / nv)
+    return float(dirs[0] @ dirs[1]) <= cos_max
 
 
 class Task(TaskBase):
@@ -770,18 +780,17 @@ class Task(TaskBase):
                 "possession in the hand before the ball touches the ground, held long enough to show control), \"in "
                 "flight\"")
     deviations = [
-        "Definitions (catch): no glove; both hands are Unitree's Dex1-1 two-jaw grippers (sold for the G1, the H2 and "
-        "the R1, not for the H1-2; mounted on the wrist where the H1-2's palm ends): 90 mm stroke, jaws 80 mm long "
-        "and 34 mm wide with rubber pads, at most 120 N of grip, opening and closing at most 375 mm/s. A catch is the "
-        "pads of both jaws of one gripper pressing on the ball from its two sides at the same time (each with a "
-        "contact whose direction is within {max_contact_angle_deg} degrees of the jaws' closing direction: the jaws "
-        "closed on it, not a ball lying on their tips or edges), at the latest {catch_window_s} s after the ball "
-        "first touched you; \"held long enough\" is {hold_s} s in which the ball "
-        "stays between the pads of that gripper (breaks of at most {hold_gap_s} s) and touches nothing else, without "
-        "falling. Nothing is welded: the ball is held only by the pads' friction and can slip out.",
-        "Definitions (catch): a ball that touches the body (any part other than the grippers and the forearms) before "
+        "Definitions (catch): no glove; both hands are the H1-2's own Inspire five-finger hands (six self-locking "
+        "drives; 10 N at each fingertip, 15 N at the thumb; a full close in about 0.8 s), bare. A catch is one hand "
+        "enclosing the ball: its fingers and its thumb or palm touching the ball at the same time from opposite "
+        "sides (the mean directions of the two contacts at least {opposed_deg} degrees apart: the hand closed on it, "
+        "not a ball lying on an open hand), at the latest {catch_window_s} s after the ball first touched you; "
+        "\"held long enough\" is {hold_s} s in which the ball stays enclosed in that hand (breaks of at most "
+        "{hold_gap_s} s) and touches nothing else, without falling. Nothing is welded: the ball is held only by the "
+        "fingers' contact and friction and can slip out.",
+        "Definitions (catch): a ball that touches the body (any part other than the hands and the forearms) before "
         "it is caught is not a catch here (the rule would allow trapping it against the body), and neither is a ball "
-        "held at the end by anything but the jaws of the gripper that caught it (the other hand, a forearm, the body).",
+        "held at the end by anything but the hand that caught it (the other hand, a forearm, the body).",
         "The fly ball is not batted: a two-wheel pitching machine {launch_distance_m} m away throws it at about "
         "{launch_speed_m_s} m/s, about {launch_elevation_deg} degrees above the horizon, about {launch_time_s} s "
         "after the start, with the little spin its wheels give it; where it comes down (within {land_within_m} m of "
@@ -795,11 +804,11 @@ class Task(TaskBase):
     # the nominal launch (with drag it lands 1.28 m from the robot); the machine's aim is trimmed to land there
     params = dict(launch_time_s=1.0, launch_distance_m=40.0, launch_height_m=1.0, launch_speed_m_s=21.35,
                   launch_elevation_deg=45.0, launch_azimuth_deg=1.18, land_within_m=3.0, hold_s=1.0,
-                  catch_window_s=0.5, hold_gap_s=0.02, max_contact_angle_deg=45.0, fall_pelvis_m=0.50,
+                  catch_window_s=0.5, hold_gap_s=0.02, opposed_deg=90.0, fall_pelvis_m=0.50,
                   machine_speed_m_s=21.17, machine_elevation_deg=45.0, machine_azimuth_deg=1.20, feed_lead_s=0.106)
 
-    sentence = ("Catch the fly ball: close the jaws of one of your grippers on the baseball before it touches the "
-                "ground or your body, and keep it there.")
+    sentence = ("Catch the fly ball: close one of your hands on the baseball before it touches the ground or your "
+                "body, and keep it there.")
     rules = ("A baseball (" + f"{2 * BALL['radius']:.3f} m across, {BALL['mass']:.3f} kg" + ", it flies in air with "
              "drag) is thrown by a two-wheel pitching machine {launch_distance_m} m in front of you: it leaves the "
              "machine's wheels {launch_height_m} m above the ground at about t = {launch_time_s} s, at about "
@@ -807,30 +816,30 @@ class Task(TaskBase):
              "{launch_azimuth_deg} degrees to the left of the line from the machine to you (it is launched when it "
              "has left the wheels), so that "
              "untouched it would come down within {land_within_m} m of where you stand at the start. Both your hands "
-             "are two-jaw grippers (90 mm stroke, jaws 80 mm long with rubber pads on their inner faces, at most 120 N "
-             "of grip) that hold things only by friction; they start open. A catch: the pads of both jaws of one "
-             "gripper touch the ball at the same time from its two sides, each with a contact whose direction is "
-             "within {max_contact_angle_deg} degrees of the jaws' closing direction (a ball lying on the jaws' tips "
-             "or edges, or on closed jaws, is not caught), after the ball has passed the top of its arc and at the latest "
-             "{catch_window_s} s after it first touched you. Before the catch the ball may touch only your grippers "
-             "and forearms. You succeed when, from the catch, the ball has stayed between the pads of that gripper "
-             "for {hold_s} s (both pads touching it in that way, apart from breaks of at most {hold_gap_s} s) touching nothing "
-             "but that gripper. You fail if the ball touches the ground, or any part of you other than a gripper or a "
+             "are five-finger hands (a thumb and four fingers, one closure command per hand) that hold things only by "
+             "contact and friction; they start open. A catch: one hand's fingers and its thumb or palm touch the ball "
+             "at the same time from opposite sides (the mean directions of the fingers' contacts and of the thumb's "
+             "and palm's contacts at least {opposed_deg} degrees apart: a ball lying on an open hand is not caught), "
+             "after the ball has passed the top of its arc and at the latest "
+             "{catch_window_s} s after it first touched you. Before the catch the ball may touch only your hands "
+             "and forearms. You succeed when, from the catch, the ball has stayed enclosed in that hand "
+             "for {hold_s} s (apart from breaks of at most {hold_gap_s} s) touching nothing "
+             "but that hand. You fail if the ball touches the ground, or any part of you other than a hand or a "
              "forearm, before the catch; if it is touched before it has passed the top of its arc; if it is not "
-             "caught within {catch_window_s} s of first touching you; if after the catch it is out of the jaws for "
+             "caught within {catch_window_s} s of first touching you; if after the catch it is out of the hand for "
              "longer than {hold_gap_s} s (dropped, slipped out or let go: a ball caught again does not count) or "
-             "touches anything but the gripper that caught it (your other gripper, a forearm, your body, the "
+             "touches anything but the hand that caught it (your other hand, a forearm, your body, the "
              "ground); if you fall (your pelvis lower than {fall_pelvis_m} m above the ground, or any part of you "
              "other than your feet on the ground) before the end; or after {time_limit_s} s.")
     venue = ("You stand on a level field facing the pitching machine (+x), {launch_distance_m} m away, its head "
              "tilted up towards you. The ball rises to "
              "about 11 m and comes down steeply, about three seconds after the launch, somewhere within "
-             "{land_within_m} m of you. Your grippers are open, their jaws pointing forwards along your forearms. "
+             "{land_within_m} m of you. Your hands are open, the fingers pointing forwards along your forearms. "
              "Still air.")
     difficulty = ("The ball is in the air for three seconds and comes down at about 17 m/s more than a metre away: "
-                  "the body has to walk there at 0.6 m/s and bring a gripper whose open jaws leave 8 mm on each side "
-                  "of the ball onto its line, and the jaws need about 40 ms to close on it, while a ball that meets "
-                  "the gripper at that speed bounces off it in a few milliseconds.")
+                  "the body has to walk there at 0.6 m/s and bring an open hand onto its line, and the fingers need "
+                  "a few tenths of a second to close round it, while a ball that meets the hand at that speed "
+                  "bounces off it in a few milliseconds.")
 
     def launch_state(self):
         p = self.p
@@ -844,13 +853,13 @@ class Task(TaskBase):
     def build(self, sc):
         p = self.p
         self.fall_z = p["fall_pelvis_m"]
-        sc.real_hands["left"] = sc.real_hands["right"] = "dex1"
+        sc.real_hands["left"] = sc.real_hands["right"] = "inspire"
         x, z = p["launch_distance_m"], p["launch_height_m"]
         sc.disc("field_mark", (0.0, 0.0), p["land_within_m"], rgba=(0.95, 0.95, 0.95, 0.18))
         self.machine = BallMachine("pitcher", "baseball", (x, 0.0, z), p["machine_speed_m_s"],
                                    p["machine_elevation_deg"], 180.0 + p["machine_azimuth_deg"])
         self.machine.build(sc)
-        sc.ball("ball", "baseball", self.machine.rest_pos())     # nothing grippable: no weld, only the jaws' friction
+        sc.ball("ball", "baseball", self.machine.rest_pos())     # nothing grippable: no weld, only the hands' friction
         sc.camera("venue", (-5.0, -7.0, 3.0), (8.0, 0.0, 3.0), fovy=60)
 
     def reset(self, w):
@@ -861,24 +870,24 @@ class Task(TaskBase):
     def referee_reset(self, w, ref):
         self.ball = ref.geoms(body="ball")
         self.ball_geom = w.m.geom("ball").id
-        self.cos_max = math.cos(math.radians(self.p["max_contact_angle_deg"]))
+        self.cos_max = math.cos(math.radians(self.p["opposed_deg"]))
         self.robot = ref.part("robot")
         self.other = self.robot & ~ref.part("hands", "forearms")
         self.hand = {s: ref.part(f"{s}_hand") for s in SIDES}
-        self.pads = {s: (ref.geoms(prefix=f"{s}_hand_pad_a"), ref.geoms(prefix=f"{s}_hand_pad_b")) for s in SIDES}
+        ng = w.m.ngeom
+        self.grips = {s: tuple(np.isin(np.arange(ng), w.hands.group_geoms(w, s, g)) for g in ("fingers", "thumb_palm"))
+                      for s in SIDES}
         self.not_hand = {s: ~(self.ball | self.hand[s]) for s in SIDES}
-        # first_touch: when the ball first touched you; caught: the side whose jaws hold it; clamp_t: the last time
-        # both of that side's pads touched it
+        # first_touch: when the ball first touched you; caught: the side whose hand holds it; clamp_t: the last time
+        # that hand enclosed it
         self.trackers = {"launched": False, "falling": False, "first_touch": None, "caught": None, "clamp_t": None}
 
     def clamped(self, w, ref, side) -> bool:
-        """The jaws closed on the ball: the pads of both jaws touch it from the two sides, each with a contact whose
-        normal is within max_contact_angle_deg of the jaws' closing axis (a ball lying on the jaws' tips or edges,
-        or on the closed jaws, is not between them)."""
-        a, b = self.pads[side]
+        """The hand closed on the ball: its fingers and its thumb or palm touch it from opposite sides (enclosed)."""
+        a, b = self.grips[side]
         if not (ref.touching(self.ball, a) and ref.touching(self.ball, b)):
             return False
-        return pinched(w, self.ball_geom, (a, b), w.hands.centre[side], self.cos_max)
+        return enclosed(w, self.ball_geom, (a, b), self.cos_max)
 
     def before_step(self, w):
         self.machine.write(w, w.t)
@@ -925,10 +934,10 @@ class Task(TaskBase):
         if self.clamped(w, ref, side):
             tr["clamp_t"] = round(ref.time, 4)
         elif ref.time - tr["clamp_t"] > p["hold_gap_s"] + 1e-9:
-            return ref.fail("the ball came out of the jaws after the catch", out_s=round(ref.time - tr["clamp_t"], 4))
+            return ref.fail("the ball came out of the hand after the catch", out_s=round(ref.time - tr["clamp_t"], 4))
         if ref.touching(self.ball, self.not_hand[side]):
             parts = sorted(ref.parts_touching(self.ball) - {f"{side}_hand"})
-            return ref.fail("after the catch the ball touched something other than the gripper that caught it",
+            return ref.fail("after the catch the ball touched something other than the hand that caught it",
                             parts=parts, ground=ref.touching(self.ball, ref.ground))
 
     def step(self, w, ref):
@@ -945,4 +954,4 @@ class Task(TaskBase):
                 "held_by": w.holder("ball"), "launched": bool(tr.get("launched")),
                 "launch_time_s": self.p["launch_time_s"], "launch_position": list(pos), "launch_velocity": list(vel),
                 "machine": self.machine.facts(),
-                "grippers": w.hands.state() if w.hands else {}}
+                "hands": w.hands.state() if w.hands else {}}
