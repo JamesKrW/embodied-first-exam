@@ -70,6 +70,10 @@ POLE_FRICTION = (0.4, 0.005, 0.0001)                     # fibreglass / the tip'
 CARRY_ARM = (0.0, -0.5, 0.5, 1.0, 0.633, 0.5, 0.0)       # the right arm carrying the pole: out to the side, the forearm
 #                                                          forwards and down, the hand turned so that the pole across
 #                                                          the palm lies level along +x, clear of the hip
+FREE_ARM_ROLL = 0.2                                       # rad: the free left arm's shoulder roll above the G1's rest
+#                                                          pose: at rest (0.2) the Dex3-1's thumb lies 32.8 mm inside
+#                                                          the hip's hull; at 0.4 it clears it by 46 mm (38 mm over 2 s
+#                                                          of the start command; tests/pv_stance.py)
 # The box (TR 28.8), in the vertical plane of the runway's middle: the bottom is 1.00 m long and slopes from the
 # runway's level at the front down to 0.20 m below it at the stop board; the stop board stands at 105 degrees to the
 # bottom, so it leans towards the landing area and its top inside edge (the "zero line", x = 0) is 0.10 m beyond its
@@ -308,6 +312,9 @@ class Task(TaskBase):
         a = w.L.ARMS.start + 7
         d.qpos[r.qadr[a:a + 7]] = CARRY_ARM
         r.arb.q_a[a:a + 7] = r.arb.q_b[a:a + 7] = CARRY_ARM
+        f = w.L.ARMS.start + 1                           # the free left arm off the hip (FREE_ARM_ROLL)
+        d.qpos[r.qadr[f]] = r.rest[f] + FREE_ARM_ROLL
+        r.arb.q_a[f] = r.arb.q_b[f] = r.rest[f] + FREE_ARM_ROLL
         mujoco.mj_kinematics(w.m, d)
         c, R = w.grasp_frame("right")                    # the pole across the palm (the grasp frame's y), at its
         ax = R[:, 1] if R[0, 1] >= 0.0 else -R[:, 1]     # middle, its tip (+x of its body) forwards
