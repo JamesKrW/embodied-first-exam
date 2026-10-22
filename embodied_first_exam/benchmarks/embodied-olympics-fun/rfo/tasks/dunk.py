@@ -1,7 +1,7 @@
-"""Basketball two-hand dunk on a lowered basket (FIBA): the ring at the FIBA
-Mini-Basketball height of 2.60 m and the start 0.75 m from the point under the ring. The ball is held between the two
+"""Basketball two-hand dunk on a lowered basket (FIBA): the ring at 2.39 m, below FIBA Mini-Basketball's 2.60 m,
+set at the robot's measured reach, and the start 0.75 m from the point under the ring. The ball is held between the two
 flat palms by squeeze and friction alone (no grip), the robot jumps, forces it down through the ring from above with
-both hands on it, and lands on its feet. Official court, size-7 ball, full-size backboard and ring lowered by 0.45 m;
+both hands on it, and lands on its feet. Official court, size-7 ball, full-size backboard and ring lowered by 0.66 m;
 the Unitree H1-2."""
 import math
 import xml.etree.ElementTree as ET
@@ -284,10 +284,12 @@ class Task(TaskBase):
                 "passes through the basket from below is a violation), Art. 25 (travelling), Art. 36 (technical foul: "
                 "hanging on the ring); FIBA Mini-Basketball Rules (the ring at 2.60 m)")
     deviations = [
-        "Basketball Equipment (basket): the basket is lowered by 0.45 m: the ring's top edge is {ring_height_m} m above "
-        "the floor, the ring height of FIBA Mini-Basketball, and the full-size backboard keeps its size and its height "
-        "relative to the ring (lower edge {board_bottom_m} m). The ball stays the size-7 ball. With the official ring at "
-        "3.05 m no H1-2 jump was found that gets the squeezed ball over the ring.",
+        "Basketball Equipment (basket): the basket is lowered: the ring's top edge is {ring_height_m} m above the "
+        "floor, below FIBA Mini-Basketball's 2.60 m (FIBA's own ring: 3.05 m), set at the robot's measured reach "
+        "(H1-2 with H2-class leg actuators: the ball held overhead between the palms reaches a centre height of "
+        "2.58 m in its own jump; the ring plus the ball's radius plus 0.02 m of entry is 0.05 m below that); the "
+        "full-size backboard keeps its size and its height relative to the ring (lower edge {board_bottom_m} m). "
+        "The ball stays the size-7 ball.",
         "Art. 3 (equipment): the hands are flat rubber palm pads without fingers; the ball is held only by pressing it "
         "between the two palms (friction), and it slips or drops when the arms do not press hard enough.",
         "Art. 3 (equipment, the hand): the palm is modelled as the soft part of a hand: it absorbs the ball (a ball "
@@ -312,14 +314,15 @@ class Task(TaskBase):
     start = (0.0, 0.0, 0.0)
     stages = ["dunk", "stand"]
     fall_z = 0.35                       # (set from params in build)
-    params = dict(ring_height_m=2.60, ring_inner_diameter_m=0.45, ring_metal_m=0.018, ring_centre_to_board_m=0.375,
-                  board_width_m=1.80, board_height_m=1.05, board_bottom_m=2.45, start_to_ring_m=0.75,
+    params = dict(ring_height_m=2.39, ring_inner_diameter_m=0.45, ring_metal_m=0.018, ring_centre_to_board_m=0.375,
+                  board_width_m=1.80, board_height_m=1.05, board_bottom_m=2.24, start_to_ring_m=0.75,
                   touch_gap_s=0.03, basket_touch_s=0.30, max_steps=2, step_gap_s=0.03, foot_slide_m=0.20, stand_s=1.0,
                   stand_speed_m_s=0.35, stand_upright_cos=0.94, fall_z_m=0.35)
 
     sentence = ("Dunk the basketball with both hands: holding it pressed between your two palms, jump, force it down "
                 "through the ring from above with both hands on it, and land on your feet.")
-    rules = ("The official basket: a rigid ring of {ring_inner_diameter_m} m inner diameter ({ring_metal_m} m metal), "
+    rules = ("The basket (official size, lowered): a rigid ring of {ring_inner_diameter_m} m inner diameter "
+             "({ring_metal_m} m metal), "
              "its top edge {ring_height_m} m above the floor, its centre {ring_centre_to_board_m} m in front of a "
              "backboard {board_width_m} m wide and {board_height_m} m high whose lower edge is {board_bottom_m} m "
              "above the floor. The ball is a size-7 basketball (" + f"{2 * BALL['radius']:.3f} m across, "
@@ -359,7 +362,8 @@ class Task(TaskBase):
              "grip: the grip columns of the action rows do "
              "nothing in this task.")
     difficulty = ("With both arms up and the ball pressed between the palms its centre is about 2.2 m above the "
-                  "floor; the ring is at 2.60 m, so the whole 67 kg body has to rise about half a metre while the arms keep "
+                  "floor; the ring is at 2.39 m, so the whole 67 kg body has to rise about a third of a metre (the "
+                  "ball's centre to about 2.53 m, near the 2.58 m the robot's own jump reaches) while the arms keep "
                   "squeezing the ball through the jump's accelerations, and the hands, wrists and forearms have to go "
                   "into a ring only 0.21 m wider than the ball, then the robot has to come down on its feet. The robot "
                   "has a walking gait and nothing that jumps or lands; the built-in walking gait steps on the spot "
