@@ -25,11 +25,15 @@ N_WEDGE = 48
 # physics over the arm's angles, its targets and where the shot touches the neck, every angle and target inside the
 # joints' ranges (a target outside them would make every plan be refused), then settled for 8 s: under the start
 # command the shot moves 4 mm relative to the hand and then rests, and the robot stands.
-SETTLED = dict(shoulder_pitch=-0.6816, shoulder_roll=0.1604, shoulder_yaw=0.2654, elbow_pitch=-0.8991,
-               elbow_roll=-0.8855, wrist_pitch=-0.4440, wrist_yaw=-1.1934)
+# Re-settled with the robot's self-collision (world.py, 2026-10-21): that stance had the hand's thumb (a look-only
+# finger then) 23 mm inside the shoulder's hull. Under the same start command, with the self-collision on, the arm
+# settles within 1 s with the thumb resting against the shoulder and the shot on the palm, and stays there for 8 s
+# (tests/sp_settle.py): SETTLED and SHOT_AT are that rest (the shot's centre 0.159 m from the neck line).
+SETTLED = dict(shoulder_pitch=-0.6882, shoulder_roll=0.1622, shoulder_yaw=0.2701, elbow_pitch=-0.8693,
+               elbow_roll=-0.9159, wrist_pitch=-0.4214, wrist_yaw=-1.1029)
 HOLD = dict(shoulder_pitch=-0.7315, shoulder_roll=0.1587, shoulder_yaw=0.3103, elbow_pitch=-0.8292,
             elbow_roll=-1.0113, wrist_pitch=-0.4500, wrist_yaw=-0.8479)
-SHOT_AT = (-0.0001, 0.0084, -0.0293)
+SHOT_AT = (-0.0001, 0.0071, -0.0015)
 PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness and its centre along the forearm
 # The palm-ball contact. The palm pad is the hand's rubber on a rigid mount; its contact with a ball is given the
 # restitution of a ball on a supported human hand: Ivanova, "Energy transfer evaluation in the 'striker-ball' system

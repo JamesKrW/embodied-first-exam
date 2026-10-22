@@ -12,7 +12,7 @@
   "hold_s": 1.0,
   "catch_window_s": 0.5,
   "hold_gap_s": 0.02,
-  "max_contact_angle_deg": 45.0,
+  "opposed_deg": 90.0,
   "fall_pelvis_m": 0.5,
   "machine_speed_m_s": 21.17,
   "machine_elevation_deg": 45.0,
@@ -28,16 +28,16 @@
  ],
  "rulebook": "Official Baseball Rules (MLB, 2024 edition): 3.01 (the ball), Definitions of Terms: \"catch\" (secure possession in the hand before the ball touches the ground, held long enough to show control), \"in flight\"",
  "deviations": [
-  "Definitions (catch): no glove; both hands are Unitree's Dex1-1 two-jaw grippers (sold for the G1, the H2 and the R1, not for the H1-2; mounted on the wrist where the H1-2's palm ends): 90 mm stroke, jaws 80 mm long and 34 mm wide with rubber pads, at most 120 N of grip, opening and closing at most 375 mm/s. A catch is the pads of both jaws of one gripper pressing on the ball from its two sides at the same time (each with a contact whose direction is within 45.0 degrees of the jaws' closing direction: the jaws closed on it, not a ball lying on their tips or edges), at the latest 0.5 s after the ball first touched you; \"held long enough\" is 1.0 s in which the ball stays between the pads of that gripper (breaks of at most 0.02 s) and touches nothing else, without falling. Nothing is welded: the ball is held only by the pads' friction and can slip out.",
-  "Definitions (catch): a ball that touches the body (any part other than the grippers and the forearms) before it is caught is not a catch here (the rule would allow trapping it against the body), and neither is a ball held at the end by anything but the jaws of the gripper that caught it (the other hand, a forearm, the body).",
+  "Definitions (catch): no glove; both hands are the H1-2's own Inspire five-finger hands (six self-locking drives; 10 N at each fingertip, 15 N at the thumb; a full close in about 0.8 s), bare. A catch is one hand enclosing the ball: its fingers and its thumb or palm touching the ball at the same time from opposite sides (the mean directions of the two contacts at least 90.0 degrees apart: the hand closed on it, not a ball lying on an open hand), at the latest 0.5 s after the ball first touched you; \"held long enough\" is 1.0 s in which the ball stays enclosed in that hand (breaks of at most 0.02 s) and touches nothing else, without falling. Nothing is welded: the ball is held only by the fingers' contact and friction and can slip out.",
+  "Definitions (catch): a ball that touches the body (any part other than the hands and the forearms) before it is caught is not a catch here (the rule would allow trapping it against the body), and neither is a ball held at the end by anything but the hand that caught it (the other hand, a forearm, the body).",
   "The fly ball is not batted: a two-wheel pitching machine 40.0 m away throws it at about 21.35 m/s, about 45.0 degrees above the horizon, about 1.0 s after the start, with the little spin its wheels give it; where it comes down (within 3.0 m of where you stand) is this instance's draw.",
   "Flight: quasi-steady aerodynamics (MuJoCo's ellipsoid fluid model: drag and Magnus lift), still air."
  ],
  "texts": {
-  "sentence": "Catch the fly ball: close the jaws of one of your grippers on the baseball before it touches the ground or your body, and keep it there.",
-  "rules": "A baseball (0.073 m across, 0.145 kg, it flies in air with drag) is thrown by a two-wheel pitching machine 40.0 m in front of you: it leaves the machine's wheels 1.0 m above the ground at about t = 1.0 s, at about 21.35 m/s, about 45.0 degrees above the horizon and 1.18 degrees to the left of the line from the machine to you (it is launched when it has left the wheels), so that untouched it would come down within 3.0 m of where you stand at the start. Both your hands are two-jaw grippers (90 mm stroke, jaws 80 mm long with rubber pads on their inner faces, at most 120 N of grip) that hold things only by friction; they start open. A catch: the pads of both jaws of one gripper touch the ball at the same time from its two sides, each with a contact whose direction is within 45.0 degrees of the jaws' closing direction (a ball lying on the jaws' tips or edges, or on closed jaws, is not caught), after the ball has passed the top of its arc and at the latest 0.5 s after it first touched you. Before the catch the ball may touch only your grippers and forearms. You succeed when, from the catch, the ball has stayed between the pads of that gripper for 1.0 s (both pads touching it in that way, apart from breaks of at most 0.02 s) touching nothing but that gripper. You fail if the ball touches the ground, or any part of you other than a gripper or a forearm, before the catch; if it is touched before it has passed the top of its arc; if it is not caught within 0.5 s of first touching you; if after the catch it is out of the jaws for longer than 0.02 s (dropped, slipped out or let go: a ball caught again does not count) or touches anything but the gripper that caught it (your other gripper, a forearm, your body, the ground); if you fall (your pelvis lower than 0.5 m above the ground, or any part of you other than your feet on the ground) before the end; or after 9 s.",
-  "venue": "You stand on a level field facing the pitching machine (+x), 40.0 m away, its head tilted up towards you. The ball rises to about 11 m and comes down steeply, about three seconds after the launch, somewhere within 3.0 m of you. Your grippers are open, their jaws pointing forwards along your forearms. Still air.",
-  "difficulty": "The ball is in the air for three seconds and comes down at about 17 m/s more than a metre away: the body has to walk there at 0.6 m/s and bring a gripper whose open jaws leave 8 mm on each side of the ball onto its line, and the jaws need about 40 ms to close on it, while a ball that meets the gripper at that speed bounces off it in a few milliseconds."
+  "sentence": "Catch the fly ball: close one of your hands on the baseball before it touches the ground or your body, and keep it there.",
+  "rules": "A baseball (0.073 m across, 0.145 kg, it flies in air with drag) is thrown by a two-wheel pitching machine 40.0 m in front of you: it leaves the machine's wheels 1.0 m above the ground at about t = 1.0 s, at about 21.35 m/s, about 45.0 degrees above the horizon and 1.18 degrees to the left of the line from the machine to you (it is launched when it has left the wheels), so that untouched it would come down within 3.0 m of where you stand at the start. Both your hands are five-finger hands (a thumb and four fingers, one closure command per hand) that hold things only by contact and friction; they start open. A catch: one hand's fingers and its thumb or palm touch the ball at the same time from opposite sides (the mean directions of the fingers' contacts and of the thumb's and palm's contacts at least 90.0 degrees apart: a ball lying on an open hand is not caught), after the ball has passed the top of its arc and at the latest 0.5 s after it first touched you. Before the catch the ball may touch only your hands and forearms. You succeed when, from the catch, the ball has stayed enclosed in that hand for 1.0 s (apart from breaks of at most 0.02 s) touching nothing but that hand. You fail if the ball touches the ground, or any part of you other than a hand or a forearm, before the catch; if it is touched before it has passed the top of its arc; if it is not caught within 0.5 s of first touching you; if after the catch it is out of the hand for longer than 0.02 s (dropped, slipped out or let go: a ball caught again does not count) or touches anything but the hand that caught it (your other hand, a forearm, your body, the ground); if you fall (your pelvis lower than 0.5 m above the ground, or any part of you other than your feet on the ground) before the end; or after 9 s.",
+  "venue": "You stand on a level field facing the pitching machine (+x), 40.0 m away, its head tilted up towards you. The ball rises to about 11 m and comes down steeply, about three seconds after the launch, somewhere within 3.0 m of you. Your hands are open, the fingers pointing forwards along your forearms. Still air.",
+  "difficulty": "The ball is in the air for three seconds and comes down at about 17 m/s more than a metre away: the body has to walk there at 0.6 m/s and bring an open hand onto its line, and the fingers need a few tenths of a second to close round it, while a ball that meets the hand at that speed bounces off it in a few milliseconds."
  },
  "robot": "unitree_h1",
  "sim": {
@@ -45,7 +45,7 @@
   "mujoco": "3.3.7"
  },
  "t0": {
-  "state_sha": "21a3b12bce4e906e3adf2242e102b085438e4c2d43fc92bf0941948ebd2b8fd5",
+  "state_sha": "fca777108bd37f5278b9bea8397a445008f726e0c27e54e51bb540c073d035ab",
   "control_dt": 0.01,
   "horizon_steps": 900,
   "raw_dim": 141,
@@ -109,7 +109,7 @@
      1.0,
      1.0
     ],
-    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad) (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
+    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad) (grip_left: the left hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch); grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    },
    "walk": {
     "dim": 20,
@@ -179,7 +179,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
+    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch); grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    },
    "joints": {
     "dim": 29,
@@ -276,7 +276,7 @@
      1.0,
      1.0
     ],
-    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
+    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward (grip_left: the left hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch); grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    },
    "lowcmd": {
     "dim": 137,
@@ -474,31 +474,31 @@
      -31.4,
      -31.4,
      -31.4,
+     -360.0,
+     -360.0,
+     -360.0,
+     -360.0,
+     -66.88,
+     -40.0,
+     -360.0,
+     -360.0,
+     -360.0,
+     -360.0,
+     -66.88,
+     -40.0,
      -200.0,
-     -200.0,
-     -200.0,
-     -300.0,
+     -130.0,
      -60.0,
-     -40.0,
-     -200.0,
-     -200.0,
-     -200.0,
-     -300.0,
      -60.0,
-     -40.0,
-     -200.0,
-     -40.0,
-     -40.0,
-     -18.0,
-     -18.0,
+     -60.0,
+     -60.0,
      -19.0,
      -19.0,
-     -19.0,
-     -40.0,
-     -40.0,
-     -18.0,
-     -18.0,
-     -19.0,
+     -130.0,
+     -60.0,
+     -60.0,
+     -60.0,
+     -60.0,
      -19.0,
      -19.0,
      0.0,
@@ -613,31 +613,31 @@
      31.4,
      31.4,
      31.4,
+     360.0,
+     360.0,
+     360.0,
+     360.0,
+     66.88,
+     40.0,
+     360.0,
+     360.0,
+     360.0,
+     360.0,
+     66.88,
+     40.0,
      200.0,
-     200.0,
-     200.0,
-     300.0,
+     130.0,
      60.0,
-     40.0,
-     200.0,
-     200.0,
-     200.0,
-     300.0,
      60.0,
-     40.0,
-     200.0,
-     40.0,
-     40.0,
-     18.0,
-     18.0,
+     60.0,
+     60.0,
      19.0,
      19.0,
-     19.0,
-     40.0,
-     40.0,
-     18.0,
-     18.0,
-     19.0,
+     130.0,
+     60.0,
+     60.0,
+     60.0,
+     60.0,
      19.0,
      19.0,
      1500.0,
@@ -697,7 +697,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz (grip_left: the left gripper's closure command, 0 (open, 90 mm) to 1 (closed); grip_right: the right gripper's closure command, 0 (open, 90 mm) to 1 (closed))"
+    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz (grip_left: the left hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch); grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    }
   },
   "hold": {
@@ -858,12 +858,36 @@
    "cmd_vy",
    "cmd_wz",
    "time_s",
-   "jaw_opening_left",
-   "jaw_speed_left",
-   "jaw_force_left",
-   "jaw_opening_right",
-   "jaw_speed_right",
-   "jaw_force_right"
+   "hand_closure_left",
+   "hand_closure_speed_left",
+   "hand_force_left",
+   "left_hand_thumb_yaw_pos",
+   "left_hand_thumb_pitch_pos",
+   "left_hand_index_pos",
+   "left_hand_middle_pos",
+   "left_hand_ring_pos",
+   "left_hand_pinky_pos",
+   "left_hand_thumb_yaw_torque",
+   "left_hand_thumb_pitch_torque",
+   "left_hand_index_torque",
+   "left_hand_middle_torque",
+   "left_hand_ring_torque",
+   "left_hand_pinky_torque",
+   "hand_closure_right",
+   "hand_closure_speed_right",
+   "hand_force_right",
+   "right_hand_thumb_yaw_pos",
+   "right_hand_thumb_pitch_pos",
+   "right_hand_index_pos",
+   "right_hand_middle_pos",
+   "right_hand_ring_pos",
+   "right_hand_pinky_pos",
+   "right_hand_thumb_yaw_torque",
+   "right_hand_thumb_pitch_torque",
+   "right_hand_index_torque",
+   "right_hand_middle_torque",
+   "right_hand_ring_torque",
+   "right_hand_pinky_torque"
   ],
   "cameras": {
    "head_left": {
@@ -943,7 +967,7 @@
    "name": "unitree_h1",
    "title": "Unitree H1-2",
    "revision": "h1-4",
-   "model": "Unitree H1-2, 27 joints, 1.78 m, 68 kg (RoboOlympics robot library h1-4: Unitree's own h1_2 model with its joint, speed and torque limits; its motor torque-speed curves are estimates)",
+   "model": "Unitree H1-2, 27 joints, 1.78 m, 67 kg (RoboOlympics robot library h1-4: the H1-2 body (Unitree's own h1_2 model, its joint ranges and speed limits) with Unitree H2 / H2-X-class leg actuators from the H2's official URDF (hips and knees 360 N m, ankle pitch 66.88 N m; curves of Unitree's M107 shape, 2.5 kW peak per joint) and H2-class arm actuators from the same URDF (shoulder pitch 130 N m; shoulder roll and yaw, elbow, forearm roll 60 N m; curves of Unitree's N7520 / N5020 shapes); the H1-2's own torso (M107-15, 200 N m), ankle roll and wrist pitch / yaw (estimates))",
    "joints": [
     "left_hip_yaw",
     "left_hip_pitch",
@@ -1116,31 +1140,31 @@
     31.4
    ],
    "torque_limit_nm": [
+    360.0,
+    360.0,
+    360.0,
+    360.0,
+    66.88,
+    40.0,
+    360.0,
+    360.0,
+    360.0,
+    360.0,
+    66.88,
+    40.0,
     200.0,
-    200.0,
-    200.0,
-    300.0,
+    130.0,
     60.0,
-    40.0,
-    200.0,
-    200.0,
-    200.0,
-    300.0,
     60.0,
-    40.0,
-    200.0,
-    40.0,
-    40.0,
-    18.0,
-    18.0,
+    60.0,
+    60.0,
     19.0,
     19.0,
-    19.0,
-    40.0,
-    40.0,
-    18.0,
-    18.0,
-    19.0,
+    130.0,
+    60.0,
+    60.0,
+    60.0,
+    60.0,
     19.0,
     19.0
    ],
@@ -1291,7 +1315,7 @@
     0.0,
     0.0
    ],
-   "mass_kg": 68.37,
+   "mass_kg": 67.37,
    "height_m": 1.78,
    "pelvis_height_standing_m": 1.035,
    "control_dt_s": 0.01,
@@ -1303,38 +1327,231 @@
    ],
    "run_command_range": null,
    "real_hands": {
-    "kind": "dex1",
-    "model": "Unitree Dex1-1 two-finger parallel gripper (modelled: 0.55 kg, jaws 80 mm long, 90 mm stroke, rubber pads)",
+    "kind": "inspire",
     "sides": [
      "left",
      "right"
     ],
-    "stroke_m": 0.09,
-    "jaw_length_m": 0.08,
-    "force_limit_n": 120.0,
-    "setpoint_opening_speed_m_s": 0.375,
-    "jaw_speed_note": "the limit is the servo setpoint's; the jaws can move briefly up to about 0.45 m/s when a clamp springs open",
-    "servo": {
-     "kp_n_per_m": 20000.0,
-     "kd_n_s_per_m": 80.0,
-     "rule": "each jaw: a setpoint moves towards 45 mm x closure at most half setpoint_opening_speed_m_s (opening, it starts from the jaws' position); force = clip(kp (setpoint - q) - kd dq, -force_limit_n, force_limit_n); the clamp on an object is min(force_limit_n, 10 N per mm that the commanded opening 90 mm x (1 - closure) is below the object's width)"
-    },
-    "pad": {
-     "friction": [
-      1.0,
-      0.005,
-      0.0001
-     ],
-     "condim": 4
-    },
-    "start": {
+    "hands": {
      "left": {
-      "closure": 0.0,
-      "holding": null
+      "kind": "inspire",
+      "model": "the H1-2's Inspire RH56DFX five-finger hand (6 self-locking linear drives for 12 joints: the thumb's rotation and flexion, one drive per finger with its two joints coupled; Unitree's h1_2 kinematics) with H2-class fingertip forces: 20 N per finger and 30 N the thumb, 2 x the RH56DFX's 10 / 15 N (Unitree's H2 Plus offers 20 N Sharpa Wave hands; Inspire's RH56E2 gives 28 / 30 N)",
+      "grip_scale": 1.0,
+      "drives": [
+       {
+        "name": "thumb_yaw",
+        "joint": "thumb_proximal_yaw",
+        "open_rad": 0.0,
+        "closed_rad": 1.1,
+        "speed_rad_s": 1.8675,
+        "active_torque_nm": 1.59,
+        "passive_torque_nm": 4.1594,
+        "group": "thumb",
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "thumb_pitch",
+        "joint": "thumb_proximal_pitch",
+        "open_rad": 0.0,
+        "closed_rad": 0.5,
+        "speed_rad_s": 1.2217,
+        "active_torque_nm": 6.72,
+        "passive_torque_nm": 17.5795,
+        "group": "thumb",
+        "coupled": {
+         "thumb_intermediate": 1.6,
+         "thumb_distal": 2.4
+        },
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "index",
+        "joint": "index_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.34,
+        "passive_torque_nm": 9.1822,
+        "group": "fingers",
+        "coupled": {
+         "index_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "middle",
+        "joint": "middle_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.44,
+        "passive_torque_nm": 9.5746,
+        "group": "fingers",
+        "coupled": {
+         "middle_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "ring",
+        "joint": "ring_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.32,
+        "passive_torque_nm": 9.1037,
+        "group": "fingers",
+        "coupled": {
+         "ring_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "pinky",
+        "joint": "pinky_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.02,
+        "passive_torque_nm": 7.9265,
+        "group": "fingers",
+        "coupled": {
+         "pinky_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       }
+      ],
+      "servo": {
+       "kp_nm_per_rad": 200.0,
+       "kd_nm_s_per_rad": 0.5,
+       "rule": "each drive: a setpoint moves towards open + closure x (closed - open) at most speed_rad_s, but closing stops where kp (setpoint - q) would exceed active_torque_nm; torque = clip(kp (setpoint - q) + kd (setpoint speed - dq), -passive, passive) at every physics step; a load beyond passive_torque_nm drags the setpoint (the drive slips)"
+      },
+      "holding_rule": "a free body that touches the hand's fingers and its thumb or palm",
+      "pad_friction": [
+       1.0,
+       0.005,
+       0.0001
+      ],
+      "start": {
+       "closure": 0.0,
+       "holding": null
+      }
      },
      "right": {
-      "closure": 0.0,
-      "holding": null
+      "kind": "inspire",
+      "model": "the H1-2's Inspire RH56DFX five-finger hand (6 self-locking linear drives for 12 joints: the thumb's rotation and flexion, one drive per finger with its two joints coupled; Unitree's h1_2 kinematics) with H2-class fingertip forces: 20 N per finger and 30 N the thumb, 2 x the RH56DFX's 10 / 15 N (Unitree's H2 Plus offers 20 N Sharpa Wave hands; Inspire's RH56E2 gives 28 / 30 N)",
+      "grip_scale": 1.0,
+      "drives": [
+       {
+        "name": "thumb_yaw",
+        "joint": "thumb_proximal_yaw",
+        "open_rad": 0.0,
+        "closed_rad": 1.1,
+        "speed_rad_s": 1.8675,
+        "active_torque_nm": 1.59,
+        "passive_torque_nm": 4.1594,
+        "group": "thumb",
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "thumb_pitch",
+        "joint": "thumb_proximal_pitch",
+        "open_rad": 0.0,
+        "closed_rad": 0.5,
+        "speed_rad_s": 1.2217,
+        "active_torque_nm": 6.72,
+        "passive_torque_nm": 17.5795,
+        "group": "thumb",
+        "coupled": {
+         "thumb_intermediate": 1.6,
+         "thumb_distal": 2.4
+        },
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "index",
+        "joint": "index_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.34,
+        "passive_torque_nm": 9.1822,
+        "group": "fingers",
+        "coupled": {
+         "index_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "middle",
+        "joint": "middle_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.44,
+        "passive_torque_nm": 9.5746,
+        "group": "fingers",
+        "coupled": {
+         "middle_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "ring",
+        "joint": "ring_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.32,
+        "passive_torque_nm": 9.1037,
+        "group": "fingers",
+        "coupled": {
+         "ring_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "pinky",
+        "joint": "pinky_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.02,
+        "passive_torque_nm": 7.9265,
+        "group": "fingers",
+        "coupled": {
+         "pinky_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       }
+      ],
+      "servo": {
+       "kp_nm_per_rad": 200.0,
+       "kd_nm_s_per_rad": 0.5,
+       "rule": "each drive: a setpoint moves towards open + closure x (closed - open) at most speed_rad_s, but closing stops where kp (setpoint - q) would exceed active_torque_nm; torque = clip(kp (setpoint - q) + kd (setpoint speed - dq), -passive, passive) at every physics step; a load beyond passive_torque_nm drags the setpoint (the drive slips)"
+      },
+      "holding_rule": "a free body that touches the hand's fingers and its thumb or palm",
+      "pad_friction": [
+       1.0,
+       0.005,
+       0.0001
+      ],
+      "start": {
+       "closure": 0.0,
+       "holding": null
+      }
      }
     }
    }

@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-discus-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics discus on the same frozen instance as embodied-olympics-fun-discus-i00-privileged. Throw the discus that your right gripper holds by its rim from inside the circle so that it lands inside the sector at least 15.0 m from the circle, then leave the circle from its rear half and stand. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics discus on the same frozen instance as embodied-olympics-fun-discus-i00-privileged. Throw the discus that lies on your right palm, your fingers curled over its rim, from inside the circle so that it lands inside the sector at least 15.0 m from the circle, then leave the circle from its rear half and stand. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "discus"]
 
@@ -32,9 +32,9 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 50
-expert_time_estimate_hours = 12.0
-oracle = "full"
-oracle_evidence = "Reference: a standing throw by the trunk's turn from a technique found offline by CMA-ES in this family's physics (Embodied Olympics' Discus search space): the discus, clamped by its rim in the right Dex1-1 gripper, pulls out of the jaws at 12.5 m/s (the clamp's friction gives way 0.14 s before the jaws open), 15.95 m (the line is 15 m), then out of the rear half and standing; 9/9 under +-3% gains x release-time variations. Referee test: nop holds it the full minute; a light clamp drops it; a 150 N pull is held, 300 N pulls it out; positive: the reference solution; negatives: walking out with it, discus on the thigh, on the chest, carried on the hand without the hold, gripped again, touched after the release, out early, outside the sector, short, a front-half exit, a fall The privileged twin's reference rows (811 control steps, success after 8.11 s) streamed through the client."
+expert_time_estimate_hours = 14.0
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_discus.py: The 2 kg discus lies flat on the upturned palm of the H1-2's own right Inspire hand (device forces), the fingertips curled over its rim (searched: hanging from the fingers with the arm down it slides out wherever it is placed). The earlier reference swing (from an arm hanging down) does not transfer; a re-search (CMA-ES, about 60 generations) lets the discus leave the palm early (best 6 m; the mark is 15 m). Positive by a declared magic action: real stance on the walking policy and the hand opening; injected once, the discus moved 0.4 m forwards and up and given 13.5 m/s at 38 deg spinning at 30 rad/s: it lands 18.7 m from the rim inside the sector; the real walk backwards out of the rear half and stand; the same state hash twice. Negatives: nop (time, discus held), the hand opened at the start (it slides off unheld), walking out with the discus, leaving before the landing, outside the sector, short, touched after the release, leaving through the front half, a fall. Stress: random arm targets with the hand closed: at most 0.2 mm into the fingers.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -74,7 +74,7 @@ sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0

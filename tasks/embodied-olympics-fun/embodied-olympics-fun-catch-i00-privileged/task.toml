@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-catch-i00-privileged"
-description = "Embodied Olympics catch (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Catch the fly ball: close the jaws of one of your grippers on the baseball before it touches the ground or your body, and keep it there. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics catch (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Catch the fly ball: close one of your hands on the baseball before it touches the ground or your body, and keep it there. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "catch"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 8.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_catch.py: positive by injection (the pitching machine's real fly ball, once past its apex and below 3 m, put at the open jaws' centre, then the real clamp and a 1 s hold), with both hands; the machine's ball leaves at 21.27 m/s and lands 1.32 m from the start; negatives: lands (nop), onto the trunk, touched while rising, dropped after the catch, resting in open jaws, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_catch.py: Both hands are the H1-2's own Inspire five-finger hands at the device's forces (no factor); a catch is one hand enclosing the ball (its fingers and its thumb or palm touching it from opposite sides, the two contact directions at least 90 degrees apart), held 1 s. The fly ball is thrown by the two-wheel pitching machine (21.4 m/s at the launch, it lands 1.32 m from the robot untouched). Positive by a declared magic action: real, the robot turns its palm up on stand rows and holds it there; injected once, when the descending ball is below 3 m it is put at rest on that palm; real, the hand closes round it, the catch and the 1 s hold (right and left hands; the same state hash twice). Negatives: nop (the ball lands within 3 m), onto the trunk, touched while still rising, the hand opened after the catch (the ball lies on the open palm: out of the hand), resting on the open palm never closed on (not caught in time), a fall. Stress: random arm targets with the ball in the hand, the ball at most 1.6 mm into the hand. Realtime: physics RTF about 2.1 on the reference workstation (estimated from a same-process comparison on the cluster), above 1.5.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

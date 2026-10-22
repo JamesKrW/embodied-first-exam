@@ -1,16 +1,17 @@
 """Javelin throw (World Athletics TR 32 and 38) with the women's 600 g javelin. The javelin is a free body held at
-its cord grip only by the friction of the right hand's Unitree Dex1-1 two-jaw gripper (the core's rfo.realhand): it
-can slip along the jaws, turn in them and drop. The release is the jaws letting go of the cord (opening them; the jaws open
-at most 375 mm/s, so when it happens is the thrower's timing, not a switch); the shaft then slides out through the jaws.
+its cord grip, across the palm, by the contact and friction of the H1-2's own right hand, its Inspire five-finger hand
+(the core's rfo.realhand, "inspire"): it can slip along the fingers, turn in the hand and drop. The release is the hand
+letting go of the cord (opening it; the fingers open at most 260 deg/s, so when it happens is the thrower's timing,
+not a switch).
 From the runway, throw it over the shoulder from behind the arc so that its head strikes the ground first, inside the
 sector, at least the qualifying mark away; then leave the runway behind the arc. The Unitree H1-2.
 
 * the official runway, arc, sector and implement (TR 32.9, 32.12, 38.3-38.6);
 * the cord grip is a collision body: TR 38.4's grip at the centre of gravity, 160 mm long (TR 38: 150-160 mm), of
   uniform thickness, 29 mm across (the shaft's 25 mm plus 4; TR 38: at most 8 mm more);
-* the right hand is the Dex1-1 (the core's model): the cord lies across its jaws (along the jaws' width, 34 mm), at the
-  jaws' centre, the javelin's axis along the wrist mount's y axis; the jaws close on it at reset (close_on, the full
-  120 N clamp);
+* the right hand is the Inspire hand at the device's forces (the core's model): the cord lies across the palm (a power
+  grasp, the javelin's axis along the hand's grasp frame's y), the fingers and thumb closed round it at reset
+  (close_on);
 * the javelin's flight: published wind-tunnel coefficients applied as forces (below: aero_wrench);
 * the hold, the release and no re-grip are judged from contacts (below), not from a grip switch.
 """
@@ -114,6 +115,10 @@ def aero_wrench(R: np.ndarray, v: np.ndarray, omega: np.ndarray, length: float, 
     return F, M
 
 
+CORD_IN_HAND_M = (-0.004, 0.0)               # the cord's axis from the hand's grasp centre: out of the palm, along
+#                                              the fingers (a search)
+CORD_TURN_DEG = 0.0                          # the javelin's axis turned in the palm from straight across it towards
+#                                              the fingers
 LINE_W, ARC_W = 0.05, 0.07                   # TR 32.9: side lines 50 mm, the arc and its end lines 70 mm
 RUNWAY = (0.72, 0.25, 0.18, 1)
 
@@ -138,12 +143,12 @@ class Task(TaskBase):
                 "the runway, the measurement), TR 38.1 (the throw), TR 38.3-38.6 (the javelin: the women's implement, "
                 "its grip)")
     deviations = [
-        "TR 38.1(a) (\"the javelin shall be held at the grip with one hand\"): the hand is a two-jaw gripper, "
-        "Unitree's Dex1-1 (90 mm stroke, 80 mm jaws, at most 120 N of clamp, opening at most 375 mm/s; Unitree sells "
-        "it for the G1, the H2 and the R1, not the H1-2: here it sits on the H1-2's right wrist where the palm ends); "
-        "the cord lies across its jaws and is held by their friction only. Held means both jaws touching the cord; "
-        "the hold may break for at most {grip_gap_s} s (contacts flicker); the release is the end of the hold, the "
-        "last moment both jaws touched the cord. \"Over the shoulder or upper part of the throwing arm\" is judged "
+        "TR 38.1(a) (\"the javelin shall be held at the grip with one hand\"): the hand is the H1-2's own Inspire "
+        "five-finger hand (six drives: four fingers, the thumb's flexion and rotation; fingertip forces 10 N, the "
+        "thumb 15 N, at {grip_scale} times the device's forces; one closure command for the whole hand); the cord "
+        "lies across its palm and is held by its fingers' and thumb's contact and friction only. Held means the cord "
+        "touching the hand's fingers and its thumb or palm; the hold may break for at most {grip_gap_s} s (contacts "
+        "flicker); the release is the end of the hold, the last moment the cord touched both. \"Over the shoulder or upper part of the throwing arm\" is judged "
         "at the release: the javelin's centre of gravity must then be at least {release_above_shoulder_m} m higher "
         "than the throwing shoulder's joint.",
         "TR 38.1(a) (one hand): before the release the javelin may not touch your left arm or hand (it may rest "
@@ -151,12 +156,13 @@ class Task(TaskBase):
         "TR 38.1(c): \"turned completely around\" is judged as the chest's heading more than {back_turn_deg} degrees "
         "away from the throwing direction at any time before the release.",
         "TR 38.3-38.6 (the implement): the robot throws the women's javelin, 600 g and 2.21 m (the men's is 800 g and "
-        "2.60-2.70 m): the H1-2's swing, holding the javelin by the friction of two jaws, cannot release the men's "
+        "2.60-2.70 m): the H1-2's swing, holding the javelin by friction alone, cannot release the men's "
         "javelin pointing along its path fast enough to throw it head first past a line (its best: 15.3 m); a lighter "
         "official implement leaves faster from the same arm. Everything about the throw is otherwise real.",
         "TR 38.3-38.6: the javelin is one rigid body (no bending or vibration) whose head does not stick in the ground; "
         "the mark is the point where the head first touches the ground; the cord grip is a smooth band "
-        "{cord_length_m} m long and {cord_diameter_m} m across (no pattern: the pads' rubber gives the friction).",
+        "{cord_length_m} m long and {cord_diameter_m} m across (no pattern: the finger pads' rubber gives the "
+        "friction).",
         "Flight: quasi-steady aerodynamics in still air, no wind: drag and lift against the angle of attack from the "
         "wind-tunnel measurement of this very kind of javelin (a World Athletics women's javelin, Seo et al., "
         "Scientific Reports 2023; drag, lift and pitching moment from 0 to 18 degrees, beyond that a cylinder's "
@@ -177,18 +183,18 @@ class Task(TaskBase):
                   cord_length_m=2 * CORD_HALF, cord_diameter_m=2 * CORD_R,
                   runway_width_m=4.0, runway_length_m=30.0, arc_radius_m=8.0, exit_line_m=4.0,
                   qualifying_mark_m=20.0, release_above_shoulder_m=0.0, back_turn_deg=135.0, grip_gap_s=0.02,
-                  retouch_grace_s=0.20, stand_s=1.0, fall_pelvis_m=0.50)
+                  retouch_grace_s=0.20, stand_s=1.0, fall_pelvis_m=0.50, grip_scale=1.0)
 
-    sentence = ("Throw the javelin held by its cord in your right gripper over the shoulder from behind the arc so "
+    sentence = ("Throw the javelin held by its cord in your right hand over the shoulder from behind the arc so "
                 "that its head strikes the ground first, inside the sector, at least {qualifying_mark_m} m from the "
                 "arc, then leave the runway behind the arc and stand.")
     rules = ("The women's javelin ({javelin_mass_kg} kg, {javelin_length_m} m long, its centre of gravity "
              "{javelin_cg_from_tip_m} m from the tip, a metal head of {javelin_head_m} m; its cord grip, "
              "{cord_length_m} m long and {cord_diameter_m} m across, covers the centre of gravity) starts held at its "
-             "cord between the two jaws of your right hand, a two-jaw gripper that holds only by friction: the "
-             "javelin can slip along or turn in the jaws, and drop. It is held while both jaws touch the cord (breaks "
-             "of at most {grip_gap_s} s are ignored); the release is the end of the hold: the last moment both jaws "
-             "touched the cord, however it ends (opened, slipped or dropped). Until the release the javelin may "
+             "cord across the palm of your right hand, a five-finger hand that holds only by contact and friction: "
+             "the javelin can slip along the fingers or turn in the hand, and drop. It is held while the cord touches "
+             "the hand's fingers and its thumb or palm (breaks of at most {grip_gap_s} s are ignored); the release is "
+             "the end of the hold: the last moment it was held, however it ends (opened, slipped or dropped). Until the release the javelin may "
              "not touch your left arm or hand (the javelin is held with one hand). The runway is {runway_width_m} m wide between "
              "the inner edges of its side lines and {runway_length_m} m long; it ends at the arc, a white strip whose "
              "inner edge is a circle of {arc_radius_m} m radius round a point on the runway's centre line; short "
@@ -196,9 +202,9 @@ class Task(TaskBase):
              "bounded by the two lines from the arc's centre through the arc's ends (28.96 degrees between them). The "
              "throw: at the release the javelin's centre of gravity must be at least {release_above_shoulder_m} m "
              "higher than your right shoulder joint. There is one release: after it the javelin may not be held again "
-             "(both jaws on the cord once more) and no part of you may touch it, except that your right arm and its "
-             "gripper may still touch it during the first {retouch_grace_s} s (the shaft sliding out through the "
-             "jaws). The throw is valid only if the head touches the ground before any other part of the javelin, at "
+             "(the cord in the hand's fingers and thumb or palm once more) and no part of you may touch it, except "
+             "that your right arm and its hand may still touch it during the first {retouch_grace_s} s (the shaft "
+             "sliding out of the hand). The throw is valid only if the head touches the ground before any other part of the javelin, at "
              "a point inside the sector lines (on a line is out). It is measured from that point to the inner edge "
              "of the arc along the line through the arc's centre. You succeed when a valid throw measures at least "
              "{qualifying_mark_m} m and you have then left the runway correctly and stood for {stand_s} s. Leaving "
@@ -216,15 +222,15 @@ class Task(TaskBase):
              "or after {time_limit_s} s. Where you touch the ground is judged on the points of contact.")
     venue = ("You stand on the runway's centre line facing the sector (+x), your pelvis 2.0 m behind the middle of "
              "the arc; the arc's centre is 6.0 m behind you, its ends are 0.25 m behind its middle and "
-             "2.0 m to either side, and the runway reaches 28 m behind you. Your right arm hangs down, its gripper's "
-             "fingers pointing down; the javelin lies level across the gripper's closed jaws, its cord between "
-             "them, pointing forwards (the tip {javelin_cg_from_tip_m} m ahead of the jaws). Still air. The jaws "
-             "open when your right grip command goes to 0 (at most 375 mm/s).")
+             "2.0 m to either side, and the runway reaches 28 m behind you. Your right arm hangs down, the hand's "
+             "fingers pointing down; the javelin lies level across the closed hand's palm, its cord held by the "
+             "fingers and thumb, pointing forwards (the tip {javelin_cg_from_tip_m} m ahead of the hand). Still air. "
+             "The hand opens when your right grip command goes to 0 (the fingers at most 260 deg/s).")
     difficulty = ("{qualifying_mark_m} m asks for a release near 18 m/s at 25 to 30 degrees with the javelin "
                   "pointing close enough to its flight that it comes down head first; the H1-2 has no running policy "
-                  "and its arm motors give 40 N m at the shoulder. Nothing holds the 2.21 m javelin but two jaws "
-                  "34 mm wide on its cord: a whip of the arm turns it in them, and the jaws must let go of it at the "
-                  "right moment, above the shoulder, on a body that has to stay on its feet behind the arc.")
+                  "and its arm motors give 40 N m at the shoulder. Nothing holds the 2.21 m javelin but the "
+                  "fingers round its cord: a whip of the arm pulls it out across them (the finger drives give way at "
+                  "their self-locking limits), and the hand must let go of it at the right moment, above the shoulder, on a body that has to stay on its feet behind the arc.")
 
     # ------------------------------------------------------------------ geometry
     def geometry(self):
@@ -236,7 +242,9 @@ class Task(TaskBase):
     def build(self, sc):
         p, g = self.p, self.geometry()
         self.fall_z = p["fall_pelvis_m"]
-        sc.real_hands["right"] = "dex1"
+        sc.real_hands["right"] = "inspire"
+        if p["grip_scale"] != 1.0:                                # a declared deviation (the grip-force factor)
+            sc.real_hand_options["right"] = {"grip_scale": float(p["grip_scale"])}
         R, hw, cx, xe, xr = g["R"], g["hw"], g["cx"], g["x_end"], g["x_rear"]
         sc.box("runway", ((xr + xe) / 2, 0, 0.0003), ((xe - xr) / 2, hw, 0.0003), rgba=RUNWAY)
         k = 16
@@ -276,7 +284,7 @@ class Task(TaskBase):
                 rgba=(0.75, 0.76, 0.8, 1), **col)
         sc.geom(b, "javelin_shaft", type="capsule", fromto=(cg - L + SHAFT_R, 0, 0, cg - head, 0, 0), size=(SHAFT_R,),
                 rgba=(0.85, 0.75, 0.2, 1), **col)
-        # the cord grip: a collision band (capsule ends inside the band's length), what the jaws hold
+        # the cord grip: a collision band (capsule ends inside the band's length), what the hand holds
         sc.geom(b, "javelin_cord", type="capsule", fromto=(-CORD_HALF + CORD_R, 0, 0, CORD_HALF - CORD_R, 0, 0),
                 size=(CORD_R,), rgba=(0.2, 0.3, 0.7, 1), **col)
         sc.geom(b, "javelin_cord_look", type="cylinder", fromto=(-CORD_HALF, 0, 0, CORD_HALF, 0, 0),
@@ -293,14 +301,16 @@ class Task(TaskBase):
 
     def reset(self, w):
         # javelin's start: the right arm straight down, a little away from the leg; the javelin level, its axis along
-        # the wrist mount's y (forwards), its centre of gravity (the cord's middle) at the jaws' centre
+        # the hand's grasp frame's y (forwards), its centre of gravity (the cord's middle) at the grasp point
         set_arm(w, right_elbow_pitch=1.57, right_shoulder_roll=-0.15)
-        c, R = w.jaw_frame("right")
-        Rb = np.column_stack([R[:, 1], R[:, 2], R[:, 0]])     # javelin x (to the tip) = across the jaws
+        c, R = w.grasp_frame("right")                         # x: out of the palm, z: along the fingers, y = z x x
+        phi = math.radians(CORD_TURN_DEG)
+        ax = math.cos(phi) * R[:, 1] + math.sin(phi) * R[:, 2]          # the javelin's axis (to the tip)
+        Rb = np.column_stack([ax, np.cross(R[:, 0], ax), R[:, 0]])     # across the palm, turned by CORD_TURN_DEG
         q = np.zeros(4)
         mujoco.mju_mat2Quat(q, Rb.reshape(-1))
-        w.put("javelin", c, quat=q)
-        w.close_on("right", "javelin")
+        w.put("javelin", c + R[:, 0] * CORD_IN_HAND_M[0] + R[:, 2] * CORD_IN_HAND_M[1], quat=q)
+        w.close_on("right", "javelin", closure=1.0)
 
     # ------------------------------------------------------------------ the referee
     def referee_reset(self, w, ref):
@@ -308,19 +318,20 @@ class Task(TaskBase):
         self.head = ref.geoms(names=["javelin_head"])
         self.shaft = ref.geoms(names=["javelin_shaft", "javelin_cord"])
         self.cord = ref.geoms(names=["javelin_cord"])
-        self.jaws = [ref.geoms(body=f"right_hand_jaw_{j}") for j in ("a", "b")]
+        ng = w.m.ngeom
+        self.grips = [np.isin(np.arange(ng), w.hands.group_geoms(w, "right", g)) for g in ("fingers", "thumb_palm")]
         self.robot = ref.part("robot")
         self.arm = ref.part("right_arm")
         self.not_arm = self.robot & ~self.arm
         self.other_arm = ref.part("left_arm")
         self.jav_id = w.m.body("javelin").id
         self.shoulder = w.m.body("right_shoulder_roll_link").id
-        # held: the last time both jaws touched the cord; at: the javelin's state then (the release, if it ends there)
+        # held: the last time the hand held the cord; at: the javelin's state then (the release, if it ends there)
         self.trackers = {"held": 0.0 if self._held(ref) else None, "at": self._snapshot(w), "released": None,
                          "landed": None, "exit": False}
 
     def _held(self, ref) -> bool:
-        return all(ref.touching(j, self.cord) for j in self.jaws)
+        return all(ref.touching(g, self.cord) for g in self.grips)
 
     def _snapshot(self, w) -> list:
         c, v = w.pos("javelin"), w.vel("javelin")
@@ -345,7 +356,7 @@ class Task(TaskBase):
         return bool(front.any()), bool(out.any()), bool(back.any())
 
     def _release(self, ref):
-        """The hold has ended (no both-jaw contact with the cord for more than grip_gap_s): the release, judged on the
+        """The hold has ended (the hand not holding the cord for more than grip_gap_s): the release, judged on the
         javelin's state at the hold's last moment."""
         tr, p = self.trackers, self.p
         tr["released"] = tr["held"] if tr["held"] is not None else 0.0

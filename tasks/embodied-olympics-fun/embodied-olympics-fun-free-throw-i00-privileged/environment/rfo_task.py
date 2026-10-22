@@ -1,12 +1,12 @@
 """Basketball free throw (FIBA): from behind the free-throw line, inside the semi-circle, shoot the
-ball you hold pressed between your two bare palms (no grip: squeeze and friction alone) so that it enters the basket
-from above. Official court, backboard, ring and size-7 ball; the Unitree H1-2."""
+ball you hold in your two hands (the H1-2's own Inspire five-finger hands: contact and friction alone, no weld) so that
+it enters the basket from above. Official court, backboard, ring and size-7 ball; the Unitree H1-2."""
 import math
-import xml.etree.ElementTree as ET
 
 import mujoco
 import numpy as np
 
+from rfo import realhand
 from rfo.referee import Crossing, HoopPass
 from rfo.scene import HITTABLE, OFFICIAL, VISUAL, bounce_solref
 from rfo.task import TaskBase
@@ -105,60 +105,98 @@ def build_court(sc, hx: float, hy: float, p: dict, flip: bool = False) -> dict:
 # ---- end of the court block ----
 
 
-# ---- the two-palm hold at the start ----
-# The H1-2's hands are the palm pads (4.4 x 8 x 10 cm boxes) on the wrist mounts; at rest their broad faces (the
-# mounts' +x) look at each other across the body, 0.294 m apart, and the ball is 0.239 m across. The start: upper
-# arms a little forward, forearms a little raised, upper arms turned in until both pads touch the ball in front of the
-# chest (HOLD, the right arm; the left one mirrored); the hold targets (the start command) are SQUEEZE further in, so
-# the shoulder servos press the ball: nothing else holds it. The arms have no gravity feed-forward, so under that
-# command they sag to SETTLED (measured: tests/test_dunk.py, 3 s of the start command): the robot starts
-# there, at rest, the ball where it then sits (BALL_OFFSET from the middle between the two pads). Rolling the upper
-# arms in does not work near the body: their hulls meet the torso's at shoulder roll 0.15 rad.
-# Measured (tests/test_dunk.py): the start command presses about 20 N on each palm (shoulder yaw 8 N m,
-# roll 5 N m) and holds the ball for the whole episode and under an extra 3.6 g; with both arms up and the shoulder
-# roll 0.12 rad (25 N m) past the touching pose the palms press about 40 N and hold an extra 1.1 g (1.6 g at the
-# roll's 40 N m); one palm alone loses the ball within about 0.1 s.
-HOLD = dict(shoulder_pitch=-0.20, shoulder_roll=0.0, shoulder_yaw=0.014, elbow_pitch=-0.30)
-SQUEEZE = dict(shoulder_yaw=0.06, shoulder_roll=0.05)
-SETTLED = dict(shoulder_pitch=-0.1708, shoulder_roll=0.0332, shoulder_yaw=0.0329, elbow_pitch=-0.2794,
-               elbow_roll=-0.0025, wrist_pitch=0.0132, wrist_yaw=-0.0625)
-BALL_OFFSET = (-0.0047, 0.0, -0.0065)
-MIRROR = ("shoulder_roll", "shoulder_yaw", "elbow_roll", "wrist_yaw")      # the joints whose sign flips on the left
-PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness and its centre along the forearm
-# The palm-ball contact. With the ball's own contact (its rule-book rebound, 0.85, a lightly damped spring) a ball
-# squeezed between two palms rattles and walks out of them in about a second, with pyramidal or elliptic friction
-# cones alike; a palm rebound of 0.42 drops it in 6 s, 0.27 lets it creep 5 mm/s. The palm is the soft part of a hand
-# and absorbs the ball: a critically damped contact (palm rebound 0.12, measured head-on at 3 m/s), with elliptic
-# friction cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py), holds a
-# still ball to 0.1 mm in 9 s. The floor, the ring and the backboard keep the ball's own contact (rebound 0.85).
-PALM_SOLREF, PALM_SOLIMP, PALM_MU, PALM_REBOUND = "0.005 1", "0.99 0.999 0.001", 0.7, 0.12
-CONE, IMPRATIO = "elliptic", 100.0
+# ---- the two-hand hold (the H1-2's own Inspire hands, rfo.realhand "inspire"; the same in free-throw,
+# catch-and-shoot, dunk and dunk-between-legs) ----
+# A two-handed hold as for a chest pass or a two-handed set shot: the palms on the ball's two sides, the fingers spread
+# up and forwards over it, both hands closed on it (a finger stops on what it touches), and the arms pressing the
+# palms in: the hold targets (the start command) turn the shoulders SQUEEZE_RAD further in (roll and yaw) than the
+# pose the arms stand in, so the shoulder servos squeeze the ball; nothing else holds it but the hands' contact and
+# friction (measured with the core of 10-21, H2-class arms and the Inspire at its 20 / 30 N defaults: held at 0.06
+# rad, the ball settling about 8 cm in the first 0.3 s onto the two thumbs and the palms' heels; with 0.03 rad, no
+# squeeze, or the fingers straight forwards or up, it drops within a second; one hand alone cannot hold it: the
+# Inspire spans about 0.2 m, the ball 0.24 m). HOLD_LEFT / HOLD_RIGHT: the arms' 7 joints (shoulder pitch, roll, yaw,
+# elbow pitch, roll, wrist pitch, yaw), from numerical inverse kinematics on the hands' grasp frames (each palm 1 cm
+# clear of the ball, the ball's centre BALL_AT ahead of and above the pelvis' start).
+BALL_AT = (0.40, 0.0, 1.20)
+HOLD_LEFT = (-0.43, 0.3529, -1.0318, 0.4546, 0.2074, -0.44, 1.24)
+HOLD_RIGHT = (-0.4301, -0.3529, 1.0321, 0.4546, -0.2073, -0.44, -1.24)
+SQUEEZE_RAD = 0.06
+HAND_CLOSED = {}                             # the hands' synergy: where each drive closes to (realhand's "closed")
 
 
-def _joint(w, name: str) -> int:
-    return w.L.JOINTS.index(name + "_joint")
+def hold_targets(side: str) -> np.ndarray:
+    """The squeezing targets of an arm: its hold pose with the shoulder's roll and yaw SQUEEZE_RAD further in."""
+    q = np.array(HOLD_RIGHT if side == "right" else HOLD_LEFT, float)
+    s = 1.0 if side == "right" else -1.0
+    q[1] += s * SQUEEZE_RAD
+    q[2] += s * SQUEEZE_RAD
+    return q
 
 
-def pad_face(w, side: str) -> tuple[np.ndarray, np.ndarray]:
-    """The centre of the pad's inner face (the mount's +x face) and its outward normal, in the world."""
-    d, b = w.d, w.robot.mount[side]
-    R = d.xmat[b].reshape(3, 3)
-    return d.xpos[b] + R @ np.array([PAD_HALF, 0.0, PAD_Z]), R[:, 0].copy()
-
-
-def ball_between_palms(w) -> None:
-    """t = 0: both arms settled in the hold, the ball between the pads; the targets (the start command) are HOLD +
-    SQUEEZE."""
+def ball_in_hands(w, arms_only: bool = False) -> None:
+    """The arms in the hold (the start command: the squeezing targets) and, unless arms_only, the ball between the
+    palms with both hands closed on it, the rest of the world held still while they close (realhand's close_on)."""
     r, d = w.robot, w.d
-    for side in ("right", "left"):
-        for jn in SETTLED:
-            s = -1.0 if side == "left" and jn in MIRROR else 1.0
-            i = _joint(w, f"{side}_{jn}")
-            d.qpos[r.qadr[i]] = s * SETTLED[jn]
-            r.arb.q_a[i] = r.arb.q_b[i] = s * (HOLD.get(jn, 0.0) + SQUEEZE.get(jn, 0.0))
+    a = w.L.ARMS.start
+    for idx, side in ((slice(a, a + 7), "left"), (slice(a + 7, a + 14), "right")):
+        d.qpos[r.qadr[idx]] = HOLD_LEFT if side == "left" else HOLD_RIGHT
+        r.arb.q_a[idx] = r.arb.q_b[idx] = hold_targets(side)
     mujoco.mj_kinematics(w.m, d)
-    c = [f + BALL["radius"] * n for f, n in (pad_face(w, "right"), pad_face(w, "left"))]
-    w.put("ball", (c[0] + c[1]) / 2 + np.array(BALL_OFFSET))
+    if arms_only:
+        return
+    w.put("ball", BALL_AT)
+    close_both(w)
+
+
+def close_both(w, settle_s: float = 0.3) -> None:
+    """Both hands closed on the ball together, the rest of the world held still (realhand's close_on for two hands):
+    the ball held in place while the fingers close at their drives' speeds until every drive has stalled or reached
+    its target, then let go to settle between the hands for settle_s. Raises unless both hands then touch it."""
+    m, d, hands = w.m, w.d, w.hands
+    qa, va = w.free["ball"]
+    keep_q = np.ones(m.nq, dtype=bool)
+    keep_v = np.ones(m.nv, dtype=bool)
+    for s_ in ("left", "right"):
+        hands.cmd[s_] = 1.0
+        keep_q[hands.hq[s_]] = keep_v[hands.hv[s_]] = False
+    mujoco.mj_forward(m, d)
+    q0 = d.qpos.copy()
+    arm0 = m.dof_armature.copy()
+    m.dof_armature[keep_v] = realhand.FREEZE_ARMATURE
+    m.dof_armature[va:va + 6] = arm0[va:va + 6]
+    free, still, settled = False, 0, 0
+    try:
+        for _ in range(int(round(2.0 / m.opt.timestep))):
+            sp0 = hands._sp.copy()
+            hands.substep()
+            mujoco.mj_step(m, d)
+            d.qpos[keep_q] = q0[keep_q]
+            d.qvel[keep_v] = 0.0
+            if not free:
+                d.qpos[qa:qa + 7] = q0[qa:qa + 7]
+                d.qvel[va:va + 6] = 0.0
+                still = still + 1 if np.allclose(hands._sp, sp0, atol=1e-9) else 0
+                if still >= 20:
+                    free = True
+                    keep_q[qa:qa + 7] = False
+                    keep_v[va:va + 6] = False
+            else:
+                settled += 1
+                if settled * m.opt.timestep >= settle_s:
+                    break
+    finally:
+        m.dof_armature[:] = arm0
+    for s_ in ("left", "right"):
+        d.qvel[hands.hv[s_]] = 0.0
+    d.qvel[va:va + 6] = 0.0
+    hands._vs[:] = 0.0
+    mujoco.mj_forward(m, d)
+    hands.update_held()
+    ball = set(np.flatnonzero(m.geom_bodyid == m.body("ball").id))
+    for s_ in ("left", "right"):
+        g = set(hands.group_geoms(w, s_, "hand"))
+        if not any((c.geom1 in g and c.geom2 in ball) or (c.geom2 in g and c.geom1 in ball) for c in d.contact[:d.ncon]):
+            raise RuntimeError(f"the {s_} hand does not touch the ball after closing")
 # ---- end of the hold ----
 
 
@@ -172,18 +210,14 @@ class Task(TaskBase):
                 "a player holds a live ball), Art. 16 (goal; a ball that passes through the basket from below is a "
                 "violation), Art. 43 (free throws)")
     deviations = [
-        "Art. 3 (equipment): the hands are flat rubber palm pads without fingers; the ball is held only by pressing it "
-        "between the two palms (friction), and it slips or drops when the arms do not press hard enough. Any "
-        "shooting style is allowed (a two-handed set or push shot, an underhand two-handed shot); the ball is "
-        "released when no hand touches it any more.",
-        "Art. 3 (equipment, the hand): the palm is modelled as the soft part of a hand: it absorbs the ball (a ball "
-        "thrown at a still palm keeps "
-        f"{PALM_REBOUND:.2f} of its speed) instead of bouncing it like the floor ({BALL['bounce']:.2f}); with the "
-        "ball's own floor rebound on the palms a squeezed ball rattles out of them within about a second. The floor, "
-        "the ring and the backboard keep the ball's rule-book rebound.",
+        "the player's hands: the H1-2's own Inspire hands (five fingers, six drives: four fingers, the thumb's "
+        "flexion and rotation; the core's fingertip forces, 20 N, the thumb 30 N: twice the device's), closed by one command per hand; they hold the "
+        "ball by contact and friction only (nothing is welded), a hand smaller than a player's (its span about 0.2 m "
+        "against the ball's 0.24 m). Any shooting style is allowed; the ball is released when no hand touches it "
+        "any more.",
         "Art. 13.1.2 (the ball is played with the hands only) is read strictly: until the shot is through, the ball "
-        "may touch no part of you but your hands (palm pads and wrists); holding it against the trunk, the arms or "
-        "a leg is not a hold of this task.",
+        "may touch no part of you but your hands (fingers, thumb, palm and wrist); holding it against the trunk, the "
+        "arms or a leg is not a hold of this task.",
         "Basketball Equipment (basket): the ring is rigid (no pressure release) and the net is only drawn: it does not "
         "slow the ball. A goal is judged at the ring: the ball's centre down through the ring's plane and on to one "
         "ball diameter below it.",
@@ -202,16 +236,17 @@ class Task(TaskBase):
                   semicircle_radius_m=1.80, start_behind_line_m=0.35, release_limit_s=5.0, retouch_grace_s=0.05,
                   touch_gap_s=0.03, fall_z_m=0.35)
 
-    sentence = ("Shoot a free throw: from behind the free-throw line, shoot the basketball you hold pressed between "
-                "your two palms so that it enters the basket from above.")
+    sentence = ("Shoot a free throw: from behind the free-throw line, shoot the basketball you hold in your two "
+                "hands so that it enters the basket from above.")
     rules = ("The official basket: a rigid ring of {ring_inner_diameter_m} m inner diameter ({ring_metal_m} m metal), "
              "its top edge {ring_height_m} m above the floor, its centre {ring_centre_to_board_m} m in front of a "
              "backboard {board_width_m} m wide and {board_height_m} m high whose lower edge is {board_bottom_m} m "
              "above the floor. The ball is a size-7 basketball (" + f"{2 * BALL['radius']:.3f} m across, "
              f"{BALL['mass']:.2f} kg, it keeps {BALL['bounce']:.2f} of its speed in a bounce on the floor" + "); it "
-             "flies in air (drag and spin lift). Your hands have no fingers and no grip: the ball starts pressed "
-             "between your two flat palms and is at your disposal at the start; only the force of your arms and "
-             "friction hold it, and it can slip out. A hand is the palm pad and the wrist; a hand is on the ball while "
+             "flies in air (drag and spin lift). Your hands are five-finger hands that hold things only by contact and "
+             "friction: the ball starts in them, between your two palms, both hands closed on it and your arms "
+             "pressing it, and is at your disposal at the start; it can slip out. A hand is its fingers, thumb, palm and "
+             "wrist; a hand is on the ball while "
              "it touches the ball, gaps shorter than {touch_gap_s} s included; the ball is in your hands while at "
              "least one hand is on it. The release is the moment the ball is no longer in your hands (no hand on it); "
              "the ball can be released only once: a ball that slips or drops out of your hands is released too. The "
@@ -230,34 +265,31 @@ class Task(TaskBase):
              "{start_behind_line_m} m behind the free-throw line's near edge and on the line through the ring's "
              "centre; the point under the ring's centre is {line_to_ring_m} m beyond that edge. Painted on the floor: "
              "the restricted area, the free-throw line and circle, the three-point line, the no-charge semi-circle. "
-             "The ball is pressed between your two palms in front of your chest, its centre about 1.3 m above the "
-             "floor and 0.45 m ahead of your pelvis: your upper arms are a little forward, your forearms a little "
-             "raised and turned in so that the palms squeeze it; the start command keeps that squeeze (the joint "
-             "table's start angles are a little further in than the arms stand: the difference is the squeeze). Your "
-             "hands have no grip: the grip columns of the action rows do nothing in this task.")
+             "The ball is in your hands in front of your chest, its centre about 1.15 m above the floor and 0.4 m "
+             "ahead of your pelvis: your palms on its two sides, your fingers spread up and forwards over it, both "
+             "hands closed on it (grip values 1); the start command turns your shoulders a little further in than "
+             "your arms stand (the difference is the squeeze that holds the ball). A grip value is that hand's closure "
+             "command (0 open, 1 every finger and thumb drive closing; a finger stops on what it touches). The "
+             "ball is a free body: `held` in your state says which hand holds it (its fingers and its thumb or palm "
+             "on it).")
     difficulty = ("The 0.62 kg ball has to leave the hands at about 8 m/s on a steep arc to reach a ring 3.05 m high "
-                  "and more than 4 m away, with a margin of a few centimetres in air that slows it; the hands can "
-                  "only squeeze it from the sides, so all of that speed has to be carried by the friction of two flat "
-                  "palms, and both have to leave it at the same instant without spinning it off line. The arms' "
-                  "fastest swing gives less than that, and the body only stands by an open-loop stance.")
+                  "and more than 4 m away, with a margin of a few centimetres in air that slows it; the hands, "
+                  "smaller than the ball, have to push it and open in time, and both have to leave it at the same "
+                  "instant without spinning it off line. The arms' fastest swing gives less than that, and the body "
+                  "only stands by an open-loop stance.")
 
     def build(self, sc):
         p = self.p
         hx = p["start_behind_line_m"] + p["line_to_ring_m"]
         self.hoop = build_court(sc, hx, 0.0, p)
-        sc.ball("ball", "basketball", (0.42, 0.0, 1.28))         # no grip: the ball is not grippable
-        opt = sc.root.find("option")
-        opt.set("cone", CONE)
-        opt.set("impratio", f"{IMPRATIO:g}")
-        for side in ("left", "right"):
-            ET.SubElement(sc.root.find("contact"), "pair", name=f"palm_ball_{side}", geom1="ball",
-                          geom2=f"{side}_palm_pad", condim="6",
-                          friction=f"{PALM_MU} {PALM_MU} 0.003 {BALL['roll']} {BALL['roll']}", solref=PALM_SOLREF,
-                          solimp=PALM_SOLIMP)
+        sc.ball("ball", "basketball", (0.42, 0.0, 1.28))         # nothing grippable: held by the hands' contact
+        for side in ("left", "right"):                           # the H1-2's own Inspire hands (rfo.realhand)
+            sc.real_hands[side] = "inspire"
+            sc.real_hand_options[side] = {"closed": dict(HAND_CLOSED)}
         sc.camera("venue", (-2.6, -3.6, 2.6), (hx * 0.55, 0.0, 1.7), fovy=55)
 
     def reset(self, w):
-        ball_between_palms(w)
+        ball_in_hands(w)
 
     def referee_reset(self, w, ref):
         h = self.hoop

@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-sprint-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `sprint` / seed 0 |
-| Oracle | `full` — Reference: stand through the start procedure, react to the gun, then the running policy at 3.5 m/s steered to the lane's centre; 9 of 10 perturbed runs at 2.5 to 4.0 m/s finished when it was written. The privileged twin's reference rows (1959 control steps, success after 19.59 s) streamed through the client. |
+| Oracle | `full` — Reference: stand through the start procedure, react to the gun, then the running policy at 3.5 m/s steered to the lane's centre; 9 of 10 perturbed runs at 2.5 to 4.0 m/s finished when it was written. The privileged twin's reference rows (1954 control steps, success after 19.54 s) streamed through the client. |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -18,7 +18,7 @@ Run the 50 m: wait for the starter's gun, then sprint down your lane until your 
 The gun has to be seen, not guessed: moving early disqualifies and waiting costs time. Then 50 m in a 1.22 m lane: the walking gait covers 20 m in the time, the running gait has to be held straight for a quarter of a minute at a speed close to where it falls. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
 
 ## Reference solution
-`solution/oracle_replay.py` streams the privileged twin's reference solution, row by row, through the client (`solution/rows.npz`, recorded at generation time). Reference: stand through the start procedure, react to the gun, then the running policy at 3.5 m/s steered to the lane's centre; 9 of 10 perturbed runs at 2.5 to 4.0 m/s finished when it was written. The privileged twin's reference rows (1959 control steps, success after 19.59 s) streamed through the client.
+`solution/oracle_replay.py` streams the privileged twin's reference solution, row by row, through the client (`solution/rows.npz`, recorded by scripts/embodied-olympics/make_oracles.py). Reference: stand through the start procedure, react to the gun, then the running policy at 3.5 m/s steered to the lane's centre; 9 of 10 perturbed runs at 2.5 to 4.0 m/s finished when it was written. The privileged twin's reference rows (1954 control steps, success after 19.54 s) streamed through the client.
 
 ## Verification
 The sim sidecar's referee judges the live attempt, and that is the verdict (`final.json`: `graded_by` live, `replays` 0;

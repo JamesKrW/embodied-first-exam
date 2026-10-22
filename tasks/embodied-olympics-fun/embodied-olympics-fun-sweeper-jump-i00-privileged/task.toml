@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md ย
 instance_seed = 0
 expert_time_estimate_hours = 8.0
 oracle = "full"
-oracle_evidence = "Reference: walk, joint and lowcmd rows with the boom angle read privileged: it faces the boom, makes three tuck jumps with the soles 4-8 cm over the 0.30 m boom and stands 2 s, success at 21.1 s; 9 of 11 perturbed starts and 15 of 20 with its own gains +-3 % succeed, below the 9 of 10 bar (landings on the 0.9 m podium). Measured (make_oracles.py): success after 21.08 s of the 30 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "Reference: walk, joint and lowcmd rows with the boom angle read privileged: it faces the boom, makes three tuck jumps with the soles 4-8 cm over the 0.30 m boom and stands 2 s, success at 21.1 s; 9 of 11 perturbed starts and 15 of 20 with its own gains +-3 % succeed, below the 9 of 10 bar (landings on the 0.9 m podium). Measured (make_oracles.py): success after 21.1 s of the 30 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md ยง2.9)

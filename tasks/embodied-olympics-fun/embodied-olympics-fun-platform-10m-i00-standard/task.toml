@@ -34,7 +34,7 @@ instance_seed = 0
 reset_budget = 50
 expert_time_estimate_hours = 8.0
 oracle = "full"
-oracle_evidence = "Reference: a scripted G1 dive (stand with the arms overhead, a balanced crouch, a 0.37 s lean with soft ankles, a lowcmd push with the hips opened, a straight entry shape), the lean time found by bisection: a half somersault of 167 deg at the first touch, the body line 8.5 deg off vertical when the hips reach the surface, entry 2.29 m out. Referee test: 12 negatives, incl. over- and under-rotation, a topple, a scrape, arms down, legs apart, toes, a twist and a side entry (injected kicks), too far, a step, a hop (double jump). The privileged twin's reference rows (630 control steps, success after 6.3 s) streamed through the client."
+oracle_evidence = "Reference: a scripted G1 dive (stand with the arms overhead, a balanced crouch, a 0.37 s lean with soft ankles, a lowcmd push with the hips opened, a straight entry shape), the lean time found by bisection: a half somersault of 167 deg at the first touch, the body line 8.5 deg off vertical when the hips reach the surface, entry 2.29 m out. Referee test: 12 negatives, incl. over- and under-rotation, a topple, a scrape, arms down, legs apart, toes, a twist and a side entry (injected kicks), too far, a step, a hop (double jump). The privileged twin's reference rows (632 control steps, success after 6.32 s) streamed through the client."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

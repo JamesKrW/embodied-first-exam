@@ -33,8 +33,8 @@ protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 50
 expert_time_estimate_hours = 8.0
-oracle = "full"
-oracle_evidence = "Reference: a toss off the open left palm by the arm's own movement (no pin, no launch), then an underarm hit, with the published palm contact model: 0.87 m/s in, 11.8 m/s out, lands 12.1 m ahead, success after 1.7 s; kp x0.97 and x1.01 also succeed, x0.99 lands wide, x1.03 short. Referee test negatives: nop (8 s on the palm), a tilted palm (it rolls off), the ball on the shoulder before the toss, a thrown ball meeting the fist, a ball falling on a still fist (absorbed: held), into the net, outside the antenna, long, a foot fault, a second touch. The privileged twin's reference rows (172 control steps, success after 1.72 s) streamed through the client."
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/roboolympics/tests/test_volleyball_serve.py: Reference, re-found on the core with Unitree's actuator data (H2-class legs, rotor inertia, joint friction): a tiny toss off the open left palm by the arm's own movement (no pin, no launch); then the same arm swings up with the trunk's turn and strikes the ball 0.12 s after the toss with the upper arm and forearm (Rule 12.4.1 allows any part of the arm). Key times, arm keys and trunk lean come from CMA-ES, with a penalty for any arm passing more than 3 mm into the body. The ball comes in at 0.50 m/s and leaves at 11.4 m/s; it lands 11.6 m ahead (2.1 m beyond the net), 3.3 m right of the middle; success after 1.8 s. The deepest self-overlap is 2.8 mm (the left wrist into the trunk). 3 of 4 perturbations succeed (servo gains x0.97 / x1.03 and the keys after the strike 10 ms earlier pass; 10 ms later fails).; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -74,7 +74,7 @@ sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0

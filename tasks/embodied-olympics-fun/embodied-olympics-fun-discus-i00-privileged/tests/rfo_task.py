@@ -1,6 +1,6 @@
-"""Discus throw (World Athletics TR 32 and 34): the official circle and sector; the right hand is Unitree's Dex1-1
-two-jaw gripper and holds the men's discus by its rim, clamped between the jaws by friction only (it can slip, turn in
-the jaws and fly out early); throw it so that it lands inside the sector at least the qualifying mark away, then leave
+"""Discus throw (World Athletics TR 32 and 34): the official circle and sector; the right hand is the H1-2's own Inspire
+five-finger hand (rfo.realhand, "inspire") and holds the men's discus flat on its palm, the fingertips curled over the
+rim, by contact and friction only (it can slip, turn in the hand and fly out early); throw it so that it lands inside the sector at least the qualifying mark away, then leave
 the circle from its rear half. The Unitree H1-2."""
 import math
 
@@ -20,16 +20,15 @@ from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 APRON, RAMP = 1.0, 1.0                        # the ground outside the circle: level for APRON m, then down to the field
 N_WEDGE = 48
 # ---- the hold ----
-# The right hand is a Dex1-1 gripper (rfo/realhand.py). The discus lies between its jaws with its axis along the closing
-# axis (its faces on the pads, as a hand's palm and fingers lie on its flat), its rim RIM_GAP_M from the housing's face
-# between the jaws: the pads cover the outer 80 mm of it, and the convex faces touch them at the pads' tips, about 30 mm
-# from the discus' centre, where it is 43 mm thick (a clamp there pushes it out of the jaws with a slope of 0.06, far
-# inside the pads' friction). Clamped at the full 120 N (measured, the robot still, a steady force at the discus'
-# centre ramped up until the discus has moved 5 mm in the jaws): about 200 N out of the jaws, 100 N across them (the
-# discus turns in the jaws), 110 N along the closing axis (it tips over a jaw's tip); its 2 kg hang in it for a minute.
-RIM_GAP_M = 0.003
-HOUSING_FACE_M = 0.063                         # the housing's face between the jaws, from the mount (realhand.HOUSING)
-JAW_CENTRE_M = 0.103                           # the jaw centre's distance from the mount (realhand.CENTRE_Z)
+# The right hand is the H1-2's Inspire hand (rfo/realhand.py). The discus lies flat on its palm (its axis along the
+# palm's normal), the fingers' tips curled over the rim, the forearm level and rolled palm up: a thrower's hold at rest.
+# Searched (the hand closed on it, then held 1.5 s standing): hanging below the hand from the fingers (the arm down)
+# the 2 kg discus slides out of the hand wherever it is placed; on the upturned palm it stays (moved 7 mm).
+ARM_START = dict(right_elbow_roll=1.57)        # the right arm at t = 0: the rest pose (the forearm level, forwards),
+#                                                the forearm rolled palm up: the discus rests on the palm
+DISCUS_IN_HAND_M = (0.0045, -0.06)             # the discus' centre from the hand's grasp centre: out of the palm (its
+#                                                face on the palm), along the fingers (the fingertips curled over the
+#                                                rim; a search: hanging from the fingers it slides out of the hand)
 # ---- end of the hold ----
 # Flight in air: MuJoCo's ellipsoid fluid model on the discus' own ellipsoid. Coefficients (blunt drag, slender drag,
 # angular drag, Kutta lift, Magnus lift) chosen so that the drag coefficient edge-on is 0.08 and the lift coefficient
@@ -97,14 +96,13 @@ class Task(TaskBase):
                 "events: the start, failures, the landing, leaving the circle, the measurement), TR 34 (the men's "
                 "discus), TR 35 (the discus cage)")
     deviations = [
-        "TR 34 (the discus; the thrower's hand): the right hand is Unitree's Dex1-1 two-jaw gripper (sold for the G1, "
-        "the H2 and the R1, not for the H1-2; mounted on the wrist where the H1-2's palm ends): 90 mm stroke, 80 mm "
-        "jaws with rubber pads, at most 120 N of grip, opening at most 375 mm/s. It holds the discus by its rim, the "
-        "discus' faces between the jaws (where a hand's palm and fingertips hold it), by friction only: nothing is "
-        "welded or grippable, and the discus slips, turns in the jaws or flies out when the throw pulls harder than "
-        "the clamp's friction (at the full clamp a steady pull at the discus' centre moves it in the jaws at about "
-        "200 N out of them and 100 N across them). The release is the gripper's last hold (both jaws on the discus) "
-        "before it is clear of the robot.",
+        "TR 34 (the discus; the thrower's hand): the right hand is the H1-2's own Inspire five-finger hand (six "
+        "drives: four fingers, the thumb's flexion and rotation; fingertip forces 10 N, the thumb 15 N, at "
+        "{grip_scale} times the device's forces; one closure command for the whole hand). The discus lies flat on its "
+        "palm, the fingertips curled over the rim, held by contact and friction only: nothing is welded or grippable, "
+        "and the discus slips, turns in the hand or flies out when the throw pulls harder than the fingers hold. The "
+        "release is the hand's last hold (the discus touching the hand's fingers and its thumb or palm) before it is "
+        "clear of the robot.",
         "TR 34 (the discus' shape): an ellipsoid of the official diameter, thickness and mass (no separate metal "
         "rim: its moment of inertia is that of a uniform body; near the rim it is 13 to 19 mm thick, as the rule "
         "book's rim).",
@@ -130,23 +128,23 @@ class Task(TaskBase):
     params = dict(discus_mass_kg=2.000, discus_diameter_m=0.220, discus_thickness_m=0.045, circle_diameter_m=2.50,
                   rim_height_m=0.02, rim_edge_m=0.003, sector_deg=34.92, qualifying_mark_m=15.0, retouch_grace_s=0.20, carry_s=0.20,
                   release_gap_s=0.03, stand_s=1.0,
-                  fall_pelvis_m=0.50)
+                  fall_pelvis_m=0.50, grip_scale=1.0)
 
-    sentence = ("Throw the discus that your right gripper holds by its rim from inside the circle so that it lands "
+    sentence = ("Throw the discus that lies on your right palm, your fingers curled over its rim, from inside the circle so that it lands "
                 "inside the sector at least {qualifying_mark_m} m from the circle, then leave the circle from its "
                 "rear half and stand.")
     rules = ("The men's discus ({discus_mass_kg} kg, {discus_diameter_m} m across, {discus_thickness_m} m thick at "
-             "its centre) starts clamped by its rim between the two jaws of your right hand's Dex1-1 gripper (the "
-             "row's right grip value is the gripper's closure command, 0 open to 1 closed; nothing is welded or "
-             "grippable: friction alone holds it, and it slips, turns or flies out when the throw pulls harder than "
-             "the clamp). The circle is {circle_diameter_m} m across inside its rim; the ground outside is "
+             "its centre) starts flat on the palm of your right hand, the fingertips curled over its rim (the row's "
+             "right grip value is the hand's closure command, 0 open to 1 closed; nothing is welded or grippable: "
+             "contact and friction alone hold it, and it slips, turns or flies out when the throw pulls harder than "
+             "the fingers hold). The circle is {circle_diameter_m} m across inside its rim; the ground outside is "
              "{rim_height_m} m higher than its inside. The sector opens from the circle's centre, {sector_deg} "
-             "degrees wide, symmetric about the direction you face at the start. Holding: the discus touches both "
-             "jaws of the right gripper. Before the release nothing of you but your right hand (the gripper and the "
-             "wrist) may touch it, and it may not stay on the hand without the gripper's hold (touching the hand but "
-             "not both jaws) for more than {carry_s} s. The release is the gripper's last hold before the discus has "
-             "touched nothing of you for {release_gap_s} s; there is one release: after it the discus may not be "
-             "held by the gripper again, nothing of you but the right hand may touch it, and the right hand only "
+             "degrees wide, symmetric about the direction you face at the start. Holding: the discus touches the "
+             "right hand's fingers and its thumb or palm. Before the release nothing of you but your right hand (the "
+             "fingers, the palm and the wrist) may touch it, and it may not stay on the hand without the hand's hold "
+             "for more than {carry_s} s. The release is the hand's last hold before the discus has touched nothing "
+             "of you for {release_gap_s} s; there is one release: after it the discus may not be held by the hand "
+             "again, nothing of you but the right hand may touch it, and the right hand only "
              "during the first {retouch_grace_s} s (brushing it as it leaves). Its first touch of the ground must be "
              "inside the sector lines (on a line is out); the throw is measured from that point to the inside of the "
              "rim along the line through the circle's centre. You succeed when a valid throw measures at least "
@@ -157,23 +155,21 @@ class Task(TaskBase):
              "slower than 0.35 m/s. You fail if any part of you touches the rim's top (its top inside edge included) "
              "or the ground outside the circle before the discus has landed, or in the front half before you have "
              "left correctly; if the discus is touched by anything but the right hand before the release, stays on "
-             "the hand without the gripper's hold, is gripped again or touched after the release (but for the right "
+             "the hand without the hand's hold, is held again or touched after the release (but for the right "
              "hand's brush); if it lands outside the sector or short of {qualifying_mark_m} m; if you fall (your "
              "pelvis lower than {fall_pelvis_m} m above the circle's floor, or any part of you other than your feet "
              "on the ground); or after {time_limit_s} s. Where you touch the ground is judged on the points of "
              "contact; a contact within {rim_edge_m} m of the rim's top counts as on it.")
     venue = ("You stand in the rear half of the circle facing the sector (+x), your pelvis 0.55 m behind the circle's "
-             "centre. Your right arm hangs straight down, a little away from the leg; the gripper's fingers point "
-             "down and its jaws, closed at the full command, clamp the discus by its rim, the discus hanging below "
-             "the hand with its faces towards and away from your leg. There is no cage. Still air.")
+             "centre. Your right forearm is level and points "
+             "forwards, rolled palm up; the discus lies flat on the palm, the closed hand's fingertips curled over its "
+             "rim. There is no cage. Still air.")
     difficulty = ("{qualifying_mark_m} m needs a release at about 12 m/s near 35 to 40 degrees with the discus flat "
                   "to its flight and spinning, or the air turns it over. The H1-2's arm motors give 40 N m at the "
                   "shoulder, so the speed has to come from the trunk's turn, inside a circle of 2.5 m that the "
                   "robot may not leave until the discus is down. At that speed the discus pulls on the hand with some "
-                  "300 N, and the gripper's friction gives way earlier (measured on the still robot, a steady force "
-                  "at the discus' centre moves it 5 mm in the jaws at about 200 N out of the jaws, 100 N across them "
-                  "and 110 N along the closing axis): the hand's path and the discus' place in the jaws decide whether "
-                  "it stays in until the release.")
+                  "300 N, held only by fingertips curled over its rim and the palm under it: the hand's path has to "
+                  "keep the discus pressed into the palm and the fingers until the release.")
 
     def build(self, sc):
         p = self.p
@@ -187,18 +183,19 @@ class Task(TaskBase):
                                                      p["discus_thickness_m"] / 2), mass=p["discus_mass_kg"],
                 rgba=(0.75, 0.3, 0.15, 1), friction=(0.7, 0.005, 0.0001), condim=4, fluidshape="ellipsoid",
                 fluidcoef=FLUID, **HITTABLE, **RIGID)
-        sc.real_hands["right"] = "dex1"                           # nothing grippable: the gripper holds by friction
+        sc.real_hands["right"] = "inspire"                        # nothing grippable: the hand holds by friction
+        if p["grip_scale"] != 1.0:                                # a declared deviation (the grip-force factor)
+            sc.real_hand_options["right"] = {"grip_scale": float(p["grip_scale"])}
         sc.camera("venue", (-3.0, -3.8, 2.6), (1.5, 0.0, 0.8), fovy=55)
         sc.camera("sector", (-3.0, 0.0, 14.0), (9.0, 0.0, 0.0), fovy=70)
 
     def reset(self, w):
-        set_arm(w, right_elbow_pitch=1.57, right_shoulder_roll=-0.20)
-        c, R = w.jaw_frame("right")                 # x: the closing axis, y: across the jaws, z: along the fingers
-        Rb = np.column_stack([R[:, 1], R[:, 2], R[:, 0]])     # the discus' axis: the closing axis
+        set_arm(w, **ARM_START)
+        c, R = w.grasp_frame("right")               # x: out of the palm, z: along the fingers, y = z x x
+        Rb = np.column_stack([R[:, 1], R[:, 2], R[:, 0]])     # the discus' axis: the palm's normal (flat on the palm)
         q = np.zeros(4)
         mujoco.mju_mat2Quat(q, Rb.reshape(-1))
-        out = HOUSING_FACE_M + RIM_GAP_M + self.p["discus_diameter_m"] / 2 - JAW_CENTRE_M
-        w.put("discus", c + R[:, 2] * out, quat=q)
+        w.put("discus", c + R[:, 0] * DISCUS_IN_HAND_M[0] + R[:, 2] * DISCUS_IN_HAND_M[1], quat=q)
         w.close_on("right", "discus", closure=1.0)
 
     # ------------------------------------------------------------------ the referee
@@ -208,7 +205,7 @@ class Task(TaskBase):
         self.apron = ref.geoms(prefix="apron")
         self.floor = ref.geoms(names=["floor"])
         self.disc_id = w.m.body("discus").id
-        # last: the discus' state when the gripper last held it (time, centre, velocity, axis, spin about the axis);
+        # last: the discus' state when the hand last held it (time, centre, velocity, axis, spin about the axis);
         # clear: since when it has touched nothing of the robot after the hold ended
         self.trackers = {"released": None, "landed": None, "exit": False, "last": self._state(w, 0.0), "clear": None}
 
@@ -251,20 +248,20 @@ class Task(TaskBase):
             if on - {"right_hand"}:
                 return ref.fail("the discus was touched by something other than the throwing hand",
                                 parts=sorted(on - {"right_hand"}))
-            if w.held["right"] == "discus":                    # both jaws on it: in the hand
+            if w.held["right"] == "discus":                    # the hand's fingers and thumb or palm on it: held
                 tr["last"], tr["clear"] = self._state(w, ref.time), None
                 return
-            if on:                                             # on the hand, but not between both jaws
+            if on:                                             # on the hand, but not held
                 tr["clear"] = None
                 if ref.time - tr["last"][0] > p["carry_s"] + 1e-9:
-                    return ref.fail("the discus stayed on the hand without the gripper's hold",
+                    return ref.fail("the discus stayed on the hand without the hand's hold",
                                     unheld_s=round(ref.time - tr["last"][0], 3))
                 return
             if tr["clear"] is None:
                 tr["clear"] = round(ref.time, 4)
             if ref.time - tr["clear"] < p["release_gap_s"] - 1e-9:
                 return
-            tr["released"] = tr["last"][0]                     # the release: the gripper's last hold
+            tr["released"] = tr["last"][0]                     # the release: the hand's last hold
             now = self._state(w, ref.time)                     # (the flight's start: measured now, free of the hand)
             v, ax = np.array(now[4:7]), np.array(now[7:10])
             ref.metrics["release_time_s"] = tr["released"]

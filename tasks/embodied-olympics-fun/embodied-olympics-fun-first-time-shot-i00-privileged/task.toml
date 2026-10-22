@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md ย
 instance_seed = 0
 expert_time_estimate_hours = 6.0
 oracle = "full"
-oracle_evidence = "Reference: a scripted standing side-foot kick of the G1 (joint targets, centre-of-mass feedback ankle balance on the left foot, the right hip turned out, the swing start timed within a control step on the rolling ball), then the walking policy recovers: the ball is met at 3.1 m/s and shot at 5.0 m/s, a goal at 9.16 s; 9 of 10 perturbations (gains, release time, ramp height) succeed. Measured (make_oracles.py): success after 9.16 s of the 15 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "Reference: a scripted standing side-foot kick of the G1 (joint targets, centre-of-mass feedback ankle balance on the left foot, the right hip turned out, the swing start timed within a control step on the rolling ball), then the walking policy recovers: the ball is met at 3.1 m/s and shot at 5.0 m/s, a goal at 9.16 s; 9 of 10 perturbations (gains, release time, ramp height) succeed. Measured (make_oracles.py): success after 9.22 s of the 15 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md ยง2.9)

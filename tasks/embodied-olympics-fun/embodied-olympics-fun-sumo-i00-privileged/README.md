@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-sumo-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `sumo` / seed 0 |
-| Oracle | `full` — Reference: FALCON walking-policy rows with privileged poses: it pushes with the forearms low, steering 1 m beyond the opponent outwards, and wins at 11.6 s (the opponent down); 8 of 10 perturbed starts and 29 of 40 with its own numbers +-3 % succeed, below the 9 of 10 bar (chaotic shoving of two walking policies). Measured (make_oracles.py): success after 11.83 s of the 30 s limit, live and in a fresh replay, ending in the same state. |
+| Oracle | `full` — Reference: FALCON walking-policy rows with privileged poses: it pushes with the forearms low, steering 1 m beyond the opponent outwards, and wins at 11.6 s (the opponent down); 8 of 10 perturbed starts and 29 of 40 with its own numbers +-3 % succeed, below the 9 of 10 bar (chaotic shoving of two walking policies). Measured (make_oracles.py): success after 14.8 s of the 30 s limit, live and in a fresh replay, ending in the same state. |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -18,7 +18,7 @@ Win a sumo bout: force the opponent robot out of the ring, or make any part of i
 The opponent is as heavy and as strong as you and walks into you on a balance policy that pushes back; the robot must stay on its feet under the impact and the shove, and turn the contact into the opponent leaving the ring or going down, with only fists and no belt to grip.
 
 ## Reference solution
-`solution/oracle.py` drives the robot through the task's own tooling, closed loop on the privileged state, and writes the trajectory (`solution/solve.sh`). Reference: FALCON walking-policy rows with privileged poses: it pushes with the forearms low, steering 1 m beyond the opponent outwards, and wins at 11.6 s (the opponent down); 8 of 10 perturbed starts and 29 of 40 with its own numbers +-3 % succeed, below the 9 of 10 bar (chaotic shoving of two walking policies). Measured (make_oracles.py): success after 11.83 s of the 30 s limit, live and in a fresh replay, ending in the same state.
+`solution/oracle.py` drives the robot through the task's own tooling, closed loop on the privileged state, and writes the trajectory (`solution/solve.sh`). Reference: FALCON walking-policy rows with privileged poses: it pushes with the forearms low, steering 1 m beyond the opponent outwards, and wins at 11.6 s (the opponent down); 8 of 10 perturbed starts and 29 of 40 with its own numbers +-3 % succeed, below the 9 of 10 bar (chaotic shoving of two walking policies). Measured (make_oracles.py): success after 14.8 s of the 30 s limit, live and in a fresh replay, ending in the same state.
 
 ## Verification
 `/tests/grade.py` replays `/app/output/trajectory.npz` from the frozen start in two fresh processes (`rcb_rfo.py replay`:

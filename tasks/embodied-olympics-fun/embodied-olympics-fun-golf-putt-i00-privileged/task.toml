@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-golf-putt-i00-privileged"
-description = "Embodied Olympics golf-putt (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Hole the 3.0 m putt: with one stroke of the putter held in your right hand's gripper, roll the golf ball that lies on the green into the hole, without letting go of the putter. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics golf-putt (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Hole the 3.0 m putt: with one stroke of the putter held in your right hand, roll the golf ball that lies on the green into the hole, without letting go of the putter. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "golf-putt"]
 
@@ -19,9 +19,9 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
-expert_time_estimate_hours = 6.0
+expert_time_estimate_hours = 8.0
 oracle = "full"
-oracle_evidence = "one Dex1-1 across the grip; club starts hanging (level it turns 23-25 deg in the jaws); two-hand address unreachable by IK; reference carries the club shaft-vertical and swings by wrist roll: holed at 17.3 s, 10/12 perturbations Measured: success after 17.3 s of the 30 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "Reference re-found for the G1's own Dex3-1 right hand at the device's torques (the putter's grip across the palm, held by the closed fingers and thumb; no weld): a one-armed pendulum putt by the wrist's roll joint with the wrist's yaw held at zero, the arm's kinematics reading where the club is in the hand; holed at 18.0 s of the 30 s limit, one 12 ms contact of the head; the same state hash twice; holed again with the swing 2 % faster and with the ball 2 mm towards the heel or the toe (3 of 5 perturbations; a face closed 0.5 degree more or a take-back 0.02 rad longer stops 6-10 cm short). At the start the hanging club turns 0.7 degree in the hand in 3 s. Negatives: nop (time), the hand opened (the putter left the hand), injected rolls too soft, too hard, over the edge, past the hole, at rest on the lip, off the green, a push, a double hit then a second stroke, a ball thrown at the shaft, a kick, astride the line, a fall; stimp 10 re-measured. Stress: random arm targets with the club in the hand end on the anchoring rule at 0.34 s, the club at most 7.4 mm into anything. Measured (make_oracles.py): success after 17.99 s of the 30 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

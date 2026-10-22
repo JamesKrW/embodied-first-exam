@@ -20,7 +20,9 @@
   "touch_gap_s": 0.03,
   "step_gap_s": 0.03,
   "pivot_slide_m": 0.2,
-  "control_radius_m": 2.0
+  "control_radius_m": 2.0,
+  "carry_s": 0.1,
+  "carry_depth": 0.3
  },
  "title": "Basketball: dribble to the frontcourt",
  "category": "basketball-and-rackets",
@@ -32,18 +34,18 @@
  ],
  "rulebook": "FIBA Official Basketball Rules 2024: Art. 2 (court), Art. 3 and the Basketball Equipment appendix (size-7 ball), Art. 13 (how the ball is played), Art. 14 (control: a player holds a live ball), Art. 23 (out of bounds), Art. 24 (dribbling), Art. 25 (travelling), Art. 28.1.3 (when a dribbled ball is in the frontcourt)",
  "deviations": [
-  "Art. 3 (equipment): the hands are flat rubber palm pads without fingers; the ball is held only by pressing it between the two palms (friction), and it slips or drops when the arms do not press hard enough. It is dribbled by pushing it with a palm; it has left your hands when no hand has been on it for 0.03 s.",
-  "Art. 3 (equipment, the hand): the palm is modelled as the soft part of a hand: it absorbs the ball (a ball thrown at a still palm keeps 0.12 of its speed) instead of bouncing it like the floor (0.85); with the ball's own floor rebound on the palms a squeezed ball rattles out of them within about a second. A dribbling hand therefore gives the ball its speed by its own motion. The floor keeps the ball's rule-book rebound.",
+  "the player's hands: the H1-2's own Inspire five-finger hands (six drives each: four fingers, the thumb's flexion and rotation; fingertip forces 10 N, the thumb 15 N), each closed by one command; the ball is held in the two hands by contact and friction alone (nothing is welded) and can slip or drop; it has left your hands when no hand has been on it for 0.03 s. The fingers' rubber pads absorb the ball (critically damped), so a dribbling hand gives the ball its speed by its own motion; the floor keeps the ball's rule-book rebound.",
+  "Art. 24.1.3 (carrying the ball, a hand under it): judged by where a hand touches the ball: a touch from below (the hand's lowest contact point on the ball lower than the ball's centre by more than 0.3 of its radius) that lasts longer than 0.1 s carries the ball; a hand on top of it or on its side pushes it.",
   "Art. 24.1.2 (the ball 'comes to rest' in a hand) is read as: a hand's touch of the ball that lasts longer than 0.3 s. A dribble that has ended cannot legally be started again (Art. 24.2), so a ball that comes to rest in a hand, or is touched by both hands at once, ends the attempt.",
   "Art. 13: every touch of the ball by a part of you other than a hand is a violation, also while the ball is held at the start (no ball held against the chest or between the forearms); intent (an accidental touch of a leg is legal in the rule book) cannot be judged.",
   "Art. 14 / 24 give no distance for 'control' of a dribbled ball: here the ball's centre must stay within 2.0 m (horizontally) of your pelvis, so that a ball thrown ahead and walked after is not a dribble.",
   "Art. 28 (eight seconds to reach the frontcourt) is not applied: the attempt lasts at most 60 s of robot time."
  ],
  "texts": {
-  "sentence": "Dribble the basketball, which starts pressed between your two palms, from the end line across the centre line, 14 m up the court, one palm at a time, without a dribbling or a travelling violation.",
-  "rules": "A FIBA court, 28.0 m by 15.0 m inside its boundary lines (lines 0.05 m wide); the centre line's axis is 14.0 m from the end line. The ball is a size-7 basketball (0.239 m across, 0.62 kg, it keeps 0.85 of its speed in a bounce on the floor). Your hands have no fingers and no grip: the ball starts pressed between your two flat palms, and only the force of your arms and friction hold it; it can slip out. A hand is the palm pad and the wrist; a hand is on the ball while it touches the ball, gaps shorter than 0.03 s included; the ball is in your hands while at least one hand is on it, and it has left them once no hand has been on it for 0.03 s. You stand still. Starting the dribble: the first foot you lift makes the other your pivot foot; the pivot foot, and before a foot is lifted either foot, may not slide more than 0.2 m along the floor, and the pivot foot may not leave the floor before the ball has left your hands (a foot has left the floor when it has not touched it for 0.03 s). While the ball is in your hands it may touch no part of you but your hands, and it may not touch the floor. The ball leaving your hands (pushed, dropped or slipped) is the first touch of your dribble. The dribble: after that you play the ball with one hand at a time, by touches that push it to the floor (thrown, tapped, rolled or bounced): between two touches by your hands the ball must have touched the floor; contacts of a hand less than 0.03 s apart are one touch. There is no limit to your steps while the ball is not in a hand. You succeed at the first moment the ball touches the floor in the frontcourt (beyond the centre line's far edge, 14.0 m plus half a line width from the end line) with both your feet in the frontcourt (every point where each foot last touched the floor is beyond that edge), after at least one touch of your dribble after the ball left your hands. You fail if you travel at the start; if the ball touches the floor or a part of you other than a hand while it is in your hands; if, after it has left your hands, a hand's touch lasts longer than 0.3 s (the ball has come to rest in the hand); if both hands touch the ball at the same time; if a hand touches the ball twice without the ball having touched the floor in between; if the ball touches any part of you other than a hand; if the ball's centre is ever more than 2.0 m (horizontally) from your pelvis after it left your hands; if the ball or any part of you touches the floor on or outside a boundary line (out of bounds); if you fall (a fall: your pelvis lower than 0.35 m above the floor, or any part of you other than your feet on the floor); or after 60 s.",
-  "venue": "You stand in the backcourt just inside the end line, facing up the court (+x): the end line's inner edge is 0.5 m behind your pelvis and the centre line 14.0 m beyond that edge. The basket of this end is to your right: the court's long axis, with the backboard (its lower edge 2.9 m high, 1.2 m in from the end line) and the ring, is 2.5 m to your right; the side lines are 15.0 m apart, the nearer one 5 m to your left. Painted on the floor: the boundary lines, the restricted area, the free-throw line (5.8 m from the end line) and circle, the three-point line, the centre line and circle. The ball is pressed between your two palms in front of your chest, its centre about 1.3 m above the floor and 0.45 m ahead of your pelvis: your upper arms are a little forward, your forearms a little raised and turned in so that the palms squeeze it; the start command keeps that squeeze (the joint table's start angles are a little further in than the arms stand: the difference is the squeeze). Your hands have no grip: the grip columns of the action rows do nothing in this task.",
-  "difficulty": "The ball keeps 85 % of its speed in a bounce but a palm absorbs it, so every touch has to push it down and forward again by the hand's own motion to where the hand will be, with a rigid palm 8 cm wide, for 14 m, on a body whose walking gait covers about 0.7 m/s, drifts in heading, and is disturbed by every push of the arm. The built-in walking gait steps on the spot even at a zero command, so the ball has to leave the palms before it starts."
+  "sentence": "Dribble the basketball, which starts held in your two hands, from the end line across the centre line, 14 m up the court, one hand at a time, without a dribbling, carrying or travelling violation.",
+  "rules": "A FIBA court, 28.0 m by 15.0 m inside its boundary lines (lines 0.05 m wide); the centre line's axis is 14.0 m from the end line. The ball is a size-7 basketball (0.239 m across, 0.62 kg, it keeps 0.85 of its speed in a bounce on the floor). Your hands are five-finger hands, each closed by its grip value (0 open, 1 closed); they hold the ball only by contact and friction: it starts resting on your upturned right hand, the fingers curled a little round it, your left hand on its side, and it can slip or drop. A hand is the palm, the fingers, the thumb and the wrist; a hand is on the ball while it touches the ball, gaps shorter than 0.03 s included; the ball is in your hands while at least one hand is on it, and it has left them once no hand has been on it for 0.03 s. You stand still. Starting the dribble: the first foot you lift makes the other your pivot foot; the pivot foot, and before a foot is lifted either foot, may not slide more than 0.2 m along the floor, and the pivot foot may not leave the floor before the ball has left your hands (a foot has left the floor when it has not touched it for 0.03 s). While the ball is in your hands it may touch no part of you but your hands, and it may not touch the floor. The ball leaving your hands (pushed, dropped or slipped) is the first touch of your dribble. The dribble: after that you play the ball with one hand at a time, by touches that push it to the floor (thrown, tapped, rolled or bounced): between two touches by your hands the ball must have touched the floor; contacts of a hand less than 0.03 s apart are one touch. There is no limit to your steps while the ball is not in a hand. You succeed at the first moment the ball touches the floor in the frontcourt (beyond the centre line's far edge, 14.0 m plus half a line width from the end line) with both your feet in the frontcourt (every point where each foot last touched the floor is beyond that edge), after at least one touch of your dribble after the ball left your hands. You fail if you travel at the start; if the ball touches the floor or a part of you other than a hand while it is in your hands; if, after it has left your hands, a hand's touch lasts longer than 0.3 s (the ball has come to rest in the hand); if a hand carries the ball (it touches the ball from below, its lowest contact point on the ball lower than the ball's centre by more than 0.3 of the ball's radius, for longer than 0.1 s); if both hands touch the ball at the same time; if a hand touches the ball twice without the ball having touched the floor in between; if the ball touches any part of you other than a hand; if the ball's centre is ever more than 2.0 m (horizontally) from your pelvis after it left your hands; if the ball or any part of you touches the floor on or outside a boundary line (out of bounds); if you fall (a fall: your pelvis lower than 0.35 m above the floor, or any part of you other than your feet on the floor); or after 60 s.",
+  "venue": "You stand in the backcourt just inside the end line, facing up the court (+x): the end line's inner edge is 0.5 m behind your pelvis and the centre line 14.0 m beyond that edge. The basket of this end is to your right: the court's long axis, with the backboard (its lower edge 2.9 m high, 1.2 m in from the end line) and the ring, is 2.5 m to your right; the side lines are 15.0 m apart, the nearer one 5 m to your left. Painted on the floor: the boundary lines, the restricted area, the free-throw line (5.8 m from the end line) and circle, the three-point line, the centre line and circle. The ball rests on your upturned right hand in front of your chest, its centre about 1.1 m above the floor, 0.39 m ahead of your pelvis and 0.06 m to its right; the right hand's fingers point forwards under it, curled a little round it (grip value 0.3), the left hand's palm is on its left side, open (grip value 0); the start command keeps that hold. A grip value is that hand's closure command: 0 opens the fingers, 1 closes every finger and the thumb until they meet something.",
+  "difficulty": "The ball keeps 85 % of its speed in a bounce but a hand absorbs it, so every touch has to push it down and forward again by the hand's own motion to where the hand will be, with a hand about 8 cm wide and a ball 24 cm across, for 14 m, on a body whose walking gait covers about 0.7 m/s, drifts in heading, and is disturbed by every push of the arm. The built-in walking gait steps on the spot even at a zero command, so the ball has to leave the hands before it starts."
  },
  "robot": "unitree_h1",
  "sim": {
@@ -51,7 +53,7 @@
   "mujoco": "3.3.7"
  },
  "t0": {
-  "state_sha": "c28c2956096d62c2253dfd0468b260de5fde1d138606ce967cb95d504b7a958a",
+  "state_sha": "af50f9f375fc5eec16553250243f9cff7aff44e0ef718611ec27d2d03149403c",
   "control_dt": 0.01,
   "horizon_steps": 6000,
   "raw_dim": 141,
@@ -115,7 +117,7 @@
      1.0,
      1.0
     ],
-    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad)"
+    "meaning": "the platform holds the legs in the stance; you give the waist's 1 and the arms' 14 joint targets (rad) (grip_left: the left hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch); grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    },
    "walk": {
     "dim": 20,
@@ -185,7 +187,7 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets"
+    "meaning": "Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets (grip_left: the left hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch); grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    },
    "joints": {
     "dim": 29,
@@ -282,7 +284,7 @@
      1.0,
      1.0
     ],
-    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward"
+    "meaning": "you give all 27 joint targets (rad); the default PD gains, no feed-forward (grip_left: the left hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch); grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    },
    "lowcmd": {
     "dim": 137,
@@ -480,31 +482,31 @@
      -31.4,
      -31.4,
      -31.4,
+     -360.0,
+     -360.0,
+     -360.0,
+     -360.0,
+     -66.88,
+     -40.0,
+     -360.0,
+     -360.0,
+     -360.0,
+     -360.0,
+     -66.88,
+     -40.0,
      -200.0,
-     -200.0,
-     -200.0,
-     -300.0,
+     -130.0,
      -60.0,
-     -40.0,
-     -200.0,
-     -200.0,
-     -200.0,
-     -300.0,
      -60.0,
-     -40.0,
-     -200.0,
-     -40.0,
-     -40.0,
-     -18.0,
-     -18.0,
+     -60.0,
+     -60.0,
      -19.0,
      -19.0,
-     -19.0,
-     -40.0,
-     -40.0,
-     -18.0,
-     -18.0,
-     -19.0,
+     -130.0,
+     -60.0,
+     -60.0,
+     -60.0,
+     -60.0,
      -19.0,
      -19.0,
      0.0,
@@ -619,31 +621,31 @@
      31.4,
      31.4,
      31.4,
+     360.0,
+     360.0,
+     360.0,
+     360.0,
+     66.88,
+     40.0,
+     360.0,
+     360.0,
+     360.0,
+     360.0,
+     66.88,
+     40.0,
      200.0,
-     200.0,
-     200.0,
-     300.0,
+     130.0,
      60.0,
-     40.0,
-     200.0,
-     200.0,
-     200.0,
-     300.0,
      60.0,
-     40.0,
-     200.0,
-     40.0,
-     40.0,
-     18.0,
-     18.0,
+     60.0,
+     60.0,
      19.0,
      19.0,
-     19.0,
-     40.0,
-     40.0,
-     18.0,
-     18.0,
-     19.0,
+     130.0,
+     60.0,
+     60.0,
+     60.0,
+     60.0,
      19.0,
      19.0,
      1500.0,
@@ -703,29 +705,29 @@
      1.0,
      1.0
     ],
-    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz"
+    "meaning": "Unitree's LowCmd for all 27 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz (grip_left: the left hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch); grip_right: the right hand's closure command, 0 (open, the fingers straight) to 1 (every drive closing towards its closed position; fingers stop on what they touch))"
    }
   },
   "hold": {
    "type": "stand",
    "row": [
     0.0,
-    -0.2,
-    -0.05,
-    -0.074,
-    -0.3,
-    -0.0,
+    -0.2102,
+    0.0481,
+    -0.724,
+    0.4173,
+    0.0342,
+    -0.47,
+    0.7949,
+    -0.4674,
+    0.2556,
+    -0.335,
+    1.5041,
+    1.3391,
+    -0.2658,
+    1.0833,
     0.0,
-    -0.0,
-    -0.2,
-    0.05,
-    0.074,
-    -0.3,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0
+    0.3
    ]
   },
   "proprio_layout": [
@@ -863,7 +865,37 @@
    "cmd_vx",
    "cmd_vy",
    "cmd_wz",
-   "time_s"
+   "time_s",
+   "hand_closure_left",
+   "hand_closure_speed_left",
+   "hand_force_left",
+   "left_hand_thumb_yaw_pos",
+   "left_hand_thumb_pitch_pos",
+   "left_hand_index_pos",
+   "left_hand_middle_pos",
+   "left_hand_ring_pos",
+   "left_hand_pinky_pos",
+   "left_hand_thumb_yaw_torque",
+   "left_hand_thumb_pitch_torque",
+   "left_hand_index_torque",
+   "left_hand_middle_torque",
+   "left_hand_ring_torque",
+   "left_hand_pinky_torque",
+   "hand_closure_right",
+   "hand_closure_speed_right",
+   "hand_force_right",
+   "right_hand_thumb_yaw_pos",
+   "right_hand_thumb_pitch_pos",
+   "right_hand_index_pos",
+   "right_hand_middle_pos",
+   "right_hand_ring_pos",
+   "right_hand_pinky_pos",
+   "right_hand_thumb_yaw_torque",
+   "right_hand_thumb_pitch_torque",
+   "right_hand_index_torque",
+   "right_hand_middle_torque",
+   "right_hand_ring_torque",
+   "right_hand_pinky_torque"
   ],
   "cameras": {
    "head_left": {
@@ -943,7 +975,7 @@
    "name": "unitree_h1",
    "title": "Unitree H1-2",
    "revision": "h1-4",
-   "model": "Unitree H1-2, 27 joints, 1.78 m, 67 kg (RoboOlympics robot library h1-4: Unitree's own h1_2 model with its joint, speed and torque limits; its motor torque-speed curves are estimates)",
+   "model": "Unitree H1-2, 27 joints, 1.78 m, 67 kg (RoboOlympics robot library h1-4: the H1-2 body (Unitree's own h1_2 model, its joint ranges and speed limits) with Unitree H2 / H2-X-class leg actuators from the H2's official URDF (hips and knees 360 N m, ankle pitch 66.88 N m; curves of Unitree's M107 shape, 2.5 kW peak per joint) and H2-class arm actuators from the same URDF (shoulder pitch 130 N m; shoulder roll and yaw, elbow, forearm roll 60 N m; curves of Unitree's N7520 / N5020 shapes); the H1-2's own torso (M107-15, 200 N m), ankle roll and wrist pitch / yaw (estimates))",
    "joints": [
     "left_hip_yaw",
     "left_hip_pitch",
@@ -1116,31 +1148,31 @@
     31.4
    ],
    "torque_limit_nm": [
+    360.0,
+    360.0,
+    360.0,
+    360.0,
+    66.88,
+    40.0,
+    360.0,
+    360.0,
+    360.0,
+    360.0,
+    66.88,
+    40.0,
     200.0,
-    200.0,
-    200.0,
-    300.0,
+    130.0,
     60.0,
-    40.0,
-    200.0,
-    200.0,
-    200.0,
-    300.0,
     60.0,
-    40.0,
-    200.0,
-    40.0,
-    40.0,
-    18.0,
-    18.0,
+    60.0,
+    60.0,
     19.0,
     19.0,
-    19.0,
-    40.0,
-    40.0,
-    18.0,
-    18.0,
-    19.0,
+    130.0,
+    60.0,
+    60.0,
+    60.0,
+    60.0,
     19.0,
     19.0
    ],
@@ -1302,10 +1334,234 @@
     1.57
    ],
    "run_command_range": null,
-   "grip": {
-    "reach_m": 0.035,
-    "max_relative_speed_m_s": 6.0,
-    "rule": "a closed grip holds the nearest grippable object whose surface is within reach_m of the palm (a point 4.5 cm beyond the wrist flange along the forearm) and that moves no faster than max_relative_speed_m_s relative to it; opening the grip lets it go"
+   "real_hands": {
+    "kind": "inspire",
+    "sides": [
+     "left",
+     "right"
+    ],
+    "hands": {
+     "left": {
+      "kind": "inspire",
+      "model": "the H1-2's Inspire RH56DFX five-finger hand (6 self-locking linear drives for 12 joints: the thumb's rotation and flexion, one drive per finger with its two joints coupled; Unitree's h1_2 kinematics) with H2-class fingertip forces: 20 N per finger and 30 N the thumb, 2 x the RH56DFX's 10 / 15 N (Unitree's H2 Plus offers 20 N Sharpa Wave hands; Inspire's RH56E2 gives 28 / 30 N)",
+      "grip_scale": 1.0,
+      "drives": [
+       {
+        "name": "thumb_yaw",
+        "joint": "thumb_proximal_yaw",
+        "open_rad": 0.0,
+        "closed_rad": 1.1,
+        "speed_rad_s": 1.8675,
+        "active_torque_nm": 1.59,
+        "passive_torque_nm": 4.1594,
+        "group": "thumb",
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "thumb_pitch",
+        "joint": "thumb_proximal_pitch",
+        "open_rad": 0.0,
+        "closed_rad": 0.5,
+        "speed_rad_s": 1.2217,
+        "active_torque_nm": 6.72,
+        "passive_torque_nm": 17.5795,
+        "group": "thumb",
+        "coupled": {
+         "thumb_intermediate": 1.6,
+         "thumb_distal": 2.4
+        },
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "index",
+        "joint": "index_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.34,
+        "passive_torque_nm": 9.1822,
+        "group": "fingers",
+        "coupled": {
+         "index_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "middle",
+        "joint": "middle_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.44,
+        "passive_torque_nm": 9.5746,
+        "group": "fingers",
+        "coupled": {
+         "middle_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "ring",
+        "joint": "ring_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.32,
+        "passive_torque_nm": 9.1037,
+        "group": "fingers",
+        "coupled": {
+         "ring_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "pinky",
+        "joint": "pinky_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.02,
+        "passive_torque_nm": 7.9265,
+        "group": "fingers",
+        "coupled": {
+         "pinky_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       }
+      ],
+      "servo": {
+       "kp_nm_per_rad": 200.0,
+       "kd_nm_s_per_rad": 0.5,
+       "rule": "each drive: a setpoint moves towards open + closure x (closed - open) at most speed_rad_s, but closing stops where kp (setpoint - q) would exceed active_torque_nm; torque = clip(kp (setpoint - q) + kd (setpoint speed - dq), -passive, passive) at every physics step; a load beyond passive_torque_nm drags the setpoint (the drive slips)"
+      },
+      "holding_rule": "a free body that touches the hand's fingers and its thumb or palm",
+      "pad_friction": [
+       1.0,
+       0.005,
+       0.0001
+      ],
+      "start": {
+       "closure": 0.0,
+       "holding": null
+      }
+     },
+     "right": {
+      "kind": "inspire",
+      "model": "the H1-2's Inspire RH56DFX five-finger hand (6 self-locking linear drives for 12 joints: the thumb's rotation and flexion, one drive per finger with its two joints coupled; Unitree's h1_2 kinematics) with H2-class fingertip forces: 20 N per finger and 30 N the thumb, 2 x the RH56DFX's 10 / 15 N (Unitree's H2 Plus offers 20 N Sharpa Wave hands; Inspire's RH56E2 gives 28 / 30 N)",
+      "grip_scale": 1.0,
+      "drives": [
+       {
+        "name": "thumb_yaw",
+        "joint": "thumb_proximal_yaw",
+        "open_rad": 0.0,
+        "closed_rad": 1.1,
+        "speed_rad_s": 1.8675,
+        "active_torque_nm": 1.59,
+        "passive_torque_nm": 4.1594,
+        "group": "thumb",
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "thumb_pitch",
+        "joint": "thumb_proximal_pitch",
+        "open_rad": 0.0,
+        "closed_rad": 0.5,
+        "speed_rad_s": 1.2217,
+        "active_torque_nm": 6.72,
+        "passive_torque_nm": 17.5795,
+        "group": "thumb",
+        "coupled": {
+         "thumb_intermediate": 1.6,
+         "thumb_distal": 2.4
+        },
+        "fingertip_force_n": 30.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "index",
+        "joint": "index_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.34,
+        "passive_torque_nm": 9.1822,
+        "group": "fingers",
+        "coupled": {
+         "index_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "middle",
+        "joint": "middle_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.44,
+        "passive_torque_nm": 9.5746,
+        "group": "fingers",
+        "coupled": {
+         "middle_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "ring",
+        "joint": "ring_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.32,
+        "passive_torque_nm": 9.1037,
+        "group": "fingers",
+        "coupled": {
+         "ring_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       },
+       {
+        "name": "pinky",
+        "joint": "pinky_proximal",
+        "open_rad": 0.0,
+        "closed_rad": 1.7,
+        "speed_rad_s": 4.5379,
+        "active_torque_nm": 2.02,
+        "passive_torque_nm": 7.9265,
+        "group": "fingers",
+        "coupled": {
+         "pinky_intermediate": 1.0
+        },
+        "fingertip_force_n": 20.0,
+        "passive_fingertip_force_n": 78.48
+       }
+      ],
+      "servo": {
+       "kp_nm_per_rad": 200.0,
+       "kd_nm_s_per_rad": 0.5,
+       "rule": "each drive: a setpoint moves towards open + closure x (closed - open) at most speed_rad_s, but closing stops where kp (setpoint - q) would exceed active_torque_nm; torque = clip(kp (setpoint - q) + kd (setpoint speed - dq), -passive, passive) at every physics step; a load beyond passive_torque_nm drags the setpoint (the drive slips)"
+      },
+      "holding_rule": "a free body that touches the hand's fingers and its thumb or palm",
+      "pad_friction": [
+       1.0,
+       0.005,
+       0.0001
+      ],
+      "start": {
+       "closure": 0.3,
+       "holding": null
+      }
+     }
+    }
    }
   },
   "grippable": [],

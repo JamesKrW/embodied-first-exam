@@ -1,7 +1,7 @@
 """Paddle bounce (table tennis ball control): a ball dropped above the paddle in your right hand kept bouncing on the
 blade, every bounce back up to the height it was dropped from. The paddle is a free 0.14 kg table tennis racket held
-only by the friction of the right hand's two-finger gripper (Unitree Dex1-1): it can slip, turn in the jaws and be
-dropped.
+only by the contact and friction of the right hand, the G1's own Dex3-1 three-finger hand: it can slip, turn in the
+hand and be dropped.
 
 The ball: the official 40 mm, 2.7 g ball with Google DeepMind's identified fluid coefficients and thin-shell inertia,
 and RoboOlympics' ball-blade contact pair (roboolympics/sports/tabletennis/sim/scene/tt_scene.xml, Apache-2.0;
@@ -16,20 +16,16 @@ blade, 0.09 kg, on a straight handle of a real racket's size, 100 mm long, 32 mm
 sets no size, shape or weight for the blade or the handle; a common "straight" handle is 100 x 30-34 x 23-26 mm), as a
 free body. Its blade's centre is 0.175 m from the butt.
 
-The hand: the core's Dex1-1 (rfo.realhand: 90 mm stroke, 80 mm jaws, 5-120 N), the paddle held by contact and friction
-only, no weld. The handle lies along the jaws (the longest patch the gripper has: 75 mm of the 80 mm pads on the
-handle), its two broad faces against the pads, so the blade's faces look along the closing axis; the butt 5 mm from
-the gripper's body; the closure command 1 (120 N). The blade's centre is 0.243 m from the wrist mount (the gripper's
-body and jaws are that long).
-
-Measured with this module (tests/test_paddle_bounce.py asserts them): at 120 N, the paddle held level on the
-standing robot's arm turns less than 0.1 degree and moves less than 0.2 mm in the jaws in 1.4 s, and it does not move
-hanging from the hand at rest; eased to a clamp of 0.6 N it slides 5 cm down the jaws under its own weight, and at
-0.3 N it slides out and falls. The two-jaw contact breaks for at most 2 ms in the reference solution's 20 bounces.
+The hand: the G1's Dex3-1 (rfo.realhand "dex3": thumb 3 joints, index and middle 2 each, the device's torques), the
+paddle held by contact and friction only, no weld: a shakehand grip, the handle across the palm (along the hand's
+grasp frame's y, the blade beyond the index finger's side), the fingers and the thumb closed round it, the blade's
+faces looking along the palm's normal; the butt GRIP["butt_out_m"] short of the grasp centre on the other side; the
+closure command 1. "In the hand" = the handle touches the hand's fingers and its thumb or palm (the core's holding
+rule).
 
 Why the rule is "back up to the drop height": no passive rebound reaches the height the ball fell from; a bounce that
 does has been given energy by the blade. Measured on this module: a ball dropped from
-1.20 m onto the still, level blade held in the gripper (its centre 0.87 m up) rises 0.25 m above it, to 1.15 m:
+1.20 m onto the still, level blade held in the hand (its centre 0.87 m up) rises 0.25 m above it, to 1.15 m:
 below the drop height, so the first passive rebound already fails.
 
 The simulator's options: DeepMind's table-tennis model uses elliptic cones with impratio 10; a world with a real hand
@@ -793,7 +789,7 @@ FREE_PADDLE = dict(blade_m=0.15, blade_thickness_m=0.015, blade_kg=0.09, blade_c
 
 def build_free_paddle(sc, pos, quat=(1, 0, 0, 0), name="paddle"):
     """The paddle as a free body at pos/quat (its butt). Geoms <name>_handle (a box) and <name>_blade (a box), both
-    colliding like a prop (HITTABLE): with the jaws, the robot, the floor, the table, the net, the ball."""
+    colliding like a prop (HITTABLE): with the hands, the robot, the floor, the table, the net, the ball."""
     P = FREE_PADDLE
     b = sc.body(name, pos, quat=quat, free=True)
     L = P["handle_length_m"]
@@ -810,7 +806,10 @@ def build_free_paddle(sc, pos, quat=(1, 0, 0, 0), name="paddle"):
 BLADE_PAIR = dict(solref="-600000 -12", friction="0.8 0.8 0.005 0.0001 0.0001", solimp="0.98 0.99 0.001 0.5 2",
                   solreffriction="-0.0 -200.0")
 SIDE = "right"
-BUTT_FROM_JAW_CENTRE_M = 0.035     # the butt 5 mm out from the gripper's housing: the handle along the 80 mm jaws
+# where the handle sits in the hand (the grasp frame, rfo.realhand: x out of the palm, z along the fingers, y = z x x,
+# on the right hand towards the index finger): the handle's axis along y, the butt butt_out_m before the grasp centre,
+# the handle's centre palm_off_m out of the palm and finger_off_m along the fingers from it (a search for the hold)
+GRIP = dict(butt_out_m=0.05, palm_off_m=0.005, finger_off_m=0.0)
 
 EARLY = "the ball was touched before it was dropped"
 OTHER = "the ball touched something other than the paddle's blade"
@@ -836,10 +835,10 @@ class Task(TaskBase):
         "long, {handle_width_m} m wide and {handle_thickness_m} m thick, {paddle_mass_kg} kg in all (legal: the Laws "
         "set no size, shape or weight); its covering is one contact law on both faces (RoboOlympics' ball-paddle pair, "
         "hand-picked, not identified)",
-        "2.5.5 (the hand carrying the racket): the hand is a two-finger gripper, Unitree's Dex1-1 (90 mm stroke, 80 mm "
-        "jaws, at most 120 N); the handle lies along its jaws and the paddle is held by their friction alone, as a "
-        "hand holds it; \"in the hand\" is defined by contact: the handle touches both of the gripper's jaws, and a "
-        "break of up to {out_of_hand_s} s is not a release",
+        "2.5.5 (the hand carrying the racket): the hand is the G1's own Dex3-1 three-finger hand (a thumb, an index "
+        "and a middle finger, at the device's joint torques), closed round the handle in a shakehand grip; the paddle "
+        "is held by contact and friction alone; \"in the hand\" is defined by contact: the handle touches the hand's "
+        "fingers and its thumb or palm, and a break of up to {out_of_hand_s} s is not a release",
         "the start: nobody drops the ball for the robot; a machine does: the ball rests in the cup of a dropper on an "
         "arm in front of the robot, whose two trapdoor leaves slide apart at {drop_time_s} s (the ball falls from "
         "rest); {retract_after_s} s later the cup pulls {retract_m} m back along the arm, away from the robot",
@@ -859,15 +858,15 @@ class Task(TaskBase):
                   retract_m=0.35, dropper_free_s=0.1)
 
     sentence = ("Keep the table tennis ball that is dropped in front of you bouncing on the paddle held in your right "
-                "hand's gripper: {bounces} bounces in a row, each back up to the height the ball was dropped from, "
+                "hand: {bounces} bounces in a row, each back up to the height the ball was dropped from, "
                 "without letting go of the paddle.")
     rules = ("A table tennis racket (a rigid square blade 0.15 m wide and 0.015 m thick on a straight handle "
              "{handle_length_m} m long, {handle_width_m} m wide and {handle_thickness_m} m thick; {paddle_mass_kg} kg; "
              "the blade's centre {blade_centre_m} m from the butt) is a separate body; at the start its handle is "
-             "closed in your right hand's two-finger gripper, which holds it by friction only: it can slip, turn in "
-             "the gripper and fall. The paddle is in your hand while its handle touches both of the gripper's jaws; "
-             "it has left your hand when for more than {out_of_hand_s} s the handle has not touched both jaws. The "
-             "paddle may touch nothing of you but your right hand (the gripper's jaws and body). The official ball "
+             "closed in your right hand (three fingers: a thumb, an index and a middle finger), which holds it by "
+             "contact and friction only: it can slip, turn in the hand and fall. The paddle is in your hand while its "
+             "handle touches the hand's fingers and its thumb or palm; it has left your hand when for more than "
+             "{out_of_hand_s} s it has not. The paddle may touch nothing of you but your right hand. The official ball "
              "(40 mm, 2.7 g; it flies in air, with drag) rests in a dropper's cup, its centre {drop_z_m} m above the "
              "floor, until {drop_time_s} s after the start, when the cup's floor opens and it falls; {retract_after_s} s "
              "later the cup moves {retract_m} m away from you along its arm. You succeed after {bounces} bounces in a row on the "
@@ -880,18 +879,18 @@ class Task(TaskBase):
              "of the blade; a rebound that rises enough but was not hit is not counted, and is not a fault. A touch "
              "is all contact of the ball with the blade from the first contact on, with breaks shorter than "
              "{touch_gap_s} s; a bounce's own contact lasts about a millisecond. You fail if the paddle leaves your "
-             "hand at any time (dropped, thrown or slipped out of the gripper); if the paddle touches any part of you "
+             "hand at any time (dropped, thrown or slipped out of the hand); if the paddle touches any part of you "
              "other than your right hand; if the ball comes back to the blade after a touch without having risen that "
              "much; if a touch lasts longer than {max_touch_s} s from its first contact to its last (the ball rests, "
              "rolls or is carried on the blade); if the ball touches the floor or anything other than the blade (the "
-             "paddle's handle, the gripper, your arm or body included, and the dropper from {dropper_free_s} s after "
+             "paddle's handle, your hand, arm or body included, and the dropper from {dropper_free_s} s after "
              "the drop on); if you or the paddle touch the ball before it is dropped; if you fall; or after {time_limit_s} s. A fall is your pelvis lower than {fall_height_m} m "
              "above the floor, or any part of you other than your feet touching the floor; the paddle touching the "
              "floor is a fall too.")
-    venue = ("You stand on a level floor facing +x. The paddle's handle is closed in your right gripper along its two "
-             "fingers, the butt just short of the gripper's body and the rest of the handle reaching beyond the "
-             "fingertips; the blade's faces look the way the jaws close (your palm's side and the back of your hand), "
-             "and the paddle points ahead along your forearm, the blade's centre about 0.24 m beyond your wrist. The "
+    venue = ("You stand on a level floor facing +x, your arms hanging. The paddle's handle lies across your right "
+             "palm in a shakehand grip, the fingers and the thumb closed round it, the blade beyond the index "
+             "finger's side and its faces looking the way your palm does (forehand) and the back of your hand "
+             "(backhand). The "
              "ball rests in the cup of a dropper {drop_x_m} m ahead of your pelvis and {drop_y_m} m to your left "
              "(negative: to your right), its centre {drop_z_m} m above the floor: a ring round it and two leaves under "
              "it, on a carriage that hangs from an arm reaching towards you from a column further ahead (+x). At "
@@ -900,8 +899,8 @@ class Task(TaskBase):
     difficulty = ("Every bounce needs an upward hit of the right strength at the right instant, with the blade level "
                   "and under a 40 mm ball: a tilt of a degree sends the ball off the 15 cm blade within a few "
                   "bounces, and the arm that holds the blade gives way a little at every hit. The paddle sits in a "
-                  "two-finger gripper, so the blade is where the jaws hold it, not where the arm was told to put "
-                  "it, and it has to go right twenty times in a row.")
+                  "three-finger hand with small finger motors, so the blade is where the fingers hold it, not where "
+                  "the arm was told to put it, and it has to go right twenty times in a row.")
 
     def __init__(self):
         super().__init__()
@@ -918,7 +917,7 @@ class Task(TaskBase):
     def build(self, sc):
         p = self.p
         sc.box("mat", (0.3, 0, 0.0003), (1.5, 1.5, 0.0003), rgba=(0.45, 0.25, 0.25, 1))
-        sc.real_hands[SIDE] = "dex1"
+        sc.real_hands[SIDE] = "dex3"
         # the dropper (the shared ball machine block); the ball rests in its cup
         self.dropper = Dropper("dropper", (p["drop_x_m"], p["drop_y_m"], p["drop_z_m"]), BALL["radius"],
                                retract=(1.0, 0.0, 0.0), retract_m=p["retract_m"], retract_s=p["retract_after_s"])
@@ -937,16 +936,17 @@ class Task(TaskBase):
         sc.camera("venue", (1.7, -1.8, 1.45), (0.2, -0.1, 0.9), fovy=42)
 
     def reset(self, w):
-        """The paddle's handle along the right gripper's fingers (its axis the fingers' axis, the blade's normal the
-        closing axis), the butt BUTT_FROM_JAW_CENTRE_M before the jaws' centre; then the jaws close on it (the full
-        command: 120 N) and the grasp settles."""
+        """The paddle's handle across the right palm (GRIP: its axis the grasp frame's y, the blade's normal the
+        palm's), then the hand closes on it (the full command) and the grasp settles."""
         p = self.p
         self.dropper.reset(w)
         self.dropper.open_t = p["drop_time_s"]
-        c, R = w.jaw_frame(SIDE)
+        c, R = w.grasp_frame(SIDE)
+        Rp = np.c_[R[:, 0], -R[:, 2], R[:, 1]]              # paddle x = the palm's normal, z = the handle = grasp y
         q = np.zeros(4)
-        mujoco.mju_mat2Quat(q, R.ravel())
-        w.put("paddle", c - BUTT_FROM_JAW_CENTRE_M * R[:, 2], quat=q)
+        mujoco.mju_mat2Quat(q, Rp.ravel())
+        w.put("paddle", c - GRIP["butt_out_m"] * R[:, 1] + GRIP["palm_off_m"] * R[:, 0] + GRIP["finger_off_m"] * R[:, 2],
+              quat=q)
         self.grasp = w.close_on(SIDE, "paddle")
 
     def referee_reset(self, w, ref):
@@ -958,10 +958,11 @@ class Task(TaskBase):
         self.dropper_g = ref.geoms(prefix="dropper")
         self.other = ref.robot_mask | self.handle
         self.right_hand = ref.part(f"{SIDE}_hand")
-        self.jaws = (ref.geoms(body=f"{SIDE}_hand_jaw_a"), ref.geoms(body=f"{SIDE}_hand_jaw_b"))
+        ng = w.m.ngeom
+        self.grips = tuple(np.isin(np.arange(ng), w.hands.group_geoms(w, SIDE, g)) for g in ("fingers", "thumb_palm"))
         self.trackers = {"blade": Touch(ref, self.ball, self.blade, gap=p["touch_gap_s"]), "dropped": False,
                          "left_z": None, "apex_z": None, "risen": True, "bounces": 0, "speed": 0.0, "v_in": 0.0,
-                         "z_in": 0.0, "both_jaws_t": 0.0}
+                         "z_in": 0.0, "in_hand_t": 0.0}
 
     def before_step(self, w):
         p = self.p
@@ -971,16 +972,16 @@ class Task(TaskBase):
             w.ref.event("drop")
 
     def in_hand(self, ref) -> bool:
-        return ref.touching(self.handle, self.jaws[0]) and ref.touching(self.handle, self.jaws[1])
+        return ref.touching(self.handle, self.grips[0]) and ref.touching(self.handle, self.grips[1])
 
     def substep(self, w, ref):
         tr, p = self.trackers, self.p
         if self.in_hand(ref):
-            tr["both_jaws_t"] = round(ref.time, 4)
+            tr["in_hand_t"] = round(ref.time, 4)
         else:
-            gap = round(ref.time - tr["both_jaws_t"], 4)
+            gap = round(ref.time - tr["in_hand_t"], 4)
             if gap > ref.metrics.get("grip_break_max_s", 0.0):
-                ref.metrics["grip_break_max_s"] = gap       # (reported: the longest break of the two-jaw contact)
+                ref.metrics["grip_break_max_s"] = gap       # (reported: the longest break of the hand's hold)
             if gap > p["out_of_hand_s"] + 1e-9:
                 return ref.fail(LEFT_HAND, out_s=gap)
         if ref.touching(self.paddle, ref.robot_mask & ~self.right_hand):
@@ -1040,5 +1041,5 @@ class Task(TaskBase):
                 "blade_centre": w.d.geom_xpos[g].tolist(), "blade_normal": (n if n[2] >= 0 else -n).tolist(),
                 "paddle_pos": w.pos("paddle").tolist(), "paddle_quat": w.d.xquat[w.m.body("paddle").id].tolist(),
                 "paddle_velocity": w.d.qvel[pv:pv + 3].tolist(), "paddle_angvel": w.d.qvel[pv + 3:pv + 6].tolist(),
-                "paddle_in_hand_t": self.trackers.get("both_jaws_t", 0.0),
+                "paddle_in_hand_t": self.trackers.get("in_hand_t", 0.0),
                 "bounces": int(self.trackers.get("bounces", 0)), "paddle": FREE_PADDLE}

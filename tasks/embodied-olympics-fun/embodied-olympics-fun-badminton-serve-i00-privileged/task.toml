@@ -20,8 +20,8 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
 expert_time_estimate_hours = 10.0
-oracle = "full"
-oracle_evidence = "Reference: a forehand low serve: the left Dex1 drops the shuttle into the swing of the friction-held racket, which hits it base first at 0.48 m, 13.9 m/s at 47 deg, landing in the receiver's right service court. The net is a mechanism (tape-and-cord beads under 130 N, the tension that gives the 26 mm sag of Law 1.10 under a 0.45 kg net; hanging mesh panels). The referee rejects all its tested negatives and counts a service that touches the net and still lands in as good. Measured (make_oracles.py): success after 3.45 s of the 15 s limit, live and in a fresh replay, ending in the same state."
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_badminton_serve.py: The racket and the shuttle are held by contact and friction in the G1's own Dex3-1 hands at the device's joint torques (no weld, no force factor): the racket's handle across the right palm, the shuttle hanging cork down across the left palm. The earlier reference serve did not carry over to these hands (with the handle across the palm the old swing sweeps the racket sideways) and a key-pose search of about 45 minutes did not find a new one. Positive by a declared injection: real, the robot stands in its service court, opens the left hand (the shuttle falls clear) and swings the right arm forwards and up with the forearm turned so that the strings face forwards and up (head about 4-9 m/s); injected, 20 ms before the racket head gets there the falling shuttle is put cork towards the strings on the head's path, falling at 1.5 m/s; real, the hit base first at 0.80 m, the flight (10.7 m/s, 49 deg) over the net and the landing in the receiver's right service court; the same state hash twice; the racket at most 0.23 mm into the hand. The shuttle's flight checks (terminal velocity 6.795 m/s, quadratic-drag decay, Law 3 speeds) pass. Negatives: nop (time), the shuttle let fall, the racket let go, the racket onto the held shuttle, let go and caught again, the shuttle on the right hand, a still racket, a feint, feathers first, a hit above the service height (the height lowered for it: the swung head does not reach 1.15 m moving forwards), thrown at the racket, the racket thrown, a hit that adds no speed, the feet (off the floor, moved, on the lines), hit twice, carried, downwards, back onto the server, a flat real hit that lands on the own side, a real swing whose face looks further left (out), under the net, outside the posts, a post, the lines in and out by 1 cm, a net cord that drops in (good), thrown over unstruck, the robot in the net, the racket on the net, a fall.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0

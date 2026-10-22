@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-golf-putt-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics golf-putt on the same frozen instance as embodied-olympics-fun-golf-putt-i00-privileged. Hole the 3.0 m putt: with one stroke of the putter held in your right hand's gripper, roll the golf ball that lies on the green into the hole, without letting go of the putter. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics golf-putt on the same frozen instance as embodied-olympics-fun-golf-putt-i00-privileged. Hole the 3.0 m putt: with one stroke of the putter held in your right hand, roll the golf ball that lies on the green into the hole, without letting go of the putter. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "golf-putt"]
 
@@ -32,9 +32,9 @@ network = "open"                 # the agent's egress (docs/protocol/README.md ย
 protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 50
-expert_time_estimate_hours = 8.0
+expert_time_estimate_hours = 10.0
 oracle = "full"
-oracle_evidence = "one Dex1-1 across the grip; club starts hanging (level it turns 23-25 deg in the jaws); two-hand address unreachable by IK; reference carries the club shaft-vertical and swings by wrist roll: holed at 17.3 s, 10/12 perturbations The privileged twin's reference rows (1730 control steps, success after 17.3 s) streamed through the client."
+oracle_evidence = "Reference re-found for the G1's own Dex3-1 right hand at the device's torques (the putter's grip across the palm, held by the closed fingers and thumb; no weld): a one-armed pendulum putt by the wrist's roll joint with the wrist's yaw held at zero, the arm's kinematics reading where the club is in the hand; holed at 18.0 s of the 30 s limit, one 12 ms contact of the head; the same state hash twice; holed again with the swing 2 % faster and with the ball 2 mm towards the heel or the toe (3 of 5 perturbations; a face closed 0.5 degree more or a take-back 0.02 rad longer stops 6-10 cm short). At the start the hanging club turns 0.7 degree in the hand in 3 s. Negatives: nop (time), the hand opened (the putter left the hand), injected rolls too soft, too hard, over the edge, past the hole, at rest on the lip, off the green, a push, a double hit then a second stroke, a ball thrown at the shaft, a kick, astride the line, a fall; stimp 10 re-measured. Stress: random arm targets with the club in the hand end on the anchoring rule at 0.34 s, the club at most 7.4 mm into anything. The privileged twin's reference rows (1799 control steps, success after 17.99 s) streamed through the client."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md ยง2.9)

@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-javelin-i00-privileged"
-description = "Embodied Olympics javelin (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Throw the javelin held by its cord in your right gripper over the shoulder from behind the arc so that its head strikes the ground first, inside the sector, at least 20.0 m from the arc, then leave the runway behind the arc and stand. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics javelin (one Unitree H1-2 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Throw the javelin held by its cord in your right hand over the shoulder from behind the arc so that its head strikes the ground first, inside the sector, at least 20.0 m from the arc, then leave the runway behind the arc and stand. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "trajectory", "javelin"]
 
@@ -19,9 +19,9 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
-expert_time_estimate_hours = 10.0
-oracle = "full"
-oracle_evidence = "Implement: the World Athletics women's 600 g javelin (2.21 m, centre of gravity 0.92 m from the tip), declared (TR 38.3-38.6): with the men's 800 g javelin about 2,400 searched throws never landed head first past 15.3 m. Flight from that javelin's own wind-tunnel data (Seo et al., Sci. Rep. 2023: C_D, C_L, C_m against the angle of attack); a nose-high release does not fly farther (33.59 m vs 32.93 m 10 deg nose-high at 17 m/s). Reference: a whole-body throw found by CMA-ES over whole episodes, with the walking policy taking over at the release: 18.5 m/s at 25 deg from 1.91 m (javelin 11 deg up), head first at 24.87 m from the arc (the mark is 20 m), a walk back behind the arc and a stand, success after 9.6 s; 9 of 10 variations succeed (servo gains x0.94-1.03, release +-5 ms; x1.06 ends in a simulator blow-up on the walk back). Referee test negatives: nop, released below the shoulder, back turned, over the arc, off the runway early, tail first, outside the sector, short, touched after the release, out in front, a fall. Measured (make_oracles.py): success after 9.64 s of the 60 s limit, live and in a fresh replay, ending in the same state."
+expert_time_estimate_hours = 12.0
+oracle = "none"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_javelin.py: The cord lies across the palm of the H1-2's own right Inspire hand (device forces), held by contact and friction. The earlier reference swing (18.5 m/s with the two-jaw gripper) no longer works: its load back-drives the finger drives to their self-locking limits and pulls the cord out across the fingers at about 1.14 s (before the commanded opening at 1.18 s), at 12-13 m/s pointing down, at 1x and equally at 2x the device's forces (so no factor up to 2x helps); a re-search of the swing (CMA-ES, about 60 generations) reached 9.8 m head first (the mark is 20 m). Positive by a declared magic action: real arm raised above the shoulder holding the javelin, the hand opened; injected once, the javelin moved 0.12 m up and given 17 m/s at 35 deg: it lands head first 31.6 m from the arc; the real walk back off the runway and stand; the same state hash twice. Negatives: nop, a release below the shoulder, the hand opened at the start, the back turned, walking over the arc, leaving the runway while it flies, tail first, outside the sector, short, touched after the release, out in front of the arc's ends, a fall. Stress: random arm targets with the hand closed: at most 0.4 mm into the fingers.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = [0]
+oracle = []
 
 [verifier]
 timeout_sec = 900.0
