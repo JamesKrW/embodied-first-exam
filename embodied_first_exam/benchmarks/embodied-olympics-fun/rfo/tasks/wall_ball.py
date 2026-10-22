@@ -1,19 +1,22 @@
 """Wall ball: from behind the line, throw the tennis ball at the target circle on the wall 5 m away
-and catch the rebound before it touches the ground, and keep it. No grip: both hands are Unitree Dex1-1 two-jaw
-grippers that hold the ball by friction only (the throw is the right gripper opening; the catch is a gripper's two
-jaws closing on the ball in the air). Official ball with its real flight and bounce; the Unitree H1-2."""
+and catch the rebound before it touches the ground, and keep it. No weld grip: both hands are the H1-2's own Inspire
+five-finger hands (rfo.realhand, "inspire"), holding the ball by contact and friction only (the throw is the right hand
+opening; the catch is a hand's fingers closing round the ball in the air). Official ball with its real flight and
+bounce; the Unitree H1-2."""
 import math
 
 import mujoco
 import numpy as np
 
-from rfo import realhand
 from rfo.referee import Touch
 from rfo.scene import OFFICIAL, VISUAL
 from rfo.task import TaskBase
 
 BALL = OFFICIAL["tennis"]                      # ITF: 6.54-6.86 cm, 56.0-59.4 g, rebound 0.745; drag and Magnus lift
 LEGAL = {"left_hand", "right_hand", "left_forearm", "right_forearm"}
+BALL_IN_HAND_M = (0.016, 0.030)                # the ball's centre from the right hand's grasp centre at the start: out
+#                                                of the palm, along the fingers (it rests on the palm; a search)
+HOLD_REACH_M = 0.12                            # a held ball's centre within this of the hand's grasp centre
 
 
 class Task(TaskBase):
@@ -25,20 +28,20 @@ class Task(TaskBase):
                 "handball training) with this benchmark's numbers. The ball is the ITF's (Rules of Tennis 2024, Rule "
                 "3 and Appendix I: size, mass, rebound)")
     deviations = [
-        "The hands: the H1-2's hands are Unitree's Dex1-1 two-jaw grippers (sold for the G1, the H2 and the R1, not "
-        "for the H1-2; mounted on the wrist where the H1-2's palm ends): 90 mm stroke, 80 mm jaws with rubber pads, at "
-        "most 120 N of grip, each jaw closing at most 187.5 mm/s; they hold the ball by friction only, and it can "
-        "slip, turn and drop. One closure command per hand (the real one also takes a speed and a force setting), no "
-        "5 N minimum force; two pads at friction 1.0 and 120 N hold about 240 N of shear, some five times the "
-        "device's rated 5 kg friction-grasp load.",
+        "The hands: the H1-2's own Inspire five-finger hands at the device's forces (six drives: four fingers, the "
+        "thumb's flexion and rotation; fingertip forces 10 N, the thumb 15 N; the fingers close at most 260 deg/s, "
+        "the thumb 70 deg/s), each closed by one command (the synergy: every drive towards its closed position); "
+        "they hold the ball by contact and friction only, and it can slip, turn and drop.",
         "The throw and the catch: the ball is released when it has touched no part of you for {release_s} s (at its "
-        "last touch); it is held while both jaws of one gripper touch it with its centre between the jaws' pads, and "
-        "a catch is the ball held after the rebound. A held ball may lose a jaw's touch for at most {held_gap_s} s.",
+        "last touch); a hand holds it while it touches that hand's fingers and its thumb or palm, its centre on the "
+        "palm's side of the hand and within " + f"{HOLD_REACH_M:g}" + " m of the hand's grasp point (not a ball "
+        "balanced on the back of the hand or the fingertips), and a catch is the ball held after the rebound. A held "
+        "ball may lose that hold for at most {held_gap_s} s.",
         "The wall is rigid and smooth; the ball's rebound from it is the ITF ball's rebound from a hard floor "
         "(" + f"{BALL['bounce']:.3f}" + " of the speed across the wall).",
         "Flight: quasi-steady aerodynamics (MuJoCo's ellipsoid fluid model: drag and Magnus lift), still air. The "
-        "world has elliptic friction cones and an impedance ratio of 100 (the grippers' setting, which makes a "
-        "clamped ball stay put); they apply to every contact.",
+        "world has elliptic friction cones and an impedance ratio of 100 (the real hands' setting, which makes a "
+        "held ball stay put); they apply to every contact.",
     ]
     time_limit_s = 15.0
     start = (-0.40, 0.0, 0.0)
@@ -47,22 +50,23 @@ class Task(TaskBase):
     params = dict(wall_distance_m=5.0, target_height_m=1.5, target_diameter_m=0.5, target_y_m=0.0, release_s=0.05,
                   retouch_grace_s=0.15, held_gap_s=0.05, hold_s=1.0, fall_pelvis_m=0.50)
 
-    sentence = ("Throw the tennis ball held in your right gripper at the target circle on the wall and catch the "
-                "rebound in a gripper before it touches the ground, and keep hold of it.")
+    sentence = ("Throw the tennis ball held in your right hand at the target circle on the wall and catch the "
+                "rebound in a hand before it touches the ground, and keep hold of it.")
     rules = ("The tennis ball (" + f"{2 * BALL['radius']:.3f} m across, {BALL['mass']:.4f} kg, it keeps "
-             f"{BALL['bounce']:.3f} of its speed in a bounce" + ", it flies in air with drag) starts held between "
-             "the jaws of your right gripper. Both your hands are two-jaw grippers that hold things only by the "
-             "friction of their jaws; nothing else holds the ball, and it can slip or drop. A gripper holds the ball "
-             "while both of its jaws touch it and its centre is between the two jaws' pads (not resting on top of "
-             "them). A wall stands {wall_distance_m} m beyond the line you stay behind; the "
+             f"{BALL['bounce']:.3f} of its speed in a bounce" + ", it flies in air with drag) starts held in "
+             "your right hand. Both your hands are five-finger hands that hold things only by contact and friction; "
+             "nothing else holds the ball, and it can slip or drop. A hand holds the ball while the ball touches its "
+             "fingers and its thumb or palm, with the ball's centre on the palm's side of the hand and within "
+             "" + f"{HOLD_REACH_M:g}" + " m of the hand's grasp point (between the closed fingers and the palm; not "
+             "resting on the back of the hand or on the fingertips). A wall stands {wall_distance_m} m beyond the line you stay behind; the "
              "target is a circle {target_diameter_m} m across painted on it, its centre {target_height_m} m above "
              "the ground and {target_y_m} m to the left of the point straight ahead of you. The throw: the ball is "
              "released when it has touched no part of you for {release_s} s (it is released at its last touch; "
              "once). The first thing it touches after that must be the wall, at a point inside the target circle. "
-             "Then catch the rebound: a gripper holding the ball (both jaws on it) before it has touched the ground; "
-             "either gripper may catch, and before the catch the rebound may touch only your hands (the grippers) "
-             "and forearms. You succeed when the ball has been held for {hold_s} s from the catch, never losing a "
-             "jaw's touch for more than {held_gap_s} s. You fail if any part of you touches the ground on or beyond "
+             "Then catch the rebound: a hand holding the ball before it has touched the ground; "
+             "either hand may catch, and before the catch the rebound may touch only your hands and forearms. You "
+             "succeed when the ball has been held for {hold_s} s from the catch, never losing the hold for more than "
+             "{held_gap_s} s. You fail if any part of you touches the ground on or beyond "
              "the line at any time; if the ball touches the ground at any time before the end; if it hits the wall "
              "outside the circle; if any part of you touches it after the release and before the wall (your right "
              "arm may still brush it during the first {retouch_grace_s} s, but not hold it); if the rebound touches "
@@ -70,19 +74,19 @@ class Task(TaskBase):
              "{held_gap_s} s after the catch; if you fall (your pelvis lower than {fall_pelvis_m} m above the "
              "ground, or any part of you other than your feet on the ground); or after {time_limit_s} s.")
     venue = ("You face the wall (+x), your pelvis 0.40 m behind the line; the wall is {wall_distance_m} m beyond the "
-             "line, 6 m wide and 4 m high. The target circle is straight ahead. The ball is held between the closed "
-             "jaws of your right gripper (closure command 1), the forearm level and pointing forwards; your left "
-             "gripper is open (closure command 0). Still air. The grip columns of the action rows are the grippers' "
-             "closure commands (0 open, 1 closed).")
+             "line, 6 m wide and 4 m high. The target circle is straight ahead. The ball is held in your closed right hand "
+             "(closure command 1), against the palm, the forearm level and pointing forwards; your left hand is open "
+             "(closure command 0). Still air. The grip columns of the action rows are the hands' closure commands (0 "
+             "open, 1 closed).")
     difficulty = ("To come back five metres through the air the ball has to hit the wall at about 16 m/s or more, "
                   "inside a circle half a metre across, and it then returns in under half a second at about 10 m/s. "
-                  "The ball, 67 mm across, has to arrive between two jaws that open at most 90 mm and are 80 mm long, "
-                  "and the jaws have to close on it in the few milliseconds it spends between them.")
+                  "The ball, 67 mm across, has to arrive in an open hand, and the fingers (260 deg/s) and the slower thumb "
+                  "have to close round it before it bounces out of the palm.")
 
     def build(self, sc):
         p = self.p
         self.fall_z = p["fall_pelvis_m"]
-        sc.real_hands["left"] = sc.real_hands["right"] = "dex1"
+        sc.real_hands["left"] = sc.real_hands["right"] = "inspire"
         X, r = p["wall_distance_m"], p["target_diameter_m"] / 2
         sc.box("court", (X / 2 - 1.0, 0, 0.0003), (X / 2 + 1.0, 3.0, 0.0003), rgba=(0.30, 0.42, 0.60, 1))
         sc.line("line", (0.0, -3.0), (0.0, 3.0))
@@ -96,8 +100,8 @@ class Task(TaskBase):
         sc.camera("venue", (-3.0, -3.6, 2.2), (X / 2 + 0.5, 0.0, 1.2), fovy=55)
 
     def reset(self, w):
-        c, R = w.jaw_frame("right")                                         # the ball between the right jaws
-        w.put("ball", c)
+        c, R = w.grasp_frame("right")                                       # the ball in the right hand
+        w.put("ball", c + R[:, 0] * BALL_IN_HAND_M[0] + R[:, 2] * BALL_IN_HAND_M[1])
         w.close_on("right", "ball")
 
     def referee_reset(self, w, ref):
@@ -114,16 +118,16 @@ class Task(TaskBase):
         return False                                                        # no weld grip exists in this task
 
     def holding(self, w) -> str | None:
-        """The gripper that holds the ball now: both its jaws touch it and its centre is between the jaws' pads (not a
-        ball balanced on top of closed jaws)."""
+        """The hand that holds the ball now: it touches the hand's fingers and its thumb or palm (World.held), its
+        centre on the palm's side and within HOLD_REACH_M of the hand's grasp point (not a ball balanced on the back
+        of the hand or on the fingertips)."""
         d = w.d
         for s in ("right", "left"):
             if w.held[s] != "ball":
                 continue
             k = w.hands.centre[s]
             off = d.site_xmat[k].reshape(3, 3).T @ (w.pos("ball") - d.site_xpos[k])
-            if (abs(off[0]) < w.hands.opening(s) / 2 and abs(off[1]) <= realhand.JAW_WIDE / 2
-                    and abs(off[2]) <= realhand.JAW_LEN / 2):
+            if off[0] >= 0.0 and float(np.linalg.norm(off)) <= HOLD_REACH_M:
                 return s
         return None
 
