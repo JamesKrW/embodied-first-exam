@@ -58,8 +58,10 @@ ROBOTS = {
     "unitree_h1": dict(title="Unitree H1-2", height_m=1.78, run=False, walkers=False,
                        source="the H1-2 body (Unitree's own h1_2 model, its joint ranges and speed limits) with Unitree "
                               "H2 / H2-X-class leg actuators from the H2's official URDF (hips and knees 360 N m, "
-                              "ankle pitch 66.88 N m; curves of Unitree's M107 shape, 2.5 kW peak per joint); "
-                              "Unitree's M107-15 curve on the torso, estimates on the ankle roll and the arms"),
+                              "ankle pitch 66.88 N m; curves of Unitree's M107 shape, 2.5 kW peak per joint) and "
+                              "H2-class arm actuators from the same URDF (shoulder pitch 130 N m; shoulder roll and "
+                              "yaw, elbow, forearm roll 60 N m; curves of Unitree's N7520 / N5020 shapes); the H1-2's "
+                              "own torso (M107-15, 200 N m), ankle roll and wrist pitch / yaw (estimates)"),
 }
 BODY = load_body("unitree_g1")
 ROBOT_REVISION = BODY.revision
@@ -289,6 +291,7 @@ def unitree_actuators(m, robot) -> None:
             Y1[i], Y2[i] = min(c["Y1"], a.tau_max[i]), min(c["Y2"], a.tau_max[i])
     if robot.name == "unitree_h1":
         h2x_legs(m, robot, keys, X1, X2, Y1, Y2)
+        h2x_arms(m, robot, keys, X1, X2, Y1, Y2)
     a._env = a.act.env = (X1, X2, Y1, Y2)
 
 
@@ -353,6 +356,77 @@ def h2x_legs(m, robot, keys, X1, X2, Y1, Y2) -> None:
             for n, la in enumerate(rig.aid):
                 if int(la) == aid:
                     rig.tau_lim[n] = eff
+
+
+# The H1-2's arms with Unitree H2-class arm actuators (owner 2026-10-21: the whole H1-2 H2-class). Torque limits from
+# Unitree's H2.urdf (unitree_ros robots/h2_description/H2.urdf, 2026-07-08; unitree_mujoco h2_mujoco.xml the same):
+# shoulder pitch 130 N m; shoulder roll, shoulder yaw, elbow, wrist roll 60 N m; wrist pitch and yaw 10 N m; waist yaw
+# 120, roll / pitch 180 N m. Mapped onto the H1-2's joints (the same chain: shoulder pitch, roll, yaw, elbow, then the
+# forearm's roll, the wrist's pitch and yaw): shoulder_pitch 130; shoulder_roll, shoulder_yaw, elbow_pitch and
+# elbow_roll (the H2's wrist roll: the forearm's roll) 60. Never weaker than the H1-2: its wrist pitch / yaw (19 N m)
+# stay, and its single torso joint (a yaw: h1_2.urdf axis 0 0 1) keeps its own 200 N m on the M107-15 curve (the
+# H2's waist yaw is 120 N m).
+# Curves: Unitree publishes none for the H2's arm motors, so each takes the measured shape of the Unitree motor class
+# of its size (UNITREE_CURVES, unitree_rl_lab unitree_actuators.py, the G1's arm and hip motors): the shoulder pitch
+# (130 N m) the N7520-14.3 shape, the 60 N m joints the N5020-16 shape: the braking peak Y2 = the URDF effort, Y1 =
+# Y2 / (the class's Y2 / Y1), X2 = X1 x (the class's X2 / X1). X1 is the class's own corner power over the new Y1
+# (N7520-14.3: 71 x 22.63 = 1.61 kW; N5020-16: 24.8 x 30.86 = 0.77 kW: the measured range of Unitree's arm-size
+# motors), raised where needed so that no joint is weaker than the H1-2's at any speed (the forearm roll: 1.25 kW, the
+# shoulder yaw and elbow 0.80 kW; below the N7520's 1.61 kW). Rotor inertia and friction: the class's
+# (UNITREE_ACTUATORS). The H1-2's URDF speed limits (shoulder 9, upper arm 20, forearm 31.4 rad/s) still bound the
+# joint targets. A smaller class than the legs' (2.5 kW): an arm joint of a humanoid is a smaller motor.
+UNITREE_CURVES = {                              # unitree_rl_lab unitree_actuators.py (= the G1's body.toml [motors])
+    "N7520_14p3": dict(X1=22.63, X2=35.52, Y1=71.0, Y2=83.3),
+    "N5020_16": dict(X1=30.86, X2=40.13, Y1=24.8, Y2=31.9),
+}
+H2X_ARMS = {                                    # joint key: (URDF effort N m, the Unitree class whose shape it takes)
+    "shoulder_pitch": (130.0, "N7520_14p3"), "shoulder_roll": (60.0, "N5020_16"), "shoulder_yaw": (60.0, "N5020_16"),
+    "elbow_pitch": (60.0, "N5020_16"), "elbow_roll": (60.0, "N5020_16"),
+}
+
+
+def _curve(w, X1, X2, Y1):
+    """The driving torque limit of a curve at speeds w (elementwise)."""
+    return np.where(w < X1, Y1, np.clip(Y1 * (1.0 - (w - X1) / max(X2 - X1, 1e-9)), 0.0, None))
+
+
+def h2x_arms(m, robot, keys, X1, X2, Y1, Y2) -> None:
+    """H2X_ARMS on the H1-2's arms: the torque limits wherever the motor is clamped, the curves (in place), the class's
+    rotor inertia and friction. Each new curve is checked to be no weaker than the H1-2's at every speed."""
+    a = robot.arb
+    grid = np.linspace(0.0, 60.0, 6001)
+    for i, k in enumerate(keys):
+        if k not in H2X_ARMS:
+            continue
+        eff, cls = H2X_ARMS[k]
+        c, u = UNITREE_CURVES[cls], UNITREE_ACTUATORS[cls]
+        old = _curve(grid, X1[i], X2[i], Y1[i])
+        y2, y1 = eff, eff / (c["Y2"] / c["Y1"])
+        r = c["X2"] / c["X1"]
+        x1 = c["X1"] * c["Y1"] / y1                    # the class's corner power at the new torque
+        while np.any(_curve(grid, x1, x1 * r, y1) < old - 1e-9):
+            x1 *= 1.001                                # raised until no speed is weaker than the H1-2's
+        if y1 < Y1[i] or y2 < Y2[i] or eff < a.tau_max[i]:
+            raise ValueError(f"H2X_ARMS would weaken {k}")
+        X1[i], X2[i], Y1[i], Y2[i] = x1, x1 * r, y1, y2
+        v = a.vadr[i]
+        m.dof_armature[v] = u["armature"]
+        m.dof_frictionloss[v], m.dof_damping[v] = u["Fs"], u["Fd"]
+        aid = int(a.aid[i])
+        jid = int(m.actuator_trnid[aid, 0])
+        m.actuator_ctrlrange[aid] = (-eff, eff)
+        if m.actuator_forcelimited[aid]:
+            m.actuator_forcerange[aid] = (-eff, eff)
+        if m.jnt_actfrclimited[jid]:
+            m.jnt_actfrcrange[jid] = (-eff, eff)
+        a.tau_max[i] = eff
+        a.act.tau_max[i] = eff
+        rig = robot.rig
+        for ids, lim in (("aid", "tau_lim"), ("laid", "ltau")):
+            if hasattr(rig, ids) and hasattr(rig, lim):
+                for n, la in enumerate(getattr(rig, ids)):
+                    if int(la) == aid:
+                        getattr(rig, lim)[n] = eff
 
 
 class Robot:
