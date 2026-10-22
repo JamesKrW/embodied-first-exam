@@ -1,7 +1,8 @@
 """Basketball: a dribble between the legs, then a dunk (FIBA). From the top of the key the ball,
 held only by pressing it between the two bare palms, is dribbled; one bounce of the dribble passes between the legs;
 the dribble ends with the ball gathered in both hands; at most two steps; the ball is forced down through the ring
-from above with the hands on it; land on the feet. Official court, backboard, ring and size-7 ball; the Unitree H1-2."""
+from above with the hands on it; land on the feet. Official court, backboard and size-7 ball; the ring lowered to
+2.39 m (below FIBA Mini-Basketball's 2.60 m: the robot's measured reach); the Unitree H1-2."""
 import math
 import xml.etree.ElementTree as ET
 
@@ -334,8 +335,14 @@ class Task(TaskBase):
                 "Art. 16 (goal; a ball that passes through the basket from below is a violation), Art. 23 (out of "
                 "bounds), Art. 24 (dribbling: its start, its end, no second dribble), Art. 25 (travelling, 25.2.1.2: "
                 "two steps upon completion of a dribble), Art. 26 (three seconds), Art. 36 (technical foul: hanging "
-                "on the ring)")
+                "on the ring); FIBA Mini-Basketball Rules (the ring at 2.60 m)")
     deviations = [
+        "Basketball Equipment (basket): the basket is lowered: the ring's top edge is {ring_height_m} m above the "
+        "floor, below FIBA Mini-Basketball's 2.60 m (FIBA's own ring: 3.05 m), set at the robot's measured reach "
+        "(H1-2 with H2-class leg actuators: the ball held overhead between the palms reaches a centre height of "
+        "2.58 m in its own jump; the ring plus the ball's radius plus 0.02 m of entry is 0.05 m below that); the "
+        "full-size backboard keeps its size and its height relative to the ring (lower edge {board_bottom_m} m). "
+        "The ball stays the size-7 ball.",
         "Art. 3 (equipment): the hands are flat rubber palm pads without fingers; the ball is held only by pressing it "
         "between the two palms (friction), and it slips or drops when the arms do not press hard enough. It is "
         "dribbled by pushing it with a palm.",
@@ -377,8 +384,8 @@ class Task(TaskBase):
     @property
     def fall_z(self) -> float:                    # (the referee's fall line: the parameter)
         return float(self.p["fall_z_m"])
-    params = dict(ring_height_m=3.05, ring_inner_diameter_m=0.45, ring_metal_m=0.018, ring_centre_to_board_m=0.375,
-                  board_width_m=1.80, board_height_m=1.05, board_bottom_m=2.90, court_width_m=15.0, line_width_m=0.05,
+    params = dict(ring_height_m=2.39, ring_inner_diameter_m=0.45, ring_metal_m=0.018, ring_centre_to_board_m=0.375,
+                  board_width_m=1.80, board_height_m=1.05, board_bottom_m=2.24, court_width_m=15.0, line_width_m=0.05,
                   free_throw_line_m=5.80, start_to_ring_m=4.425, start_behind_free_throw_line_m=0.20,
                   touch_gap_s=0.03, hand_touch_max_s=0.30, from_above_m=0.06, cross_speed_min_m_s=1.0,
                   gate_min_area_m2=0.02, fall_z_m=FALL_Z,
@@ -470,10 +477,10 @@ class Task(TaskBase):
     difficulty = ("Every touch of the dribble has to push the ball down with a flat palm, and one bounce has to go "
                   "through the narrow gap between the robot's own feet and come out where a hand can meet it, without "
                   "touching a leg; then both palms have to catch the moving ball and squeeze it, with only the arms' "
-                  "force holding it. After at most two steps the 67 kg body has to rise about a metre with the ball "
-                  "pressed overhead and bring it down into a ring only 0.21 m wider than the ball, and land; the robot "
-                  "has a walking gait (which steps on the spot even at a zero command) and nothing that jumps or "
-                  "lands.")
+                  "force holding it. After at most two steps the 67 kg body has to rise about a third of a metre "
+                  "with the ball pressed overhead and bring it down into a ring only 0.21 m wider than the ball, and "
+                  "land; the robot has a walking gait (which steps on the spot even at a zero command) and nothing "
+                  "that jumps or lands.")
 
     def build(self, sc):
         p = self.p
