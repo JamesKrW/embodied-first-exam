@@ -1023,7 +1023,7 @@ class Task(AlpineRace):
         "plank after Wolfsperger et al. 2021, the edge's hold across it after Mossner et al. 2013 with race-piste "
         "snow, the sidecut's arc after Howe 2001, hard well-damped snow (the model's final version, PR #259); the "
         "snow keeps no ruts. Still air at a mountain venue (1.052 kg/m^3), drag and lift on every link (a normal-force model).",
-        "Equipment: no ski poles (the robot's hands are bare pads that cannot hold one), no ski boots (the feet are "
+        "Equipment: no ski poles (the G1's hands are its rubber fists, which do not close: nothing to hold one with), no ski boots (the feet are "
         "bound directly); the binding is rigid and never releases; each ski is three bodies, its forebody and "
         "afterbody on hinges with the ski's bending stiffness (EI 60 / 80 N m^2: estimates, as the "
         "RoboOlympics freeski sport's skis); the skis are solid against the robot's body and each other.",
