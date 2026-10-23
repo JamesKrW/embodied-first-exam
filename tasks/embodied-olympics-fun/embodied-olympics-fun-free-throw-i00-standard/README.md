@@ -15,7 +15,7 @@
 Shoot a free throw: from behind the free-throw line, shoot the basketball you hold in your two hands so that it enters the basket from above. (Embodied Olympics `free-throw`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The 0.62 kg ball has to leave the hands at about 8 m/s on a steep arc to reach a ring 3.05 m high and more than 4 m away, with a margin of a few centimetres in air that slows it; the hands, smaller than the ball, have to push it and open in time, and both have to leave it at the same instant without spinning it off line. The arms' fastest swing gives less than that, and the body only stands by an open-loop stance. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The 0.62 kg ball has to leave the hands at about 8 m/s on a steep arc to reach a ring 3.05 m high and more than 4 m away, with a margin of a few centimetres in air that slows it; the hands, smaller than the ball, have to push it and open in time, and both have to leave it at the same instant without spinning it off line. The arms' fastest swing gives less than that, and the body only stands by an open-loop stance. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-free-throw-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | release → through the ring |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1200 control steps (12 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1200 control steps (12 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

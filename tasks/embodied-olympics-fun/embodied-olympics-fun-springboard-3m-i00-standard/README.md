@@ -15,7 +15,7 @@
 Do a forward dive straight (101A) from the 3 m springboard: from your standing start at its end, take off from both feet, turn half a somersault forwards in the straight position and enter the water head first, vertical, with your arms stretched beyond your head. (Embodied Olympics `springboard-3m`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-No controller does dives: the robot must time its push with a board that bends and recoils under its 33 kg, take off high with exactly the right forward rotation, and then hold a straight body with the legs drawn together, the toes pointed and the short arms stretched overhead through a 1 s fall. Nothing can be corrected once it is in the air. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+No controller does dives: the robot must time its push with a board that bends and recoils under its 33 kg, take off high with exactly the right forward rotation, and then hold a straight body with the legs drawn together, the toes pointed and the short arms stretched overhead through a 1 s fall. Nothing can be corrected once it is in the air. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 `solution/oracle_replay.py` streams the privileged twin's reference solution, row by row, through the client (`solution/rows.npz`, recorded by scripts/embodied-olympics/make_oracles.py). Reference: a scripted dive (ankle-strategy balance on the bent board while the arms rise, a balanced crouch, a 0.27 s lean, a push that depresses the board 0.18 m), the lean time found by bisection: 170 deg at the first touch, 5.3 deg at the hips, entry 1.44 m out. The board has a tip stiffness of 5449 N/m (built for a published 5446) and a first mode of 3.93 Hz (sqrt(k/m_eff) 3.94). Referee test negatives as in platform-10m plus a double bounce; nop topples off at 18.5 s (a fall). The privileged twin's reference rows (567 control steps, success after 5.67 s) streamed through the client.
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | take-off → entry → under water |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 2000 control steps (20 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 2000 control steps (20 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

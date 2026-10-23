@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-pitch-target-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics pitch-target on the same frozen instance as embodied-olympics-fun-pitch-target-i00-privileged. Pitch a strike: from the pitcher's plate on the mound, with a foot on the plate, throw the baseball held in your right hand through the strike zone over home plate, on the fly. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics pitch-target on the same frozen instance as embodied-olympics-fun-pitch-target-i00-privileged. Pitch a strike: from the pitcher's plate on the mound, with a foot on the plate, throw the baseball held in your right hand through the strike zone over home plate, on the fly. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "pitch-target"]
 
@@ -31,7 +31,7 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 50
+reset_budget = 5
 expert_time_estimate_hours = 8.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_pitch_target.py: The H1-2's own right Inspire hand at the device's forces holds the baseball against its palm by contact and friction (no weld). Positive by a declared magic action: real stance on the mound with both feet across the pitcher's plate and the hand opening; injected once, 10 ms after it starts to open, the ball moved 0.1 m forwards and up and given 22 m/s at 9.5 deg: released on the plate, it crosses the zone at 0.91 m height, 0.02 m off centre, at 20 m/s (strike); the same state hash twice; a 14.5 m/s lob through the zone is also a strike. Negatives: nop (pitch timer, ball still in the hand), release with no foot on the plate (behind it, in front of it), a bounce, high, wide, the hand opened (the ball drops to the mound), the ball touched after the release, a fall before the call. Stress: random arm targets with the hand closed: the ball drops out, never through the fingers (at most 1.9 mm into them).; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"

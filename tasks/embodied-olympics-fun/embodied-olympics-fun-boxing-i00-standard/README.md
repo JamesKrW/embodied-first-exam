@@ -15,7 +15,7 @@
 Punch the heavy bag once with the knuckles of your right fist, on the marked band, hard enough to give it 12.0 N s, then bring the fist back to your guard and stand. (Embodied Olympics `boxing`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-12.0 N s in a tenth of a second cannot be pushed out of arm motors of 40 N m: the fist has to arrive at speed with the arm's and the trunk's mass behind it, end first, and leave again at once. The reaction must not tip a body that only stands by an open-loop stance, and the bag swings back. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+12.0 N s in a tenth of a second cannot be pushed out of arm motors of 40 N m: the fist has to arrive at speed with the arm's and the trunk's mass behind it, end first, and leave again at once. The reaction must not tip a body that only stands by an open-loop stance, and the bag swings back. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-boxing-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | strike → guard |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1500 control steps (15 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1500 control steps (15 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

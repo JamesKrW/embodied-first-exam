@@ -15,7 +15,7 @@
 Vault over the vault table at the end of the run-up: go over it with only your hands touching it, land on your feet on the landing mat and stand. (Embodied Olympics `vault`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The table is 1.35 m high and the robot has no running policy: its walk reaches about 0.65 m/s and its best standing jump lifts it far less than a metre, so the 67 kg body has to be carried over the table by a take-off and arm support that nobody has built for it. It must then come down feet first from above 1.35 m and absorb the landing without a hand on the mat. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The table is 1.35 m high and the robot has no running policy: its walk reaches about 0.65 m/s and its best standing jump lifts it far less than a metre, so the 67 kg body has to be carried over the table by a take-off and arm support that nobody has built for it. It must then come down feet first from above 1.35 m and absorb the landing without a hand on the mat. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-vault-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | hands on the table → over the table → landing → stand |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 8000 control steps (80 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 8000 control steps (80 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

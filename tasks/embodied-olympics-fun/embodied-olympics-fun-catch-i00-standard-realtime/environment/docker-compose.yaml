@@ -32,7 +32,7 @@ services:
       # Knobs: ${NAME:-default} takes NAME from the shell that runs harbor. The defaults are the standard
       # configuration; results under other settings are reported separately.
       RCB_SLOWDOWN: "${RCB_SLOWDOWN:-1}"                # S = 1: the world runs at 1/S of real speed (the family's measured RTF; PROTOCOL §4b)
-      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-10}"       # 10 resets (PROTOCOL §4b default); 0: one attempt
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-5}"        # 5: Embodied Olympics' attempts (tasks/embodied-olympics-fun/README.md); 0: one attempt
       RCB_SESSION_LOG: ""
       PYTHONPATH: /srv
       MUJOCO_GL: egl

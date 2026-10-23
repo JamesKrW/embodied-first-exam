@@ -15,7 +15,7 @@
 Catch and shoot: catch the chest pass that comes to you from the left wing with your two hands, then shoot from where you stand so that the ball enters the basket from above. (Embodied Olympics `catch-and-shoot`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The pass arrives at 7 m/s and hands smaller than the ball cannot close around it: the two palms have to meet the ball from opposite sides as it arrives, squeeze it to a stop and close the fingers over it, before it bounces out or touches the body. Then a 0.62 kg ball must leave the two palms at about 9 m/s on a steep arc towards a ring 5.8 m away, from a body that may not take a step. The built-in walking gait steps on the spot even at a zero command, so while the ball is in your hands its steps are counted like any others. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The pass arrives at 7 m/s and hands smaller than the ball cannot close around it: the two palms have to meet the ball from opposite sides as it arrives, squeeze it to a stop and close the fingers over it, before it bounces out or touches the body. Then a 0.62 kg ball must leave the two palms at about 9 m/s on a steep arc towards a ring 5.8 m away, from a body that may not take a step. The built-in walking gait steps on the spot even at a zero command, so while the ball is in your hands its steps are counted like any others. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-catch-and-shoot-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | catch → release → through the ring |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1500 control steps (15 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1500 control steps (15 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

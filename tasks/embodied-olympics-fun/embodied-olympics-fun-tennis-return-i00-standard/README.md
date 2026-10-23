@@ -15,7 +15,7 @@
 Return the serve: after the tennis ball has bounced once in your service box, hit it with the racket held in your right hand back over the net so that it lands in the singles court on the far side, without letting go of the racket. (Embodied Olympics `tennis-return`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The ball crosses the whole court in about a second and is still moving at more than 15 m/s when it reaches you, so the racket has to be in a path a few centimetres wide at an instant you must predict, and a robot that only walks cannot go far to meet it. The racket is held only by a hand's friction: a hard swing and the ball's impact twist it in the grip, so the face the ball meets is not where the arm put it, and a swing strong enough to return the ball over the net must not fling the racket out of the hand. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The ball crosses the whole court in about a second and is still moving at more than 15 m/s when it reaches you, so the racket has to be in a path a few centimetres wide at an instant you must predict, and a robot that only walks cannot go far to meet it. The racket is held only by a hand's friction: a hard swing and the ball's impact twist it in the grip, so the face the ball meets is not where the arm put it, and a swing strong enough to return the ball over the net must not fling the racket out of the hand. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-tennis-return-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | bounce → racket → over the net → in |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1000 control steps (10 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1000 control steps (10 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

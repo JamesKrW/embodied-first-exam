@@ -15,7 +15,7 @@
 Jump Double Dutch: enter the two ropes turning in opposite directions and jump them 10 times in a row, one rope per jump, without a rope ever touching you, then land on your feet. (Embodied Olympics `double-dutch`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-Neither built-in gait can jump: the robot has to get in between two ropes that sweep the floor in turn every half second, then hop again and again in that rhythm, feet off the ground at the very moment each rope passes and back on balance for the next. A drift out of the middle or a toe left behind catches a rope. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+Neither built-in gait can jump: the robot has to get in between two ropes that sweep the floor in turn every half second, then hop again and again in that rhythm, feet off the ground at the very moment each rope passes and back on balance for the next. A drift out of the middle or a toe left behind catches a rope. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-double-dutch-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | entry → jump 1 → jump 2 → jump 3 → jump 4 → jump 5 → jump 6 → jump 7 → jump 8 → jump 9 → jump 10 → landing |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 2500 control steps (25 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 2500 control steps (25 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

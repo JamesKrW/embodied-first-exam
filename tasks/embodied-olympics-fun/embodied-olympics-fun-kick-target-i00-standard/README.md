@@ -15,7 +15,7 @@
 Kick the heavy bag once with your right foot or shin, on the marked band at trunk height, hard enough to give it 20.0 N s, then stand on both feet. (Embodied Olympics `kick-target`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The band is higher than the robot's hip joint: the foot has to be swung above hip height, fast, while the other leg alone carries 67 kg; there is no kicking or one-leg balance policy. The bag pushes back with the same impulse, and the body has to end on both feet, still. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The band is higher than the robot's hip joint: the foot has to be swung above hip height, fast, while the other leg alone carries 67 kg; there is no kicking or one-leg balance policy. The bag pushes back with the same impulse, and the body has to end on both feet, still. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-kick-target-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | strike → stand |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1500 control steps (15 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1500 control steps (15 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

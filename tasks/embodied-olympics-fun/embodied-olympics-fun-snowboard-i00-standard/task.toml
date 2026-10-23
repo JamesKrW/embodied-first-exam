@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-snowboard-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics snowboard on the same frozen instance as embodied-olympics-fun-snowboard-i00-privileged. Ride the parallel slalom on your snowboard: one run down the course, the board and both feet through each of the 6 gates in order, then over the finish line. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics snowboard on the same frozen instance as embodied-olympics-fun-snowboard-i00-privileged. Ride the parallel slalom on your snowboard: one run down the course, the board and both feet through each of the 6 gates in order, then over the finish line. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "snowboard"]
 
@@ -31,7 +31,7 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 50
+reset_budget = 5
 expert_time_estimate_hours = 26.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_snowboard.py: positive by injection (straight runs re-aimed by hand: 6 gates passed, finished in 15.61 s). The ski controller adapted to the board (heel and toe edge by leg IK) passes no gate: an edge command without the matching lean tips the robot over the other edge (static test, flat snow); human review in the pull request that adds the benchmark (PROTOCOL §2.7)"

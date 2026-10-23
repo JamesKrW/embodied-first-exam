@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-inline-slalom-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics inline-slalom on the same frozen instance as embodied-olympics-fun-inline-slalom-i00-privileged. Skate the speed slalom: from the start box, 12 m of run-up, then on one foot through the 20 cones, passing them alternately left and right, and over the end line, as fast as you can. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics inline-slalom on the same frozen instance as embodied-olympics-fun-inline-slalom-i00-privileged. Skate the speed slalom: from the start box, 12 m of run-up, then on one foot through the 20 cones, passing them alternately left and right, and over the end line, as fast as you can. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "inline-slalom"]
 
@@ -31,7 +31,7 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 50
+reset_budget = 5
 expert_time_estimate_hours = 122.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_inline_slalom.py: positive by injection (the floating base written every control step along a weaving path, one skate rolling, the other lifted; cones, skates and wheels are physics); the real run-up only: a scripted swizzle (IK) skates from the start box over the 12 m run-up in 12.3 s on two feet, which the referee voids at the second cone (7.4.2.2). No one-foot controller exists for the G1: one-skate glides steered by capture point last at most 2.2 s at 2 m/s; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"

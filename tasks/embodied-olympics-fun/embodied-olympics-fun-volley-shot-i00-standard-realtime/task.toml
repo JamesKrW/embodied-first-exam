@@ -17,7 +17,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-volley-shot-i00-standard-realtime"
-description = "STANDARD-REALTIME MODE (robot as a service on a clock that does not stop, eai-standard/2.3, slowdown S = 1): Embodied Olympics volley-shot on the same frozen instance as embodied-olympics-fun-volley-shot-i00-privileged. Volley the cross: strike the football that is crossed to you from the wing with a foot before it touches the ground, into the official goal 11 m away, past the goalkeeper dummy. Once an attempt starts the venue does not wait; the agent drives the robot from a program of its own through the client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 10 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records every executed control step and grades the last attempt live with the family's referee (no grading replay)."
+description = "STANDARD-REALTIME MODE (robot as a service on a clock that does not stop, eai-standard/2.3, slowdown S = 1): Embodied Olympics volley-shot on the same frozen instance as embodied-olympics-fun-volley-shot-i00-privileged. Volley the cross: strike the football that is crossed to you from the wing with a foot before it touches the ground, into the official goal 11 m away, past the goalkeeper dummy. Once an attempt starts the venue does not wait; the agent drives the robot from a program of its own through the client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records every executed control step and grades the last attempt live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-realtime-mode", "trajectory", "volley-shot"]
 
@@ -34,7 +34,7 @@ slowdown = 1                      # standard-realtime: the world runs at 1/S of 
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 protocol = "eai-standard/2.3"
 instance_seed = 0
-reset_budget = 10
+reset_budget = 5
 expert_time_estimate_hours = 12.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_volley_shot.py: positive by injection (the robot teleported 0.3 m forward and the ball's velocity set at the foot contact, in 11.9, out 19.4 m/s, then into the goal); the cross comes from a football machine on the left wing (exit 14.2 m/s with backspin, apex 4.5 m) and comes down knee-high 0.6 m in front at 11.7 m/s; the keeper is the physical board of header; negatives: a still leg (at most 0.89 of the speed back), a body contact, carried, wide, at the keeper (saved), a second touch, too close to the machine, touching the machine, a goal without a volley, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"

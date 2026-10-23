@@ -15,7 +15,7 @@
 Run the 50 m hurdles over four free-standing hurdles: go over each one in your lane, never beside it, under its top, or after pushing it away, leave at least one of them standing, and bring your torso to the finish line. (Embodied Olympics `hurdles-freestanding`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-A hurdle's top is higher than the robot's hip joints: each of the four has to be jumped with the whole pelvis above 1.067 m and each foot lifted a metre, on a body of 67 kg whose only built-in gait walks at 0.7 m/s and drifts in heading. The hurdles are loose: a clipped bar tips one into the landing, where it lies as an obstacle, and walking up to one shoves it away, which is a failure. Knocking a hurdle down is allowed, but not all four: at least one must be jumped cleanly. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+A hurdle's top is higher than the robot's hip joints: each of the four has to be jumped with the whole pelvis above 1.067 m and each foot lifted a metre, on a body of 67 kg whose only built-in gait walks at 0.7 m/s and drifts in heading. The hurdles are loose: a clipped bar tips one into the landing, where it lies as an obstacle, and walking up to one shoves it away, which is a failure. Knocking a hurdle down is allowed, but not all four: at least one must be jumped cleanly. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-hurdles-freestanding-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | hurdle 1 → hurdle 2 → hurdle 3 → hurdle 4 → finish |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 14000 control steps (140 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 14000 control steps (140 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

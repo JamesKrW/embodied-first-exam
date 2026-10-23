@@ -15,7 +15,7 @@
 Clean and jerk the barbell: lift it from its blocks to your shoulders, then to locked arms overhead, and hold it there motionless until the down signal. (Embodied Olympics `clean-and-jerk`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The bar is light, but the hands hold it only by their fingers' friction. Turning it over from the hang to the shoulders, slowly, asks about half of what the elbow and shoulder motors give; too fast, and the bar slides out of the hands. Nothing balances the robot under a load, and no built-in action bends down to the bar or straightens the knees. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The bar is light, but the hands hold it only by their fingers' friction. Turning it over from the hang to the shoulders, slowly, asks about half of what the elbow and shoulder motors give; too fast, and the bar slides out of the hands. Nothing balances the robot under a load, and no built-in action bends down to the bar or straightens the knees. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-clean-and-jerk-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | lift-off → clean → overhead → down signal |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 6000 control steps (60 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 6000 control steps (60 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

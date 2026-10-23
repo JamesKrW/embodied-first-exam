@@ -15,7 +15,7 @@
 On the trampoline, bounce as you like, then do one tuck jump, land on both feet, stop the bounce (one more straight out-bounce at most) and stand still. (Embodied Olympics `trampoline`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-No controller bounces on a trampoline: the robot must time its leg push with a bed that drops and recoils under it to gain height, tuck and open again in the air, land on both feet, and then kill the bounce of a springy bed with its legs until it stands still. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+No controller bounces on a trampoline: the robot must time its leg push with a bed that drops and recoils under it to gain height, tuck and open again in the air, land on both feet, and then kill the bounce of a springy bed with its legs until it stands still. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 `solution/oracle_replay.py` streams the privileged twin's reference solution, row by row, through the client (`solution/rows.npz`, recorded by scripts/embodied-olympics/make_oracles.py). Reference: a scripted G1 tuck jump (a balanced crouch, a lowcmd push on the sprung bed, the tuck held mid-flight, a squat landing that sinks as the bed recoils, one straight out-bounce, an ankle-strategy stand-up, 3 s still), chosen from 12 settings: 0.457 s of flight, a centre-of-mass rise of 0.32 m. The bed passes the FIG IV TRA 1 impact test in simulation (60 kg sphere from 4.00 m: deflection 0.988 m, in 940-1010 mm; rebound 3.486 m, in 3410-3660 mm). Negatives: nop, a tuck without a jump, pike first, a bent out-bounce, a second flight, a fall, an injected roll spin, an injected push onto the padding. The privileged twin's reference rows (755 control steps, success after 7.55 s) streamed through the client.
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | tuck jump → landing → stop |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 3000 control steps (30 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 3000 control steps (30 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

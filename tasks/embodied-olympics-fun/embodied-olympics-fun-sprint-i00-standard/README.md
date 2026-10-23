@@ -15,7 +15,7 @@
 Run the 50 m: wait for the starter's gun, then sprint down your lane until your torso reaches the finish line. (Embodied Olympics `sprint`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The gun has to be seen, not guessed: moving early disqualifies and waiting costs time. Then 50 m in a 1.22 m lane: the walking gait covers 20 m in the time, the running gait has to be held straight for a quarter of a minute at a speed close to where it falls. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The gun has to be seen, not guessed: moving early disqualifies and waiting costs time. Then 50 m in a 1.22 m lane: the walking gait covers 20 m in the time, the running gait has to be held straight for a quarter of a minute at a speed close to where it falls. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 `solution/oracle_replay.py` streams the privileged twin's reference solution, row by row, through the client (`solution/rows.npz`, recorded by scripts/embodied-olympics/make_oracles.py). Reference: stand through the start procedure, react to the gun, then the running policy at 3.5 m/s steered to the lane's centre; 9 of 10 perturbed runs at 2.5 to 4.0 m/s finished when it was written. The privileged twin's reference rows (1954 control steps, success after 19.54 s) streamed through the client.
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | start → finish |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 3420 control steps (34.2 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 3420 control steps (34.2 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

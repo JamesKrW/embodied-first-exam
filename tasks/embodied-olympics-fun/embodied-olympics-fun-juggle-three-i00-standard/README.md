@@ -15,7 +15,7 @@
 Juggle three balls in a cascade: throw each ball from one hand in an arc to the other, the hands in turn, catching each in the hand, until 10 catches have been made in a row. (Embodied Olympics `juggle-three`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-Each throw has to come down into a palm that is hardly wider than the ball, 0.4 m away, about 0.6 s later, the fingers must close on it within a few hundredths of a second before it bounces off, and the catching hand must have thrown its own ball before: three balls, two hands, never two in one. A throw is the hand opening while the arm moves, and errors add up from throw to throw, because a ball is thrown from wherever it was caught. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+Each throw has to come down into a palm that is hardly wider than the ball, 0.4 m away, about 0.6 s later, the fingers must close on it within a few hundredths of a second before it bounces off, and the catching hand must have thrown its own ball before: three balls, two hands, never two in one. A throw is the hand opening while the arm moves, and errors add up from throw to throw, because a ball is thrown from wherever it was caught. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-juggle-three-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | first catch → half way → ten catches |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 2000 control steps (20 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 2000 control steps (20 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

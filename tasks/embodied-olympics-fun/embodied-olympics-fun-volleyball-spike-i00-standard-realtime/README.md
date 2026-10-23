@@ -9,14 +9,14 @@
 | Family / instance | `volleyball_spike` / seed 0 |
 | Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_volleyball_spike.py: positive by injection (a 3.2 m/s ghost jump, the ball's velocity set on the fist at 2.70 m, the landing softened); the set comes from a volleyball machine on a stand at the setter's place (exit 7.7 m/s, 55 deg, at 2.3 m), peaks at 4.49 m and comes down 0.5 m from the net at 2.8 m height, 1.21 s after it leaves; negatives: a leg tuck, a lift without a jump, a still fist in a jump (0.87 back), from the floor, below the net, before the apex, upward, into the net, long, the antenna, outside the antenna, a second touch, held, the net, the centre line, a fall, touching the machine. No jump or landing controller exists for the H1-2; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 5 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
 Spike the set: jump and strike the volleyball that comes down near the net with a hand, above the height of the net, down into the opponent's court, and land on your feet without touching the net. (Embodied Olympics `volleyball-spike`; the robot as a service on a clock that does not stop, slowdown S = 1: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The robot reaches 2.24 m standing: its hand has to be above 2.43 m, so it must jump at least a quarter of a metre, after an approach of about 2 m on a walking policy, and swing through a ball that falls through the reachable window in under a tenth of a second, half a metre from a net it may not touch, then land a 67 kg body on its feet. No jumping skill is built in. The scene is dynamic (`scripts/task_dynamics.toml`: A ball machine at the setter's place sends the set at launch_time_s.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 10 resets (only the last attempt is graded).
+The robot reaches 2.24 m standing: its hand has to be above 2.43 m, so it must jump at least a quarter of a metre, after an approach of about 2 m on a walking policy, and swing through a ball that falls through the reachable window in under a tenth of a second, half a metre from a net it may not touch, then land a 67 kg body on its feet. No jumping skill is built in. The scene is dynamic (`scripts/task_dynamics.toml`: A ball machine at the setter's place sends the set at launch_time_s.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-volleyball-spike-i00-privileged`).
@@ -53,5 +53,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Service | `environment/sim/rcb_realtime.py` (the shared realtime layer, eai-standard/2.3) with the standard twin's `server.py` on `rcb_service.py`, `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's); EGL rendering on the GPU |
 | Slowdown | S = 1 (`RCB_SLOWDOWN`'s default): RTF 2.33 with the clock flat out (RCB_SLOWDOWN = 0.01, physics only, 4 attempts; 4090-ws1, 4 CPUs, 2026-10-20); PROTOCOL §4b: S = 1 when RTF >= 3, else ceil(1.5 / RTF) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1200 control steps (12 s at 100 Hz); 10 resets, the last attempt graded |
+| Episode | 1200 control steps (12 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

@@ -9,14 +9,14 @@
 | Family / instance | `dodgeball` / seed 0 |
 | Oracle | `full` — Reference: the G1 turns side-on and walks back and forth on the walking policy so that it is moving at each feed; five 14.2 m/s throws from turret-aimed machines all miss; 9 of 10 perturbations (feed times, speed, gap, aim height, machine distance) succeed, the machine at 2.8 m fails. In standard-realtime mode the privileged twin's reference rows, each run of one action type planned at the control step where it ran (`submit(..., at=step)`), succeed at the task's S (board 0112). |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 5 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
 Dodge: five cloth dodgeballs are thrown at you by ball machines that aim at you; do not let a live ball touch you, stay inside your court and on your feet. (Embodied Olympics `dodgeball`; the robot as a service on a clock that does not stop, slowdown S = 1: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-A ball thrown at you reaches you about 0.75 s after it leaves the machine, aimed where you were: standing still is a hit; the G1 has to be moving when each ball is thrown and keep moving, within its court, with a walking policy that makes about 0.5 m/s, and turn its narrow side to the throws. The scene is dynamic (`scripts/task_dynamics.toml`: Five turret-mounted ball machines throw at the robot from first_throw_s, every throw_gap_s.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 10 resets (only the last attempt is graded).
+A ball thrown at you reaches you about 0.75 s after it leaves the machine, aimed where you were: standing still is a hit; the G1 has to be moving when each ball is thrown and keep moving, within its court, with a walking policy that makes about 0.5 m/s, and turn its narrow side to the throws. The scene is dynamic (`scripts/task_dynamics.toml`: Five turret-mounted ball machines throw at the robot from first_throw_s, every throw_gap_s.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 5 resets (only the last attempt is graded).
 
 ## Reference solution
 `solution/oracle_plan.py` plans the privileged twin's reference rows (`solution/rows.npz`) into the attempt at the control steps where they ran there (`submit(..., at=step)`; the first, at step 0, starts the clock); it uses no privileged information at run time. Reference: the G1 turns side-on and walks back and forth on the walking policy so that it is moving at each feed; five 14.2 m/s throws from turret-aimed machines all miss; 9 of 10 perturbations (feed times, speed, gap, aim height, machine distance) succeed, the machine at 2.8 m fails.
@@ -53,5 +53,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Service | `environment/sim/rcb_realtime.py` (the shared realtime layer, eai-standard/2.3) with the standard twin's `server.py` on `rcb_service.py`, `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's); EGL rendering on the GPU |
 | Slowdown | S = 1 (`RCB_SLOWDOWN`'s default): RTF 2.99 with the clock flat out (RCB_SLOWDOWN = 0.01, physics only, 4 attempts; 4090-ws1, 4 CPUs, 2026-10-20); PROTOCOL §4b: S = 1 when RTF >= 3, else ceil(1.5 / RTF) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1550 control steps (15.5 s at 100 Hz); 10 resets, the last attempt graded |
+| Episode | 1550 control steps (15.5 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

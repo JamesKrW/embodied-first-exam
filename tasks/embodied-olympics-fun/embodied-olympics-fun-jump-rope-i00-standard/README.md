@@ -15,7 +15,7 @@
 Skip rope: turn the rope forwards with both hands, over your head and under your feet, and jump it with both feet together, 17 times within one minute. (Embodied Olympics `jump-rope`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-Every jump needs two skills at once. The arms must keep a light, floppy rope turning at a steady speed through hands that hold it only by friction. The legs must make a two-footed hop, about 0.1 m high and timed to within a tenth of a second, to the rope coming under the feet. Then the robot must land and do it again 17 times without falling. Neither built-in gait can hop, and a rope that stops on a shin or a toe has to be started again from behind. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+Every jump needs two skills at once. The arms must keep a light, floppy rope turning at a steady speed through hands that hold it only by friction. The legs must make a two-footed hop, about 0.1 m high and timed to within a tenth of a second, to the rope coming under the feet. Then the robot must land and do it again 17 times without falling. Neither built-in gait can hop, and a rope that stops on a shin or a toe has to be started again from behind. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-jump-rope-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | jump 1 → jump 2 → jump 3 → jump 4 → jump 5 → jump 6 → jump 7 → jump 8 → jump 9 → jump 10 → jump 11 → jump 12 → jump 13 → jump 14 → jump 15 → jump 16 → jump 17 → stand |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 6000 control steps (60 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 6000 control steps (60 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

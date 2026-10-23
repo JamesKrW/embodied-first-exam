@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-free-kick-wall-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics free-kick-wall on the same frozen instance as embodied-olympics-fun-free-kick-wall-i00-privileged. Take a direct free kick: with one kick of a foot, send the ball over or around the wall of mannequins into the official goal 20.0 m away. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics free-kick-wall on the same frozen instance as embodied-olympics-fun-free-kick-wall-i00-privileged. Take a direct free kick: with one kick of a foot, send the ball over or around the wall of mannequins into the official goal 20.0 m away. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "free-kick-wall"]
 
@@ -31,7 +31,7 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 50
+reset_budget = 5
 expert_time_estimate_hours = 8.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_free_kick_wall.py: positive by a real kick (a standing power kick through lowcmd: 14.8 m/s off the foot, in at the near post); a fall after the kick does not fail; but only 8 of 13 gain and ball-offset perturbations score (the ball rebounds off the wall into the fallen robot, or goes wide), below the 9 of 10 bar, so it is not shipped as a reference solution; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"

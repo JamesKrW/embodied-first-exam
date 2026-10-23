@@ -15,7 +15,7 @@
 Kick the trunk protector of the dummy in front of you once with a foot, hard enough to score, then land and stand still for 2.0 s. (Embodied Olympics `taekwondo-kick`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The protector is above the robot's hip joints: the foot has to rise above hip height, fast, while the other leg alone carries the 33 kg body; the robot has no kicking or one-leg balance skill, and the protector's push back and the leg's swing both throw the body off its standing foot before it has to come down on both feet and stand. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The protector is above the robot's hip joints: the foot has to rise above hip height, fast, while the other leg alone carries the 33 kg body; the robot has no kicking or one-leg balance skill, and the protector's push back and the leg's swing both throw the body off its standing foot before it has to come down on both feet and stand. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-taekwondo-kick-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | kick → stand |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1500 control steps (15 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1500 control steps (15 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

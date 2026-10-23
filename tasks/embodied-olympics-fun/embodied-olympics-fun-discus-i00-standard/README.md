@@ -15,7 +15,7 @@
 Throw the discus that lies on your right palm, your fingers curled over its rim, from inside the circle so that it lands inside the sector at least 15.0 m from the circle, then leave the circle from its rear half and stand. (Embodied Olympics `discus`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-15.0 m needs a release at about 12 m/s near 35 to 40 degrees with the discus flat to its flight and spinning, or the air turns it over. The H1-2's arm motors give 40 N m at the shoulder, so the speed has to come from the trunk's turn, inside a circle of 2.5 m that the robot may not leave until the discus is down. At that speed the discus pulls on the hand with some 300 N, held only by fingertips curled over its rim and the palm under it: the hand's path has to keep the discus pressed into the palm and the fingers until the release. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+15.0 m needs a release at about 12 m/s near 35 to 40 degrees with the discus flat to its flight and spinning, or the air turns it over. The H1-2's arm motors give 40 N m at the shoulder, so the speed has to come from the trunk's turn, inside a circle of 2.5 m that the robot may not leave until the discus is down. At that speed the discus pulls on the hand with some 300 N, held only by fingertips curled over its rim and the palm under it: the hand's path has to keep the discus pressed into the palm and the fingers until the release. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-discus-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | release → landing → exit |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 6000 control steps (60 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 6000 control steps (60 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |
