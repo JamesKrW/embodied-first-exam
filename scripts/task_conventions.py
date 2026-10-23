@@ -1305,7 +1305,7 @@ def normalize_slowdown(task: Path) -> None:
 # trial, recorded with every result so that results are ranked only within one comparable configuration (docs/protocol/running.md
 # "Results"). Standard library only: scripts/write_task_results.py, scripts/dataset_manifest.py and the scheduler's run
 # policy (the evaluation pool's) read these.
-PROTOCOL_VERSION = "2.0"                         # docs/protocol/README.md
+PROTOCOL_VERSION = "2.1"                         # docs/protocol/README.md
 
 
 def metadata_of(task: Path) -> dict:

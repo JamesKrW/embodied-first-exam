@@ -147,7 +147,7 @@ def test_config_and_attempts():
         write(jobs, "a", out)
         res = out / TASK / "codex-x-high"
         cfg = json.loads((res / "config.json").read_text())
-        for k, v in {"protocol_version": "2.0", "mode": "standard", "network": "allowlist", "validated": True, "result": "success",
+        for k, v in {"protocol_version": tc.PROTOCOL_VERSION, "mode": "standard", "network": "allowlist", "validated": True, "result": "success",
                      "counted": True, "attempts": 2, "attempts_over_cap": False, "seed_source": "default", "digest_match": True,
                      "trial": f"{TASK}__t2"}.items():
             check(cfg.get(k) == v, f"config.json {k} = {cfg.get(k)!r}, want {v!r}")
@@ -155,7 +155,7 @@ def test_config_and_attempts():
             check(k in cfg, f"config.json has no {k}")
         att = json.loads((res / "attempts.json").read_text())["attempts"]
         check([a["counted"] for a in att] == [False, True], f"attempts.json: the infra attempt is counted: {att}")
-        check("| configuration | protocol 2.0, standard" in (res / "README.md").read_text(), "README has no configuration row")
+        check(f"| configuration | protocol {tc.PROTOCOL_VERSION}, standard" in (res / "README.md").read_text(), "README has no configuration row")
         # a later infrastructure failure of the same task x run id never replaces the counted result, and a third attempt is flagged
         make_trial(jobs, "b", "t3", TASK, "2026-10-14T03:00:00Z", infra, {"task_checksum": dg})
         r = write(jobs, "b", out)
@@ -206,6 +206,32 @@ def test_config_and_attempts():
         check(cfg.get("seed") == 4242 and cfg.get("seed_source") == "runner copy", f"the runner's seed: {cfg}")
 
 
+def test_first_attempt():
+    """PROTOCOL §4: the standard modes report the first-attempt (no-reset) result beside the graded one: reward.json's
+    first_success, else the graded success when no reset was made; the first attempt's video is published next to the
+    graded one; privileged results and infrastructure failures carry none."""
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td); jobs, out = td / "jobs", td / "out"
+        cases = {"j1": ({"success": 1, "resets": 0}, 1), "j2": ({"success": 1, "resets": 2}, 0),
+                 "j3": ({"success": 1, "resets": 2, "first_success": 0}, 0), "j4": ({"success": 0, "resets": 0}, 0),
+                 "j5": ({"success": 1}, None), "j6": ({"success": 0, "infra_error": 1, "resets": 0}, None)}
+        for job, (reward, want) in cases.items():
+            t = make_trial(jobs, job, "f1", f"{SMALL}-standard", "2026-10-14T01:00:00Z", reward)
+            if job == "j2":
+                (t / "verifier/replay.first.mp4").write_bytes(b"mp4")
+            res = out / job
+            write(jobs, job, res)
+            cfg = json.loads((res / f"{SMALL}-standard" / "codex-x-high" / "config.json").read_text())
+            check(cfg.get("first_success") == want, f"{job} {reward}: first_success {cfg.get('first_success')!r}, want {want!r}")
+            readme = (res / f"{SMALL}-standard" / "codex-x-high" / "README.md").read_text()
+            check(("| first attempt (no reset) |" in readme) == (want is not None), f"{job}: first-attempt row: {readme[:400]}")
+        check((out / "j2" / f"{SMALL}-standard" / "codex-x-high" / "replay.first.mp4").exists(), "replay.first.mp4 not published")
+        make_trial(jobs, "p1", "f1", f"{SMALL}-privileged", "2026-10-14T01:00:00Z", {"success": 1, "resets": 0})
+        write(jobs, "p1", out / "p1")
+        cfg = json.loads((out / "p1" / f"{SMALL}-privileged" / "codex-x-high" / "config.json").read_text())
+        check(cfg.get("first_success") is None, f"a privileged result has first_success {cfg.get('first_success')!r}")
+
+
 def summary_code() -> str:
     s = (ROOT / "scripts/run_agent_batch.sh").read_text()
     m = re.search(r"(?ms)^summary\(\) \{.*?<<'PY'\n(.*?)^PY$", s)
@@ -233,7 +259,7 @@ def test_summary_grouping():
                            env={**os.environ, "RCB_CORE_SET_FILE": str(td / "core_set.toml")})
         check(r.returncode == 0, f"summary failed: {r.stderr[-800:]}")
         out = r.stdout
-        check("## Unvalidated" not in out and out.count("\n## protocol 2.0, ") == 3, f"not one table per configuration:\n{out}")
+        check("## Unvalidated" not in out and out.count(f"\n## protocol {tc.PROTOCOL_VERSION}, ") == 3, f"not one table per configuration:\n{out}")
         rt = out[out.index("standard-realtime, "):]
         check(f"| {UNVALIDATED} (unvalidated) |" in rt and f"| {VALIDATED_RT} |" in rt,
               f"the unvalidated task is not ranked (marked) with the validated one of its configuration:\n{out}")
@@ -475,6 +501,7 @@ def test_gateway_restart():
 if __name__ == "__main__":
     test_results()
     test_config_and_attempts()
+    test_first_attempt()
     test_summary_grouping()
     test_core_set()
     test_benchmarks()
@@ -484,4 +511,4 @@ if __name__ == "__main__":
     if fails:
         print(f"{len(fails)} failure(s)")
         sys.exit(1)
-    print("ok: write_task_results not-a-result cases, config.json and attempts, the summary per configuration, the core set, clamp_cpus, run_agent_batch.sh stamped job copies, clamped copies and gateway restart")
+    print("ok: write_task_results not-a-result cases, config.json and attempts, the first-attempt result, the summary per configuration, the core set, clamp_cpus, run_agent_batch.sh stamped job copies, clamped copies and gateway restart")

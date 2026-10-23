@@ -217,7 +217,7 @@ class LiberoMax:
                    "video_stride": r.get("video_stride"), "video_frames": r.get("video_frames"),
                    "video_skipped": r.get("video_skipped")}  # fmt: skip
             with contextlib.suppress(OSError):
-                with open(os.path.join(os.path.dirname(path), "replay.video.json"), "w") as f:
+                with open(path.removesuffix(".mp4") + ".video.json", "w") as f:   # replay.first.mp4: its own record
                     json.dump(rec, f)
             if not rec["ends_in_live_state"]:
                 print(f"[video] the video pass ended in {r.get('state_sha')}, the live episode in {self._live_sha}: "

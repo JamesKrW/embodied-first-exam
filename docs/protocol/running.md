@@ -71,7 +71,8 @@ Results are not committed (published on the [results site](https://www.embodied-
 `<harness>-<model>-<effort>`, the model token with underscores: `codex-gpt6_luna-xhigh`; provider, tier and settings go
 in the metadata). `scripts/write_task_results.py` writes, per task and run id, `README.md`, `config.json` (the trial's
 effective configuration: `protocol_version`, `mode`, `cutoff_s`, `reset_budget`, `slowdown`, `seed`, `network`,
-`validated`, `set`, `oracle`, `service_protocol`, `digest`, the result and whether it counts; a result dir from before v2.0
+`validated`, `set`, `oracle`, `service_protocol`, `digest`, the result, the first-attempt result `first_success`
+(standard modes) and whether it counts; a result dir from before v2.0
 gets its fields from the task at that digest, else `"legacy"`) and `attempts.json`. Rankings (the batch summary,
 the results site) compare trials only within one comparable configuration (`task_conventions.config_key`: protocol
 version, mode, cutoff, reset budget, S, network), report success together with cost (tokens, money, turns, wall clock,
