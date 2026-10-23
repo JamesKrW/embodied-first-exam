@@ -8,8 +8,9 @@
 #      service applied it to the steps it ran (its hold / track windows are part of that rule). Nothing is replayed to
 #      grade it. final.json gets graded_by = "live", replays = 0, finalized = true: the only thing the verifier grades.
 #   3. ONE render pass of the trajectory from the frozen instance in a fresh process (video.py) draws replay.mp4, after
-#      the verdict is on disk (video_pending while it runs): it checks nothing, and a render that fails or runs out of
-#      time loses only the video, never the verdict.
+#      the verdict is on disk (video_pending while it runs): it checks no success, and a render that fails or runs out of
+#      time loses only the video, never the verdict. It is the run's video only when its replay ended in the live end
+#      state (video.json state_sha; docs/protocol/README.md §4), else it is kept as replay.unmatched.mp4.
 # Time: the hook has RCB_COLLECT_BUDGET_S (the task's [[verifier.collect]] timeout_sec). The render steps the physics of
 # the graded episode once (no agent thinking time, ~1500 frames at most) and gets what is left of the budget, less a
 # minute; it stops itself 30 s before that (the frames so far stay playable) and is killed at it.
@@ -92,12 +93,19 @@ else:
         except subprocess.TimeoutExpired:
             p.kill(); p.wait()
             print("[finalize] the video render ran out of time", flush=True)
-    ok = bool(read("video.json").get("video")) and os.path.isfile(mp4)
+    vj = read("video.json")
+    ok = bool(vj.get("video")) and os.path.isfile(mp4)
     if not ok:
         try:
             os.remove(mp4)   # a file cut off mid-write does not play
         except OSError:
             pass
+    # the run's video only when the render's replay ended in the live end state (docs/protocol/README.md §4), else kept aside
+    match = ok and bool(ep.get("live_sha")) and vj.get("state_sha") == ep.get("live_sha")
+    if ok and not match:
+        os.replace(mp4, os.path.join(d, "replay.unmatched.mp4"))
+    out.update({"video_state_sha": vj.get("state_sha"), "video_matches_live": match})
+    ok = match
 out.update({"video": ok, "video_pending": False})
 write_final(out)
 PY

@@ -5,8 +5,10 @@ after final.json holds the live episode's verdict (owner 2026-10-17: no grading 
 
 Builds the frozen instance in this new process, replays the rows the live episode executed (episode.json `live_rows`;
 rows recorded after the live end were never commanded live) once, plainly (the instance's own thresholds, no grading
-hold), and renders the human-viewable video during that replay. Nothing it computes is a verdict: it records no success
-and compares no state with the live one. After a live success with live review events (deep task contacts,
+hold), and renders the human-viewable video during that replay. Nothing it computes is a verdict: it records no success.
+The video stands for the live episode only when the replay ends in the live end state (`video_state_sha` = episode.json
+`live_sha`, `video_matches_live`); otherwise (the GPU contact solver of some families does not replay bit for bit) it is
+renamed replay.unmatched.mp4 / replay.unmatched.last.png and `video` is false. After a live success with live review events (deep task contacts,
 rcb_topogym.CONTACT_RULE: the success is held for human review), it renders frames around those events and the live
 forcing events into <data>/review_frames/ (`review_frames`), evidence for the reviewer. Writes <data>/replay.video.json
 (the video's record) as it goes and prints it as one JSON line at the end."""
@@ -43,7 +45,13 @@ def main() -> int:
         s.replay(live, physics_steps=ticks, grading=False)
         try:
             s.stop_video()
-            out["video"] = os.path.isfile(a.video)
+            got = s.state_sha(); ok = os.path.isfile(a.video) and bool(dump.get("live_sha")) and got == dump["live_sha"]
+            out.update(video=ok, video_state_sha=got, video_matches_live=ok)
+            if not ok:
+                stem = os.path.splitext(a.video)[0]
+                for ext in (".mp4", ".last.png"):
+                    if os.path.exists(stem + ext):
+                        os.replace(stem + ext, stem + ".unmatched" + ext)
         except Exception as exc:
             traceback.print_exc(); video_error = repr(exc)[:300]
         out.update(media_status="error" if video_error else "complete", video_error=video_error, wall_s=round(time.time() - t0, 1))

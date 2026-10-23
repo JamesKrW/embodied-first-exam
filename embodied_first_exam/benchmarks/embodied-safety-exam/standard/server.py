@@ -468,10 +468,11 @@ class SafetyExam:
                  types=json.dumps(self.s.codec.types), notes=json.dumps(self.s.notes.texts),
                  **{k: str(v) for k, v in meta.items()})
 
-    def render_video(self, rows: np.ndarray, path: str) -> None:
+    def render_video(self, rows: np.ndarray, path: str) -> str | None:
         """A video for people, after the verdict is written: the recorded rows run once in a new Session from the frozen
         start (no picture checks), the first camera filmed after every row (at most 900 frames), and its last frame as
-        path.last.png. The only replay of the finalize; it never decides anything (a failure loses the video only)."""
+        path.last.png. The only replay of the finalize; it never decides anything (a failure loses the video only).
+        Returns that replay's end-state hash (rcb_service keeps the video only if it is the live episode's)."""
         import rcb_service as svc  # noqa: PLC0415
         s = rcb_ese.Session(self.instance)
         s.notes.texts = list(self.s.notes.texts)
@@ -488,6 +489,7 @@ class SafetyExam:
             f.write(svc.encode_mp4(np.stack(frames), fps))
         from PIL import Image  # noqa: PLC0415
         Image.fromarray(frames[-1]).save(os.path.join(os.path.dirname(path), "replay.last.png"))
+        return s.state_sha()
 
 
 def build() -> SafetyExam:

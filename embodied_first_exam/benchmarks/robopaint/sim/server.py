@@ -125,13 +125,19 @@ def dump() -> list | None:
 
 def render(acts) -> None:
     """The one render pass after the verdict: the recorded trajectory from the frozen instance into replay.mp4 (+ .last.png),
-    as the replays used to film it. A failed render loses the video only; the verdict on disk is not touched."""
+    as the replays used to film it. A failed render loses the video only; the verdict on disk is not touched. It is the
+    run's video only when the pass ended in the live end state (docs/protocol/README.md §4), else it is kept as
+    replay.unmatched.mp4 (final.json video_matches_live)."""
     v = E["verdict"]
     if acts is not None:
         try:
             every = max(2, int(math.ceil(len(acts) / max(1, M.MAX_VIDEO_FRAMES))))
-            S.render_video(acts, os.path.join(DATA, "replay.mp4"), every=every, fps=10)
-            v["video"] = os.path.exists(os.path.join(DATA, "replay.mp4"))
+            mp4 = os.path.join(DATA, "replay.mp4")
+            S.render_video(acts, mp4, every=every, fps=10)
+            got = S.state_sha(); ok = os.path.exists(mp4) and got == E.get("live_sha")   # the pass's end state
+            if os.path.exists(mp4) and not ok:
+                os.replace(mp4, os.path.join(DATA, "replay.unmatched.mp4"))
+            v.update(video=ok, video_state_sha=got, video_matches_live=ok)
         except Exception as exc:  # noqa: BLE001
             traceback.print_exc(); v["video_error"] = repr(exc)[:300]
     v.update(video_pending=False, video_done=True)

@@ -194,13 +194,15 @@ class AbcSim:
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None:
         self.s.save_trajectory(rows, path, meta)
 
-    def render_video(self, rows: np.ndarray, path: str) -> None:
-        """The episode's video, after the verdict (it decides nothing): the rows replayed on this service's session."""
+    def render_video(self, rows: np.ndarray, path: str) -> str | None:
+        """The episode's video, after the verdict (it decides nothing): the rows replayed on this service's session.
+        Returns that replay's end-state hash (rcb_service keeps the video only if it is the live episode's)."""
         import imageio.v2 as imageio
         rows = np.asarray(rows, dtype=np.float64)
         every = max(1, -(-len(rows) // 1500))
         self.s.render_video(rows, path, cameras=list(M.DEFAULT_CAMERAS), every=every, size=(240, 320))
         imageio.imwrite(os.path.splitext(path)[0] + ".last.png", self.s.render_frame("top", (self.H, self.W)))
+        return self.s.state_sha()
 
 
 def build() -> AbcSim:

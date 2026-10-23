@@ -91,12 +91,18 @@ python - <<'PY'
 import json, os
 d = os.environ.get("RCB_DATA", "/data")
 try:
-    shown = bool(json.load(open(os.path.join(d, "video.json"))).get("video"))
+    vj = json.load(open(os.path.join(d, "video.json")))
+    shown = bool(vj.get("video"))
 except (OSError, ValueError, AttributeError):
-    shown = False
+    vj, shown = {}, False
 p = os.path.join(d, "final.json")   # the verdict is on disk: only the video fields change, in a copy renamed into place
 try:
-    out = json.load(open(p)); out["video"] = shown and os.path.exists(os.path.join(d, "replay.mp4")); out["video_pending"] = False
+    out = json.load(open(p)); mp4 = os.path.join(d, "replay.mp4"); shown = shown and os.path.exists(mp4)
+    # the run's video only when the video pass ended in the live end state (docs/protocol/README.md §4), else kept aside
+    match = shown and bool(out.get("live_sha")) and vj.get("state_sha") == out.get("live_sha")
+    if shown and not match:
+        os.replace(mp4, os.path.join(d, "replay.unmatched.mp4"))
+    out.update({"video": match, "video_pending": False, "video_state_sha": vj.get("state_sha"), "video_matches_live": match})
     out["video_source"] = "render" if out["video"] else None
     with open(p + ".tmp", "w") as f:
         json.dump(out, f); f.flush(); os.fsync(f.fileno())

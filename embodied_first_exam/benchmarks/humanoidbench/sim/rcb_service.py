@@ -26,7 +26,9 @@ Evidence under DATA, never visible to the agent:
   final.json           kept current (written atomically); "finalized": true once the verdict is in -- before the
                        video is rendered ("video_pending": true while it is), so the video never decides anything
   trajectory.npz       the graded episode (the deliverable: every control step since the last reset, as executed)
-  replay.mp4, replay.last.png   the episode's video, rendered from trajectory.npz after the verdict (for people only)
+  replay.mp4, replay.last.png   the episode's video, rendered from trajectory.npz after the verdict (for people only);
+                       kept as the run's video only when the render's replay ended in the live end state (final.json
+                       video_matches_live), else renamed replay.unmatched.mp4 / .last.png
 
 The verdict is the live episode's (docs/protocol/README.md H.4; owner, 2026-10-17): success = the episode this
 service ran ended in success under the task's rule (the adapter's step()), judged here, after the agent's container is
@@ -127,8 +129,9 @@ class Sim:
     # optional: replay_free = True   the adapter has a verify() but knows nothing calls it (else refused at build)
     # build() may raise InstanceMismatch: the adapter's own loader found the frozen instance does not build (infra)
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None: ...
-    def render_video(self, rows: np.ndarray, path: str) -> None: ...   # path and path.last.png: the episode's video, after
-                                                                        # the verdict; it never decides anything
+    def render_video(self, rows: np.ndarray, path: str) -> str | None: ...   # path and path.last.png: the episode's video,
+                                         # after the verdict; it never decides anything. Returns the state_sha() of the
+                                         # simulator that replayed the rows for it, at their end (None: not known)
 
 
 class GiveUp(Exception):
@@ -144,7 +147,8 @@ RESERVED = frozenset({"protocol", "success", "live_success", "done", "reason", "
                       "control_steps_total", "episodes", "resets", "reset_budget", "elapsed_s", "sim_startups",
                       "finalized", "n_actions", "graded_by", "replays", "state_sha", "video", "video_pending",
                       "video_source", "live_rule", "live_verdict_error", "finalize_error", "infra_error",
-                      "instance_mismatch", "ev", "ts", "deterministic", "replay_success", "live_sha"})
+                      "instance_mismatch", "ev", "ts", "deterministic", "replay_success", "live_sha",
+                      "video_state_sha", "video_matches_live"})
 
 
 def json_safe(d: dict) -> dict:
@@ -867,7 +871,9 @@ class Service:
         episode ended with (plus the adapter's live_verdict(), which can only take it away): final from the moment it is
         written ("finalized": true). Nothing is replayed to grade it. Then a video for humans, rendered from the
         trajectory, which can no longer change or void the verdict: while it renders final.json says
-        "video_pending": true (the collect hook waits for it as long as its time allows)."""
+        "video_pending": true (the collect hook waits for it as long as its time allows). A render is the run's video
+        only when its replay ended in the live end state (docs/protocol/README.md §4: rendering after the episode
+        needs a simulator that replays bit for bit, checked on every trial): final.json video_matches_live."""
         rows = None
         try:
             rows = np.asarray(self.episode, dtype=np.float64).reshape(-1, self.sim.raw_dim)
@@ -913,8 +919,7 @@ class Service:
         if not graded:
             return
         try:
-            self.sim.render_video(rows, os.path.join(self.data, "replay.mp4"))
-            self.verdict["video"] = True
+            self._check_video(self.sim.render_video(rows, os.path.join(self.data, "replay.mp4")))
         except Exception as exc:  # noqa: BLE001 -- the video is for humans; it never decides the verdict
             traceback.print_exc()
             self.log("video_error", error=repr(exc)[:500])
@@ -923,6 +928,21 @@ class Service:
             self._write_final()
         except Exception:  # noqa: BLE001 -- the finalized verdict is on disk already; only the video's flag is lost
             traceback.print_exc()
+
+    def _check_video(self, got) -> None:
+        """The render's replay against the live episode: the same end state (its hash, as render_video() returned it)
+        or the video does not show the graded run. Then it is kept aside as replay.unmatched.mp4 (and .last.png), and
+        final.json says video = false, video_matches_live = false (an unknown hash counts as unequal)."""
+        live = self.verdict.get("state_sha")
+        got = got if isinstance(got, str) else None
+        ok = bool(live) and got == live
+        self.verdict.update(video_state_sha=got, video_matches_live=ok, video=ok)
+        if not ok:
+            for ext in (".mp4", ".last.png"):
+                src = os.path.join(self.data, "replay" + ext)
+                if os.path.exists(src):
+                    os.replace(src, os.path.join(self.data, "replay.unmatched" + ext))
+            self.log("video_unmatched", live_sha=live, video_state_sha=got)
 
     # ------------------------------------------------------------------ HTTP
     def http_server(self, address: tuple[str, int]) -> HTTPServer:

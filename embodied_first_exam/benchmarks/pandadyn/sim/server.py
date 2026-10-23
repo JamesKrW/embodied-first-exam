@@ -179,10 +179,11 @@ class PandaDyn:
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None:
         self.s.save_trajectory(rows, path, meta)
 
-    def render_video(self, rows: np.ndarray, path: str) -> None:
+    def render_video(self, rows: np.ndarray, path: str) -> str | None:
         from PIL import Image
         self.s.render_video(rows, path, fps=25, camera="overview")
         Image.fromarray(self.s.render_frame("overview")).save(os.path.splitext(path)[0] + ".last.png")
+        return self.s.state_sha()   # the replay's end state: rcb_service keeps the video only if it is the live one
 
 
 def build() -> PandaDyn:

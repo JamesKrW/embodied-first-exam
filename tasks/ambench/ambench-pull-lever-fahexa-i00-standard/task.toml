@@ -3,12 +3,12 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
   { source = "/data/final.json", service = "sim" },
   { source = "/data/episode.jsonl", service = "sim" },
   { source = "/data/trajectory.npz", service = "sim" },
-  { source = "/data/replay.mp4", service = "sim" },
-  { source = "/data/replay.last.png", service = "sim" },
+  { source = "/data/live.mp4", service = "sim" },
+  { source = "/data/live.last.png", service = "sim" },
   { source = "/data/server.log", service = "sim" },            # the service's own output (Harbor keeps none)
   { source = "/data/journal.f64", service = "sim" },           # crash recovery: every executed control step (float64 rows)
   { source = "/data/startups.jsonl", service = "sim" },        # crash recovery: one line per service start
-  { source = "/data/film.log", service = "sim" },              # the collect hook's film pass (the video; never decides anything)
+  { source = "/data/video.log", service = "sim" },             # the collect hook's encode of the live video (never decides anything)
   "/app/output/",
 ]
 
@@ -93,10 +93,9 @@ timeout_sec = 30
 
 [[verifier.collect]]
 service = "sim"
-command = "sh /srv/finalize.sh"   # end + dump + exit the service, write final.json from the live episode (no replay), then film once
+command = "sh /srv/finalize.sh"   # end + dump + exit the service, write final.json from the live episode (no replay), then encode the live video
 timeout_sec = 4800                # = finalize.sh's HOOK_BUDGET_S (RCB_COLLECT_TIMEOUT_S; keep them equal): the episode end (up to
-                                  # 2700 s through a resume) + ONE film pass (the video only, at most 1800 s: an Isaac start and
-                                  # the render worker's, 1.5-6 min, + at most one episode, 7200 control steps at 10-15 steps/s)
+                                  # 2700 s through a resume) + the encode of the live video (at most 600 s, CPU only)
                                   # + a margin; graded by the live episode since 2026-10-17 (7200 s with two replays before)
 
 [agent]

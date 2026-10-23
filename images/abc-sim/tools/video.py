@@ -1,6 +1,7 @@
 """The episode's video (ABC Sim standard modes): ONE render pass of the recorded trajectory from the frozen instance, in
-a fresh process, after the verdict is in final.json. It is for people only and decides nothing: it checks no success
-and no state, and a render that fails, is stopped or runs out of time loses only the video.
+a fresh process, after the verdict is in final.json. It is for people only and decides nothing: it checks no success,
+and a render that fails, is stopped or runs out of time loses only the video. It records where the replay ended
+(state_sha), and finalize.sh keeps the video as the run's only when that is the live end state.
 
     python /opt/abc-tools/video.py --instance /srv/instance.npz --traj /data/trajectory.npz --out /data/replay.mp4 \
         --result /data/video.json --deadline-s 1500
@@ -60,6 +61,7 @@ def main() -> int:
         finally:
             w.close()
         res["video"] = os.path.isfile(a.out)
+        res["state_sha"] = s.state_sha()   # where the filmed replay ended: finalize.sh compares it with the live end state
     except Exception as exc:  # noqa: BLE001 -- the video never changes the verdict
         import traceback
         traceback.print_exc()

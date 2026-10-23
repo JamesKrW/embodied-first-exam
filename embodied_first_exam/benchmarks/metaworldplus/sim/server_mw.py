@@ -684,19 +684,23 @@ def finalize() -> None:
 
 def render_video(A: np.ndarray) -> None:
     """The episode's video, for people: one pass over the recorded trajectory in a fresh simulator, after the verdict is
-    on disk. It never changes the verdict: success adds "video": true, and any failure (an exception; a crash, after
-    which the restarted service finds the verdict and idles; the collect hook giving up on it) leaves only the video
-    missing."""
+    on disk. It never changes the verdict: any failure (an exception; a crash, after which the restarted service finds
+    the verdict and idles; the collect hook giving up on it) leaves only the video missing. It is the run's video
+    ("video": true) only when that replay ended in the live end state (docs/protocol/README.md §4; final.json
+    video_matches_live), else it is kept as replay.unmatched.mp4 / .last.png."""
     t = time.time()
     try:
         ver = TOOL.Session(INSTANCE, enable_render=True)
         tmp = os.path.join(DATA, "replay.tmp.mp4")  # rendered aside: a half-written replay.mp4 is never collected
         ver.render_video(A, tmp, every=max(2, len(A) // 600), fps=25)
-        os.replace(tmp, os.path.join(DATA, "replay.mp4"))
+        got = ver.state_sha()                # the render's replay, at the trajectory's end
+        ok = got == E["verdict"].get("live_state_sha")
+        name = "replay" if ok else "replay.unmatched"
+        os.replace(tmp, os.path.join(DATA, name + ".mp4"))
         if os.path.exists(os.path.join(DATA, "replay.tmp.last.png")):
-            os.replace(os.path.join(DATA, "replay.tmp.last.png"), os.path.join(DATA, "replay.last.png"))
-        E["verdict"]["video"] = True
-        log({"ev": "video", "video_s": round(time.time() - t, 1)})
+            os.replace(os.path.join(DATA, "replay.tmp.last.png"), os.path.join(DATA, name + ".last.png"))
+        E["verdict"].update(video=ok, video_state_sha=got, video_matches_live=ok)
+        log({"ev": "video", "video_s": round(time.time() - t, 1), "video_matches_live": ok})
     except Exception as exc:  # noqa: BLE001
         traceback.print_exc()
         try:

@@ -139,15 +139,17 @@ class BiGym2:
                  layout=np.array(self.ep.layout), task=self.ep.task,
                  **{k: str(v) for k, v in meta.items()})
 
-    def render_video(self, rows: np.ndarray, path: str) -> None:
-        """The episode's video, after the verdict: the trajectory re-run once from the frozen instance, filmed."""
-        replay(self.instance, rows, video=path)
+    def render_video(self, rows: np.ndarray, path: str) -> str | None:
+        """The episode's video, after the verdict: the trajectory re-run once from the frozen instance, filmed. Returns
+        that replay's end-state hash (rcb_service keeps the video only if it is the live episode's)."""
+        sha = replay(self.instance, rows, video=path).get("state_sha")
         try:  # the last frame, for the verifier's evidence
             import subprocess
             subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-sseof", "-0.1", "-i", path, "-frames:v", "1",
                             path[: -len(".mp4")] + ".last.png"], check=False, timeout=60)
         except Exception:  # noqa: BLE001
             pass
+        return sha
 
 
 def build() -> BiGym2:

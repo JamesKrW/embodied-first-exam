@@ -4,7 +4,7 @@
 FROM ghcr.io/mll-lab-nu/efe:humanoidbench-0.2.0
 COPY . /srv/
 COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.3.0@sha256:e2d97664330216cfc9359f88199033f94142e7e53505625de0ab0c3842379bbc /rcb1.py /srv/rcb1.py
-COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.3.0@sha256:abcbbe70cffddaa630b3381221f97431d53e93bb345af5e1f170ea356e0d3368 \
+COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.4.0@sha256:bd87b30f7fcfbc1343e3ef24af0a40a58b349146e2ceb47e2eb00eb64ac9ff2d \
      /privileged/environment/rcb_hb.py \
      /privileged/tests/rcb_rewards.py \
      /sim/rcb_service.py \

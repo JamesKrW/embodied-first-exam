@@ -117,7 +117,7 @@ done = os.path.isfile(os.path.join(d, ".replay_rc"))
 out["video"] = bool(r.get("video")) and os.path.exists(os.path.join(d, "replay.mp4"))
 out["media_status"] = r.get("media_status") or ("error" if done else "pending")
 out["video_pending"] = not done
-for k in ("video_error", "review_frames", "review_frames_error"):
+for k in ("video_error", "video_state_sha", "video_matches_live", "review_frames", "review_frames_error"):
     if r.get(k) is not None:
         out[k] = r[k]
 out["video_wall_s"] = r.get("wall_s")

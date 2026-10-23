@@ -9,7 +9,7 @@
 | Family / instance | `put_relative` |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
-| Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.1.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.2.0` |
 
 ## Task
 ABC Sim `put_relative` (two I2RT YAM arms (6 revolute joints and a parallel two-finger gripper each) side by side at the near edge of a table, facing +x (the left arm is the one at +y)): Follow the directive **"put the soap dispenser to the right of the boxed food"**. Directions are as the arms face the table: left = +y, right = -y, behind = +x (farther from the arms), in front = -x (nearer to them). Success: measured from the boxed food's centre (wherever it is at that moment), the soap dispenser's centre lies 0.06-0.30 m to the right of it (along that direction) and within 0.08 m of that line sideways, and no more than 0.03 m higher than where the soap dispenser started (so it is set down, not held up). The goal must hold for 30 consecutive control steps (1.02 s); the episode then ends in success.

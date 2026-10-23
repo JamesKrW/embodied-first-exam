@@ -111,7 +111,12 @@ def main() -> None:
         (DATA / "replay.mp4").unlink(missing_ok=True)
         (DATA / "video.json").write_text(json.dumps({"video": False, "why": why or "no video written"},
                                                     sort_keys=True))
-    write({**result, "video": rendered, "video_pending": False})
+    # the run's video only when the filmed replay ended in the live end state (docs/protocol/README.md §4), else kept aside
+    got = read("video.json").get("state_sha")
+    match = rendered and got == result.get("live_sha")
+    if rendered and not match:
+        (DATA / "replay.mp4").replace(DATA / "replay.unmatched.mp4")
+    write({**result, "video": match, "video_pending": False, "video_state_sha": got, "video_matches_live": match})
 
 
 if __name__ == "__main__":

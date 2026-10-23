@@ -9,7 +9,9 @@
 #      delay the verdict. A live episode that did not start in the instance's recorded state (`instance_ok_live` false)
 #      is an infrastructure failure, not the agent's 0.
 #   3. the video: one replay of the recorded trajectory from the frozen instance (`rcb_labutopia.py replay --video`), after the
-#      verdict is on disk; a failed or slow replay costs the video only (`video` false), never the verdict.
+#      verdict is on disk; a failed or slow replay costs the video only (`video` false), never the verdict. It is the
+#      run's video only when that replay ended in the live end state (docs/protocol/README.md §4), else it is kept as
+#      replay.unmatched.mp4.
 set -u
 DATA="${RCB_DATA:-/data}"; TOOL="${RCB_TOOL:-/srv/rcb_labutopia.py}"; INSTANCE="${RCB_INSTANCE:-/srv/instance.json}"
 # Time. The hook has HOOK_BUDGET_S (its [[verifier.collect]] timeout_sec in task.toml; keep the two equal):
@@ -85,14 +87,19 @@ try:
 except Exception as exc:
     print(f"[finalize] final.json unreadable, video fields not added: {exc!r}"); raise SystemExit
 try:
-    shown = bool(json.load(open(os.path.join(d, "replay3.json"))).get("video"))
+    vj = json.load(open(os.path.join(d, "replay3.json")))
+    shown = bool(vj.get("video"))
 except (OSError, ValueError, AttributeError):
-    shown = False
+    vj, shown = {}, False
 mp4 = os.path.join(d, "replay.mp4")
 ok = shown and os.path.isfile(mp4) and os.path.getsize(mp4) > 0
-out.update({"video": ok, "video_pending": False})
 if not ok:
     out["video_error"] = "the video replay gave no video (replay3.log)"
+# the run's video only when the video replay ended in the live end state (docs/protocol/README.md §4), else kept aside
+match = ok and bool(out.get("live_sha")) and vj.get("state_sha") == out.get("live_sha")
+if ok and not match:
+    os.replace(mp4, os.path.join(d, "replay.unmatched.mp4"))
+out.update({"video": match, "video_pending": False, "video_state_sha": vj.get("state_sha"), "video_matches_live": match})
 tmp = f"{p}.{os.getpid()}.tmp"
 with open(tmp, "w") as f:
     json.dump(out, f); f.flush(); os.fsync(f.fileno())

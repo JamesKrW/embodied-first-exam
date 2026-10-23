@@ -1,7 +1,8 @@
 """The standard collect hook's video (finalize.sh): one pass over the recorded trajectory from the frozen instance, in a
 fresh process, rendered into an mp4 (the default static camera and the right hand camera side by side, at most ~1500
-frames). It runs after final.json holds the verdict and decides nothing: no success, no state
-hash is compared or written. `--deadline-s` stops it that long after its start, keeping the frames written so far.
+frames). It runs after final.json holds the verdict and decides nothing: no success is checked; it writes where the
+replay ended (state_sha), and finalize.sh keeps the video as the run's only when that is the live end state.
+`--deadline-s` stops it that long after its start, keeping the frames written so far.
 
     python video.py --task T --instance instance.npz --traj trajectory.npz --out replay.mp4 --json video.json [--deadline-s S]
 """
@@ -39,6 +40,7 @@ def main() -> int:
         s = M.Session(a.task, instance=a.instance)
         s.render_video(A, a.out, cameras=s.video_cameras(), every=max(2, -(-len(A) // MAX_FRAMES)),
                        deadline=(t0 + a.deadline_s) if a.deadline_s else None)
+        res["state_sha"] = s.state_sha()   # where the filmed replay ended: finalize.sh compares it with the live end state
         s.close()
         res["video"] = os.path.isfile(a.out)
     except Exception as exc:  # noqa: BLE001 -- a video that failed is only a missing video

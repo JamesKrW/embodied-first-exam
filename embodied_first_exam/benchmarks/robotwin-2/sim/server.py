@@ -110,6 +110,7 @@ def write_final() -> None:
                  "finalized": bool(E.get("finalized")), "n_actions": E.get("n_actions"), "replays": 0,
                  **({"graded_by": "live", "live_sha": E.get("live_sha"), "video_source": "render", "video_pending": bool(E.get("video_pending"))} if E.get("graded_by") else {}),
                  "video": bool(E.get("video")),
+                 **{k: E[k] for k in ("video_state_sha", "video_matches_live") if k in E},
                  **{k: E[k] for k in ("trajectory_error", "video_error") if E.get(k)},
                  # the service could not record the episode's end (not the agent's episode): no verdict, an infrastructure error
                  **({"finalize_error": 1, "infra_error": 1} if E.get("finalize_error") else {}),
@@ -119,7 +120,9 @@ def write_final() -> None:
 def finalize() -> None:
     """The verdict is the live episode's (E["success"], judged by finish() on this simulator after the agent's last call):
     written at once, nothing replayed. Then the deliverable (trajectory.npz; trajectory_live.f64 holds the same rows) and
-    ONE render pass from it for the videos, which can no longer change the verdict."""
+    ONE render pass from it for the videos, which can no longer change the verdict. A rendered video is the run's only
+    when that pass ended in the live end state (docs/protocol/README.md §4; final.json video_matches_live), else it is
+    kept as replay.unmatched.mp4 (and, rendered in the same pass in RCB_LIVE=replay, live.unmatched.mp4)."""
     with LOCK:
         acts = None
         try:
@@ -140,6 +143,12 @@ def finalize() -> None:
             return
         try:   # one pass over the trajectory renders both videos (replay.mp4: six views; live.mp4: labelled by call)
             E.update(LIVE.render_videos(acts, os.path.join(DATA, "replay.mp4"), every=max(10, len(acts) // 600), fps=25))
+            got = S.state_sha(); ok = got == E["live_sha"]   # the pass ran on S from the frozen start: its end state
+            E.update(video=bool(E.get("video")) and ok, video_state_sha=got, video_matches_live=ok)
+            if not ok:
+                for name in ("replay.mp4", "replay.last.png") + (("live.mp4",) if LIVE.mode == "replay" else ()):
+                    if os.path.exists(os.path.join(DATA, name)):
+                        os.replace(os.path.join(DATA, name), os.path.join(DATA, name.replace(".", ".unmatched.", 1)))
         except Exception as exc:  # noqa — a failed render loses the video only
             traceback.print_exc(); E["video_error"] = repr(exc)[:300]
         E["video_pending"] = False; write_final()

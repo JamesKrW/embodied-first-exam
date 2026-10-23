@@ -11,7 +11,8 @@
 #      steps, the stands' 100 -- and joystick's full horizon are inside it).
 #   3. one video-only pass (`video.py`, a fresh process): the trajectory rendered from the frozen instance into
 #      replay.mp4, after the verdict is on disk ("video_pending" while it runs). It never changes the verdict: a video
-#      that fails or runs out of time loses only the video.
+#      that fails or runs out of time loses only the video; it is the run's video only when its replay ended in the
+#      live end state (video.json state_sha; docs/protocol/README.md §4), else it is kept as replay.unmatched.mp4.
 # Time: the hook has RCB_COLLECT_BUDGET_S (the task's [[verifier.collect]] timeout_sec). The graded episode is at most the
 # horizon (300-1000 control steps) and the video at most ~150 frames: well under a minute; it gets what is left of the
 # budget, at most RCB_COLLECT_VIDEO_MAX_S, and is stopped at that. final.json is always written whole (temporary file +
@@ -100,7 +101,13 @@ except subprocess.TimeoutExpired:
     except OSError:
         pass
 print(f"[finalize] video exit {p.returncode}", flush=True)
-out["video"] = bool(read("video.json").get("video")) and os.path.exists(mp4)
+vj = read("video.json")
+ok = bool(vj.get("video")) and os.path.exists(mp4)
+# the run's video only when the render's replay ended in the live end state (docs/protocol/README.md §4), else kept aside
+match = ok and bool(ep.get("live_sha")) and vj.get("state_sha") == ep.get("live_sha")
+if ok and not match:
+    os.replace(mp4, os.path.join(d, "replay.unmatched.mp4"))
+out.update({"video": match, "video_state_sha": vj.get("state_sha"), "video_matches_live": match})
 out["video_pending"] = False
 write_final(out)
 PY

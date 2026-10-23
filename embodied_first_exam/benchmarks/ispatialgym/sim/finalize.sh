@@ -11,8 +11,10 @@
 #      it ran) into final.json (written atomically), the only file the verifier sandbox grades. The video is checked for
 #      playability and never decides anything.
 #   3. only when the live video (live.mp4) is missing or does not play: ONE video-only pass, a fresh-process render of
-#      trajectory.npz (`rcb_ispatialgym.py replay --video`) after the verdict; its success and hash are not read, it is
-#      not retried, and a render that fails or runs out of the hook's time loses only the video.
+#      trajectory.npz (`rcb_ispatialgym.py replay --video`) after the verdict; its success is not read, it is not
+#      retried, and a render that fails or runs out of the hook's time loses only the video. The render stands for the
+#      episode only when its end-state hash is the live one (`video_matches_live`); otherwise it is kept as
+#      replay.unmatched.mp4 and `video` is false.
 set -u
 DATA="${RCB_DATA:-/out}"
 SRV="${RCB_SRV:-/srv}"
@@ -115,7 +117,22 @@ try:
 except Exception as exc:
     print(f"[finalize] video fields: final.json unreadable: {exc!r}"); raise SystemExit(0)
 v = os.path.join(d, "replay.mp4")
-out["video"] = os.path.exists(v) and playable(v)
+res = {}
+try:
+    for line in open(os.path.join(d, "video.json")):
+        if line.strip().startswith("{"):
+            res = json.loads(line)
+except Exception:
+    pass
+# the render stands for the live episode only when it ends in the live end state; else it is kept as replay.unmatched.*
+got = ((res.get("replays") or [{}])[-1] or {}).get("state_sha")
+match = bool(out.get("live_sha")) and got == out.get("live_sha")
+if not match:
+    for ext in (".mp4", ".last.png"):
+        if os.path.exists(os.path.join(d, "replay" + ext)):
+            os.replace(os.path.join(d, "replay" + ext), os.path.join(d, "replay.unmatched" + ext))
+out["video"] = match and os.path.exists(v) and playable(v)
+out.update(video_state_sha=got, video_matches_live=match)
 out["video_source"] = "render" if out["video"] else None
 out["video_pending"] = False
 tmp = p + ".tmp"

@@ -75,6 +75,7 @@ def write_final() -> None:
         "live_success": bool(E["success"]), "finalized": bool(E.get("finalized")), "n_actions": E.get("n_actions"), "replays": 0,
         **({"graded_by": "live", "video_source": "render", "video_pending": bool(E.get("video_pending"))} if E.get("graded_by") else {}),
         "live_sha": E.get("live_sha"), "video": bool(E.get("video")),
+        **{k: E[k] for k in ("video_state_sha", "video_matches_live") if k in E},
         "video_done": bool(E.get("video_done")), "backend": BACKEND, "grade_error": bool(E.get("grade_error")),
         "instance_exact": E.get("instance_exact"), "settle": E.get("settle"), "agent_time_s": E.get("agent_time_s"),
         "final_window": E.get("final_window"), **{k: E[k] for k in ("trajectory_error", "video_error", "finalize_error") if E.get(k)}, **EP.final_fields()})
@@ -117,7 +118,11 @@ def finalize() -> None:
                 # the recorded rows, as they ran live (a settle window that ended the episode is among them); nothing is judged
                 S.start_video(os.path.join(DATA, "replay.mp4"), fps=15)
                 S.replay(acts, settle=False); S.stop_video()   # + replay.last.png
-                E["video"] = video_ok(os.path.join(DATA, "replay.mp4"))
+                # the run's video only when the pass ended in the live end state (docs/protocol/README.md §4), else kept aside
+                got = S.state_sha(); ok = video_ok(os.path.join(DATA, "replay.mp4")) and got == E.get("live_sha")
+                if video_ok(os.path.join(DATA, "replay.mp4")) and not ok:
+                    os.replace(os.path.join(DATA, "replay.mp4"), os.path.join(DATA, "replay.unmatched.mp4"))
+                E.update(video=ok, video_state_sha=got, video_matches_live=ok)
             except Exception as exc:  # noqa — a failed render loses the video only
                 traceback.print_exc(); E["video_error"] = repr(exc)[:300]
         E.update(verdict)                # whatever the video did, the verdict written above is the one that stays

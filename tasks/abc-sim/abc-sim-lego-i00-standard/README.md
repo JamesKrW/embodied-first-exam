@@ -9,7 +9,7 @@
 | Family / instance | `lego` |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
-| Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.1.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.2.0` |
 
 ## Task
 ABC Sim `sort_lego_blocks` (two I2RT YAM arms (6 revolute joints and a parallel two-finger gripper each) side by side at the near edge of a table, facing +x (the left arm is the one at +y)): Sort the blocks into the bins of their colours. Success: every block is in the bin of its colour and no block is in another colour's bin, at the same time; a block is in a bin when its centre is inside the bin's interior region. The goal must hold for 30 consecutive control steps (1.02 s); the episode then ends in success.

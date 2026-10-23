@@ -181,8 +181,8 @@ class RoboFun:
         np.savez(path, actions=np.asarray(rows, dtype=np.float64).reshape(-1, self.raw_dim), family=self.ep.family,
                  **{k: str(v) for k, v in meta.items()})
 
-    def render_video(self, rows: np.ndarray, path: str) -> None:
-        replay(self.instance, rows, video=path)
+    def render_video(self, rows: np.ndarray, path: str) -> str | None:
+        return replay(self.instance, rows, video=path).get("state_sha")   # the replay's end state: rcb_service compares it
 
 
 def build() -> RoboFun:

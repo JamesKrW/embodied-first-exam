@@ -1,5 +1,5 @@
 """Standard-mode verifier (AM-Bench): reads what the sim service (which the agent could not touch) wrote: /data/final.json
-(the LIVE episode's result and the crash-recovery fields), /data/trajectory.npz, /data/replay.mp4 (the film pass: an
+(the LIVE episode's result and the crash-recovery fields), /data/trajectory.npz, /data/live.mp4 (recorded live: an
 illustration). The trial is graded by its live episode (owner 2026-10-17; no grading replay): success =
 the live episode's success (AM-Bench's success check held at a control step of the episode the agent ran) and no
 infrastructure failure. The same rule for every task (one task, "determinism": "verdict", was graded so before; the
@@ -28,7 +28,7 @@ try:
 except Exception:  # noqa: BLE001 -- a truncated or corrupt final.json is the infrastructure's failure, not the agent's
     traceback.print_exc()
     write(False, {**NONE, "missing_log": 0, "grader_error": 1, "infra_error": 1}); raise SystemExit
-for f in ("replay.mp4", "replay.last.png", "trajectory.npz", "episode.jsonl"):
+for f in ("live.mp4", "live.last.png", "trajectory.npz", "episode.jsonl"):
     try:
         if os.path.exists(f"{DATA}/{f}"): shutil.copy(f"{DATA}/{f}", f"{LOG}/{f}")
     except OSError:

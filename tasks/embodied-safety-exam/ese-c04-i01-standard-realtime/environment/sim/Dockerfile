@@ -3,7 +3,7 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:ese-0.5.6
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:ese-files-0.6.0@sha256:cf1cf3fb360e6607e3bb33ad733b207b56bffc621c2bb987f7d2fcbb69c89599 \
+COPY --from=ghcr.io/mll-lab-nu/efe:ese-files-0.7.0@sha256:63d915a9eca94cefbd56b479da590597ea75ce74df84caf4531c947e4a9790ef \
      /standard/candidate_identity.py \
      /standard/picture_delivery.py \
      /standard/rcb_ese.py \

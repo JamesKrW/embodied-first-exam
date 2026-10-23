@@ -651,18 +651,22 @@ def run_observe(q: dict):
 
 def _render_video(A: np.ndarray) -> None:
     """The video: strictly optional, and only after the verdict is final on disk. One render pass: the live session is
-    rebuilt from the frozen instance and runs the recorded trajectory again with its camera on (nothing is compared or
-    judged; the agent's container is gone and LOCK keeps requests out meanwhile). It is rendered under a temporary name
-    and renamed when complete; success adds "video": true to final.json and nothing else. Any failure here (an
+    rebuilt from the frozen instance and runs the recorded trajectory again with its camera on (nothing is judged; the
+    agent's container is gone and LOCK keeps requests out meanwhile). It is rendered under a temporary name and renamed
+    when complete. It is the run's video only when that replay ended in the live end state (docs/protocol/README.md
+    §4; final.json video_matches_live): then "video": true, else it is kept as replay.unmatched.mp4 / .last.png. Any failure here (an
     exception; a crash, after which the restarted service finds the verdict and idles; the collect hook giving up on
     it) leaves the verdict exactly as finalize() wrote it."""
     t = time.time()
     try:
         S.render_video(A, VIDEO_TMP, every=max(2, len(A) // 300), fps=10)
-        os.replace(VIDEO_TMP[:-4] + ".last.png", os.path.join(DATA, "replay.last.png"))
-        os.replace(VIDEO_TMP, os.path.join(DATA, "replay.mp4"))
-        E["verdict"]["video"] = True
-        log({"ev": "video", "video_s": round(time.time() - t, 1)})
+        got = S.state_sha()                  # the render's replay, at the trajectory's end
+        ok = got == E["verdict"].get("live_state_sha")
+        name = "replay" if ok else "replay.unmatched"
+        os.replace(VIDEO_TMP[:-4] + ".last.png", os.path.join(DATA, name + ".last.png"))
+        os.replace(VIDEO_TMP, os.path.join(DATA, name + ".mp4"))
+        E["verdict"].update(video=ok, video_state_sha=got, video_matches_live=ok)
+        log({"ev": "video", "video_s": round(time.time() - t, 1), "video_matches_live": ok})
     except Exception as exc:  # noqa: BLE001
         traceback.print_exc()
         try:

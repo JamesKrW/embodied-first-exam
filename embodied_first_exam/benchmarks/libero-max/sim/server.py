@@ -181,12 +181,13 @@ class LiberoMax:
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None:
         np.savez(path, actions=np.asarray(rows, np.float64), meta=np.array(lmx_tool.canonical(meta)))
 
-    def render_video(self, rows: np.ndarray, path: str) -> None:
+    def render_video(self, rows: np.ndarray, path: str) -> str | None:
         """Called by rcb_service once the verdict is on disk: the episode's video, one replay of the trajectory in a fresh
         process (`lmx_tool.py --replay ... <video>`; one simulator per process) that renders agentview on the way. It
         decides nothing: what it says about success is not read, a failure raises (rcb_service then records video =
         false). Next to the video, replay.video.json says whether that replay ended in the live episode's final state
-        (the video shows the live episode only then) and its stride (control steps per frame)."""
+        (the video shows the live episode only then) and its stride (control steps per frame). Returns that replay's
+        end-state hash (rcb_service keeps the video only if it is the live episode's)."""
         tmp = tempfile.mkdtemp(prefix="video-")
         proc = None
         try:
@@ -221,7 +222,8 @@ class LiberoMax:
                     json.dump(rec, f)
             if not rec["ends_in_live_state"]:
                 print(f"[video] the video pass ended in {r.get('state_sha')}, the live episode in {self._live_sha}: "
-                      "the video may not show the live episode", file=sys.stderr, flush=True)  # fmt: skip
+                      "the video does not show the live episode", file=sys.stderr, flush=True)  # fmt: skip
+            return r.get("state_sha")
         finally:
             if proc is not None and proc.poll() is None:
                 proc.kill()

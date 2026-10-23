@@ -591,7 +591,9 @@ def finalize() -> None:
     control step since the last reset) is saved as the trajectory, and the task's rule is read off the live simulator:
     DexToolBench, every goal reached (the goal tracker ran on every executed control step, as the privileged replay runs
     it); Playground, the tooling's check() of the final state. Nothing is replayed to grade it. final.json is finalized
-    before the video, which is one render pass over the trajectory from the frozen start and never changes the verdict."""
+    before the video, which is one render pass over the trajectory from the frozen start and never changes the verdict;
+    it is the run's video only when that pass ended in the live end state (docs/protocol/README.md §4; final.json
+    video_matches_live), else it is kept as replay.unmatched.mp4 / .last.png."""
     with LOCK:
         A = None
         try:
@@ -623,9 +625,11 @@ def finalize() -> None:
                 if hasattr(TOOL, "MAX_STEPS"): TOOL.MAX_STEPS = max(int(TOOL.MAX_STEPS), len(A))   # the privileged hand-in cap
                 tmp = os.path.join(DATA, "replay.tmp.mp4")                 # a half-written replay.mp4 is never collected
                 S.render_video(A, tmp, every=max(2, len(A) // 600), fps=25)
-                os.replace(tmp, os.path.join(DATA, "replay.mp4"))
-                if os.path.exists(os.path.join(DATA, "replay.tmp.last.png")): os.replace(os.path.join(DATA, "replay.tmp.last.png"), os.path.join(DATA, "replay.last.png"))
-                E["verdict"]["video"] = True
+                got = S.state_sha(); ok = got == live_sha                 # the pass's end state against the live one
+                name = "replay" if ok else "replay.unmatched"
+                os.replace(tmp, os.path.join(DATA, name + ".mp4"))
+                if os.path.exists(os.path.join(DATA, "replay.tmp.last.png")): os.replace(os.path.join(DATA, "replay.tmp.last.png"), os.path.join(DATA, name + ".last.png"))
+                E["verdict"].update(video=ok, video_state_sha=got, video_matches_live=ok)
             except Exception: traceback.print_exc()  # noqa -- the video is for people; it never decides the verdict
         E["finalized"] = True; E["video_done"] = True
         if isinstance(E.get("verdict"), dict) and "video_pending" in E["verdict"]: E["verdict"]["video_pending"] = False

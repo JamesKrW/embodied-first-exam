@@ -156,9 +156,11 @@ class _Robot:
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None:
         self.s.save_trajectory(rows, path, meta)
 
-    def render_video(self, rows: np.ndarray, path: str) -> None:
-        """The episode's video, after the verdict: the trajectory re-run once on this simulator, from the frozen start."""
+    def render_video(self, rows: np.ndarray, path: str) -> str | None:
+        """The episode's video, after the verdict: the trajectory re-run once on this simulator, from the frozen start.
+        Returns that replay's end-state hash (rcb_service keeps the video only if it is the live episode's)."""
         self.s.render_video(rows, path)         # the view that frames the task (MuJoCo: task_view)
+        return self.s.state_sha()
 
 
 class TidyBot(_Robot):

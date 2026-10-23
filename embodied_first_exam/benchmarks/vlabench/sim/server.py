@@ -167,9 +167,12 @@ class VLABench:
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None:
         np.savez(path, actions=np.asarray(rows, np.float64), meta=np.array(vlb_tool.canonical(meta)))
 
-    def render_video(self, rows: np.ndarray, path: str) -> None:
-        """The episode's video, after the verdict: the trajectory re-run once in a fresh scene, filmed."""
-        vlb_tool.Session(self.instance).render_video(rows, path, every=max(1, len(rows) // 600))
+    def render_video(self, rows: np.ndarray, path: str) -> str | None:
+        """The episode's video, after the verdict: the trajectory re-run once in a fresh scene, filmed. Returns that
+        replay's end-state hash (rcb_service keeps the video only if it is the live episode's)."""
+        s = vlb_tool.Session(self.instance)
+        s.render_video(rows, path, every=max(1, len(rows) // 600))
+        return s.state_sha()
 
 
 def build() -> VLABench:

@@ -1,7 +1,8 @@
 """The standard collect hook's video (finalize.sh): one pass over the recorded trajectory from the frozen instance, in a
 fresh process, rendered into an mp4 (rcb_quadruped.Session.render_video: the robot's first two cameras side by side,
-at most ~150 frames) and its last frame. It runs after final.json holds the verdict and decides nothing: no success, no
-state hash is compared or written.
+at most ~150 frames) and its last frame. It runs after final.json holds the verdict and decides nothing: no success is
+checked; it writes where the replay ended (state_sha), and finalize.sh keeps the video as the run's only when that is
+the live end state.
 
     python video.py --instance instance.json --traj trajectory.npz --out replay.mp4 --json video.json
 """
@@ -32,8 +33,10 @@ def main() -> int:
     try:
         A = np.asarray(np.load(a.traj, allow_pickle=False)["actions"], dtype=np.float64)
         res["rows"] = int(len(A))
-        Q.Session(a.instance, check_hash=False).render_video(A, a.out)
+        s = Q.Session(a.instance, check_hash=False)
+        s.render_video(A, a.out)
         res["video"] = os.path.isfile(a.out)
+        res["state_sha"] = s.state_sha()   # where the filmed replay ended: finalize.sh compares it with the live end state
     except Exception as exc:  # noqa: BLE001 -- a video that failed is only a missing video
         traceback.print_exc()
         res["error"] = repr(exc)[:300]

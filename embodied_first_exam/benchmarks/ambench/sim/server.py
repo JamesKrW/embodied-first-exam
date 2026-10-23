@@ -26,8 +26,11 @@ Differences from the YAMLab service, all from the robot and the simulator:
   episode length), or when the time is up;
 - the episode is graded as it ran (owner 2026-10-17: no grading replay): when it ends the service writes
   /data/trajectory.npz (the deliverable) + /data/episode.json (the live result and the end-state hash); the collect hook's
-  SIGUSR1 makes it exit, and environment/sim/finalize.sh writes final.json from it, then films the rows once (an
-  illustration, never a verdict);
+  SIGUSR1 makes it exit, and environment/sim/finalize.sh writes final.json from it, then encodes the live video;
+- the video is recorded live (live_video.py): AM-Bench's GPU physics does not replay bit for bit (a rare race, resume
+  class `approx`), so a render after the episode could show another episode. Every slot (5 frames per simulated second)
+  the render worker draws both onboard cameras side by side from the state the physics process sends it, the drawing
+  the agent's own frames use: the physics process computes the same with or without it;
 - the start state is checked before the agent is served: the rebuilt scene's state hash against the frozen instance's
   (instance.json `initial_sha`); a mismatch ends the trial as an infrastructure failure (`instance_mismatch`, a give-up:
   nothing is served)."""
@@ -38,6 +41,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import rcb_limited as L  # noqa: E402
+import live_video  # noqa: E402
 
 PROTOCOL = L.PROTOCOL
 DATA = os.environ.get("RCB_DATA", "/data"); os.makedirs(DATA, exist_ok=True); os.makedirs(os.path.join(DATA, "calls"), exist_ok=True)
@@ -98,6 +102,7 @@ def dump() -> None:
                    "n_actions": E.get("n_actions"), "hold_pad_rows": E.get("hold_pad_rows", 0), "live_sha": E.get("live_sha"),
                    "determinism_verdict_mode": VERDICT, **INSTANCE_CHECK, **EP.final_fields()})
     write_final()
+    VIDEO.last(ctrl_steps())  # after the verdict is on disk: a render that fails or hangs here never costs it
 
 
 def finish(reason: str) -> None:
@@ -302,7 +307,7 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder) -> bool:
     """One recorded control step, journaled for crash recovery. True when the call must stop here: the episode is over
     (success, AM-Bench's time-out), or the service stops the call (max_call_wall_s, the client hung up)."""
     a = np.asarray(a, dtype=np.float64)                    # the exact row Session.step executes (and records)
-    over = S.step(a); stop = EP.journal(a); rec.tick()
+    over = S.step(a); stop = EP.journal(a); rec.tick(); VIDEO.offer(ctrl_steps())
     if over: finish(end_reason())
     return E["done"] or stop
 
@@ -442,22 +447,26 @@ def end_from_signal() -> None:
         S.renderer.close()
     except Exception:  # noqa: BLE001
         pass
-    os._exit(0)          # frees the GPU and the memory: finalize.sh writes final.json, then films, once this process is gone
+    os._exit(0)          # frees the GPU and the memory: finalize.sh writes final.json, then encodes the video, once this process is gone
 
 
 def replay_row(row) -> None:
     """One journaled row during a resume (no rendering asked for). A row the scene can no longer take (the episode ended
     earlier than logged) is skipped: the state hash check then refuses the resume (class exact)."""
     if not S.done:
-        S.step(np.asarray(row, dtype=np.float64))
+        S.step(np.asarray(row, dtype=np.float64)); VIDEO.offer(ctrl_steps())   # slots already on disk are skipped
 
 
 # The physics of the episode starts here (a resume replays the journal first): finalize.sh counts the GPU faults in
 # server.log only from this marker on, in the starts that reached it (a start that died while building the scene and was
 # restarted is not the episode's physics).
 print("[rcb] the episode's physics starts (live_gpu_faults are counted from here)", flush=True)
-EP.begin(state=E, step=replay_row, state_sha=lambda: S.status()["state_sha"], proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
+VIDEO = live_video.LiveVideo(DATA, ctrl_hz=CTRL_HZ, frame=lambda: np.hstack([S.render_frame(c) for c in CAMS]), log=log)
+VIDEO.offer(0)                          # the start state (a restarted service has it on disk already)
+resumed = EP.begin(state=E, step=replay_row, state_sha=lambda: S.status()["state_sha"], proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
          start_event={"task": S.env_id, "cameras": CAMS, "kinematics_check": S.kinematics_check, "dropped_events": S.dropped_events})
+if resumed:
+    VIDEO.truncate(ctrl_steps())       # frames of the call lost in the crash show rolled-back states
 E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)

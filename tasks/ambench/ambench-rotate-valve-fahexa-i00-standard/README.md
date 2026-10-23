@@ -16,8 +16,8 @@ Standard-mode twin of `ambench-rotate-valve-fahexa-i00-privileged` (the same fro
 0): A valve is mounted on the front face of a wall in front of the hovering aerial manipulator: a large red wheel disc on a short shaft, with a handle bar sticking out of the disc's face toward the robot. Turn the valve: rotate the wheel clockwise, as seen from the robot's side of the wall, by at least 170 degrees from its starting angle. The agent gets only the `eai-standard/2.2` client (docs/protocol/standard_mode.md); the simulator runs in
 the `sim` sidecar (`environment/docker-compose.yaml`, GPU on the sidecar), which owns the scene and records the episode as a
 (T, 8) trajectory of AM-Bench's own end-effector pose actions. The collect hook (`environment/sim/finalize.sh`) ends the
-episode, lets the service exit, writes `final.json` from the live episode's record (no replay) and then films the
-trajectory once (the video only); the verifier runs in a separate sandbox (`tests/Dockerfile`) over those artifacts. Compare against the privileged task to measure the cost of losing
+episode, lets the service exit, writes `final.json` from the live episode's record (no replay) and then encodes the
+video the service recorded during the episode; the verifier runs in a separate sandbox (`tests/Dockerfile`) over those artifacts. Compare against the privileged task to measure the cost of losing
 resets and privileged state.
 
 ## Difficulty
@@ -31,8 +31,9 @@ step the service reports.
 
 ## Verification
 Graded by the live episode (owner 2026-10-17): `success` = the live episode's success, judged by the sim service on the episode the agent ran, with no grading replay (until 2026-10-17: live success ∧ two fresh-process replays that succeed and agree on the outcome). The live service runs camera-free physics (its cameras are drawn by a separate render process), the same computation as a fresh-process replay of its rows. `tests/grade.py` reads `final.json` with no network and writes the reward fields (`graded_by_live` = 1,
-`replays` = 0, `infra_error`, the crash-recovery fields), plus `/logs/verifier/replay.mp4` (the recorded rows drawn by the
-render worker in one film pass after the verdict, an illustration: its failure costs the video only). AM-Bench's success
+`replays` = 0, `infra_error`, the crash-recovery fields), plus `/logs/verifier/live.mp4` (recorded live: the render worker
+draws both onboard cameras during the episode, 5 frames per simulated second; AM-Bench's GPU physics does not replay bit for bit, so no
+render after the episode stands in for it; its failure costs the video only). AM-Bench's success
 check is evaluated after every control step; the episode ends at the first step where it holds. Before serving, the
 service checks the rebuilt scene's state hash against the frozen instance's (`instance_mismatch`: an infrastructure
 failure), and GPU faults in the live episode's physics (`live_gpu_faults`) make it no verdict on the agent
