@@ -327,7 +327,10 @@ the agent's 0 (`bad_trajectory`), a replay that does not finish is `grader_error
 live episode is the verdict (PROTOCOL H.4). The sidecar journals every executed sim row, the collect
 hook ends the episode, and the service writes the verdict from the live attempt (`final.json`: `graded_by` live,
 `replays` 0, `success` = the referee's live call, the referee's record in `referee`) before the video, which is one render
-pass from `trajectory.npz` (`video_source` render). No grading replay runs. The referee latches a success the moment it
+pass from `trajectory.npz` (`video_source` render). No grading replay runs. With resets, the trial's first attempt is kept
+beside the graded one, for people only: `trajectory.first.npz` (its rows from the journal) and `replay.first.mp4`, rendered
+after the graded video; `final.json`'s `first_success` and `first_reason` give the no-reset view (a success ends the
+trial, so `first_success` is the graded success when no reset was made, else 0). The referee latches a success the moment it
 happens and ends the attempt; there is no hold or settle window. The frozen
 start is checked on the live simulator. `server.py`'s build() refuses a world that does not start at the instance's
 `t0.state_sha` (InstanceMismatch), and `start_sha` makes the layer void a graded attempt begun by a reset that did not
