@@ -679,6 +679,10 @@ class AlpineRace(TaskBase):
 
     def substep(self, w, ref):
         self.ss.apply(w.d)
+        if not (ref.failed or ref.success):              # the snow's fall rule, after every physics step (1 ms)
+            bad = ref.parts_touching(self.snow_mask) - set(self.legal_ground)
+            if bad:
+                return ref.fail("fell", on_the_snow=sorted(bad))
         tr = self.trackers
         P = self.points(w)
         prev, tr["prev"] = tr["prev"], P[:, :2].round(9).tolist()
@@ -728,11 +732,8 @@ class AlpineRace(TaskBase):
         p, tr = self.p, self.trackers
         if ref.failed or ref.success:
             return
-        bad = ref.parts_touching(self.snow_mask) - set(self.legal_ground)
         pel = w.d.xpos[w.robot.pelvis]
         h = self.height(w, pel)
-        if bad:
-            return ref.fail("fell", on_the_snow=sorted(bad))
         if h < p["fall_h_m"]:
             return ref.fail("fell", pelvis_height_m=round(h, 3))
         v = float(np.linalg.norm(w.d.qvel[w.robot.fv:w.robot.fv + 3]))

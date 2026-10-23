@@ -1,8 +1,8 @@
 """Javelin throw (World Athletics TR 32 and 38) with the women's 600 g javelin. The javelin is a free body held at
 its cord grip, across the palm, by the contact and friction of the H1-2's own right hand, its Inspire five-finger hand
-(the core's rfo.realhand, "inspire"): it can slip along the fingers, turn in the hand and drop. The release is the hand
-letting go of the cord (opening it; the fingers open at most 260 deg/s, so when it happens is the thrower's timing,
-not a switch).
+(the core's rfo.realhand, "inspire"): it can slip along the fingers, turn in the hand and drop. The release is the
+javelin's last contact with the robot after the hand has let go of the cord (opening it; the fingers open at most
+260 deg/s, so when it happens is the thrower's timing, not a switch).
 From the runway, throw it over the shoulder from behind the arc so that its head strikes the ground first, inside the
 sector, at least the qualifying mark away; then leave the runway behind the arc. The Unitree H1-2.
 
@@ -13,7 +13,8 @@ sector, at least the qualifying mark away; then leave the runway behind the arc.
   grasp, the javelin's axis along the hand's grasp frame's y), the fingers and thumb closed round it at reset
   (close_on);
 * the javelin's flight: published wind-tunnel coefficients applied as forces (below: aero_wrench);
-* the hold, the release and no re-grip are judged from contacts (below), not from a grip switch.
+* the hold, the release and no re-grip are judged from contacts (below), not from a grip switch; the release is
+  clean: a touch after it may not change the javelin's flight (its contact impulses summed: contact_dv below).
 """
 import math
 
@@ -123,6 +124,26 @@ LINE_W, ARC_W = 0.05, 0.07                   # TR 32.9: side lines 50 mm, the ar
 RUNWAY = (0.72, 0.25, 0.18, 1)
 
 
+def contact_dv(w, prop: np.ndarray, who: np.ndarray, mass: float) -> float:
+    """The size of the velocity change (m/s) that the contacts between the geoms `prop` and `who` gave the prop in the
+    physics step just taken: MuJoCo's contact forces of that step (mj_contactForce, in each contact's frame) summed in
+    the world frame, times the step, over the prop's mass."""
+    d, m = w.d, w.m
+    n = d.ncon
+    if not n:
+        return 0.0
+    g = d.contact.geom[:n]
+    a, b = prop[g[:, 0]] & who[g[:, 1]], prop[g[:, 1]] & who[g[:, 0]]
+    J, f = np.zeros(3), np.zeros(6)
+    for i in np.flatnonzero(a | b):
+        if d.contact.efc_address[i] < 0:
+            continue
+        mujoco.mj_contactForce(m, d, int(i), f)
+        F = d.contact.frame[i].reshape(3, 3).T @ f[:3]
+        J += F if b[i] else -F                    # the force on geom2, along the normal from geom1 to geom2
+    return float(np.linalg.norm(J)) * m.opt.timestep / mass
+
+
 def set_arm(w, **angles) -> None:
     """Put arm joints (names without "_joint") at angles for t = 0, and their held targets with them."""
     r, d = w.robot, w.d
@@ -148,8 +169,10 @@ class Task(TaskBase):
         "thumb 15 N, at {grip_scale} times the device's forces; one closure command for the whole hand); the cord "
         "lies across its palm and is held by its fingers' and thumb's contact and friction only. Held means the cord "
         "touching the hand's fingers and its thumb or palm; the hold may break for at most {grip_gap_s} s (contacts "
-        "flicker); the release is the end of the hold, the last moment the cord touched both. \"Over the shoulder or upper part of the throwing arm\" is judged "
-        "at the release: the javelin's centre of gravity must then be at least {release_above_shoulder_m} m higher "
+        "flicker); the release is the javelin's last contact with any part of you once the hold has ended, when it "
+        "has then touched nothing of you for {grip_gap_s} s (between the end of the hold and the release only the "
+        "right arm may touch it, for at most {carry_s} s). \"Over the shoulder or upper part of the throwing arm\" "
+        "is judged at the release: the javelin's centre of gravity must then be at least {release_above_shoulder_m} m higher "
         "than the throwing shoulder's joint.",
         "TR 38.1(a) (one hand): before the release the javelin may not touch your left arm or hand (it may rest "
         "against the rest of you: the rule book forbids only the second hand).",
@@ -169,6 +192,11 @@ class Task(TaskBase):
         "cross-flow); the shaft's cross-flow damps its rotation. The javelin does not bend or vibrate.",
         "TR 32.15 (interrupting a trial, laying the implement down): not modelled; the first release is the throw, "
         "and the javelin may not be gripped again.",
+        "TR 38.1(a) (\"held at the grip with one hand ... shall not be slung or hurled\"): the throw is the hand's "
+        "alone and its release clean. The rule book has no article on touching the javelin after it has left the "
+        "hand; here the right arm may still brush it during {retouch_grace_s} s after the release, but those touches "
+        "may change its velocity by at most {retouch_dv_m_s} m/s in all (the sum of their contact impulses over its "
+        "mass): a harder touch is a second propulsion of a released implement, and fails the throw.",
         "TR 32.14 names no fall: here a fall ends the trial as a failure, as in every task of this benchmark; the "
         "trial ends when the robot has left the runway correctly and stands.",
         "TR 25.17 (one minute for a trial): the whole trial, leaving the runway included, has {time_limit_s} s.",
@@ -183,7 +211,7 @@ class Task(TaskBase):
                   cord_length_m=2 * CORD_HALF, cord_diameter_m=2 * CORD_R,
                   runway_width_m=4.0, runway_length_m=30.0, arc_radius_m=8.0, exit_line_m=4.0,
                   qualifying_mark_m=20.0, release_above_shoulder_m=0.0, back_turn_deg=135.0, grip_gap_s=0.02,
-                  retouch_grace_s=0.20, stand_s=1.0, fall_pelvis_m=0.50, grip_scale=1.0)
+                  retouch_grace_s=0.20, retouch_dv_m_s=0.5, carry_s=0.20, stand_s=1.0, fall_pelvis_m=0.50, grip_scale=1.0)
 
     sentence = ("Throw the javelin held by its cord in your right hand over the shoulder from behind the arc so "
                 "that its head strikes the ground first, inside the sector, at least {qualifying_mark_m} m from the "
@@ -193,9 +221,11 @@ class Task(TaskBase):
              "{cord_length_m} m long and {cord_diameter_m} m across, covers the centre of gravity) starts held at its "
              "cord across the palm of your right hand, a five-finger hand that holds only by contact and friction: "
              "the javelin can slip along the fingers or turn in the hand, and drop. It is held while the cord touches "
-             "the hand's fingers and its thumb or palm (breaks of at most {grip_gap_s} s are ignored); the release is "
-             "the end of the hold: the last moment it was held, however it ends (opened, slipped or dropped). Until the release the javelin may "
-             "not touch your left arm or hand (the javelin is held with one hand). The runway is {runway_width_m} m wide between "
+             "the hand's fingers and its thumb or palm (breaks of at most {grip_gap_s} s are ignored). The release is "
+             "the javelin's last contact with any part of you after the hold has ended (however it ends: opened, "
+             "slipped or dropped), once it has then touched nothing of you for {grip_gap_s} s; between the end of the "
+             "hold and the release only your right arm and hand may touch it, for at most {carry_s} s. Until the "
+             "release the javelin may not touch your left arm or hand (the javelin is held with one hand). The runway is {runway_width_m} m wide between "
              "the inner edges of its side lines and {runway_length_m} m long; it ends at the arc, a white strip whose "
              "inner edge is a circle of {arc_radius_m} m radius round a point on the runway's centre line; short "
              "white lines run outwards from the arc's two ends at right angles to the side lines. The sector is "
@@ -203,8 +233,9 @@ class Task(TaskBase):
              "throw: at the release the javelin's centre of gravity must be at least {release_above_shoulder_m} m "
              "higher than your right shoulder joint. There is one release: after it the javelin may not be held again "
              "(the cord in the hand's fingers and thumb or palm once more) and no part of you may touch it, except "
-             "that your right arm and its hand may still touch it during the first {retouch_grace_s} s (the shaft "
-             "sliding out of the hand). The throw is valid only if the head touches the ground before any other part of the javelin, at "
+             "that your right arm and its hand may still brush it during the first {retouch_grace_s} s, if those "
+             "touches change its velocity by at most {retouch_dv_m_s} m/s in all (the sum of their contact impulses "
+             "over its mass: the release must be clean). The throw is valid only if the head touches the ground before any other part of the javelin, at "
              "a point inside the sector lines (on a line is out). It is measured from that point to the inner edge "
              "of the arc along the line through the arc's centre. You succeed when a valid throw measures at least "
              "{qualifying_mark_m} m and you have then left the runway correctly and stood for {stand_s} s. Leaving "
@@ -216,7 +247,9 @@ class Task(TaskBase):
              "its rear end) before the javelin has landed; if your chest is turned more than {back_turn_deg} degrees "
              "away from the throwing direction before the release (your back to the arc); if the javelin touches your "
              "left arm or hand before the release; if it is released lower than the "
-             "shoulder; if it is held again, or touched, after the release (but for the grace above); if it does not "
+             "shoulder; if after the end of the hold it stays on your right arm for more than {carry_s} s or touches "
+             "another part of you; if it is held again, or touched, after the release (but for the brush above); if "
+             "it does not "
              "land head first, lands outside the sector or short of {qualifying_mark_m} m; if you fall (your pelvis "
              "lower than {fall_pelvis_m} m above the ground, or any part of you other than your feet on the ground); "
              "or after {time_limit_s} s. Where you touch the ground is judged on the points of contact.")
@@ -325,9 +358,13 @@ class Task(TaskBase):
         self.not_arm = self.robot & ~self.arm
         self.other_arm = ref.part("left_arm")
         self.jav_id = w.m.body("javelin").id
+        self.jav_mass = float(w.m.body_subtreemass[self.jav_id])
         self.shoulder = w.m.body("right_shoulder_roll_link").id
-        # held: the last time the hand held the cord; at: the javelin's state then (the release, if it ends there)
-        self.trackers = {"held": 0.0 if self._held(ref) else None, "at": self._snapshot(w), "released": None,
+        # held: the last time the hand held the cord; touch: the last time any part of the robot touched the
+        # javelin; at: the javelin's state then (the release, if it ends there); dv: the velocity the touches after
+        # the release have given it, in all (m/s)
+        held = 0.0 if self._held(ref) else None
+        self.trackers = {"held": held, "touch": held, "at": self._snapshot(w), "released": None, "dv": 0.0,
                          "landed": None, "exit": False}
 
     def _held(self, ref) -> bool:
@@ -356,10 +393,10 @@ class Task(TaskBase):
         return bool(front.any()), bool(out.any()), bool(back.any())
 
     def _release(self, ref):
-        """The hold has ended (the hand not holding the cord for more than grip_gap_s): the release, judged on the
-        javelin's state at the hold's last moment."""
+        """The hold has ended and the javelin has touched nothing of the robot for more than grip_gap_s: the release,
+        judged on the javelin's state at its last contact with the robot."""
         tr, p = self.trackers, self.p
-        tr["released"] = tr["held"] if tr["held"] is not None else 0.0
+        tr["released"] = tr["touch"] if tr["touch"] is not None else 0.0
         x, y, z, vx, vy, vz, axz, above = tr["at"]
         ref.metrics["release_speed_m_s"] = round(math.sqrt(vx * vx + vy * vy + vz * vz), 2)
         ref.metrics["release_height_m"] = round(z, 3)
@@ -399,9 +436,21 @@ class Task(TaskBase):
                 return ref.fail("the javelin touched your other arm before the release (one hand)",
                                 parts=sorted(ref.parts_touching(self.jav)))
             if held:
-                tr["held"], tr["at"] = round(ref.time, 4), self._snapshot(w)
+                tr["held"] = tr["touch"] = round(ref.time, 4)
+                tr["at"] = self._snapshot(w)
                 return
             if tr["held"] is not None and ref.time - tr["held"] <= p["grip_gap_s"] + 1e-9:
+                return
+            if ref.touching(self.jav, self.robot):            # the hold has ended, the javelin still on you
+                if ref.touching(self.jav, self.not_arm):
+                    return ref.fail("the javelin was touched after the release",
+                                    parts=sorted(ref.parts_touching(self.jav)))
+                if tr["held"] is not None and ref.time - tr["held"] > p["carry_s"] + 1e-9:
+                    return ref.fail("the javelin stayed on the arm without the hand's hold",
+                                    unheld_s=round(ref.time - tr["held"], 3))
+                tr["touch"], tr["at"] = round(ref.time, 4), self._snapshot(w)
+                return
+            if tr["touch"] is not None and ref.time - tr["touch"] <= p["grip_gap_s"] + 1e-9:
                 return
             self._release(ref)
             if ref.done:
@@ -411,6 +460,12 @@ class Task(TaskBase):
         elif (ref.touching(self.jav, self.not_arm)
               or (ref.time - tr["released"] > p["retouch_grace_s"] and ref.touching(self.jav, self.arm))):
             return ref.fail("the javelin was touched after the release", parts=sorted(ref.parts_touching(self.jav)))
+        elif ref.failed is None and ref.touching(self.jav, self.arm):    # a brush in the grace: no second throw
+            tr["dv"] = round(tr["dv"] + contact_dv(w, self.jav, self.robot, self.jav_mass), 6)
+            ref.metrics["retouch_dv_m_s"] = round(tr["dv"], 3)
+            if tr["dv"] > p["retouch_dv_m_s"]:
+                return ref.fail("the javelin was struck after the release (not a clean release)",
+                                dv_m_s=round(tr["dv"], 3))
         if not ref.touching(self.jav, ref.ground):
             return
         head = ref.contact_points(self.head, ref.ground)       # the landing: the first touch of the ground

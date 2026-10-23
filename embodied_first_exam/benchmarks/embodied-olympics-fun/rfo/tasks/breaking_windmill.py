@@ -103,7 +103,8 @@ class Task(TaskBase):
         self.allowed = ref.part(*ALLOWED)
         self.tb = w.robot.torso
         self.trackers = {"spin": 0.0, "roll": 0.0, "count": 0, "best": 0, "touched": [False, False], "down": False,
-                         "phi": None, "psi": None, "lying": False, "rev_spin0": 0.0, "rev_roll0": 0.0}
+                         "phi": None, "psi": None, "lying": False, "rev_spin0": 0.0, "rev_roll0": 0.0,
+                         "parts_k": []}                # the parts on the floor during this control step (every 1 ms)
 
     def angles(self, w):
         R = w.d.xmat[self.tb].reshape(3, 3)
@@ -123,13 +124,19 @@ class Task(TaskBase):
         tr["rev_spin0"] = tr["rev_roll0"] = 0.0
         tr["touched"] = [False, False]
 
-    def step(self, w, ref):
+    def substep(self, w, ref):
         p, tr = self.p, self.trackers
         half = p["fop_m"] / 2
-        pts = ref.contact_points(ref.robot_mask, ref.ground)
+        pts = ref.contact_points(ref.robot_mask, ref.ground)       # after every physics step (1 ms)
         if len(pts) and (np.abs(pts[:, :2]) > half + 1e-9).any():
             return ref.fail("outside the field of play")
-        parts = ref.parts_touching(ref.ground)
+        now = ref.parts_touching(ref.ground)
+        if not now <= set(tr["parts_k"]):
+            tr["parts_k"] = sorted(set(tr["parts_k"]) | now)
+
+    def step(self, w, ref):
+        p, tr = self.p, self.trackers
+        parts, tr["parts_k"] = set(tr["parts_k"]), []
         bad = parts - set(ALLOWED)
         phi, psi = self.angles(w)
         uz = float(w.d.xmat[self.tb].reshape(3, 3)[2, 2])     # the long axis' vertical component

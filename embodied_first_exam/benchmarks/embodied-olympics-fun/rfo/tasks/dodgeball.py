@@ -991,6 +991,13 @@ class Task(TaskBase):
     def substep(self, w, ref):
         p, tr = self.p, self.trackers
         st = tr["state"]
+        pts = ref.contact_points(ref.robot_mask, ref.ground)   # out of bounds: after every physics step (1 ms)
+        if len(pts):
+            x0, x1, ym = self.legal
+            bad = (pts[:, 0] <= x0) | (pts[:, 0] >= x1) | (np.abs(pts[:, 1]) >= ym)
+            if np.any(bad):
+                q = pts[np.argmax(bad)]
+                return ref.fail("out of bounds (rule 26)", at=[round(float(q[0]), 3), round(float(q[1]), 3)])
         xpos = w.d.xpos
         for i in range(N_BALLS):
             if st[i] == "held":                                    # thrown: past the wheels (by distance from the nip)
@@ -1015,13 +1022,6 @@ class Task(TaskBase):
         for i in range(N_BALLS):                                   # (slow: checked every control step)
             if st[i] == "held" and ref.touching(ref.robot_mask, self.ball_sel[i]):
                 return ref.fail("touched a ball in a machine", ball=i + 1)
-        pts = ref.contact_points(ref.robot_mask, ref.ground)
-        if len(pts):
-            x0, x1, ym = self.legal
-            bad = (pts[:, 0] <= x0) | (pts[:, 0] >= x1) | (np.abs(pts[:, 1]) >= ym)
-            if np.any(bad):
-                q = pts[np.argmax(bad)]
-                return ref.fail("out of bounds (rule 26)", at=[round(float(q[0]), 3), round(float(q[1]), 3)])
         ref.metrics["dodged"] = len(ref.stages)
 
     def privileged(self, w):
