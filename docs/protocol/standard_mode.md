@@ -142,8 +142,12 @@ the agent's processes; from then on the service refuses every request, and it ju
 and writes the verdict into `final.json` (`success`, the verdict; `live_success`, how the episode itself ended, before
 any settle or hold check; `graded_by` = `live`, `replays` = 0); nothing is
 replayed to grade it (PROTOCOL H.4). The video is recorded during the episode or rendered from `trajectory.npz` after
-the verdict (`video_source`), and never decides anything. A separate verifier transcribes `final.json` into
-`reward.json` (`graded_by_live` = 1). `infra_error = 1` means there is no verdict on the agent: `final.json` is
+the verdict (`video_source`), and never decides anything. With resets, the first episode is kept as evidence too:
+`trajectory.first.npz` (its rows from the journal) and `replay.first.mp4`, rendered after the graded video; `final.json`
+says how it ended (`first_success`, `first_reason`; a success ends the trial, so after a reset `first_success` is 0) and
+decides nothing with it. A separate verifier transcribes `final.json` into `reward.json` (`graded_by_live` = 1,
+`first_success`: the first-attempt, no-reset result reported beside the graded one; without the field, `success` when
+no reset was made, else 0). `infra_error = 1` means there is no verdict on the agent: `final.json` is
 missing, unreadable or not finalized, or the service reported `sim_crashed`, `resume_failed`, `instance_mismatch` or
 (2.4) `call_watchdog`.
 
