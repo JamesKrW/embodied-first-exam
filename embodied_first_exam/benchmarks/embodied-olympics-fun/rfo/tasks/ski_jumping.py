@@ -720,6 +720,8 @@ class Task(TaskBase):
         body_down = ref.parts_touching(self.snow_mask) - set(self.legal_ground)
         feet_x = [float(d.site_xpos[w.robot.foot_site[s]][0]) for s in ("left", "right")]
         if tr["phase"] == "inrun":
+            if body_down and not (ref.failed or ref.success):    # the snow's fall rule, after every physics step
+                return ref.fail("fell", on_the_snow=sorted(body_down))
             if not any(on_run) and min(feet_x) > 0.0:   # the skis have left the in-run, the feet past the edge
                 ref.stage("take-off")
                 tr["phase"], tr["t_off"] = "air", ref.time
@@ -742,6 +744,8 @@ class Task(TaskBase):
                 ref.stage("landing", distance_m=dist)
                 tr["phase"] = "landed"
         elif tr["phase"] == "landed":
+            if body_down and not (ref.failed or ref.success):
+                return ref.fail("fell", on_the_snow=sorted(body_down))
             if min(feet_x) >= self.land.marks["U"][0]:
                 if tr["distance_m"] < self.p["w_m"]:
                     return ref.fail("short of the K-point", distance_m=tr["distance_m"])
@@ -752,11 +756,8 @@ class Task(TaskBase):
         p, tr = self.p, self.trackers
         if ref.failed or ref.success:
             return
-        bad = ref.parts_touching(self.snow_mask) - set(self.legal_ground)
         pel = w.d.xpos[w.robot.pelvis]
         h = self.height(pel)
-        if bad:
-            return ref.fail("fell", on_the_snow=sorted(bad))
         if h < p["fall_h_m"] and tr["phase"] != "air":
             return ref.fail("fell", pelvis_height_m=round(h, 3))
         if tr["phase"] == "landed":                     # tipped over on the skis (the torso more than tilt_max_deg
