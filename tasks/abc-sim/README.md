@@ -92,7 +92,7 @@ without a colour), and an "all of a colour and shape" directive for the generic 
   agent's 0) before it replays it twice, side by side, in fresh processes; a replay that then gives no result is
   `replay_failed` with `grader_error = 1` and `infra_error = 1`. A third replay renders `replay.mp4` after the verdict.
 - **Standard (`eai-standard/2.2`):** the shared layer of `embodied_first_exam/standard/` (from the pinned
-  `standard-sim-files` image) and the adapter `/opt/abc-tools/standard/server.py` (in the base image; `run.sh` starts it
+  `standard-files` image) and the adapter `/opt/abc-tools/standard/server.py` (in the base image; `run.sh` starts it
   through `RCB_SERVER`):
   - action type `joint_position`: the 14 numbers per control step, as in privileged mode; `linear` or `hold` between rows
     `dt` apart; rows are executed as sent (abc_sim rounds each command to float32 and the servos clamp it to the
@@ -107,7 +107,7 @@ without a colour), and an "all of a colour and shape" directive for the generic 
   - resume class `exact` (MuJoCo on the CPU repeats bit for bit in a fresh process); `max_frames_per_call` 1000;
   - reset budget 0 (the mode's default): one episode. The adapter implements the optional reset capability, so a run
     can grant resets with `RCB_RESET_BUDGET`.
-- **Standard-realtime (`eai-standard/2.3`):** the shared realtime layer (`rcb_realtime.py` from `standard-sim-files`,
+- **Standard-realtime (`eai-standard/2.3`):** the shared realtime layer (`rcb_realtime.py` from `standard-files`,
   `rcb_service.py` byte-identical to the other realtime benchmarks' copies, in the base image at
   `/opt/abc-tools/realtime/`) and the adapter `/opt/abc-tools/realtime/server.py` on the same Session: the standard twin's
   instance, action, success rule, cameras and proprioception (not served: `/kinematics`, per-frame camera poses, depth
