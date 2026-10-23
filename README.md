@@ -43,51 +43,42 @@ In every task, a coding agent writes code, runs it on a robot in a frozen scene 
 Nine of the suites were written for this exam:
 
 <table>
-<tr><th>Suite</th><th>Description</th><th>Links</th></tr>
+<tr><th>Suite</th><th>Description</th></tr>
 <tr>
-<td><b>RoboPaint</b></td>
-<td>A robot arm copies the picture it is shown with a brush or pen, stroke by stroke, from Chinese calligraphy to oil paintings.</td>
-<td><a href="https://www.embodied-first-exam.ai/suite/?id=robopaint">suite page</a><br><a href="https://robopaint.embodied-first-exam.ai/">project website</a><br><a href="tasks/robopaint/README.md">task README</a></td>
+<td><b><a href="https://www.embodied-first-exam.ai/suite/?id=robopaint">RoboPaint</a></b></td>
+<td><b>Tests fine tool control.</b> A robot arm reproduces a given picture with a brush or pen, from Chinese calligraphy to oil painting.</td>
 </tr>
 <tr>
-<td><b>RoboARC</b></td>
-<td>Robot arms take apart tangled metal puzzles, untie and thread ropes, flatten and fold cloth, and assemble IKEA furniture.</td>
-<td><a href="https://www.embodied-first-exam.ai/suite/?id=roboarc">suite page</a><br><a href="https://roboarc.embodied-first-exam.ai/">project website</a><br><a href="tasks/roboarc/README.md">task README</a><br><a href="tasks/roboarc/README.md#ikea-suite">IKEA task README</a></td>
+<td><b><a href="https://www.embodied-first-exam.ai/suite/?id=roboarc">RoboARC</a></b></td>
+<td><b>Tests manipulation of tangled, deformable and multi-part objects.</b> Robot arms take apart metal wire puzzles, tie and thread ropes, fold cloth and assemble IKEA furniture.</td>
 </tr>
 <tr>
-<td><b>RoboDynamicExam</b></td>
-<td>One or two robot arms catch, strike, carry and hand over things that move on their own: tossed balls, sliding pucks, swinging loads.</td>
-<td><a href="https://www.embodied-first-exam.ai/suite/?id=pandadyn">suite page</a><br><a href="tasks/pandadyn/README.md">task README</a></td>
+<td><b><a href="https://www.embodied-first-exam.ai/suite/?id=pandadyn">RoboDynamicExam</a></b></td>
+<td><b>Tests handling of moving objects.</b> One or two robot arms catch, strike, carry and hand over objects in motion: tossed balls, sliding pucks, swinging loads.</td>
 </tr>
 <tr>
-<td><b>Embodied Olympics - Fun</b></td>
-<td>Fun movement tasks we designed from many sports, from sprints and hurdles to serves and shots, for the agent to try on a humanoid robot.</td>
-<td><a href="https://www.embodied-first-exam.ai/suite/?id=embodied-olympics-fun">suite page</a><br><a href="https://olympics.embodied-first-exam.ai/">project website</a><br><a href="tasks/embodied-olympics-fun/README.md">task README</a></td>
+<td><b><a href="https://www.embodied-first-exam.ai/suite/?id=embodied-olympics-fun">Embodied Olympics - Fun</a></b></td>
+<td><b>Tests humanoid motor skills with fun sports-inspired tasks.</b> The agent gets a humanoid robot to perform moves taken from many sports.</td>
 </tr>
 <tr>
-<td><b>Embodied Olympics - Match</b></td>
-<td>Robots play whole matches against scripted and learned opponents: table tennis, badminton, humanoid and wheeled soccer, foosball and épée fencing.</td>
-<td><a href="https://www.embodied-first-exam.ai/suite/?id=embodied-olympics-match">suite page</a><br><a href="https://olympics.embodied-first-exam.ai/">project website</a><br><a href="tasks/embodied-olympics-match/README.md">task README</a></td>
+<td><b><a href="https://www.embodied-first-exam.ai/suite/?id=embodied-olympics-match">Embodied Olympics - Match</a></b></td>
+<td><b>Tests competitive play against an opponent.</b> Robots play full matches of table tennis, badminton, soccer, foosball and fencing against scripted or learned opponents.</td>
 </tr>
 <tr>
-<td><b>DexHandExam</b></td>
-<td>Five-finger robot hands turn book pages, open jars, stir coffee, plug in a USB stick, fold paper and build a hamburger.</td>
-<td><a href="https://www.embodied-first-exam.ai/suite/?id=dexhand">suite page</a><br><a href="tasks/dexhand/README.md">task README</a></td>
+<td><b><a href="https://www.embodied-first-exam.ai/suite/?id=dexhand">DexHandExam</a></b></td>
+<td><b>Tests dexterous hand manipulation.</b> Five-finger robot hands turn book pages, open jars, stir coffee, plug in a USB stick, fold paper and build a hamburger.</td>
 </tr>
 <tr>
-<td><b>RoboEngineer</b></td>
-<td>Build a robot controller in a public simulator, deploy it to one with hidden dynamics, and fix it from what the deployment shows.</td>
-<td><a href="https://www.embodied-first-exam.ai/suite/?id=roboengineer">suite page</a><br><a href="tasks/roboengineer/README.md">task README</a></td>
+<td><b><a href="https://www.embodied-first-exam.ai/suite/?id=roboengineer">RoboEngineer</a></b></td>
+<td><b>Tests the sim-to-real engineering loop.</b> The agent builds a controller in a public simulator, deploys it to one with hidden dynamics, and fixes it from what the deployment shows.</td>
 </tr>
 <tr>
-<td><b>Embodied Safety Exam</b></td>
-<td>A robot carries out a person's harmless requests, refuses the ones that would hurt someone, and tells them what the danger is.</td>
-<td><a href="https://www.embodied-first-exam.ai/suite/?id=embodied-safety-exam">suite page</a><br><a href="tasks/embodied-safety-exam/README.md">task README</a></td>
+<td><b><a href="https://www.embodied-first-exam.ai/suite/?id=embodied-safety-exam">Embodied Safety Exam</a></b></td>
+<td><b>Tests safety.</b> The robot must carry out safe requests, refuse requests that would harm people, and explain the risk.</td>
 </tr>
 <tr>
-<td><b>iSpatialGym</b></td>
-<td>The goal is only a picture: a mobile two-armed robot rearranges the room, or moves itself, until its camera sees that picture.</td>
-<td><a href="https://www.embodied-first-exam.ai/suite/?id=ispatialgym">suite page</a><br><a href="tasks/ispatialgym/README.md">task README</a></td>
+<td><b><a href="https://www.embodied-first-exam.ai/suite/?id=ispatialgym">iSpatialGym</a></b></td>
+<td><b>Tests spatial reasoning from images.</b> The goal is given only as a picture: a mobile two-armed robot rearranges the room, or moves itself, until its camera view matches it.</td>
 </tr>
 </table>
 
