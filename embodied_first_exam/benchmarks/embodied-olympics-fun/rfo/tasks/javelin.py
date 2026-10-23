@@ -9,7 +9,7 @@ sector, at least the qualifying mark away; then leave the runway behind the arc.
 * the official runway, arc, sector and implement (TR 32.9, 32.12, 38.3-38.6);
 * the cord grip is a collision body: TR 38.4's grip at the centre of gravity, 160 mm long (TR 38: 150-160 mm), of
   uniform thickness, 29 mm across (the shaft's 25 mm plus 4; TR 38: at most 8 mm more);
-* the right hand is the Inspire hand at the device's forces (the core's model): the cord lies across the palm (a power
+* the right hand is the Inspire hand at the core's forces (20 N per fingertip, 30 N the thumb): the cord lies across the palm (a power
   grasp, the javelin's axis along the hand's grasp frame's y), the fingers and thumb closed round it at reset
   (close_on);
 * the javelin's flight: published wind-tunnel coefficients applied as forces (below: aero_wrench);
