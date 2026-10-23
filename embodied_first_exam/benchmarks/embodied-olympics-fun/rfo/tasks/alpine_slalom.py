@@ -1020,7 +1020,7 @@ class Task(AlpineRace):
         "ICR 614.2.4 and 628 (a racer who falls may get up and go on): a fall ends the run here (the families' fall "
         "rule): a part of the robot other than its feet and its hands on the snow, or its pelvis less than "
         "{fall_h_m} m above the snow.",
-        "Equipment: no ski poles (the robot's hands are bare pads that cannot hold one), no ski boots (the feet are "
+        "Equipment: no ski poles (the G1's hands are its rubber fists, which do not close: nothing to hold one with), no ski boots (the feet are "
         "bound directly); the binding is rigid and never releases; each ski is three bodies, its forebody and "
         "afterbody on hinges with the ski's bending stiffness (EI 60 / 80 N m^2: estimates, as the "
         "RoboOlympics freeski sport's skis); the skis are solid against the robot's body and each other.",
