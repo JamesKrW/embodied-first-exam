@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Write per-task agent results for the results site (not into the repository, PROTOCOL D3): <out>/<task>/<run id>/README.md
-(+ replay.mp4, replay.last.png, config.json, attempts.json). One folder per agent+model; the privileged and standard twins
+(+ replay.mp4, replay.last.png, replay.first.mp4 and replay.first.last.png when the trial made resets, config.json,
+attempts.json). One folder per agent+model; the privileged and standard twins
 each get their own.
 usage: write_task_results.py <jobs_dir> <job_name> <run-id> "<agent label>" --out <dir>
 
 config.json (docs/protocol/running.md "Results", PROTOCOL v2.0): the trial's effective configuration (scripts/task_conventions.py
 effective_config: protocol version, mode, cutoff, reset budget, slowdown S, seed, network, validated flag, digest), its
-result (`success`, `fail` or `not_a_result` with the reason) and whether it is counted. Results are ranked only within
+result (`success`, `fail` or `not_a_result` with the reason), whether it is counted and, in the standard modes, the
+first-attempt result `first_success` (PROTOCOL §4: the no-reset performance, reported beside the graded one). Results are ranked only within
 one comparable configuration (task_conventions.config_key), validated and unvalidated tasks together.
 attempts.json: every trial of this task x run id seen so far. docs/protocol/running.md "Infrastructure retry": an infrastructure failure
 (not a result) allows at most one full retry with the same instance, seed and configuration; the voided attempt is never
@@ -86,6 +88,19 @@ def classify(trial, r, rw):
     ok = rw.get("success") == 1 and not over and not infra
     why = None if ok or (over and not infra) else not_a_result(trial, r, rw)
     return ("success" if ok else "not_a_result" if why else "fail"), why, over
+
+
+def first_success(rw, mode):
+    """The first attempt's result in the standard modes (PROTOCOL §4): reward.json's first_success; a verifier that does
+    not write it: the graded success when no reset was made, else 0 (a success ends the trial); None when reward.json
+    says neither (privileged mode, no verdict, no `resets`)."""
+    if mode == "privileged" or not rw or rw.get("infra_error") or rw.get("grader_error"):
+        return None
+    if rw.get("first_success") is not None:
+        return int(bool(rw["first_success"]))
+    if rw.get("resets") is None:
+        return None
+    return int(rw.get("success") == 1 and int(rw.get("resets") or 0) == 0)
 
 
 def trial_config(trial, task, r):
@@ -177,9 +192,10 @@ def main(argv):
             continue
         cfg = trial_config(trial, task, r)
         cfg.update({"run_id": slug, "job": job, "trial": trial.name, "result": status, "not_a_result_reason": why,
-                    "counted": status != "not_a_result", "attempts": len(led), "attempts_over_cap": over_cap})
+                    "counted": status != "not_a_result", "attempts": len(led), "attempts_over_cap": over_cap,
+                    "first_success": first_success(rw, mode)})
         (out / "config.json").write_text(json.dumps(cfg, indent=1) + "\n")
-        for f in ("replay.mp4", "replay.last.png"):
+        for f in ("replay.mp4", "replay.last.png", "replay.first.mp4", "replay.first.last.png"):
             if (trial / "verifier" / f).exists(): shutil.copy(trial / "verifier" / f, out / f)
         ok = status == "success"
         lines = [f"# {label} — {task}\n",
@@ -190,6 +206,8 @@ def main(argv):
                  f"{'validated' if cfg.get('validated') is True else 'unvalidated' if cfg.get('validated') is False else 'legacy'}"
                  f"{'; not in the core set (docs/core_set.toml)' if cfg.get('set') not in (None, '', 'core') else ''} (`config.json`) |",
                  f"| attempts | {len(led)}" + (f" — **over the cap of {MAX_ATTEMPTS}**" if over_cap else "") + " |",
+                 *([f"| first attempt (no reset) | {cfg['first_success']}; resets {rw.get('resets')} |"]
+                   if cfg["first_success"] is not None else []),
                  f"| agent time | {span(r.get('agent_execution') or {})} s |",
                  f"| actions / physics steps | {rw.get('steps') or rw.get('n_actions') or '—'} / {rw.get('sim_steps') or '—'} |",
                  f"| tokens in / out | {ar.get('n_input_tokens')} / {ar.get('n_output_tokens')} |",
@@ -199,6 +217,9 @@ def main(argv):
             lines.append(f"Debugging footprint (self-reported by the agent's tooling log): {rw.get('agent_sessions')} sessions, {rw.get('agent_resets')} resets, {rw.get('agent_sim_steps')} physics steps.\n")
         if (out / "replay.mp4").exists():
             lines += ["## Replay (verifier's six-camera video)\n", f"![last frame](replay.last.png)\n", "[replay.mp4](replay.mp4) — top: world / observer / head; bottom: front / left wrist / right wrist.\n"]
+        if (out / "replay.first.mp4").exists():
+            lines += ["## First attempt (before the first reset; not graded)\n", "![last frame](replay.first.last.png)\n",
+                      "[replay.first.mp4](replay.first.mp4)\n"]
         msgs = last_msgs(trial)
         if msgs:
             lines += ["## Agent's last messages\n"] + [f"- {m[:600]}" for m in msgs] + [""]

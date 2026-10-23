@@ -206,6 +206,32 @@ def test_config_and_attempts():
         check(cfg.get("seed") == 4242 and cfg.get("seed_source") == "runner copy", f"the runner's seed: {cfg}")
 
 
+def test_first_attempt():
+    """PROTOCOL §4: the standard modes report the first-attempt (no-reset) result beside the graded one: reward.json's
+    first_success, else the graded success when no reset was made; the first attempt's video is published next to the
+    graded one; privileged results and infrastructure failures carry none."""
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td); jobs, out = td / "jobs", td / "out"
+        cases = {"j1": ({"success": 1, "resets": 0}, 1), "j2": ({"success": 1, "resets": 2}, 0),
+                 "j3": ({"success": 1, "resets": 2, "first_success": 0}, 0), "j4": ({"success": 0, "resets": 0}, 0),
+                 "j5": ({"success": 1}, None), "j6": ({"success": 0, "infra_error": 1, "resets": 0}, None)}
+        for job, (reward, want) in cases.items():
+            t = make_trial(jobs, job, "f1", f"{SMALL}-standard", "2026-10-14T01:00:00Z", reward)
+            if job == "j2":
+                (t / "verifier/replay.first.mp4").write_bytes(b"mp4")
+            res = out / job
+            write(jobs, job, res)
+            cfg = json.loads((res / f"{SMALL}-standard" / "codex-x-high" / "config.json").read_text())
+            check(cfg.get("first_success") == want, f"{job} {reward}: first_success {cfg.get('first_success')!r}, want {want!r}")
+            readme = (res / f"{SMALL}-standard" / "codex-x-high" / "README.md").read_text()
+            check(("| first attempt (no reset) |" in readme) == (want is not None), f"{job}: first-attempt row: {readme[:400]}")
+        check((out / "j2" / f"{SMALL}-standard" / "codex-x-high" / "replay.first.mp4").exists(), "replay.first.mp4 not published")
+        make_trial(jobs, "p1", "f1", f"{SMALL}-privileged", "2026-10-14T01:00:00Z", {"success": 1, "resets": 0})
+        write(jobs, "p1", out / "p1")
+        cfg = json.loads((out / "p1" / f"{SMALL}-privileged" / "codex-x-high" / "config.json").read_text())
+        check(cfg.get("first_success") is None, f"a privileged result has first_success {cfg.get('first_success')!r}")
+
+
 def summary_code() -> str:
     s = (ROOT / "scripts/run_agent_batch.sh").read_text()
     m = re.search(r"(?ms)^summary\(\) \{.*?<<'PY'\n(.*?)^PY$", s)
@@ -475,6 +501,7 @@ def test_gateway_restart():
 if __name__ == "__main__":
     test_results()
     test_config_and_attempts()
+    test_first_attempt()
     test_summary_grouping()
     test_core_set()
     test_benchmarks()
@@ -484,4 +511,4 @@ if __name__ == "__main__":
     if fails:
         print(f"{len(fails)} failure(s)")
         sys.exit(1)
-    print("ok: write_task_results not-a-result cases, config.json and attempts, the summary per configuration, the core set, clamp_cpus, run_agent_batch.sh stamped job copies, clamped copies and gateway restart")
+    print("ok: write_task_results not-a-result cases, config.json and attempts, the first-attempt result, the summary per configuration, the core set, clamp_cpus, run_agent_batch.sh stamped job copies, clamped copies and gateway restart")
