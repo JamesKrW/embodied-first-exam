@@ -141,15 +141,17 @@ on which the frozen instance does not rebuild to its stored initial state report
 the agent's processes; from then on the service refuses every request, and it judges the episode it ran (the task's success rule, with any settle or hold window run on the live simulator)
 and writes the verdict into `final.json` (`success`, the verdict; `live_success`, how the episode itself ended, before
 any settle or hold check; `graded_by` = `live`, `replays` = 0); nothing is
-replayed to grade it (PROTOCOL H.4). The video is recorded during the episode or rendered from `trajectory.npz` after
-the verdict (`video_source`), and never decides anything. A separate verifier transcribes `final.json` into
+replayed to grade it (PROTOCOL H.4). The video is a live recording, or, only where the simulator is verified bit-wise
+replayable, a post-hoc replay of `trajectory.npz` after the verdict (`video_source`, PROTOCOL §4); it never decides
+anything. A separate verifier transcribes `final.json` into
 `reward.json` (`graded_by_live` = 1). `infra_error = 1` means there is no verdict on the agent: `final.json` is
 missing, unreadable or not finalized, or the service reported `sim_crashed`, `resume_failed`, `instance_mismatch` or
 (2.4) `call_watchdog`.
 
-### Live recording (optional, sidecar only; the agent sees none of it)
-`live.mp4`, `live_timeline.jsonl`, `live_segments.jsonl`, `trajectory_live.f64`, `startups.jsonl`: rendered from the
-recorded trajectory by default, frames stamped with the call, never affecting the verdict. The reference recording is RoboTwin's
+### Live recording (sidecar only; the agent sees none of it)
+`live.mp4`, `live_timeline.jsonl`, `live_segments.jsonl`, `trajectory_live.f64`, `startups.jsonl`: captured during the
+episode, or rendered from the recorded trajectory where a post-hoc replay is allowed (PROTOCOL §4), frames stamped with
+the call, never affecting the verdict. The reference recording is RoboTwin's
 (tasks/robotwin-2/README.md).
 
 ### Proprioception (2.1)
@@ -445,8 +447,8 @@ negative `Content-Length` (CI job `unit-tests`).
 `episode.jsonl` (calls, checkpoints, resumes), `journal.f64`, `startups.jsonl`, `calls/NNNNNN/` (meta + last frames per call),
 `server.log`, and at the end `trajectory.npz`, `final.json`, `replay.mp4`. The collect hook signals the service by PID
 after a collect hook has stopped the agent's processes; the service judges the live episode in-process (or dumps it with its live verdict
-and exits), and the hook writes `final.json`, then the video (recorded live or rendered from the trajectory: the
-benchmark's doc). A separate, network-less verifier transcribes `final.json` (PROTOCOL H.4). A GPU lost to a host
+and exits), and the hook writes `final.json`, then the video (a live recording, or a post-hoc replay where PROTOCOL §4
+allows one). A separate, network-less verifier transcribes `final.json` (PROTOCOL H.4). A GPU lost to a host
 systemd reload before the episode was judged is reported as `gpu_lost` (`infra_error`).
 
 ### 15. Privileged-mode parity
