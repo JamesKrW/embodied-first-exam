@@ -781,7 +781,7 @@ class Task(TaskBase):
                 "flight\"")
     deviations = [
         "Definitions (catch): no glove; both hands are the H1-2's own Inspire five-finger hands (six self-locking "
-        "drives; 10 N at each fingertip, 15 N at the thumb; a full close in about 0.8 s), bare. A catch is one hand "
+        "drives; 20 N at each fingertip, 30 N at the thumb; a full close in about 0.8 s), bare. A catch is one hand "
         "enclosing the ball: its fingers and its thumb or palm touching the ball at the same time from opposite "
         "sides (the mean directions of the two contacts at least {opposed_deg} degrees apart: the hand closed on it, "
         "not a ball lying on an open hand), at the latest {catch_window_s} s after the ball first touched you; "

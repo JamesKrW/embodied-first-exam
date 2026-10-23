@@ -118,7 +118,7 @@ class Task(TaskBase):
                 "discus), TR 35 (the discus cage)")
     deviations = [
         "TR 34 (the discus; the thrower's hand): the right hand is the H1-2's own Inspire five-finger hand (six "
-        "drives: four fingers, the thumb's flexion and rotation; fingertip forces 10 N, the thumb 15 N, at "
+        "drives: four fingers, the thumb's flexion and rotation; fingertip forces 20 N, the thumb 30 N, at "
         "{grip_scale} times the device's forces; one closure command for the whole hand). The discus lies flat on its "
         "palm, the fingertips curled over the rim, held by contact and friction only: nothing is welded or grippable, "
         "and the discus slips, turns in the hand or flies out when the throw pulls harder than the fingers hold. The "

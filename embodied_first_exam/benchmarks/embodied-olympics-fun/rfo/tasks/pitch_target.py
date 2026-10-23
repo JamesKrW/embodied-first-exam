@@ -79,7 +79,7 @@ class Task(TaskBase):
                 "Terms: \"strike zone\", \"in flight\"")
     deviations = [
         "3.01 (the ball in the pitcher's hand): the hand is the H1-2's own Inspire five-finger hand (six drives for "
-        "four fingers and a thumb, fingertip forces 10 N, the thumb 15 N, one closure command for the whole hand); "
+        "four fingers and a thumb, fingertip forces 20 N, the thumb 30 N, one closure command for the whole hand); "
         "the ball starts held against its palm by the fingers' and thumb's contact and friction only (no seams: no "
         "grip-made spin beyond what the fingers' motion gives). The release is the moment the ball last touched you "
         "before it had touched nothing of you for {release_s} s.",
