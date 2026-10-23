@@ -27,6 +27,10 @@ Evidence under DATA, never visible to the agent:
                        video is rendered ("video_pending": true while it is), so the video never decides anything
   trajectory.npz       the graded episode (the deliverable: every control step since the last reset, as executed)
   replay.mp4, replay.last.png   the episode's video, rendered from trajectory.npz after the verdict (for people only)
+  trajectory.first.npz, replay.first.mp4, replay.first.last.png   with resets, the trial's first episode too (its
+                       rows from the journal, its video rendered after the graded one's): the no-reset view, for people;
+                       final.json's first_success / first_reason say how it ended (a success ends the trial, so
+                       first_success is the graded success when no reset was made, else 0)
 
 The verdict is the live episode's (docs/protocol/README.md H.4; owner, 2026-10-17): success = the episode this
 service ran ended in success under the task's rule (the adapter's step()), judged here, after the agent's container is
@@ -144,7 +148,8 @@ RESERVED = frozenset({"protocol", "success", "live_success", "done", "reason", "
                       "control_steps_total", "episodes", "resets", "reset_budget", "elapsed_s", "sim_startups",
                       "finalized", "n_actions", "graded_by", "replays", "state_sha", "video", "video_pending",
                       "video_source", "live_rule", "live_verdict_error", "finalize_error", "infra_error",
-                      "instance_mismatch", "ev", "ts", "deterministic", "replay_success", "live_sha"})
+                      "instance_mismatch", "ev", "ts", "deterministic", "replay_success", "live_sha", "first_success",
+                      "first_reason", "first_n_actions", "first_video"})
 
 
 def json_safe(d: dict) -> dict:
@@ -461,6 +466,9 @@ class Service:
             d["infra_error"] = 1
         if not self.ep_start_ok:                        # the graded episode began off the frozen instance (a reset)
             d.update(success=False, instance_mismatch=True, infra_error=1)
+        # The first attempt: a success ends the trial, so it succeeded only when it is the graded episode
+        d["first_success"] = bool(d["success"]) if self.resets == 0 else False
+        d.setdefault("first_reason", self.reason if self.resets == 0 else None)
         write_json_atomic(os.path.join(self.data, "final.json"), d)
 
     def _save_call(self, meta: dict, actions: np.ndarray | None) -> None:
@@ -861,6 +869,23 @@ class Service:
                 self._end("timeout")
             self._finalize()
 
+    def _first_episode(self) -> tuple[dict, np.ndarray | None]:
+        """With resets, the trial's first episode: how it ended (the last "end" of episode 1 in the log; a reset lost
+        with its call did not end it) and its rows (the journal up to the first reset's ep_start). Without: nothing."""
+        if self.resets == 0:
+            return {}, None
+        ev = self._events()
+        end = [e for e in ev if e["ev"] == "end" and int(e.get("resets", 0)) == 0]
+        cut = next((int(e["ep_start"]) for e in ev if e["ev"] == "reset" and int(e.get("resets", 0)) == 1
+                    and "ep_start" in e), None)
+        info = {"first_reason": end[-1].get("reason") if end else None}
+        if not cut:
+            return info, None
+        rows = np.fromfile(self.journal_path, dtype=np.float64, count=cut * int(self.sim.raw_dim))
+        if rows.size != cut * int(self.sim.raw_dim):
+            return info, None
+        return {**info, "first_n_actions": cut}, rows.reshape(cut, -1)
+
     def _finalize(self) -> None:
         """The verdict: the live episode's (docs/protocol/README.md H.4). The graded episode (every control step since the last
         reset) is saved as the trajectory, the deliverable that stays replayable, and the success is the one the live
@@ -868,7 +893,7 @@ class Service:
         written ("finalized": true). Nothing is replayed to grade it. Then a video for humans, rendered from the
         trajectory, which can no longer change or void the verdict: while it renders final.json says
         "video_pending": true (the collect hook waits for it as long as its time allows)."""
-        rows = None
+        rows = first_rows = None
         try:
             rows = np.asarray(self.episode, dtype=np.float64).reshape(-1, self.sim.raw_dim)
             try:
@@ -881,6 +906,20 @@ class Service:
                                       "episode": self.resets + 1})
             verdict = {"n_actions": int(len(rows)), "graded_by": "live", "replays": 0, "state_sha": live_sha,
                        "video": False, "video_source": "render"}
+            first_rows = None
+            try:                                     # the first episode is evidence only: it never decides anything
+                first, first_rows = self._first_episode()
+                verdict.update(first)
+                if first_rows is not None:
+                    self.sim.save_trajectory(first_rows, os.path.join(self.data, "trajectory.first.npz"),
+                                             {"source": "standard-mode episode (the first; not graded)",
+                                              "protocol": PROTOCOL, "reason": str(first.get("first_reason")),
+                                              "episode": 1})
+                    verdict["first_video"] = False
+            except Exception as exc:  # noqa: BLE001
+                traceback.print_exc()
+                self.log("first_episode_error", error=repr(exc)[:500])
+                first_rows = None
             judge = getattr(self.sim, "live_verdict", None)
             if callable(judge):
                 # the benchmark's own record of the live episode, judged on the live simulator (e.g. a settle window):
@@ -918,6 +957,13 @@ class Service:
         except Exception as exc:  # noqa: BLE001 -- the video is for humans; it never decides the verdict
             traceback.print_exc()
             self.log("video_error", error=repr(exc)[:500])
+        if first_rows is not None:
+            try:
+                self.sim.render_video(first_rows, os.path.join(self.data, "replay.first.mp4"))
+                self.verdict["first_video"] = True
+            except Exception as exc:  # noqa: BLE001
+                traceback.print_exc()
+                self.log("first_video_error", error=repr(exc)[:500])
         self.verdict["video_pending"] = False
         try:
             self._write_final()

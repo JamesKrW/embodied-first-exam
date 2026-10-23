@@ -3,7 +3,7 @@
 #  1. Standard library only: the runner's helpers (scripts/tests/), the usage gateway's raw log and budget stop, the
 #     runner's lane stop and infra rules (account_failure_check.py --selftest).
 #  2. numpy + requests (no simulator, no image, no GPU): the eai-standard/2.2 and 2.4 layers' selftests on a stub
-#     simulator (embodied_first_exam/standard/). Run when both modules can be imported, skipped with a note otherwise;
+#     simulator (embodied_first_exam/standard/), and the 2.1 service's first-attempt record on a toy simulator (v2_1/). Run when both modules can be imported, skipped with a note otherwise;
 #     `--all` makes a missing module a failure.
 # A benchmark's own tests live with its tasks (their tests/), not here. The resource monitor's tests are run by
 # check-monitor.py.
@@ -39,7 +39,8 @@ done
 run 120 scripts/account_failure_check.py --selftest
 if python3 -c "import numpy, requests" 2>/dev/null; then
   export PATH="$(dirname "$(command -v python3)"):$PATH"   # run.sh starts `python`: the same interpreter
-  for t in embodied_first_exam/standard/selftest.py embodied_first_exam/standard/v2_4/selftest.py; do run 900 "$t"; done
+  for t in embodied_first_exam/standard/selftest.py embodied_first_exam/standard/v2_4/selftest.py \
+           embodied_first_exam/standard/v2_1/selftest.py; do run 900 "$t"; done
 elif [ $all -eq 1 ]; then
   echo "FAIL check-unit-tests.sh --all: numpy and requests are needed for the second tier (pip install numpy requests)"; rc=1
 else
