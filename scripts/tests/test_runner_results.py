@@ -147,7 +147,7 @@ def test_config_and_attempts():
         write(jobs, "a", out)
         res = out / TASK / "codex-x-high"
         cfg = json.loads((res / "config.json").read_text())
-        for k, v in {"protocol_version": "2.0", "mode": "standard", "network": "allowlist", "validated": True, "result": "success",
+        for k, v in {"protocol_version": tc.PROTOCOL_VERSION, "mode": "standard", "network": "allowlist", "validated": True, "result": "success",
                      "counted": True, "attempts": 2, "attempts_over_cap": False, "seed_source": "default", "digest_match": True,
                      "trial": f"{TASK}__t2"}.items():
             check(cfg.get(k) == v, f"config.json {k} = {cfg.get(k)!r}, want {v!r}")
@@ -155,7 +155,7 @@ def test_config_and_attempts():
             check(k in cfg, f"config.json has no {k}")
         att = json.loads((res / "attempts.json").read_text())["attempts"]
         check([a["counted"] for a in att] == [False, True], f"attempts.json: the infra attempt is counted: {att}")
-        check("| configuration | protocol 2.0, standard" in (res / "README.md").read_text(), "README has no configuration row")
+        check(f"| configuration | protocol {tc.PROTOCOL_VERSION}, standard" in (res / "README.md").read_text(), "README has no configuration row")
         # a later infrastructure failure of the same task x run id never replaces the counted result, and a third attempt is flagged
         make_trial(jobs, "b", "t3", TASK, "2026-10-14T03:00:00Z", infra, {"task_checksum": dg})
         r = write(jobs, "b", out)
@@ -259,7 +259,7 @@ def test_summary_grouping():
                            env={**os.environ, "RCB_CORE_SET_FILE": str(td / "core_set.toml")})
         check(r.returncode == 0, f"summary failed: {r.stderr[-800:]}")
         out = r.stdout
-        check("## Unvalidated" not in out and out.count("\n## protocol 2.0, ") == 3, f"not one table per configuration:\n{out}")
+        check("## Unvalidated" not in out and out.count(f"\n## protocol {tc.PROTOCOL_VERSION}, ") == 3, f"not one table per configuration:\n{out}")
         rt = out[out.index("standard-realtime, "):]
         check(f"| {UNVALIDATED} (unvalidated) |" in rt and f"| {VALIDATED_RT} |" in rt,
               f"the unvalidated task is not ranked (marked) with the validated one of its configuration:\n{out}")
