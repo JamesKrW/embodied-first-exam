@@ -137,13 +137,13 @@ Codex session (`agent/sessions/`). Run Codex with `--ak reasoning_summary=detail
   `artifacts/data/` or `artifacts/out/` is flagged by the runner (`no_video`, with the reason it can read), unless it
   is a privileged trial whose agent submitted no trajectory that replays. A video a trial missed (the render ran out of
   its time bound, crashed, or the task rendered none) is rendered afterwards from the recorded trajectory in the
-  task's own image, on the same host class when the replay is only reproducible there, and kept only when the replay
-  reaches the recorded final state; `replay.regenerated.json` next to it says how. The grade is never touched, and
+  task's own image, only where a post-hoc replay is allowed (PROTOCOL §4), on the same host class when the replay is
+  only reproducible there, and kept only when the replay reaches the recorded final state; `replay.regenerated.json` next to it says how. The grade is never touched, and
   the agent is never rerun for a video.
-- **Standard modes:** no replay grades the episode (PROTOCOL H.4), so the video is what the sidecar recorded during the
-  live episode where that is cheap, or one render of the recorded trajectory after the verdict (each benchmark's doc
-  says which, and what it costs). Either way the verdict is on disk first (`final.json` `finalized`; `video_pending`
-  while the render runs) and `final.json` says `video_source` (`live` / `render`).
+- **Standard modes:** no replay grades the episode (PROTOCOL H.4). The video is a live recording, or a post-hoc replay
+  where the benchmark declares its simulator verified bit-wise replayable (PROTOCOL §4). Either way the verdict is on
+  disk first (`final.json` `finalized`; `video_pending` while the video is made) and `final.json` says `video_source`
+  (`live` / `render`). Published videos follow the same rule and keep the label.
 - **Standard mode (RoboTwin):** the sim service records `live.mp4` (six views, frames only while physics runs and something moves,
   each stamped with the agent's call and wall/sim time; rendered from the trajectory after the verdict, in the same pass
   as `replay.mp4`, so it costs the agent nothing; `RCB_LIVE=realtime` captures during the episode instead), the exact actions of every call,
