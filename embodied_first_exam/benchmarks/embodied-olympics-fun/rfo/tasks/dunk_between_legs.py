@@ -331,7 +331,9 @@ class Task(TaskBase):
         "during its own jump, the ball's centre reached 2.56 m in searched open-loop jumps, above the 2.53 m of the "
         "ring plus the ball's radius plus 0.02 m of entry, but none brought it nearer than 0.24 m to the ring's "
         "axis while high enough to pass over the rim, even with the ring lowered to 2.23 m and the start 0.45 to "
-        "0.75 m from it: the dunk is beyond the reach of these jumps); the "
+        "0.75 m from it; an agent's own-motor two-hand dunk at this height is recorded (the `dunk` family: the ball "
+        "pinched between the two thumbs, the ball's centre at 2.56 m), so the ring is at the edge of the robot's "
+        "reach, and the pass between the legs is the harder part); the "
         "full-size backboard keeps its size and its height relative to the ring (lower edge {board_bottom_m} m). "
         "The ball stays the size-7 ball.",
         "Art. 3 (equipment, the hands): the hands are the H1-2's own Inspire five-finger hands (six drives: four "
