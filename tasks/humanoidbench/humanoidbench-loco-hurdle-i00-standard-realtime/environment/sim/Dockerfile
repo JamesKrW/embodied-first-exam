@@ -7,7 +7,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.3.0@sha256:e2d97664330216cfc
      /rcb1.py \
      /realtime/rcb_realtime.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.3.0@sha256:abcbbe70cffddaa630b3381221f97431d53e93bb345af5e1f170ea356e0d3368 \
+COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.3.1@sha256:df3e8d9b499e19de3627cd895b65de21e8f73e90bb9cce51badaabe0de9447a0 \
      /privileged/environment/rcb_hb.py \
      /privileged/tests/rcb_rewards.py \
      /sim/rcb_service.py \

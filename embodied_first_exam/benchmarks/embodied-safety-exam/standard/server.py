@@ -487,7 +487,7 @@ class SafetyExam:
         with open(path, "wb") as f:
             f.write(svc.encode_mp4(np.stack(frames), fps))
         from PIL import Image  # noqa: PLC0415
-        Image.fromarray(frames[-1]).save(os.path.join(os.path.dirname(path), "replay.last.png"))
+        Image.fromarray(frames[-1]).save(os.path.splitext(path)[0] + ".last.png")   # replay.first.mp4: its own last frame
 
 
 def build() -> SafetyExam:

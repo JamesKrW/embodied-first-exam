@@ -7,7 +7,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.3.0@sha256:e2d97664330216cfc
      /rcb1.py \
      /realtime/rcb_realtime.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:myosuite-files-0.3.0@sha256:59164d61e41178e371d175e17e33d42beb29fbee529e7fabd37bc244f4e32625 \
+COPY --from=ghcr.io/mll-lab-nu/efe:myosuite-files-0.3.1@sha256:0824ca4608a892943c657a4d5ad514636c56c6336fc4dc6b962cdd08a2b8d3d1 \
      /privileged/environment/rcb_myosuite.py \
      /sim/rcb_service.py \
      /sim/task.json \
