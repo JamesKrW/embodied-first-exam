@@ -29,7 +29,7 @@ class Task(TaskBase):
                 "3 and Appendix I: size, mass, rebound)")
     deviations = [
         "The hands: the H1-2's own Inspire five-finger hands at the device's forces (six drives: four fingers, the "
-        "thumb's flexion and rotation; fingertip forces 10 N, the thumb 15 N; the fingers close at most 260 deg/s, "
+        "thumb's flexion and rotation; fingertip forces 20 N, the thumb 30 N; the fingers close at most 260 deg/s, "
         "the thumb 70 deg/s), each closed by one command (the synergy: every drive towards its closed position); "
         "they hold the ball by contact and friction only, and it can slip, turn and drop.",
         "The throw and the catch: the ball is released when it has touched no part of you for {release_s} s (at its "

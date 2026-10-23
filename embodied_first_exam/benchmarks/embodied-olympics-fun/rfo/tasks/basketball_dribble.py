@@ -272,7 +272,7 @@ class Task(TaskBase):
                 "is in the frontcourt)")
     deviations = [
         "the player's hands: the H1-2's own Inspire five-finger hands (six drives each: four fingers, the thumb's "
-        "flexion and rotation; fingertip forces 10 N, the thumb 15 N), each closed by one command; the ball is held "
+        "flexion and rotation; fingertip forces 20 N, the thumb 30 N), each closed by one command; the ball is held "
         "in the two hands by contact and friction alone (nothing is welded) and can slip or drop; it has left your "
         "hands when no hand has been on it for {touch_gap_s} s. The fingers' rubber pads absorb the ball (critically "
         "damped), so a dribbling hand gives the ball its speed by its own motion; the floor keeps the ball's "

@@ -25,7 +25,7 @@ Where the numbers come from:
   dwell on a 40 mm collision slab whose restitution on a racket fixed in space is 0.85 from 5 to 50 m/s (measured,
   the table in the racket block), friction 0.4 (tn.py's; tn.py's RACKET_GAIN = 5 is not used); the frame is solid;
 * the hands: the H1-2's Inspire RH56DFX hands (rfo.realhand, real_hands = "inspire"), at the device's forces
-  (fingertip 10 N, the thumb 15 N; self-locking to 8 kg per finger): the racket's handle lies across the right
+  (fingertip 20 N, the thumb 30 N; self-locking to 8 kg per finger): the racket's handle lies across the right
   palm (its axis along the hand's grasp frame), the butt just beyond the little finger;
 * the service rules: Rule 16 (at rest behind the baseline, release by hand, strike before the ball lands), Rule 17
   (from the right half into the diagonally opposite box), Rule 18 (foot faults), Rule 19 (faults), Rule 22 (the let),
@@ -343,7 +343,7 @@ class Task(TaskBase):
         "was when it reached the racket; and the ball may move at most {toss_max_speed_m_s} m/s when it reaches the "
         "racket (the speed of a ball that has fallen about 1.3 m: a toss, not a throw)",
         "the player's hands: the H1-2's own Inspire five-finger hands (six drives: four fingers, the thumb's "
-        "flexion and rotation; fingertip forces 10 N, the thumb 15 N), closed by one command per hand; they hold "
+        "flexion and rotation; fingertip forces 20 N, the thumb 30 N), closed by one command per hand; they hold "
         "the racket and the ball by contact and friction only",
         "Rule 24 i (the racket held): made measurable: the racket is held while its handle touches your right "
         "hand's fingers and its thumb or palm; it must not go unheld for more than {racket_gap_s} s at any time of "

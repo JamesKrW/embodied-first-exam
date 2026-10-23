@@ -93,8 +93,8 @@ class Task(TaskBase):
         "3.3 (what the maker does not give): the bar's {bar_mass_kg} kg are split {shaft_mass_kg} kg for the shaft "
         "and the rest between the two revolving sleeves with their inner collars (0.08 m across, 0.03 m wide); "
         "these are estimates",
-        "3.3 (the grip): each hand is the H1-2's own Inspire five-finger hand (six self-locking drives; 10 N at each "
-        "fingertip, 15 N at the thumb), open at the start; it holds the bar by its fingers' and palm's contact and "
+        "3.3 (the grip): each hand is the H1-2's own Inspire five-finger hand (six self-locking drives; 20 N at each "
+        "fingertip, 30 N at the thumb), open at the start; it holds the bar by its fingers' and palm's contact and "
         "friction alone (nothing is welded; no chalk, no hook grip with the thumb under the fingers), and the bar "
         "can slip, turn in the hand and drop. A hand holds the bar while the grip section touches that hand's "
         "fingers (closed round it; a break of up to {off_bar_s} s, the contact flickering under a load, is not "

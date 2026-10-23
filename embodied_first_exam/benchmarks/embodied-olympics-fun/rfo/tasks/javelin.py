@@ -165,8 +165,8 @@ class Task(TaskBase):
                 "its grip)")
     deviations = [
         "TR 38.1(a) (\"the javelin shall be held at the grip with one hand\"): the hand is the H1-2's own Inspire "
-        "five-finger hand (six drives: four fingers, the thumb's flexion and rotation; fingertip forces 10 N, the "
-        "thumb 15 N, at {grip_scale} times the device's forces; one closure command for the whole hand); the cord "
+        "five-finger hand (six drives: four fingers, the thumb's flexion and rotation; fingertip forces 20 N, the "
+        "thumb 30 N, at {grip_scale} times the device's forces; one closure command for the whole hand); the cord "
         "lies across its palm and is held by its fingers' and thumb's contact and friction only. Held means the cord "
         "touching the hand's fingers and its thumb or palm; the hold may break for at most {grip_gap_s} s (contacts "
         "flicker); the release is the javelin's last contact with any part of you once the hold has ended, when it "
