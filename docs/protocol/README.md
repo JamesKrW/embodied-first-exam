@@ -1,4 +1,4 @@
-# Embodied First Exam — Task Protocol v2.0
+# Embodied First Exam — Task Protocol v2.1
 
 This is the task protocol of Embodied First Exam (EFE; [repository](https://github.com/mll-lab-nu/embodied-first-exam),
 [site](https://www.embodied-first-exam.ai), [how to contribute](https://www.embodied-first-exam.ai/contribute/)). It is
@@ -123,7 +123,8 @@ off by default). Derivation, enforcement and the reward fields: running.md "Reso
 
 ## 7. Versions
 
-This text is **v2.0**. The wire protocol's versions:
+This text is **v2.1**; like the wire protocol's, its minor versions only add (a recommended field, evidence), and a
+result records the version it was run under (`protocol_version`, running.md "Results"). The wire protocol's versions:
 `eai-standard/2.1` (the base: `/spec`, `/status`, `/observe`, `/submit`, RCB1 frames), 2.2 (depth, kinematics, per-call
 bounds; shared layer `embodied_first_exam/standard/`), 2.3 (2.2 + realtime), 2.4 (2.3 + operation ids and deadlines; layer
 `embodied_first_exam/standard/v2_4/`). Minor versions only add; `/spec.protocol` equals `metadata.protocol`. A protocol change is
