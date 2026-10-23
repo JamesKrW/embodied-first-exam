@@ -68,6 +68,8 @@ UNITS: dict[str, list[str]] = {
     "Embodied Olympics - Match": ["images/olympiad/", "images/embodied-olympics-match-files/"],   # the olympiad image: built from Embodied Olympics' tree, not here
     "BiGym 2.0": _own("bigym2"),
     "YAMLab": _own("yamlab"),
+    "LabUtopia": _own("labutopia"),
+    "AutoBio": _own("autobio"),
     "RoboDojo": _own("robodojo"),
     "Panda Dynamic Scenes": _own("pandadyn"),
     "AM-Bench": _own("ambench"),

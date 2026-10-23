@@ -94,6 +94,8 @@ BENCHMARKS = [  # (directory prefix, label)
     ("ispatialgym-", "iSpatialGym"),
     ("ikea-", "IKEA MuJoCo"),
     ("roboengineer-", "roboEngineer"),   # its own multi-round runtime eai-policy/1.x (ci_checks/benchmarks/roboengineer/exported.toml)
+    ("labutopia-", "LabUtopia"),
+    ("autobio-", "AutoBio"),
 ]
 # Modes (PROTOCOL §3, owner 2026-10-14): a benchmark ships any subset of the modes. A standard or standard-realtime
 # task without a privileged twin says why in its README's Twin row ("— (none: ...)"), the task's own declaration:
@@ -276,7 +278,7 @@ BENCHMARK_DIRS = {
     "LIBERO-MAX": "libero-max", "RoboARC": "roboarc", "BiGym 2.0": "bigym2", "YAMLab": "yamlab", "RoboDojo": "robodojo",
     "Embodied Olympics - Fun": "embodied-olympics-fun", "Embodied Olympics - Match": "embodied-olympics-match", "Embodied Safety Exam": "embodied-safety-exam",
     "Panda Dynamic Scenes": "pandadyn", "AM-Bench": "ambench", "iSpatialGym": "ispatialgym", "IKEA MuJoCo": "ikea-mujoco",
-    "roboEngineer": "roboengineer",
+    "roboEngineer": "roboengineer", "LabUtopia": "labutopia", "AutoBio": "autobio",
 }
 
 
@@ -1454,6 +1456,10 @@ BEFORE_YOU_RUN = {
                  "dataset (accept its terms, `hf auth login`) or with your own BlenderKit Full Plan key.", ""),
     "VLABench": ("What you need before running", "", "Builds its image (CPU only): 5-20 min, 40 GB free disk."),
     "YAMLab": ("Before you run", "", f"Builds its image ({ISAAC}): about 25 min, 60 GB free disk."),
+    "LabUtopia": ("Before you run", "",
+                  f"Builds its image ({ISAAC}; LabUtopia's assets are CC BY-NC 4.0): about 25 min, 90 GB free disk."),
+    "AutoBio": ("Before you run", "",
+                "Builds its image from AutoBio's repository, which states no licence (CPU only): a few minutes, 3 GB free disk."),
 }
 # Benchmarks whose README asks for RT cores although their tasks declare gpu_class "any" (RoboARC: its renderer Nyx).
 RT_CORES_BY_README = {"RoboARC"}

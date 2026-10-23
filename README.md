@@ -44,7 +44,7 @@ In every task, a coding agent writes code, runs it on a robot in a frozen scene 
 ### Before you run
 
 - **Host:** Linux x86_64 with git, [uv](https://docs.astral.sh/uv/) (it fetches a Python 3.12-3.14 for Harbor if needed) and Docker Engine with Compose v2 and BuildKit (the `buildx` plugin). Without Docker, e.g. on a Slurm cluster: rootless podman with `-e podman` ([docs/protocol/running.md](docs/protocol/running.md#without-docker-rootless-podman-eg-a-slurm-cluster)).
-- **GPU:** the NVIDIA driver and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for every task that uses a GPU. An RTX-class GPU (with RT cores; not A100 or H100): AM-Bench, BEHAVIOR-1K, iSpatialGym, ManiGuard, RoboARC, RoboDojo, RoboLab, YAMLab. Any NVIDIA GPU: BiGym 2.0, DexToolBench, MolmoSpaces, Panda Dynamic Scenes, RoboPaint, RoboTwin 2.0, RoboWits. Some tasks: Embodied Olympics - Fun, Embodied Olympics - Match, HumanoidBench, IKEA MuJoCo, KinDER, MuJoCo Playground, MyoSuite, roboEngineer. No GPU: DexHand, DexJoCo, Embodied Safety Exam, LIBERO-MAX, MetaWorld+, RoboCasa, RoboCasa-GR1, RoboCasa365, VLABench.
+- **GPU:** the NVIDIA driver and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for every task that uses a GPU. An RTX-class GPU (with RT cores; not A100 or H100): AM-Bench, BEHAVIOR-1K, iSpatialGym, LabUtopia, ManiGuard, RoboARC, RoboDojo, RoboLab, YAMLab. Any NVIDIA GPU: BiGym 2.0, DexToolBench, MolmoSpaces, Panda Dynamic Scenes, RoboPaint, RoboTwin 2.0, RoboWits. Some tasks: Embodied Olympics - Fun, Embodied Olympics - Match, HumanoidBench, IKEA MuJoCo, KinDER, MuJoCo Playground, MyoSuite, roboEngineer. No GPU: AutoBio, DexHand, DexJoCo, Embodied Safety Exam, LIBERO-MAX, MetaWorld+, RoboCasa, RoboCasa-GR1, RoboCasa365, VLABench.
 - **Disk:** a benchmark's public images take 1-30 GB, pulled on its first run; a benchmark that builds its image needs the free disk its row below states.
 - **API keys** for the agent's model in `.env` (step 1), or a subscription (step 3).
 
@@ -53,8 +53,10 @@ These benchmarks need a step by hand, or build their image on their first run be
 | Benchmark | By hand, once | First run |
 |---|---|---|
 | [AM-Bench](tasks/ambench/README.md#before-you-run) | - | Builds its image (accepts NVIDIA's Isaac Sim terms): about 25 min, 60 GB free disk. |
+| [AutoBio](tasks/autobio/README.md#before-you-run) | - | Builds its image from AutoBio's repository, which states no licence (CPU only): a few minutes, 3 GB free disk. |
 | [BEHAVIOR-1K](tasks/behavior-1k/README.md#before-you-run) | Download the BEHAVIOR dataset (its downloader asks you to accept the BEHAVIOR Data Bundle licence; about 32 GB, 40 GB on disk) and export `RCB_BEHAVIOR_DATA`. | Builds its image (accepts NVIDIA's Isaac Sim terms): about 20 min, 30 GB free disk. |
 | [iSpatialGym](tasks/ispatialgym/README.md#before-you-run) | The BEHAVIOR-1K dataset, `RCB_BEHAVIOR_DATA` (the same directory). | Builds its image (accepts NVIDIA's Isaac Sim terms): about 20 min, 31 GB free disk. |
+| [LabUtopia](tasks/labutopia/README.md#before-you-run) | - | Builds its image (accepts NVIDIA's Isaac Sim terms; LabUtopia's assets are CC BY-NC 4.0): about 25 min, 90 GB free disk. |
 | [LIBERO-MAX](tasks/libero-max/README.md#task-definition) | A CPU with AVX-512 (Intel Ice Lake or newer Xeon, AMD Zen 4 or newer). | - |
 | [ManiGuard](tasks/maniguard/README.md#before-you-run) | Prepare the data root `RCB_MANIGUARD_DATA` (3.4 GB; its key asks you to accept the BEHAVIOR Data Bundle licence). NVIDIA driver 580.x: newer drivers crashed at start. | Builds its image (accepts NVIDIA's Isaac Sim terms): about 20 min, 50 GB free disk. |
 | [RoboARC](images/roboarc/README.md#host) | NVIDIA driver 580 or newer, one GPU per container; knot_untying and rope_threading need a 24 GB GPU of their own. | - |
@@ -95,7 +97,7 @@ harbor run -d embodied-first-exam --privileged -a codex -m openai/gpt-6-astra
 ```
 
 ```bash
-# every task: 2128 task dirs (1090 tasks in their modes, 32 benchmarks)
+# every task: 2164 task dirs (1108 tasks in their modes, 34 benchmarks)
 harbor run -d embodied-first-exam@all -a codex -m openai/gpt-6-astra
 ```
 
@@ -155,6 +157,8 @@ Nine of the suites were written for this exam. The others are adapted from exist
 - **[AM-Bench](https://ambench.github.io/)**: AM-Bench: A Modular Simulation Suite and Benchmark for Aerial Manipulation Policy Learning ([paper](https://arxiv.org/abs/2609.00641), [code](https://github.com/ambench/ambench))
 - **[RoboWits](https://umass-embodied-agi.github.io/RoboWits/)**: RoboWits: Unexpected Challenges for Robotic Creative Problem Solving ([paper](https://arxiv.org/abs/2605.30326), [code](https://github.com/UMass-Embodied-AGI/RoboWits))
 - **[ManiGuard](https://nu-ideas-lab.github.io/ManiGuard/)**: MANIGUARD: A Benchmark and Data Suite for Specification-Grounded Safety Evaluation and Improvement of Robotic Manipulation ([paper](https://arxiv.org/abs/2608.17386), [code](https://github.com/NU-IDEAS-Lab/ManiGuard))
+- **[LabUtopia](https://rui-li023.github.io/labutopia-site/)**: LabUtopia: High-Fidelity Simulation and Hierarchical Benchmark for Scientific Embodied Agents ([paper](https://arxiv.org/abs/2505.22634), [code](https://github.com/Rui-li023/LabUtopia))
+- **[AutoBio](https://github.com/autobio-bench/AutoBio)**: AutoBio: A Simulation and Benchmark for Robotic Automation in Digital Biology Laboratory ([paper](https://arxiv.org/abs/2505.14030), [code](https://github.com/autobio-bench/AutoBio))
 
 ## License
 

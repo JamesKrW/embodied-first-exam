@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared-source rules (PROTOCOL §2.1, D9: copies of shared sources are byte-identical). Two parts:
-# 1. BEHAVIOR-1K, RoboLab, RoboWits, ManiGuard, MolmoSpaces, MyoSuite, DexJoCo, DexHand, RoboARC, BiGym 2.0, YAMLab, RoboDojo, Panda Dynamic Scenes, AM-Bench and IKEA MuJoCo: within one benchmark, every mode, every copy of a shared file is byte-identical
+# 1. BEHAVIOR-1K, RoboLab, RoboWits, ManiGuard, MolmoSpaces, MyoSuite, DexJoCo, DexHand, RoboARC, BiGym 2.0, YAMLab, RoboDojo, Panda Dynamic Scenes, AM-Bench, IKEA MuJoCo, LabUtopia and AutoBio: within one benchmark, every mode, every copy of a shared file is byte-identical
 #    (one source per benchmark, copied unchanged):
 #    - the tooling module rcb_<sim>.py wherever it sits (privileged environment/ and tests/, standard environment/sim/);
 #    - the standard agent side environment/rcb_client.py + rcb1.py and the sim service environment/sim/ (server.py,
@@ -13,7 +13,7 @@
 #    A change to one of them is rolled out to every task of the benchmark at once. Same approach as ci_checks/benchmarks/robopaint/advisory-tooling.sh.
 #    Tasks the benchmark's own exporter wrote (task.toml [metadata] exporter: Embodied Olympics, PROTOCOL §4c) are a group of their own,
 #    one per exporter and [metadata] skill_in_loop.
-# 2. The eai-standard/2.2 layer (every task whose metadata.protocol is 2.2: BEHAVIOR, RoboLab, RoboWits, RoboPaint, MolmoSpaces, MyoSuite, DexJoCo, DexHand, YAMLab, RoboDojo; Panda Dynamic Scenes until 2026-10-17): the
+# 2. The eai-standard/2.2 layer (every task whose metadata.protocol is 2.2: BEHAVIOR, RoboLab, RoboWits, RoboPaint, MolmoSpaces, MyoSuite, DexJoCo, DexHand, YAMLab, RoboDojo, LabUtopia, AutoBio; Panda Dynamic Scenes until 2026-10-17): the
 #    agent's client environment/rcb_client.py + rcb1.py and the service's environment/sim/rcb_limited.py + rcb1.py +
 #    run.sh are byte-identical to their source in embodied_first_exam/standard/ (docs/protocol/standard_mode.md), and the sidecar is
 #    set up for crash recovery: `command: sh /srv/run.sh` (run.sh exits non-zero when the service crashes) and
@@ -44,6 +44,7 @@ sys.path.insert(0, os.path.join(ROOTD, "scripts")); import task_conventions as t
 MODULE = {"behavior": "rcb_behavior.py", "robolab": "rcb_robolab.py", "robowits": "rcb_robowits.py", "maniguard": "rcb_maniguard.py",
           "molmospaces": "rcb_molmospaces.py", "myosuite": "rcb_myosuite.py",
           "dexjoco": "rcb_dexjoco.py", "dexhand": "rcb_dexhand.py", "roboarc": "rcb_topogym.py", "bigym2": "rcb_bigym2.py", "yamlab": "rcb_yamlab.py", "robodojo": "rcb_robodojo.py",
+          "labutopia": "rcb_labutopia.py", "autobio": "rcb_autobio.py",
           "embodied-olympics": "rcb_rfo.py",
           "pandadyn": "rcb_pandadyn.py",
           "ambench": "rcb_ambench.py", "ispatialgym": "rcb_ispatialgym.py",

@@ -1030,6 +1030,88 @@ verifier_min_memory_gb = 20.0
 verifier_min_gpu_memory_gb = 8.0
 measured = "RTX 4090, 2026-10-14 (conformance run and oracle trials, nvidia-smi every 15 s): the sim sidecar runs the camera-free physics process (2.0 GiB of memory, 1.2 GiB of GPU memory with one environment's PhysX buffers; 2.65 GiB with Isaac Lab's) and the render worker (11.9 GiB, 3.4 GiB): 14 GiB and 4.6 GiB; the agent's container holds the client only; the collect hook replayed camera-free (1.2 GiB) and then filmed through the render worker (4.6 GiB) until 2026-10-17; since then it only films, through the render worker (4.6 GiB)"
 
+# autobio, privileged: 9 task(s)
+[[rule]]
+match = "^autobio-.*-privileged$"
+min_cpus = 4.0
+min_memory_gb = 8.0
+min_gpu_memory_gb = 0.0
+gpu_required = false
+gpu_class = "none"
+verifier_min_cpus = 4.0
+verifier_min_memory_gb = 8.0
+verifier_min_gpu_memory_gb = 0.0
+measured = "author (merged PR #94): CPU-only, 4 CPUs and 8 GB per trial, verifier the same"
+
+# autobio, standard: 9 task(s)
+[[rule]]
+match = "^autobio-.*-standard$"
+min_cpus = 4.0
+min_memory_gb = 8.0
+min_gpu_memory_gb = 0.0
+gpu_required = false
+gpu_class = "none"
+verifier_min_cpus = 4.0
+verifier_min_memory_gb = 8.0
+verifier_min_gpu_memory_gb = 0.0
+measured = "author (merged PR #94): CPU-only, 4 CPUs and 8 GB per trial, verifier the same"
+
+# labutopia, privileged: 6 task(s)
+[[rule]]
+match = "^labutopia-.*-privileged$"
+min_cpus = 8.0
+min_memory_gb = 23.0
+min_gpu_memory_gb = 8.5
+gpu_required = true
+gpu_class = "rtx"
+recommended_gpu = "RTX 4090 24GB / L40S 48GB"
+verifier_min_cpus = 8.0
+verifier_min_memory_gb = 21.0
+verifier_min_gpu_memory_gb = 8.5
+measured = "oracle checks on RTX 4090 (driver 580), lab_001 pick: rendering container peak 17 GB RAM, about 7 GB GPU, 8 CPUs (start-up bursts to 16 cores for about 70 s); author: lab_003 families 21 GB at the peak (8 vCPU host)"
+
+# labutopia, privileged: 3 task(s)
+[[rule]]
+match = "^(labutopia-heat-liquid-i00|labutopia-press-i00|labutopia-shake-i00)-privileged$"
+min_cpus = 8.0
+min_memory_gb = 28.0
+min_gpu_memory_gb = 8.5
+gpu_required = true
+gpu_class = "rtx"
+recommended_gpu = "RTX 4090 24GB / L40S 48GB"
+verifier_min_cpus = 8.0
+verifier_min_memory_gb = 26.0
+verifier_min_gpu_memory_gb = 8.5
+measured = "oracle checks on RTX 4090 (driver 580), lab_001 pick: rendering container peak 17 GB RAM, about 7 GB GPU, 8 CPUs (start-up bursts to 16 cores for about 70 s); author: lab_003 families 21 GB at the peak (8 vCPU host)"
+
+# labutopia, standard: 6 task(s)
+[[rule]]
+match = "^labutopia-.*-standard$"
+min_cpus = 8.0
+min_memory_gb = 23.0
+min_gpu_memory_gb = 8.5
+gpu_required = true
+gpu_class = "rtx"
+recommended_gpu = "RTX 4090 24GB / L40S 48GB"
+verifier_min_cpus = 8.0
+verifier_min_memory_gb = 22.0
+verifier_min_gpu_memory_gb = 8.5
+measured = "oracle checks on RTX 4090 (driver 580), lab_001 pick: rendering container peak 17 GB RAM, about 7 GB GPU, 8 CPUs (start-up bursts to 16 cores for about 70 s); author: lab_003 families 21 GB at the peak (8 vCPU host)"
+
+# labutopia, standard: 3 task(s)
+[[rule]]
+match = "^(labutopia-heat-liquid-i00|labutopia-press-i00|labutopia-shake-i00)-standard$"
+min_cpus = 8.0
+min_memory_gb = 28.0
+min_gpu_memory_gb = 8.5
+gpu_required = true
+gpu_class = "rtx"
+recommended_gpu = "RTX 4090 24GB / L40S 48GB"
+verifier_min_cpus = 8.0
+verifier_min_memory_gb = 27.0
+verifier_min_gpu_memory_gb = 8.5
+measured = "oracle checks on RTX 4090 (driver 580), lab_001 pick: rendering container peak 17 GB RAM, about 7 GB GPU, 8 CPUs (start-up bursts to 16 cores for about 70 s); author: lab_003 families 21 GB at the peak (8 vCPU host)"
+
 [[limit]]
 match = "^embodied-olympics-(fun|match)-.*-privileged$"
 scope = "trial"
@@ -2184,6 +2266,96 @@ trial_max_gpu_memory_gb = 16.0
 trial_max_memory_gb = 30.0
 measured = "the agent's container holds Python and the client only (as every standard task's); the whole trial adds the sim sidecar (physics + render worker, the rule's measurement): provisional"
 
+[[limit]]
+match = "^autobio-.*-privileged$"
+scope = "trial"
+max_gpu_memory_gb = 0.0
+max_memory_gb = 10.0
+max_processes = 512
+max_disk_gb = 10.0
+disk_paths = ["/app", "/tmp", "/root"]
+disk_exclude = []
+sustain_sec = 60.0
+window_sec = 120.0
+trial_max_gpu_memory_gb = 0.0
+trial_max_memory_gb = 10.0
+measured = "memory: the [environment] cap 8 GiB, which every past trial ran under (no samples); processes 512 and disk 10 GiB: design defaults, not yet measured"
+
+[[limit]]
+match = "^autobio-.*-standard$"
+scope = "agent"
+max_gpu_memory_gb = 0.0
+max_memory_gb = 8.0
+max_processes = 512
+max_disk_gb = 20.0
+disk_paths = ["/app", "/tmp", "/root"]
+disk_exclude = []
+sustain_sec = 60.0
+window_sec = 120.0
+trial_max_gpu_memory_gb = 0.0
+trial_max_memory_gb = 20.0
+measured = "memory: no samples of the agent's container; floor 8 GiB (at most the 8 GiB cap); whole trial: + the sim service's 12 GiB (from the minimum: no samples); processes 512 and disk 20 GiB: design defaults, not yet measured"
+
+[[limit]]
+match = "^labutopia-.*-privileged$"
+scope = "trial"
+max_gpu_memory_gb = 16.0
+max_memory_gb = 32.0
+max_processes = 512
+max_disk_gb = 20.0
+disk_paths = ["/app", "/tmp", "/root"]
+disk_exclude = []
+sustain_sec = 60.0
+window_sec = 120.0
+trial_max_gpu_memory_gb = 16.0
+trial_max_memory_gb = 32.0
+measured = "GPU: about 7 GiB, oracle on an RTX 4090 (author); no trial data -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: the [environment] cap 32 GiB, which every past trial ran under (no samples); processes 512 and disk 20 GiB: design defaults, not yet measured"
+
+[[limit]]
+match = "^(labutopia-heat-liquid-i00|labutopia-press-i00|labutopia-shake-i00)-privileged$"
+scope = "trial"
+max_gpu_memory_gb = 16.0
+max_memory_gb = 32.0
+max_processes = 512
+max_disk_gb = 20.0
+disk_paths = ["/app", "/tmp", "/root"]
+disk_exclude = []
+sustain_sec = 60.0
+window_sec = 120.0
+trial_max_gpu_memory_gb = 16.0
+trial_max_memory_gb = 32.0
+measured = "GPU: about 7 GiB, oracle on an RTX 4090 (author); no trial data -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: the [environment] cap 32 GiB, which every past trial ran under (no samples); processes 512 and disk 20 GiB: design defaults, not yet measured"
+
+[[limit]]
+match = "^labutopia-.*-standard$"
+scope = "agent"
+max_gpu_memory_gb = 0.0
+max_memory_gb = 8.0
+max_processes = 512
+max_disk_gb = 20.0
+disk_paths = ["/app", "/tmp", "/root"]
+disk_exclude = []
+sustain_sec = 60.0
+window_sec = 120.0
+trial_max_gpu_memory_gb = 16.0
+trial_max_memory_gb = 28.0
+measured = "GPU: about 7 GiB, oracle on an RTX 4090 (author); no trial data -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: no samples of the agent's container; floor 8 GiB (at most the 32 GiB cap); whole trial: + the sim service's 20 GiB (docker peak 12.7 GiB, 1 samples); processes 512 and disk 20 GiB: design defaults, not yet measured"
+
+[[limit]]
+match = "^(labutopia-heat-liquid-i00|labutopia-press-i00|labutopia-shake-i00)-standard$"
+scope = "agent"
+max_gpu_memory_gb = 0.0
+max_memory_gb = 8.0
+max_processes = 512
+max_disk_gb = 20.0
+disk_paths = ["/app", "/tmp", "/root"]
+disk_exclude = []
+sustain_sec = 60.0
+window_sec = 120.0
+trial_max_gpu_memory_gb = 16.0
+trial_max_memory_gb = 28.0
+measured = "GPU: about 7 GiB, oracle on an RTX 4090 (author); no trial data -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: no samples of the agent's container; floor 8 GiB (at most the 32 GiB cap); whole trial: + the sim service's 20 GiB (docker peak 12.7 GiB, 1 samples); processes 512 and disk 20 GiB: design defaults, not yet measured"
+
 [[cap]]
 match = "^behavior-.*-privileged$"
 main = { cpus = 8.0, memory_gb = 29.0, pids = 16384 }
@@ -2947,3 +3119,30 @@ measured = "the reference (4096 environments) peaked at 16.1 GiB of GPU memory a
 match = "^roboengineer-g1-.*-standard$"
 main = { cpus = 4.0, memory_gb = 12.0, pids = 8192 }
 sim = { cpus = 4.0, memory_gb = 6.0, pids = 8192 }
+
+[[cap]]
+match = "^autobio-.*-privileged$"
+main = { cpus = 4.0, memory_gb = 12.0, pids = 8192 }
+
+[[cap]]
+match = "^autobio-.*-standard$"
+main = { cpus = 4.0, memory_gb = 10.0, pids = 8192 }
+sim = { cpus = 8.0, memory_gb = 15.0, pids = 8192 }
+
+[[cap]]
+match = "^labutopia-.*-privileged$"
+main = { cpus = 8.0, memory_gb = 39.0, pids = 16384 }
+
+[[cap]]
+match = "^(labutopia-heat-liquid-i00|labutopia-press-i00|labutopia-shake-i00)-privileged$"
+main = { cpus = 8.0, memory_gb = 39.0, pids = 16384 }
+
+[[cap]]
+match = "^labutopia-.*-standard$"
+main = { cpus = 8.0, memory_gb = 32.0, pids = 16384 }
+sim = { cpus = 16.0, memory_gb = 24.0, pids = 16384 }
+
+[[cap]]
+match = "^(labutopia-heat-liquid-i00|labutopia-press-i00|labutopia-shake-i00)-standard$"
+main = { cpus = 8.0, memory_gb = 32.0, pids = 16384 }
+sim = { cpus = 16.0, memory_gb = 32.0, pids = 16384 }
