@@ -1429,7 +1429,7 @@ default_mode = "standard"
 
 [[task]]
 task = "embodied-olympics-fun-first-time-shot-i00"
-default_mode = "standard-realtime"
+default_mode = "standard"
 
 [[task]]
 task = "embodied-olympics-fun-free-kick-wall-i00"
@@ -1537,11 +1537,11 @@ default_mode = "standard"
 
 [[task]]
 task = "embodied-olympics-fun-sumo-i00"
-default_mode = "standard-realtime"
+default_mode = "standard"
 
 [[task]]
 task = "embodied-olympics-fun-sweeper-jump-i00"
-default_mode = "standard-realtime"
+default_mode = "standard"
 
 [[task]]
 task = "embodied-olympics-fun-table-tennis-return-i00"
