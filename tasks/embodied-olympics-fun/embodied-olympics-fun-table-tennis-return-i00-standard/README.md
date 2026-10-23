@@ -15,7 +15,7 @@
 Return the service: after the table tennis ball has bounced once on your court, strike it with the paddle held in your right hand so that it touches the opponent's court, without letting go of the paddle. (Embodied Olympics `table-tennis-return`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The served ball is over your court for a few tenths of a second, low above a table that is as high as your hips, and may have to be met far inside the end line: the blade, a rigid extension of a 0.5 m arm, has to be there at the right instant and angle while the body leans over the table without touching the net. The return must clear a 15 cm net and still come down on a court 1.37 m long, off a ball that carries spin. The paddle sits in a three-finger hand with small finger motors: the blade is where the fingers hold it, and a fast stroke must not fling it out of the hand. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The served ball is over your court for a few tenths of a second, low above a table that is as high as your hips, and may have to be met far inside the end line: the blade, a rigid extension of a 0.5 m arm, has to be there at the right instant and angle while the body leans over the table without touching the net. The return must clear a 15 cm net and still come down on a court 1.37 m long, off a ball that carries spin. The paddle sits in a three-finger hand with small finger motors: the blade is where the fingers hold it, and a fast stroke must not fling it out of the hand. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-table-tennis-return-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | bounce → strike → opponent's court |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 800 control steps (8 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 800 control steps (8 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

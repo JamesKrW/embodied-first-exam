@@ -15,7 +15,7 @@
 Serve: standing in your right service court, let the shuttle go from your left hand and hit it with the racket in your right hand, base first and below 1.15 m, over the net into the receiver's service court diagonally opposite. (Embodied Olympics `badminton-serve`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The shuttle must leave the strings at about 9 m/s or more, 40 to 55 degrees upwards, to clear a 1.52 m net 2 m away from a hit below 1.15 m, and the G1 meets it only in the lower part of a swing whose racket is held by friction in a three-finger hand; the left hand's reach and the racket's path barely overlap, and the shuttle falls through it in a few hundredths of a second. The swing must leave the feet where they stand and the robot on them, on a stand without balance feedback. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The shuttle must leave the strings at about 9 m/s or more, 40 to 55 degrees upwards, to clear a 1.52 m net 2 m away from a hit below 1.15 m, and the G1 meets it only in the lower part of a swing whose racket is held by friction in a three-finger hand; the left hand's reach and the racket's path barely overlap, and the shuttle falls through it in a few hundredths of a second. The swing must leave the feet where they stand and the robot on them, on a stand without balance feedback. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-badminton-serve-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | release → hit → over the net → in |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1500 control steps (15 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1500 control steps (15 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

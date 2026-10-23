@@ -15,7 +15,7 @@
 Ride the parallel slalom on your snowboard: one run down the course, the board and both feet through each of the 6 gates in order, then over the finish line. (Embodied Olympics `snowboard`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-A snowboard turns on its toe edge and its heel edge: the robot must tip the board by leaning forwards or back over it, its feet locked to one plank, with no walking policy; toe-side turns ask it to balance over the narrow board's front edge at speed, heel-side turns to sit back without falling. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+A snowboard turns on its toe edge and its heel edge: the robot must tip the board by leaning forwards or back over it, its feet locked to one plank, with no walking policy; toe-side turns ask it to balance over the narrow board's front edge at speed, heel-side turns to sit back without falling. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-snowboard-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | gate 1 → gate 2 → gate 3 → gate 4 → gate 5 → gate 6 → finish |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 6000 control steps (60 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 6000 control steps (60 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

@@ -15,7 +15,7 @@
 Do a handstand: from your stance get up onto your hands, hold the handstand still for 2 s with only your hands on the floor, then come back down onto your feet and stand. (Embodied Olympics `handstand`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-Your whole 33 kg rests on two small fists and arms whose shoulders give 25 N m: the body has to be balanced over a support a few centimetres long, actively, as an inverted pendulum, and no built-in action does that. Getting from standing onto the hands, and from the hands back onto the feet, are as hard as the hold. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+Your whole 33 kg rests on two small fists and arms whose shoulders give 25 N m: the body has to be balanced over a support a few centimetres long, actively, as an inverted pendulum, and no built-in action does that. Getting from standing onto the hands, and from the hands back onto the feet, are as hard as the hold. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-handstand-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | handstand → held 2 s → on the feet → stand |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 3000 control steps (30 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 3000 control steps (30 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

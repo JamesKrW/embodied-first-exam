@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-free-throw-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics free-throw on the same frozen instance as embodied-olympics-fun-free-throw-i00-privileged. Shoot a free throw: from behind the free-throw line, shoot the basketball you hold in your two hands so that it enters the basket from above. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics free-throw on the same frozen instance as embodied-olympics-fun-free-throw-i00-privileged. Shoot a free throw: from behind the free-throw line, shoot the basketball you hold in your two hands so that it enters the basket from above. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "free-throw"]
 
@@ -31,7 +31,7 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 50
+reset_budget = 5
 expert_time_estimate_hours = 10.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_free_throw.py: The H1-2's own Inspire hands at the core's default forces (20 N fingertips, 30 N thumb; grip factor 1), H2-class arms (no weld): the ball starts between the two palms, the fingers closed over it and the arms squeezing it (held 5 s at rest, the ball settling onto the thumbs and the palms' heels; one hand alone cannot hold the 0.24 m ball). Positive by a declared magic action: real hold, real opening of both hands with the arms moving out of the squeeze; injected at that step: the ball moved 0.15 m up and given the 58-degree shot's velocity (about 8 m/s) to the ring; the flight, the ring and the referee are real; the same state hash twice; a bank shot (injected) is also a goal. Negatives: nop (not released within 5 s), the hands opened (the ball drops to the floor), taken back after the release, the ball on the chest, walking onto the line, leaving the semi-circle, beyond the line while the ball drops in (and the same drop from behind the line is a goal), up through the ring from below, a fall. Stress: random arm targets with the ball held: it presses at most 0.4 mm into the hands.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"

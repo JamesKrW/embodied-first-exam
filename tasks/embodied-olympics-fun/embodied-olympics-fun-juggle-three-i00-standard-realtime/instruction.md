@@ -41,7 +41,7 @@ A referee in the service decides this from the simulator's state. The events tha
   Use your turns to start attempts, read what happened, and improve the program.
 - **Attempts.** `r.reset()` abandons the running attempt (or follows one that has ended) and starts a new one from the
   same start, paused until your next `submit`; `spec()["budget"]["reset"]` says how many resets you have
-  (10 here; authoritative: if it says 0, the one attempt is the run). Once an attempt has ended,
+  (5 here; authoritative: if it says 0, the one attempt is the run). Once an attempt has ended,
   `submit` raises `EpisodeOver` until you reset. **Only your last attempt is graded**, and a success ends the trial at
   once. The wall clock is the run's and never restarts.
 - **No privileged state.** You get what the robot's own sensors give: its two head cameras (`head_left`,

@@ -36,7 +36,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Attempts.** The first episode starts when the service comes up. `r.reset()` abandons the running attempt (or
   follows one that has ended) and starts a new one from the same start; `spec()["budget"]["reset"]` says how many
-  resets you have (50 here). **Only your last attempt is graded**, and a success ends the trial at once.
+  resets you have (5 here). **Only your last attempt is graded**, and a success ends the trial at once.
 - **Time moves only inside calls.** `submit` runs your rows and `get_obs(seconds=s)` holds the command in force for
   s seconds; both use up the attempt's time. Between calls the robot waits, frozen, while you think; `get_obs()` with
   no seconds is free.

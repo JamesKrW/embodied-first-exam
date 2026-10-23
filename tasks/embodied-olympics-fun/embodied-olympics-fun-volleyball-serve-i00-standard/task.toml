@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-volleyball-serve-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics volleyball-serve on the same frozen instance as embodied-olympics-fun-volleyball-serve-i00-privileged. Serve the volleyball: from behind the end line, toss it up off your open left palm and hit it with one hand or arm over the net into the opponent's court. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics volleyball-serve on the same frozen instance as embodied-olympics-fun-volleyball-serve-i00-privileged. Serve the volleyball: from behind the end line, toss it up off your open left palm and hit it with one hand or arm over the net into the opponent's court. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-h1-2", "humanoid", "standard-mode", "trajectory", "volleyball-serve"]
 
@@ -31,7 +31,7 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 50
+reset_budget = 5
 expert_time_estimate_hours = 8.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested by scripts/roboolympics/tests/test_volleyball_serve.py: Reference, re-found on the core with Unitree's actuator data (H2-class legs, rotor inertia, joint friction): a tiny toss off the open left palm by the arm's own movement (no pin, no launch); then the same arm swings up with the trunk's turn and strikes the ball 0.12 s after the toss with the upper arm and forearm (Rule 12.4.1 allows any part of the arm). Key times, arm keys and trunk lean come from CMA-ES, with a penalty for any arm passing more than 3 mm into the body. The ball comes in at 0.50 m/s and leaves at 11.4 m/s; it lands 11.6 m ahead (2.1 m beyond the net), 3.3 m right of the middle; success after 1.8 s. The deepest self-overlap is 2.8 mm (the left wrist into the trunk). 3 of 4 perturbations succeed (servo gains x0.97 / x1.03 and the keys after the strike 10 ms earlier pass; 10 ms later fails).; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"

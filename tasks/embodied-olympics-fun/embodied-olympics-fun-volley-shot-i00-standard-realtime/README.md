@@ -9,14 +9,14 @@
 | Family / instance | `volley_shot` / seed 0 |
 | Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_volley_shot.py: positive by injection (the robot teleported 0.3 m forward and the ball's velocity set at the foot contact, in 11.9, out 19.4 m/s, then into the goal); the cross comes from a football machine on the left wing (exit 14.2 m/s with backspin, apex 4.5 m) and comes down knee-high 0.6 m in front at 11.7 m/s; the keeper is the physical board of header; negatives: a still leg (at most 0.89 of the speed back), a body contact, carried, wide, at the keeper (saved), a second touch, too close to the machine, touching the machine, a goal without a volley, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 5 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
 Volley the cross: strike the football that is crossed to you from the wing with a foot before it touches the ground, into the official goal 11 m away, past the goalkeeper dummy. (Embodied Olympics `volley-shot`; the robot as a service on a clock that does not stop, slowdown S = 1: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The ball crosses the reach of a leg in a few hundredths of a second, at 11 m/s and at right angles to the goal: the foot has to meet it in the air with a swing of its own, fast enough that the ball leaves faster than it came, aimed 11 m into the goal and beside the dummy, by a 67 kg robot on one leg whose walking policy has no kick. The scene is dynamic (`scripts/task_dynamics.toml`: A ball machine on the wing fires the cross toward the robot at launch_time_s.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 10 resets (only the last attempt is graded).
+The ball crosses the reach of a leg in a few hundredths of a second, at 11 m/s and at right angles to the goal: the foot has to meet it in the air with a swing of its own, fast enough that the ball leaves faster than it came, aimed 11 m into the goal and beside the dummy, by a 67 kg robot on one leg whose walking policy has no kick. The scene is dynamic (`scripts/task_dynamics.toml`: A ball machine on the wing fires the cross toward the robot at launch_time_s.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-volley-shot-i00-privileged`).
@@ -53,5 +53,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Service | `environment/sim/rcb_realtime.py` (the shared realtime layer, eai-standard/2.3) with the standard twin's `server.py` on `rcb_service.py`, `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's); EGL rendering on the GPU |
 | Slowdown | S = 1 (`RCB_SLOWDOWN`'s default): RTF 3.19 with the clock flat out (RCB_SLOWDOWN = 0.01, physics only, 4 attempts; 4090-ws1, 4 CPUs, 2026-10-20); PROTOCOL §4b: S = 1 when RTF >= 3, else ceil(1.5 / RTF) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1000 control steps (10 s at 100 Hz); 10 resets, the last attempt graded |
+| Episode | 1000 control steps (10 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

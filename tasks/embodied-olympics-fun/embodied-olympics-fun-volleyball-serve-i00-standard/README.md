@@ -15,7 +15,7 @@
 Serve the volleyball: from behind the end line, toss it up off your open left palm and hit it with one hand or arm over the net into the opponent's court. (Embodied Olympics `volleyball-serve`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The ball has to leave the hit at about 11 m/s (10.8 m/s from 2.2 m up, 11.5 m/s underarm from 1 m) to clear a 2.43 m net 9 m away and still come down inside the far court: a fist at 6 to 7 m/s, about the most a full swing of this arm gives, through a ball the robot has tossed itself off a flat palm (straight up: a palm that moves sideways leaves the ball behind), at the right instant, on a 67 kg robot whose stand has no balance feedback. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The ball has to leave the hit at about 11 m/s (10.8 m/s from 2.2 m up, 11.5 m/s underarm from 1 m) to clear a 2.43 m net 9 m away and still come down inside the far court: a fist at 6 to 7 m/s, about the most a full swing of this arm gives, through a ball the robot has tossed itself off a flat palm (straight up: a palm that moves sideways leaves the ball behind), at the right instant, on a 67 kg robot whose stand has no balance feedback. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-volleyball-serve-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | toss → hit → over the net → in the court |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1200 control steps (12 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1200 control steps (12 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

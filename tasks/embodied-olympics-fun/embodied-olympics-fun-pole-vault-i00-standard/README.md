@@ -15,7 +15,7 @@
 Vault over the bar with the pole you carry: plant its tip in the box, leave the ground hanging on it, go over the bar between the uprights and come down on the mat, with the bar still on its pegs. (Embodied Olympics `pole-vault`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The bar is 1.0 m up and the robot 1.32 m tall: its whole body has to pass over it on a rigid pole that gives nothing back, from a run-up that the running policy makes at about 4 m/s, with arms whose motors give 25 N m, and three-finger hands that hold little along the pole: the plant's jolt slides the pole through the hands. Nothing built in grips, plants, swings or lets go. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The bar is 1.0 m up and the robot 1.32 m tall: its whole body has to pass over it on a rigid pole that gives nothing back, from a run-up that the running policy makes at about 4 m/s, with arms whose motors give 25 N m, and three-finger hands that hold little along the pole: the plant's jolt slides the pole through the hands. Nothing built in grips, plants, swings or lets go. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-pole-vault-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | plant → take-off → clearance → bar stays |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 6000 control steps (60 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 6000 control steps (60 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

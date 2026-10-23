@@ -15,7 +15,7 @@
 Head the cross: meet the football that is crossed to you from the wing with your head and send it into the official goal 5.5 m away, past the goalkeeper dummy. (Embodied Olympics `header`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The head has to be brought about half a metre forward into the path of a 12 m/s ball within a few centimetres and hundredths of a second, and driven into it (a step, a lunge of the trunk or a jump) so that the ball leaves faster than it came, turned through a right angle into the goal and beside the dummy; the shoulders are 25 cm from the head and must not touch. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The head has to be brought about half a metre forward into the path of a 12 m/s ball within a few centimetres and hundredths of a second, and driven into it (a step, a lunge of the trunk or a jump) so that the ball leaves faster than it came, turned through a right angle into the goal and beside the dummy; the shoulders are 25 cm from the head and must not touch. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-header-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | header → goal |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1000 control steps (10 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1000 control steps (10 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

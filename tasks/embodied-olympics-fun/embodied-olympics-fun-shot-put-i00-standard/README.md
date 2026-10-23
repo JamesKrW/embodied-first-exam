@@ -15,7 +15,7 @@
 Put the shot that rests on your open right palm at your neck, from the shoulder with that hand alone, so that it lands inside the sector at least 6.0 m from the circle, then leave the circle from its rear half and stand. (Embodied Olympics `shot-put`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The shot weighs 7.26 kg and rests on a flat palm without fingers: every move of the trunk or the arm that tilts the palm or accelerates the hand sideways rolls it off, and the H1-2's arm motors (40 N m at the shoulder, 18 N m at the elbow, soft servos) only just carry it, so the legs and the trunk have to drive the put while the palm stays under and behind the shot, inside a circle two steps wide. 6.0 m needs a release near 7 m/s at about 40 degrees. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The shot weighs 7.26 kg and rests on a flat palm without fingers: every move of the trunk or the arm that tilts the palm or accelerates the hand sideways rolls it off, and the H1-2's arm motors (40 N m at the shoulder, 18 N m at the elbow, soft servos) only just carry it, so the legs and the trunk have to drive the put while the palm stays under and behind the shot, inside a circle two steps wide. 6.0 m needs a release near 7 m/s at about 40 degrees. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-shot-put-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | release → landing → exit |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 6000 control steps (60 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 6000 control steps (60 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

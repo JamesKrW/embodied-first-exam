@@ -15,7 +15,7 @@
 Volley the cross: strike the football that is crossed to you from the wing with a foot before it touches the ground, into the official goal 11 m away, past the goalkeeper dummy. (Embodied Olympics `volley-shot`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The ball crosses the reach of a leg in a few hundredths of a second, at 11 m/s and at right angles to the goal: the foot has to meet it in the air with a swing of its own, fast enough that the ball leaves faster than it came, aimed 11 m into the goal and beside the dummy, by a 67 kg robot on one leg whose walking policy has no kick. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The ball crosses the reach of a leg in a few hundredths of a second, at 11 m/s and at right angles to the goal: the foot has to meet it in the air with a swing of its own, fast enough that the ball leaves faster than it came, aimed 11 m into the goal and beside the dummy, by a 67 kg robot on one leg whose walking policy has no kick. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-volley-shot-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | volley → goal |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1000 control steps (10 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1000 control steps (10 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

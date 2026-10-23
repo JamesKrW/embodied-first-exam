@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-ski-jumping-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics ski-jumping on the same frozen instance as embodied-olympics-fun-ski-jumping-i00-privileged. Jump the K 10 hill: ski down the in-run, take off from the table, land on your skis at or beyond the K-point (10.0 m) and ski through the transition past the fall line without falling. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics ski-jumping on the same frozen instance as embodied-olympics-fun-ski-jumping-i00-privileged. Jump the K 10 hill: ski down the in-run, take off from the table, land on your skis at or beyond the K-point (10.0 m) and ski through the transition past the fall line without falling. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "ski-jumping"]
 
@@ -31,7 +31,7 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 50
+reset_budget = 5
 expert_time_estimate_hours = 14.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_ski_jumping.py: positive by a real controller (an in-run crouch, extension 1.13 m before the edge, torso-pitch and ski-pitch control in the air, a landing posture; parameters from a search): 10.0 m (K = 10 m), 0.85 s in the air, past the fall line standing. It is fragile: 2 of 10 succeed with its parameters scaled by 0.98 to 1.02 (9.5-10.0 m every time; the failures come after the touchdown), so it is not shipped as a reference solution; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"

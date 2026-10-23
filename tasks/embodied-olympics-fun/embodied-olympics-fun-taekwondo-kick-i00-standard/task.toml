@@ -15,7 +15,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-taekwondo-kick-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics taekwondo-kick on the same frozen instance as embodied-olympics-fun-taekwondo-kick-i00-privileged. Kick the trunk protector of the dummy in front of you once with a foot, hard enough to score, then land and stand still for 2.0 s. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 50 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics taekwondo-kick on the same frozen instance as embodied-olympics-fun-taekwondo-kick-i00-privileged. Kick the trunk protector of the dummy in front of you once with a foot, hard enough to score, then land and stand still for 2.0 s. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "taekwondo-kick"]
 
@@ -31,7 +31,7 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.
 network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 50
+reset_budget = 5
 expert_time_estimate_hours = 14.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_taekwondo_kick.py: positive by a real front kick (lowcmd: 14.2 N s in 0.027 s on the protector, the threshold is 7.2 N s, peak 990 N) with an injected recovery (the robot put back at its start pose 0.25 s after the kick). No recovery was found: the robot falls within 0.6 s in every one of about 60 settings tried; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"

@@ -15,7 +15,7 @@
 Throw the javelin held by its cord in your right hand over the shoulder from behind the arc so that its head strikes the ground first, inside the sector, at least 20.0 m from the arc, then leave the runway behind the arc and stand. (Embodied Olympics `javelin`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-20.0 m asks for a release near 18 m/s at 25 to 30 degrees with the javelin pointing close enough to its flight that it comes down head first; the H1-2 has no running policy and its arm motors give 40 N m at the shoulder. Nothing holds the 2.21 m javelin but the fingers round its cord: a whip of the arm pulls it out across them (the finger drives give way at their self-locking limits), and the hand must let go of it at the right moment, above the shoulder, on a body that has to stay on its feet behind the arc. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+20.0 m asks for a release near 18 m/s at 25 to 30 degrees with the javelin pointing close enough to its flight that it comes down head first; the H1-2 has no running policy and its arm motors give 40 N m at the shoulder. Nothing holds the 2.21 m javelin but the fingers round its cord: a whip of the arm pulls it out across them (the finger drives give way at their self-locking limits), and the hand must let go of it at the right moment, above the shoulder, on a body that has to stay on its feet behind the arc. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-javelin-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | release → landing → exit |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 6000 control steps (60 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 6000 control steps (60 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

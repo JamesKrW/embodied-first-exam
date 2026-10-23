@@ -15,7 +15,7 @@
 Keep goal: three penalty kicks are shot at the official goal you stand in; keep every ball out, with a foot on the goal line at each kick. (Embodied Olympics `goalkeeper-save`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-Each ball arrives about 0.55 s after it leaves the machine at 20 m/s and 0.43 kg: the body has to be in its line when it is kicked, standing with a foot on the line, and the ball must come off it away from the goal; between the kicks a 67 kg robot whose walking policy makes about 0.3 m/s sideways has to cross up to 2.5 m of goal and stop on the line again in time. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+Each ball arrives about 0.55 s after it leaves the machine at 20 m/s and 0.43 kg: the body has to be in its line when it is kicked, standing with a foot on the line, and the ball must come off it away from the goal; between the kicks a 67 kg robot whose walking policy makes about 0.3 m/s sideways has to cross up to 2.5 m of goal and stop on the line again in time. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 `solution/oracle_replay.py` streams the privileged twin's reference solution, row by row, through the client (`solution/rows.npz`, recorded by scripts/embodied-olympics/make_oracles.py). Reference: the H1-2 walks along the goal line into each shot's line (walking policy, closed loop on the pelvis), feet on the line at each kick; three 20 m/s machine shots hit the body and stay out. It learns each machine's real crossing (scatter up to 0.4 m) and side offsets over privileged resets (2-6 attempts); 10 of 10 perturbations (aims, speeds 19 and 21 m/s, kick time) succeed. The privileged twin's reference rows (2670 control steps, success after 26.7 s) streamed through the client.
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | save 1 → save 2 → save 3 |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 2700 control steps (27 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 2700 control steps (27 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

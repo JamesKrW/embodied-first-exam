@@ -15,7 +15,7 @@
 Dodge: five cloth dodgeballs are thrown at you by ball machines that aim at you; do not let a live ball touch you, stay inside your court and on your feet. (Embodied Olympics `dodgeball`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-A ball thrown at you reaches you about 0.75 s after it leaves the machine, aimed where you were: standing still is a hit; the G1 has to be moving when each ball is thrown and keep moving, within its court, with a walking policy that makes about 0.5 m/s, and turn its narrow side to the throws. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+A ball thrown at you reaches you about 0.75 s after it leaves the machine, aimed where you were: standing still is a hit; the G1 has to be moving when each ball is thrown and keep moving, within its court, with a walking policy that makes about 0.5 m/s, and turn its narrow side to the throws. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 `solution/oracle_replay.py` streams the privileged twin's reference solution, row by row, through the client (`solution/rows.npz`, recorded by scripts/embodied-olympics/make_oracles.py). Reference: the G1 turns side-on and walks back and forth on the walking policy so that it is moving at each feed; five 14.2 m/s throws from turret-aimed machines all miss; 9 of 10 perturbations (feed times, speed, gap, aim height, machine distance) succeed, the machine at 2.8 m fails. The privileged twin's reference rows (1306 control steps, success after 13.06 s) streamed through the client.
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | dodge 1 → dodge 2 → dodge 3 → dodge 4 → dodge 5 |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1550 control steps (15.5 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 1550 control steps (15.5 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

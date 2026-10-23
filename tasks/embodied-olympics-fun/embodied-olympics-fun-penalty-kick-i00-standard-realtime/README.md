@@ -9,14 +9,14 @@
 | Family / instance | `penalty_kick` / seed 0 |
 | Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_penalty_kick.py: positive by injection (a real walk-up and foot contact, the ball's velocity set at the contact to 20 m/s into the corner; also a chip over the keeper); the keeper is a board on a rail driven by a force-limited servo (at most 800 N, 3 m/s), never moved by state writes, and a 15 m/s ball pushes it 3 mm; negatives: an 8 m/s corner shot saved by the keeper, a weak kick, wide, over the bar, a second touch, in without a kick, a body contact. Beating the keeper takes about 12 m/s to a corner; a G1 foot running into the ball at 4 m/s gives 3 to 5 m/s; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 5 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
 Take a penalty kick: with one kick of a foot, send the ball that lies on the penalty mark into the official goal 11 m away, past the goalkeeper dummy. (Embodied Olympics `penalty-kick`; the robot as a service on a clock that does not stop, slowdown S = 1: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The dummy reaches any ball that needs more than about 1.45 s for the 11 m: the kick has to send a 0.43 kg ball off at about 12 m/s or more and into a corner (or over the dummy and under the bar). The robot weighs 33 kg and has no kicking skill; a foot that merely runs into the ball at the running policy's 4 m/s sends it off at 3 to 5 m/s. The scene is dynamic (`scripts/task_dynamics.toml`: A goalkeeper dummy on a rail, driven by a force-limited motor, moves toward the ball after the kick.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 10 resets (only the last attempt is graded).
+The dummy reaches any ball that needs more than about 1.45 s for the 11 m: the kick has to send a 0.43 kg ball off at about 12 m/s or more and into a corner (or over the dummy and under the bar). The robot weighs 33 kg and has no kicking skill; a foot that merely runs into the ball at the running policy's 4 m/s sends it off at 3 to 5 m/s. The scene is dynamic (`scripts/task_dynamics.toml`: A goalkeeper dummy on a rail, driven by a force-limited motor, moves toward the ball after the kick.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-penalty-kick-i00-privileged`).
@@ -53,5 +53,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Service | `environment/sim/rcb_realtime.py` (the shared realtime layer, eai-standard/2.3) with the standard twin's `server.py` on `rcb_service.py`, `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's); EGL rendering on the GPU |
 | Slowdown | S = 1 (`RCB_SLOWDOWN`'s default): RTF 3.46 with the clock flat out (RCB_SLOWDOWN = 0.01, physics only, 4 attempts; 4090-ws1, 4 CPUs, 2026-10-20); PROTOCOL §4b: S = 1 when RTF >= 3, else ceil(1.5 / RTF) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 1500 control steps (15 s at 100 Hz); 10 resets, the last attempt graded |
+| Episode | 1500 control steps (15 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

@@ -15,7 +15,7 @@
 Ollie the skateboard from a standstill: pop the tail, take the board up with your feet until all of it is at least 0.05 m off the ground, land on it and stand still on it for 1.0 s. (Embodied Olympics `skateboard-ollie`; the robot as a service: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-The ollie is a timed whole-body skill on a free board: the tail has to be snapped down with the front foot unloaded, the front foot has to drag the rising board up and level it while the robot is in the air, and the robot has to land on a narrow deck that rolls and steers when it tilts. Even standing still, the board is unstable under a rigid rider (its trucks tilt and steer), so the ankles have to balance it before and after the trick. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 50 resets (only the last attempt is graded).
+The ollie is a timed whole-body skill on a free board: the tail has to be snapped down with the front foot unloaded, the front foot has to drag the rising board up and level it while the robot is in the air, and the robot has to land on a narrow deck that rolls and steers when it tilts. Even standing still, the board is unstable under a rigid rider (its trucks tilt and steer), so the ankles have to balance it before and after the trick. In standard mode the agent has no simulator and no state: it sees through the robot's cameras, acts through the client, and has 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-skateboard-ollie-i00-privileged`).
@@ -48,5 +48,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Stages | pop → clear → landed → stand |
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 800 control steps (8 s at 100 Hz); 50 resets, the last attempt graded |
+| Episode | 800 control steps (8 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |

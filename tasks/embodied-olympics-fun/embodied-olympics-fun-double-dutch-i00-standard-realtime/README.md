@@ -9,14 +9,14 @@
 | Family / instance | `double_dutch` / seed 0 |
 | Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_double_dutch.py: positive by injection (a teleported entry and ten 1.5 m/s kicks timed to the ropes: 10 jumps, a landing, success). No controller: entering needs the whole body across 1.0 m of rope sweep in a 0.58 s clear window (1.7 m/s; the G1 walks 0.6 m/s), then hops at 2.2 Hz; the best G1 hop controller found makes 1.7 Hz, 19 hops in 11 s with 10-15 cm clearance; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 5 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
 Jump Double Dutch: enter the two ropes turning in opposite directions and jump them 10 times in a row, one rope per jump, without a rope ever touching you, then land on your feet. (Embodied Olympics `double-dutch`; the robot as a service on a clock that does not stop, slowdown S = 1: its head cameras, joint sensors and IMUs, and the venue's fixed camera only.)
 
 ## Difficulty
-Neither built-in gait can jump: the robot has to get in between two ropes that sweep the floor in turn every half second, then hop again and again in that rhythm, feet off the ground at the very moment each rope passes and back on balance for the next. A drift out of the middle or a toe left behind catches a rope. The scene is dynamic (`scripts/task_dynamics.toml`: Two rope-turning machines turn two ropes in opposite directions from t = 0 at tempo_rev_s.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 10 resets (only the last attempt is graded).
+Neither built-in gait can jump: the robot has to get in between two ropes that sweep the floor in turn every half second, then hop again and again in that rhythm, feet off the ground at the very moment each rope passes and back on balance for the next. A drift out of the middle or a toe left behind catches a rope. The scene is dynamic (`scripts/task_dynamics.toml`: Two rope-turning machines turn two ropes in opposite directions from t = 0 at tempo_rev_s.), and in standard-realtime mode time does not stop: once an attempt's clock starts the venue's timed events happen whatever the agent does, so it has to plan or stream the robot's rows from a program of its own, with no simulator and no state, and 5 resets (only the last attempt is graded).
 
 ## Reference solution
 None (as `embodied-olympics-fun-double-dutch-i00-privileged`).
@@ -53,5 +53,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Service | `environment/sim/rcb_realtime.py` (the shared realtime layer, eai-standard/2.3) with the standard twin's `server.py` on `rcb_service.py`, `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's); EGL rendering on the GPU |
 | Slowdown | S = 1 (`RCB_SLOWDOWN`'s default): RTF 1.7 with the clock flat out (RCB_SLOWDOWN = 0.01, physics only, 4 attempts; 4090-ws1, 4 CPUs, 2026-10-20); PROTOCOL §4b: S = 1 when RTF >= 3, else ceil(1.5 / RTF) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
-| Episode | 2500 control steps (25 s at 100 Hz); 10 resets, the last attempt graded |
+| Episode | 2500 control steps (25 s at 100 Hz); 5 resets, the last attempt graded |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |
