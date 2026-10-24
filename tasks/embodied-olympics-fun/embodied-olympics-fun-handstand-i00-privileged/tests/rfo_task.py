@@ -38,6 +38,14 @@ class Task(TaskBase):
         "limit of {max_dev_deg} degrees, on two lines of the body: from the middle of the hands' support to the "
         "pelvis and from the pelvis to the middle of the ankles; the 15 and 30 degree execution deductions are not "
         "applied, as there is no E-Jury",
+        "Art. 9.2.13 / I.19 (the handstand's shape: a straight body, legs together and extended): the Code treats "
+        "bent legs and a bent body as execution faults and sets no number for when a balance stops being a "
+        "handstand; here, judged pass or fail, the knees (the knee joints' angle, 0 = straight) may bend at most "
+        "{max_knee_deg} degrees and the hips at most {max_hip_deg} degrees (the angle, measured towards the front, "
+        "between the line from the middle of the shoulder joints to the middle of the hip joints and each line "
+        "from a hip joint to its knee joint), during the whole hold; both limits lie in the medium band (15-30 "
+        "degrees) of the Code's angle-fault scale, so a slightly bent handstand counts (its deductions are not "
+        "applied) and a tucked or piked balance does not",
         "Art. 9.2.15 (a complete stop): without judges a stop is the pelvis slower than {still_m_s} m/s",
         "Art. 10.2.1.1 (the exercise begins from a still stand, legs together): the robot starts in its own stance, "
         "feet 0.24 m apart, because that is how it stands; the task is one element and the way back to the feet, "
@@ -48,7 +56,8 @@ class Task(TaskBase):
     fall_rule = True
     legal_ground = ("left_foot", "right_foot", "left_hand", "right_hand")
     stages = ["handstand", "held 2 s", "on the feet", "stand"]
-    params = dict(hold_s=2.0, max_dev_deg=45.0, min_leg_m=0.55, still_m_s=0.15, stand_s=1.0, stand_tilt_deg=20.0,
+    params = dict(hold_s=2.0, max_dev_deg=45.0, max_knee_deg=20.0, max_hip_deg=25.0, still_m_s=0.15,
+                  stand_s=1.0, stand_tilt_deg=20.0,
                   stand_still_m_s=0.35, fall_pelvis_m=0.25, area_m=12.0)
 
     sentence = ("Do a handstand: from your stance get up onto your hands, hold the handstand still for 2 s with only "
@@ -57,8 +66,11 @@ class Task(TaskBase):
              "hands and your ankles above your pelvis, and both lines of your body, from the middle of where your "
              "hands touch the floor to your pelvis and from your pelvis to the middle of your ankles, within "
              "{max_dev_deg} degrees of vertical (the Code of Points does not recognise a handstand that deviates "
-             "more), and your legs extended, the middle of your ankles at least {min_leg_m} m from your pelvis (a "
-             "tucked or piked balance is not a handstand). Any part of your hand counts as the hand (you have fists, not fingers). The handstand is held "
+             "more), and your body extended: your knees bent at most {max_knee_deg} degrees (the knee joints' "
+             "angle, 0 is straight) and your hips bent at most {max_hip_deg} degrees (the angle, towards your "
+             "front, between the line from the middle of your shoulder joints to the middle of your hip joints and "
+             "the line from each hip joint to its knee joint); a tucked or piked balance is not a handstand. Any part of "
+             "your hand counts as the hand (you have fists, not fingers). The handstand is held "
              "while you stay in it with your pelvis slower than {still_m_s} m/s (a complete stop); it counts once it "
              "has been held without a break for {hold_s} s. After that you come back down so that only your feet "
              "touch the floor (your hands off it), and then you stand for {stand_s} s without a break: only your feet "
@@ -91,8 +103,33 @@ class Task(TaskBase):
         self.min_upright = math.cos(math.radians(self.p["stand_tilt_deg"]))
         m = w.m
         self.ankles = [m.body(f"{s}_ankle_roll_link").id for s in ("left", "right")]
+        jid = lambda n: m.joint(n).id
+        self.knees = [int(m.jnt_qposadr[jid(f"{s}_knee_joint")]) for s in ("left", "right")]
+        self.hip_j = [jid(f"{s}_hip_pitch_joint") for s in ("left", "right")]
+        self.knee_j = [jid(f"{s}_knee_joint") for s in ("left", "right")]
+        self.shoulder_j = [jid(f"{s}_shoulder_pitch_joint") for s in ("left", "right")]
+        self.torso = m.body("torso_link").id
         # off_hands: something other than the hands touched the floor during this control step (seen every 1 ms)
         self.trackers = {"best_hold_s": 0.0, "in_handstand": False, "hold_n": 0, "off_hands": False}
+
+    def shape(self, w):
+        """(the knees' bend, the hips' bend) in degrees, the larger of the two sides. Knee: the knee joint's angle
+        (0 = straight). Hip: the angle from the trunk line (the shoulder joints' middle to the hip joints' middle)
+        to the thigh line (a hip joint to its knee joint), positive towards the torso's front (flexion, a pike);
+        0 in the robot's zero pose."""
+        d = w.d
+        knee = max(math.degrees(float(d.qpos[a])) for a in self.knees)
+        sh = 0.5 * (d.xanchor[self.shoulder_j[0]] + d.xanchor[self.shoulder_j[1]])
+        hp = 0.5 * (d.xanchor[self.hip_j[0]] + d.xanchor[self.hip_j[1]])
+        trunk = hp - sh
+        side = d.xmat[self.torso].reshape(3, 3)[:, 1]
+        hip = -180.0
+        for h, k in zip(self.hip_j, self.knee_j):
+            thigh = d.xanchor[k] - d.xanchor[h]
+            c = float(trunk @ thigh) / max(1e-9, float(np.linalg.norm(trunk) * np.linalg.norm(thigh)))
+            a = math.degrees(math.acos(max(-1.0, min(1.0, c))))
+            hip = max(hip, a if float(np.cross(trunk, thigh) @ side) <= 0.0 else -a)
+        return knee, hip
 
     def geometry(self, w, ref):
         """(in a handstand now, the two lines' deviations in degrees, the hands' support middle)."""
@@ -109,8 +146,9 @@ class Task(TaskBase):
             v = b - a
             n = float(np.linalg.norm(v))
             devs.append(180.0 if n < 1e-9 else math.degrees(math.acos(max(-1.0, min(1.0, v[2] / n)))))
+        knee, hip = self.shape(w)
         ok = (max(devs) <= self.p["max_dev_deg"] and pel[2] > h[2] and ank[2] > pel[2]
-              and float(np.linalg.norm(ank - pel)) >= self.p["min_leg_m"])
+              and knee <= self.p["max_knee_deg"] and hip <= self.p["max_hip_deg"])
         return ok, devs, h
 
     def substep(self, w, ref):
@@ -137,7 +175,9 @@ class Task(TaskBase):
             ok = ok and not off                            # a foot down in between breaks the handstand
             tr["in_handstand"] = bool(ok)
             if ok:
-                ref.stage("handstand", dev_deg=[round(x, 1) for x in devs])
+                knee, hip = self.shape(w)
+                ref.stage("handstand", dev_deg=[round(x, 1) for x in devs], knee_deg=round(knee, 1),
+                          hip_deg=round(hip, 1))
             v = float(np.linalg.norm(w.d.qvel[w.robot.fv:w.robot.fv + 3]))
             still = ok and v <= p["still_m_s"]
             tr["hold_n"] = tr["hold_n"] + 1 if still else 0
@@ -157,6 +197,8 @@ class Task(TaskBase):
     def privileged(self, w):
         ref = w.ref
         ok, devs, h = self.geometry(w, ref)
+        knee, hip = self.shape(w)
         return {"pelvis": w.pelvis().tolist(), "com": w.com().tolist(), "in_handstand": bool(ok),
-                "dev_deg": devs, "hands_support": None if h is None else h.tolist(),
+                "dev_deg": devs, "knee_bend_deg": knee, "hip_bend_deg": hip,
+                "hands_support": None if h is None else h.tolist(),
                 "hold_s": self.trackers.get("best_hold_s", 0.0)}

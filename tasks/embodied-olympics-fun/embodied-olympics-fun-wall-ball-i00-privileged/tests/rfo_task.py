@@ -17,6 +17,18 @@ LEGAL = {"left_hand", "right_hand", "left_forearm", "right_forearm"}
 BALL_IN_HAND_M = (0.016, 0.030)                # the ball's centre from the right hand's grasp centre at the start: out
 #                                                of the palm, along the fingers (it rests on the palm; a search)
 HOLD_REACH_M = 0.12                            # a held ball's centre within this of the hand's grasp centre
+# The ball on the wall. The wall (concrete or plywood) is rigid next to a tennis ball: what yields in the impact is the
+# ball itself. R. Cross, "Dynamic properties of tennis balls", Sports Engineering 2 (1999) 23-33, Figs 7-8 (a ball
+# fired at a rigid force plate, 2-17 m/s): the impact lasts 4.0-4.5 ms at 10-17 m/s and the ball's centre of mass
+# comes at most 16.5 mm closer to the surface at 17 m/s (about 10 mm at 10 m/s). The ball's own contact (rfo/scene.py:
+# a spring of 250 rad/s, a 12.6 ms impact) let its centre sink 57-73 mm into the wall at 17-21 m/s (QC2), more than
+# its diameter. The wall's contact wins over the ball's (priority 2) and is that impact: a spring-damper of natural
+# frequency WALL_W (pi / WALL_W = 4.5 ms, the measured duration) whose damping ratio WALL_ZETA keeps, on average, the
+# ITF rebound (BALL["bounce"]) that the rules quote, measured in this simulator (1 ms physics, the ball shot at the
+# wall from 10 arrival phases at 10, 17 and 21 m/s, 2026-10-24): it keeps 0.747-0.756 on average (0.70-0.80 by
+# phase), its centre comes 12 / 21 / 25 mm closer (at most 14 / 23 / 28 mm), the impact lasts 4-5 ms. The ball's
+# friction and rolling resistance are kept (condim 6). The robot never reaches the wall (it stays behind the line).
+WALL_W, WALL_ZETA = 700.0, 0.096
 
 
 class Task(TaskBase):
@@ -38,7 +50,10 @@ class Task(TaskBase):
         "balanced on the back of the hand or the fingertips), and a catch is the ball held after the rebound. A held "
         "ball may lose that hold for at most {held_gap_s} s.",
         "The wall is rigid and smooth; the ball's rebound from it is the ITF ball's rebound from a hard floor "
-        "(" + f"{BALL['bounce']:.3f}" + " of the speed across the wall).",
+        "(" + f"{BALL['bounce']:.3f}" + " of the speed across the wall, on average: with 1 ms physics it varies by "
+        "up to 0.05 either way with where in a step the ball arrives; a real ball keeps less at high speed, about "
+        "0.65 at 17 m/s). The impact itself is the ball's measured one on a rigid surface (R. Cross, Sports "
+        "Engineering 2, 1999): about 4.5 ms long, the ball's centre coming about 20 mm closer to the wall at 17 m/s.",
         "Flight: quasi-steady aerodynamics (MuJoCo's ellipsoid fluid model: drag and Magnus lift), still air. The "
         "world has elliptic friction cones and an impedance ratio of 100 (the real hands' setting, which makes a "
         "held ball stay put); they apply to every contact.",
@@ -90,7 +105,9 @@ class Task(TaskBase):
         X, r = p["wall_distance_m"], p["target_diameter_m"] / 2
         sc.box("court", (X / 2 - 1.0, 0, 0.0003), (X / 2 + 1.0, 3.0, 0.0003), rgba=(0.30, 0.42, 0.60, 1))
         sc.line("line", (0.0, -3.0), (0.0, 3.0))
-        sc.box("wall", (X + 0.10, 0.0, 2.0), (0.10, 3.0, 2.0), rgba=(0.82, 0.80, 0.74, 1), solid="hit")
+        sc.box("wall", (X + 0.10, 0.0, 2.0), (0.10, 3.0, 2.0), rgba=(0.82, 0.80, 0.74, 1), solid="hit", priority=2,
+               condim=6, friction=(0.7, 0.003, BALL["roll"]), solref=(-WALL_W ** 2, -2 * WALL_ZETA * WALL_W),
+               solimp=(0.95, 0.99, 0.001, 0.5, 2))
         q = (math.sqrt(0.5), 0, math.sqrt(0.5), 0)
         sc.geom(sc.wb, "target", type="cylinder", pos=(X - 0.001, p["target_y_m"], p["target_height_m"]), quat=q,
                 size=(r, 0.001), rgba=(0.9, 0.2, 0.15, 1), **VISUAL)
@@ -112,7 +129,7 @@ class Task(TaskBase):
         self.not_arm = self.robot & ~self.arm
         self.other = self.robot & ~ref.part("hands", "forearms")
         self.trackers = {"released": None, "last_touch": 0.0, "wall": Touch(ref, self.ball, self.wall),
-                         "caught": None, "last_held": None, "hand": None}
+                         "caught": None, "last_held": None, "hand": None, "v_in": 0.0}
 
     def may_grip(self, w, side, name):
         return False                                                        # no weld grip exists in this task
@@ -156,12 +173,14 @@ class Task(TaskBase):
             ref.stage("release", t=tr["released"])
             return
         hit = tr["wall"].update()
+        if not hit and not ref.has("target") and not ref.touching(self.ball, self.wall):
+            tr["v_in"] = float(np.linalg.norm(w.vel("ball")))             # the speed it arrives at the wall with
         if not ref.has("target"):
             if hit:
                 pt = ref.contact_points(self.ball, self.wall)[0]
                 off = math.hypot(float(pt[1]) - p["target_y_m"], float(pt[2]) - p["target_height_m"])
                 ref.metrics["target_offset_m"] = round(off, 3)
-                ref.metrics["wall_speed_m_s"] = round(float(np.linalg.norm(w.vel("ball"))), 2)
+                ref.metrics["wall_speed_m_s"] = round(tr["v_in"], 2)
                 if off > p["target_diameter_m"] / 2:
                     return ref.fail("the ball hit the wall outside the target", y=round(float(pt[1]), 3), z=round(float(pt[2]), 3))
                 ref.stage("target", offset_m=round(off, 3))
