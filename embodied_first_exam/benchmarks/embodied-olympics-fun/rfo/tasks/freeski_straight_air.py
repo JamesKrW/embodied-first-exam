@@ -777,9 +777,11 @@ D_CORK_PER_FLIP, D_SWITCH = 10.0, 5.0
 
 
 def classify(f, base_deg):
-    """The flight's trick as the judges name it, with its credited and measured rotations."""
+    """The flight's trick as the judges name it, with its credited and measured rotations. (QC2 fix, 2026-10-24: the
+    spin is the skis' heading change over the flight, f.spin, not the pelvis's integrated yaw rate f.rot[2]; the rest
+    is verbatim.)"""
     lat, along = f.e_axes
-    spin_m = math.degrees(float(f.rot[2]))
+    spin_m = math.degrees(float(f.spin))
     flip_m = math.degrees(float(f.rot @ lat)) - base_deg  # + forward, - backward, the straight air's own removed
     n180 = int(math.floor(abs(spin_m) / 180.0 + 0.5))
     inverted = f.min_up < 0.0
@@ -800,17 +802,29 @@ def classify(f, base_deg):
     if f.switch:
         name, D = "switch " + name, D + D_SWITCH
     return dict(name=name, difficulty=min(100.0, D), half_turns=n180, flips=nflip, spin_deg=round(spin_m, 1),
-                flip_deg=round(flip_m, 1), short_deg=round(short, 1), inverted=bool(inverted), switch=bool(f.switch))
+                flip_deg=round(flip_m, 1), short_deg=round(short, 1), inverted=bool(inverted), switch=bool(f.switch),
+                pelvis_spin_deg=round(math.degrees(float(f.rot[2])), 1))
 # (end of the verbatim part)
 
 
+def wrap_pi(a: float) -> float:
+    return (a + math.pi) % (2.0 * math.pi) - math.pi
+
+
+HEADING_MIN_XY = math.sin(math.radians(10.0))   # a ski within 10 degrees of the vertical has no heading
+
+
 class FlightRec(Flight):
-    """freeski's Flight in the state hash."""
+    """freeski's Flight in the state hash, with the skis' heading change over the flight (spin, rad: the mean of the
+    two skis' changes, ski_turn)."""
+    spin = 0.0
+    ski_turn = (0.0, 0.0)
 
     def state(self):
         return [self.k0, round(self.x0, 9), round(self.speed0, 9), round(self.angle0, 9),
                 [round(float(x), 9) for x in self.rot], round(self.min_up, 9), round(self.peak, 9),
-                [[round(float(x), 9) for x in a] for a in self.e_axes], self.switch, self.landing]
+                [[round(float(x), 9) for x in a] for a in self.e_axes], self.switch, self.landing,
+                round(float(self.spin), 9), [round(float(x), 9) for x in self.ski_turn]]
 
 
 class FreeskiTask(TaskBase):
@@ -837,11 +851,15 @@ class FreeskiTask(TaskBase):
                 "Specifications for Competition Equipment 2026/27 B.2.2 (freestyle skis: no limits)")
     deviations = [
         "ICR 3402 / Park & Pipe Judges Handbook 8-11 (judges score each jump 0-100 by impression): one task is one "
-        "trick, pass or fail: the trick is measured, not judged (the method of the RoboOlympics freeski sport, MIT): "
-        "the pelvis's angular velocity integrated over the flight only (from the last contact with the snow to the "
-        "next), so a rotation on the snow never counts and a wobble back and forth cancels; the spin is the "
-        "rotation about the vertical, counted in 180 degree units; the flip is the rotation about the horizontal "
-        "axis across the take-off direction less the straight air's own forward turn ({base_deg} degrees: the lip's "
+        "trick, pass or fail: the trick is measured, not judged (the method of the RoboOlympics freeski sport, MIT, with "
+        "the spin taken from the skis), over the flight only (from the last contact with the snow to the next), so a "
+        "rotation on the snow never counts and a wobble back and forth cancels; the spin is the skis' heading change "
+        "(each ski's long axis, tail to tip, followed in the horizontal plane every 1 ms and unwrapped, so whole turns "
+        "add up; held while a ski points within 10 degrees of the vertical; the mean of the two skis), counted in 180 "
+        "degree units (not the pelvis's yaw: the pelvis turns against the skis on the hips and against the trunk at "
+        "the waist, so its yaw can count turns the skis never made); the flip is the pelvis's angular velocity "
+        "integrated about the horizontal axis across the take-off direction less the straight air's own forward turn "
+        "({base_deg} degrees: the lip's "
         "plus the landing's angle), counted in 360 degree units and only if the body went upside down; each to the "
         "nearest unit, so up to half a unit short or over still counts as that unit (a judge would deduct; a "
         "rotation half a unit or more off is the next or the previous trick). A flip with half a turn of spin is "
@@ -849,13 +867,20 @@ class FreeskiTask(TaskBase):
         "like any spin (a cork and a twisting flip are not told apart). Grabs, amplitude, style and execution are "
         "not judged.",
         "Park & Pipe Judges Handbook (a landed trick: on the skis, riding away in control): the landing must be "
-        "clean: the first contact after the flight is the skis', no other part of the robot (hands included; the "
+        "clean: the first contact after the flight is the skis', with both skis pointing the way the trick lands "
+        "(forwards after whole turns, backwards after an odd number of half turns) within {land_heading_deg} degrees "
+        "(a judge sees a 360 landed sideways or switch as another trick or a crash); from {settle_s} s after that "
+        "contact (the landing's impact and its first correction) to the finish line each ski's heading stays within "
+        "{ride_turn_deg} degrees of its heading then (no spin on the snow: a judge does not credit rotation made on "
+        "the landing, and a skier riding away straight needs at most the landing's {land_heading_deg} degrees plus "
+        "the finish line's {ride_heading_deg} degrees of correction; a quarter turn is above that and half the "
+        "smallest spin, the 180 of a revert); no other part of the robot (hands included; the "
         "boots on their skis are allowed) touches the snow from then until the finish line {finish_m} m past the "
         "outrun's start, the robot is not down (on the snow with the pelvis less than {fall_h_m} m above it or the "
         "trunk more than {tilt_max_deg} degrees from its normal) for {fall_s} s in all (freeski's fall rule; a "
         "judge would deduct for sitting back), the landing is past the table (a landing on the table "
-        "or the knuckle before the knoll fails), and the skis cross the finish line pointing along the course "
-        "(within {ride_heading_deg} degrees, forwards or backwards).",
+        "or the knuckle before the knoll fails), and the skis cross the finish line pointing the way the trick "
+        "landed (within {ride_heading_deg} degrees).",
         "ICR 3102.4.1 (the big air site): the course is the RoboOlympics freeski big air (MIT): a level start platform "
         "{start_len} m long, its edge rounded (radius {rollin_R} m, an estimate) onto a {inrun_len} m in-run at "
         "{inrun_angle} degrees, a {inrun_R} m transition, a {flat_len} m flat, a kicker of transition radius "
@@ -886,7 +911,8 @@ class FreeskiTask(TaskBase):
         kicker_R=18.0, takeoff=25.0, lip_len=1.0, table_len=15.0, knoll_R=8.0, landing_angle=36.0, landing_len=30.0,
         landing_R=30.0, outrun_len=45.0, w_inrun=8.0, w_kicker=6.0, w_landing=24.0, w_outrun=30.0,
         base_deg=61.0, air_ms=30, fall_h_m=0.40, tilt_max_deg=70.0, fall_s=1.0, finish_m=15.0, ride_heading_deg=30.0,
-        dns_s=20.0, stop_speed_m_s=0.3, stop_s=3.0, lip_window_m=4.0, min_angle_deg=10.0)
+        land_heading_deg=45.0, settle_s=0.5, ride_turn_deg=90.0, dns_s=20.0, stop_speed_m_s=0.3, stop_s=3.0,
+        lip_window_m=4.0, min_angle_deg=10.0)
 
     sentence = ("Drop in from the start platform, ride the in-run, take off from the kicker, do a {trick} in the air, "
                 "land on your skis and ride away past the finish line.")
@@ -898,21 +924,29 @@ class FreeskiTask(TaskBase):
              "rises to its lip at {takeoff} degrees, 2.1 m above the flat), a table {table_len} m long at the flat's "
              "level, the knoll, the landing ({landing_angle} degrees, {landing_len} m long), a transition and the "
              "flat outrun. The jump is your flight off the kicker: it starts within {lip_window_m} m of the lip, "
-             "rising at {min_angle_deg} degrees or more. The trick is measured from your pelvis's rotation in the air "
-             "only (from the moment your last contact with the snow ends until the next contact): the spin about the "
-             "vertical, counted in half turns of 180 degrees; the flip about the horizontal axis across your take-off "
-             "direction, after removing the {base_deg} degrees a straight air turns forward anyway, counted in full "
+             "rising at {min_angle_deg} degrees or more. The trick is measured in the air only (from the moment your last "
+             "contact with the snow ends until the next contact). The spin is your skis' heading change: each ski's "
+             "long axis (tail to tip) is followed in the horizontal plane (unwrapped, so whole turns add up; held while "
+             "the ski points within 10 degrees of the vertical) and the spin is the mean of the two skis' changes, "
+             "counted in half turns of 180 degrees (your pelvis's or trunk's own yaw does not count). The flip is your "
+             "pelvis's rotation about the horizontal axis across your take-off direction, after removing the "
+             "{base_deg} degrees a straight air turns forward anyway, counted in full "
              "turns of 360 degrees and only if your body went upside down; each to the nearest unit (up to half a "
              "unit short or over still counts as that unit). A flip with half a turn of spin is still that flip. You "
              "succeed when the jump's rotation is the {trick} and the landing is clean: the first contact after the "
-             "flight is your skis', on the knoll or the landing hill (past the table); from then until both boots "
+             "flight is your skis', on the knoll or the landing hill (past the table), with both skis pointing forwards "
+             "(down the course, +x) within {land_heading_deg} degrees at that first contact; from {settle_s} s after "
+             "it until both boots cross the finish line each ski's heading stays within {ride_turn_deg} degrees of its "
+             "heading at that moment (no spinning on the snow); from the first contact until both boots "
              "cross the finish line ({finish_m} m past the start of the outrun) no part of you but the boots touches "
              "the snow and you are not down for {fall_s} s in all (down: on the snow with your pelvis less than "
              "{fall_h_m} m above it, measured along its normal, or your trunk more than {tilt_max_deg} degrees from "
              "its normal; the time down shrinks again at a quarter of the rate while you are up); and at the finish "
-             "line your pelvis is at least {fall_h_m} m above the snow and your skis point along the course (within {ride_heading_deg} degrees, forwards or backwards). You fail: on any other trick "
-             "(more or less rotation, a flip where none is asked, a different direction of flip, a take-off riding "
-             "backwards), on a fall at any time (a part of you other than your boots on the snow, or down for {fall_s} s "
+             "line your pelvis is at least {fall_h_m} m above the snow and both skis point forwards (within "
+             "{ride_heading_deg} degrees). You fail: on any other trick (more or less rotation, a flip where none is "
+             "asked, a different direction of flip, a take-off riding backwards), a landing with a ski pointing more "
+             "than {land_heading_deg} degrees from forwards, a spin on the snow (a ski's heading more than "
+             "{ride_turn_deg} degrees from where it was {settle_s} s after the landing), on a fall at any time (a part of you other than your boots on the snow, or down for {fall_s} s "
              "in all), a landing on the table, the body first, a "
              "run with no jump, a stop (slower than {stop_speed_m_s} m/s for {stop_s} s after the start), no start "
              "within {dns_s} s, or at {time_limit_s} s.")
@@ -1054,6 +1088,8 @@ class FreeskiTask(TaskBase):
         self.trackers = {"phase": "platform", "air_k": 0, "rot": [0.0, 0.0, 0.0], "min_up": 1.0, "peak": 0.0,
                          "flight": None, "slow_k": 0, "k_start": None, "result": None,
                          "down_s": 0.0, "low": None,
+                         "head": [self.ski_yaw(w, b) for b in self.ski_body.values()], "head0": None,
+                         "land_ph": None, "land_dir": 0.0, "head_ref": None, "ride_turn": 0.0,
                          "snow": Digest(w, list(self.ss.bodies))}
         self.base_deg = float(self.p["base_deg"])
         self.ss.apply(w.d)
@@ -1062,12 +1098,31 @@ class FreeskiTask(TaskBase):
         d, r = w.d, w.robot
         return d.xmat[r.pelvis].reshape(3, 3) @ d.qvel[r.fv + 3:r.fv + 6]
 
-    def ski_heading_ok(self, w) -> bool:
-        tol = math.radians(self.p["ride_heading_deg"])
+    @staticmethod
+    def ski_yaw(w, b):
+        """A ski's heading: the angle of its long axis (tail to tip) in the horizontal plane from the course's
+        direction (+x), or None while the ski points within 10 degrees of the vertical."""
+        x = w.d.xmat[b].reshape(3, 3)[:, 0]
+        if math.hypot(float(x[0]), float(x[1])) < HEADING_MIN_XY:
+            return None
+        return math.atan2(float(x[1]), float(x[0]))
+
+    def track_heading(self, w) -> None:
+        """Each ski's heading, unwrapped (followed continuously every 1 ms step, so whole turns add up); held while a
+        ski has no heading."""
+        hd = self.trackers["head"]
+        for i, b in enumerate(self.ski_body.values()):
+            h = self.ski_yaw(w, b)
+            if h is None:
+                continue
+            hd[i] = h if hd[i] is None else hd[i] + wrap_pi(h - hd[i])
+
+    def ski_heading_ok(self, w, direction=0.0, tol_deg=None) -> bool:
+        """Both skis point within tol_deg (default ride_heading_deg) of `direction` (0 forwards, pi backwards)."""
+        tol = math.radians(self.p["ride_heading_deg"] if tol_deg is None else tol_deg)
         for b in self.ski_body.values():
-            x = w.d.xmat[b].reshape(3, 3)[:, 0]
-            h = math.atan2(float(x[1]), float(x[0]))
-            if min(abs(h), math.pi - abs(h)) > tol:
+            h = self.ski_yaw(w, b)
+            if h is None or abs(wrap_pi(h - direction)) > tol:
                 return False
         return True
 
@@ -1075,6 +1130,7 @@ class FreeskiTask(TaskBase):
         self.ss.apply(w.d)
         tr, d, r, p = self.trackers, w.d, w.robot, self.p
         dt = w.m.opt.timestep
+        self.track_heading(w)
         ski_on = ref.touching(self.ski_mask, self.snow_mask)
         body_on = ref.parts_touching(self.snow_mask) - set(self.legal_ground)
         any_on = ski_on or bool(body_on) or ref.touching(self.feet_mask, self.snow_mask)
@@ -1088,6 +1144,7 @@ class FreeskiTask(TaskBase):
                 tr["v0"] = [float(x) for x in v]
                 tr["x0"] = float(d.xpos[r.pelvis][0])
                 tr["k0"] = ref.ph
+                tr["head0"] = list(tr["head"])
             tr["air_k"] += 1
             tr["rot"] = [a + b * dt for a, b in zip(tr["rot"], self.omega(w))]
             tr["min_up"] = min(tr["min_up"], float(d.xmat[r.pelvis].reshape(3, 3)[2, 2]))
@@ -1128,11 +1185,24 @@ class FreeskiTask(TaskBase):
             f.min_up = tr["min_up"]
             f.peak = tr["peak"]
         elif tr["phase"] == "landed":
+            # no spinning on the snow: from settle_s after the landing to the finish line each ski's heading stays
+            # within ride_turn_deg of its heading at that moment
+            if tr["head_ref"] is None:
+                if (ref.ph - tr["land_ph"]) * dt >= p["settle_s"] - 1e-9:
+                    tr["head_ref"] = list(tr["head"])
+            else:
+                turn = max(abs(a - b) for a, b in zip(tr["head"], tr["head_ref"]))
+                tr["ride_turn"] = max(tr["ride_turn"], turn)
+                if turn > math.radians(p["ride_turn_deg"]):
+                    return ref.fail("spun on the snow", turn_deg=round(math.degrees(turn), 1),
+                                    x=round(float(d.xpos[r.pelvis][0]), 2))
             if min(float(d.xpos[b][0]) for b in self.ski_body.values()) > self.finish_x():
+                ref.metrics["ride_turn_deg"] = round(math.degrees(tr["ride_turn"]), 1)
                 if self.height(d.xpos[r.pelvis]) < p["fall_h_m"]:
                     return ref.fail("not riding away", reason="the pelvis down at the finish line")
-                if not self.ski_heading_ok(w):
-                    return ref.fail("not riding away", reason="the skis cross the finish line sideways")
+                if not self.ski_heading_ok(w, tr["land_dir"]):
+                    return ref.fail("not riding away", reason="the skis do not point the trick's way at the finish "
+                                                              "line")
                 if ref.stage("ride-away"):
                     tr["phase"] = "done"
                     ref.succeed()
@@ -1142,9 +1212,13 @@ class FreeskiTask(TaskBase):
         x = float(d.xpos[r.pelvis][0])
         air = (ref.ph - f.k0) * w.m.opt.timestep
         f.landing = dict(x=round(x, 2), airtime_s=round(air, 3), from_knoll_m=round(x - self.pr.marks["knoll"][0], 2))
+        h0, h1 = tr.get("head0"), tr["head"]
+        if h0 is not None and None not in h0 and None not in h1:      # (a hand-made flight brings its own spin)
+            f.ski_turn = tuple(float(b - a) for a, b in zip(h0, h1))
+            f.spin = float(np.mean(f.ski_turn))
         c = classify(f, self.base_deg)
         tr["result"] = c
-        for k in ("spin_deg", "flip_deg", "short_deg", "half_turns", "flips"):
+        for k in ("spin_deg", "flip_deg", "short_deg", "half_turns", "flips", "pelvis_spin_deg"):
             ref.metrics[f"trick_{k}"] = c[k]
         ref.metrics["air_s"] = round(air, 3)
         ref.metrics["height_m"] = round(f.peak - self.pr.marks["lip"][1], 2)
@@ -1155,7 +1229,17 @@ class FreeskiTask(TaskBase):
             return ref.fail("landed on the table", x=round(x, 2))
         if not self.is_trick(c):
             return ref.fail("wrong trick", trick=c["name"], spin_deg=c["spin_deg"], flip_deg=c["flip_deg"])
-        tr["phase"] = "landed"
+        # the skis point the way the family's trick lands: forwards after a whole number of turns, backwards after an
+        # odd number of half turns (a switch take-off the other way round; a flip family: its measured half turns)
+        n180 = c["half_turns"] if self.want[0] is None else self.want[0]
+        tr["land_dir"] = math.pi if (n180 + int(c["switch"])) % 2 else 0.0
+        yaws = [self.ski_yaw(w, b) for b in self.ski_body.values()]
+        ref.metrics["landing_heading_deg"] = [None if h is None else round(math.degrees(wrap_pi(h - tr["land_dir"])), 1)
+                                              for h in yaws]
+        if not self.ski_heading_ok(w, tr["land_dir"], self.p["land_heading_deg"]):
+            return ref.fail("landed facing the wrong way", ski_heading_deg=ref.metrics["landing_heading_deg"],
+                            want="backwards" if tr["land_dir"] else "forwards")
+        tr["phase"], tr["land_ph"] = "landed", ref.ph
         ref.stage("landing", trick=c["name"], spin_deg=c["spin_deg"], flip_deg=c["flip_deg"], air_s=round(air, 3))
 
     def is_trick(self, c) -> bool:
@@ -1206,6 +1290,8 @@ class FreeskiTask(TaskBase):
         return {"pelvis": w.pelvis().tolist(), "pelvis_height_m": self.height(pel),
                 "phase": self.trackers.get("phase"), "marks": {k: list(v) for k, v in pr.marks.items()},
                 "finish_x": self.finish_x(), "air_rotation_rad": list(self.trackers.get("rot", [0, 0, 0])),
+                "ski_heading_unwrapped_rad": list(self.trackers.get("head", [])),
+                "ski_heading_at_takeoff_rad": self.trackers.get("head0"),
                 "skis": {n: {"pos": d.xpos[b].tolist(), "xmat": d.xmat[b].tolist()} for n, b in self.ski_body.items()},
                 "snow_model": dict(self.ss.last)}
 # ====================================================================================== END freeski block
@@ -1216,4 +1302,5 @@ class Task(FreeskiTask):
     title = "Freeski big air: straight air"
     trick = "straight air"
     want = (0, 0, None)
-    trick_rule = ("the straight air: no spin (less than half a turn about the vertical) and no flip.")
+    trick_rule = ("the straight air: no spin (your skis turn less than 90 degrees about the vertical in the "
+                  "air) and no flip.")
