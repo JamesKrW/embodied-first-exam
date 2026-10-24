@@ -29,7 +29,7 @@ Where the numbers come from:
   (measured, mean over the contact's phase): the racket fixed in space 0.85 from 5 to 50 m/s; a free racket 0.44 at
   the centre, 0.32 8 cm towards the tip, 0.20 8 cm off the axis (a real racket's is about 0.4 at the centre, Cross
   2000).
-* the hand: the H1-2's Inspire RH56DFX (rfo.realhand, "inspire"; fingertip 10 N, the thumb 15 N, self-locking to 8 kg
+* the hand: the H1-2's Inspire RH56DFX (rfo.realhand, "inspire"; fingertip 20 N, the thumb 30 N, self-locking to 8 kg
   per finger), at the device's forces: the racket is held by contact and friction only, no weld. The grip is
   tennis-serve's: the handle across the palm along the hand's grasp frame, the butt BUTT_OUT_M beyond the little
   finger, the strings' normal the palm's, the closure command 1. "In the hand" = the handle touches the hand's fingers
@@ -982,7 +982,7 @@ class Task(TaskBase):
         "the far baseline throws the serve from the server's strike point ({serve_height_m} m up) at about "
         "{serve_time_s} s; there is no opponent, the attempt ends when your return lands",
         "Rule 4 (the racket held in the hand): the hand is the H1-2's own Inspire five-finger hand (six drives, "
-        "fingertip forces 10 N, the thumb 15 N), closed by one command; the handle lies across the palm, and the "
+        "fingertip forces 20 N, the thumb 30 N), closed by one command; the handle lies across the palm, and the "
         "racket is held by the fingers' contact and friction alone, as a hand holds it",
         "Rules 4 and 24 (the ball hit with the racket held in the hand; a thrown racket does not play the ball): "
         "\"in the hand\" is defined by contact: the racket's handle touches the hand's fingers and its thumb or palm; "

@@ -18,7 +18,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-giant-slalom-i00-standard"
-description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics giant-slalom on the same frozen instance as embodied-olympics-fun-giant-slalom-i00-privileged. Ski the giant slalom: one run down the course on your skis, both ski tips and both feet through each of the 4 gates in order, then over the finish line. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
+description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics giant-slalom on the same frozen instance as embodied-olympics-fun-giant-slalom-i00-privileged. Ski the giant slalom: one run down the course on your skis, both ski tips and both feet through each of the 26 gates in order, then over the finish line. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "giant-slalom"]
 
@@ -37,7 +37,7 @@ instance_seed = 0
 reset_budget = 5
 expert_time_estimate_hours = 22.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_giant_slalom.py: positive by injection (straight runs re-aimed by hand at the gates: 4 gates passed, finished in 16.55 s). The slalom controller re-searched for this course reaches gate 3 of 4 (it falls at about 7 m/s on the 14.5 m-radius skis); human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_giant_slalom.py: A giant slalom with the U16-U14 minimum vertical drop (200 m: 640 m at 33 %, 26 open gates with panels), a level start platform and a self-start. Positive by injection: pushed off the platform, straight runs re-aimed by hand at each gate; sliding, crossings and finish are physics; deterministic. Negatives: did not start, a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

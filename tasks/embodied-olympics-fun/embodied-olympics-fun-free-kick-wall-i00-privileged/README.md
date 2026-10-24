@@ -15,7 +15,7 @@
 Take a direct free kick: with one kick of a foot, send the ball over or around the wall of mannequins into the official goal 20.0 m away. (Embodied Olympics `free-kick-wall`: one Unitree G1 on the Embodied Olympics simulator, judged by a referee of events, geometry and contact rules.)
 
 ## Difficulty
-The wall hides the near half of the goal: the ball has to be driven past or over its end along a narrow line, or round it into the far half, some 21 m, which needs well over 6 m/s off the foot (over the wall about 11 m/s). The robot has no kicking skill: RoboOlympics' balanced model-based kick sends the ball off at about 4 m/s, and a swing hard enough (10 to 16 m/s measured) throws the 33 kg body round on its standing foot.
+The wall hides the near half of the goal: the ball has to be driven past or over its end along a narrow line, or round it into the far half, some 21 m, which needs well over 6 m/s off the foot (over the wall about 11 m/s). The robot has no kicking skill: Embodied Olympics' balanced model-based kick sends the ball off at about 4 m/s, and a swing hard enough (10 to 16 m/s measured) throws the 33 kg body round on its standing foot.
 
 ## Reference solution
 None. No reference controller exists for this family yet: positive by a real kick (a standing power kick through lowcmd: 14.8 m/s off the foot, in at the near post); a fall after the kick does not fail; but only 8 of 13 gain and ball-offset perturbations score (the ball rebounds off the wall into the fallen robot, or goes wide), below the 9 of 10 bar, so it is not shipped as a reference solution.

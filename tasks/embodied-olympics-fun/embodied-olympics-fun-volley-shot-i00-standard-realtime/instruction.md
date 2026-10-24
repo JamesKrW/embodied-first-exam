@@ -5,8 +5,8 @@ You control a simulated Unitree H1-2 humanoid robot (27 joints, 1.78 m tall, 67 
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Volley the cross: strike the football that is crossed to you from the wing with a foot before it touches the ground, into the official goal 11 m away, past the goalkeeper dummy.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You face the goal (+x) from the penalty mark. The ball machine stands on the grass about 6 m ahead of you and 19 m to your left, aimed across the penalty area. About 3.0 s after the start the cross leaves it; it climbs to about 4.5 m and comes down steeply (about 40 degrees below the horizontal) at roughly 11.7 m/s, travelling mostly from your left to your right. About 2 s after the cross it is knee-high about 0.6 m in front of you, a little to your left; untouched it lands about half a metre in front of you, on the side of your right foot.
@@ -33,7 +33,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

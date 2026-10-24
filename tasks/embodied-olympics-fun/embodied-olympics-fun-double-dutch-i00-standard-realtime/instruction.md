@@ -5,8 +5,8 @@ You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 33 kg
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Jump Double Dutch: enter the two ropes turning in opposite directions and jump them 10 times in a row, one rope per jump, without a rope ever touching you, then land on your feet.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 A wooden sports floor. The two turning machines stand on the y axis, at y = -1.95 m and +1.95 m (to your right and left), the ropes turning between them across your way. You stand at x = -1.5 m, y = 0, facing +x, towards the middle of the ropes (x = 0), outside the space the turning ropes sweep; the centre zone is painted on the floor round the middle.
@@ -32,7 +32,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;
@@ -178,7 +178,7 @@ What the platform does and does not do for you:
   walker takes the legs at once, from where they are (its memory starts afresh); `walk`, the other walker and `run`
   take them from it the same way. Going from a walker straight to `stand` usually ends in a fall (`stand` holds
   Unitree's stance and does not balance): give `walk` a zero command for about 2 s first.
-- **`run`** runs RoboOlympics' athletics running policy (50 Hz) on all 29 joints: `vx` from 0 to about 4 m/s (it falls
+- **`run`** runs Embodied Olympics' athletics running policy (50 Hz) on all 29 joints: `vx` from 0 to about 4 m/s (it falls
   above that; the command changes at most 1.5 m/s per second), `|vy|` ≤ 0.12 m/s, `|wz|` ≤ 0.5 rad/s. `run_arms` gives
   you the arms while it keeps the legs and the waist; taking the arms away from its swing disturbs it. Switching to
   `stand`, `walk` or `joints` above about 0.6 m/s usually ends in a fall: slow down first (from 2.4 m/s that takes

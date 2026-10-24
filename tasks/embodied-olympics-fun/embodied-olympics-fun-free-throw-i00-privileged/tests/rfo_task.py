@@ -6,7 +6,6 @@ import math
 import mujoco
 import numpy as np
 
-from rfo import realhand
 from rfo.referee import Crossing, HoopPass
 from rfo.scene import HITTABLE, OFFICIAL, VISUAL, bounce_solref
 from rfo.task import TaskBase
@@ -107,26 +106,27 @@ def build_court(sc, hx: float, hy: float, p: dict, flip: bool = False) -> dict:
 
 # ---- the two-hand hold (the H1-2's own Inspire hands, rfo.realhand "inspire"; the same in free-throw,
 # catch-and-shoot, dunk and dunk-between-legs) ----
-# A two-handed hold as for a chest pass or a two-handed set shot: the palms on the ball's two sides, the fingers spread
-# up and forwards over it, both hands closed on it (a finger stops on what it touches), and the arms pressing the
-# palms in: the hold targets (the start command) turn the shoulders SQUEEZE_RAD further in (roll and yaw) than the
-# pose the arms stand in, so the shoulder servos squeeze the ball; nothing else holds it but the hands' contact and
-# friction (measured with the core of 10-21, H2-class arms and the Inspire at its 20 / 30 N defaults: held at 0.06
-# rad, the ball settling about 8 cm in the first 0.3 s onto the two thumbs and the palms' heels; with 0.03 rad, no
-# squeeze, or the fingers straight forwards or up, it drops within a second; one hand alone cannot hold it: the
-# Inspire spans about 0.2 m, the ball 0.24 m). HOLD_LEFT / HOLD_RIGHT: the arms' 7 joints (shoulder pitch, roll, yaw,
-# elbow pitch, roll, wrist pitch, yaw), from numerical inverse kinematics on the hands' grasp frames (each palm 1 cm
-# clear of the ball, the ball's centre BALL_AT ahead of and above the pelvis' start).
-BALL_AT = (0.40, 0.0, 1.20)
-HOLD_LEFT = (-0.43, 0.3529, -1.0318, 0.4546, 0.2074, -0.44, 1.24)
-HOLD_RIGHT = (-0.4301, -0.3529, 1.0321, 0.4546, -0.2073, -0.44, -1.24)
-SQUEEZE_RAD = 0.06
-HAND_CLOSED = {}                             # the hands' synergy: where each drive closes to (realhand's "closed")
+# A two-handed hold as for a chest pass or a two-handed set shot, the hands open (the fingers straight): the palms on
+# the ball's two sides, the fingers up and forwards beside it, and the arms pressing the palms in: the start command
+# (hold_targets) turns the shoulders SQUEEZE_RAD further in (roll and yaw) than TOUCH_LEFT / TOUCH_RIGHT, the pose in
+# which the palms just clear the ball, so the shoulder servos squeeze it; nothing else holds it but the hands' contact
+# and friction. On the Inspire the open thumb lies a little proud of the palm, so the ball bears on the two thumbs'
+# proximal and middle links (measured with the core of 10-22, H2-class arms, self-collision on: about 57 N normal per
+# hand, half the friction used, the elbows 8.6 cm off the torso; with the fingers closed over the ball it rests on
+# the thumbs alone, about 8 cm lower). HOLD_LEFT / HOLD_RIGHT: where the arms stand under that squeeze with the
+# ball's centre at BALL_AT (ahead of and above the pelvis' start): the settled hold, measured, so the start is at
+# rest. The arms' 7 joints: shoulder pitch, roll, yaw, elbow pitch, roll, wrist pitch, yaw.
+BALL_AT = (0.39, 0.0, 1.13)
+TOUCH_LEFT = (-0.43, 0.3529, -1.0318, 0.4546, 0.2074, -0.44, 1.24)
+TOUCH_RIGHT = (-0.4301, -0.3529, 1.0321, 0.4546, -0.2073, -0.44, -1.24)
+HOLD_LEFT = (-0.3867, 0.3303, -1.0768, 0.5032, 0.1042, -0.4638, 1.2792)
+HOLD_RIGHT = (-0.3867, -0.3303, 1.0768, 0.5032, -0.1042, -0.4638, -1.2792)
+SQUEEZE_RAD = 0.10
 
 
 def hold_targets(side: str) -> np.ndarray:
-    """The squeezing targets of an arm: its hold pose with the shoulder's roll and yaw SQUEEZE_RAD further in."""
-    q = np.array(HOLD_RIGHT if side == "right" else HOLD_LEFT, float)
+    """The squeezing targets of an arm: the touching pose with the shoulder's roll and yaw SQUEEZE_RAD further in."""
+    q = np.array(TOUCH_RIGHT if side == "right" else TOUCH_LEFT, float)
     s = 1.0 if side == "right" else -1.0
     q[1] += s * SQUEEZE_RAD
     q[2] += s * SQUEEZE_RAD
@@ -134,8 +134,8 @@ def hold_targets(side: str) -> np.ndarray:
 
 
 def ball_in_hands(w, arms_only: bool = False) -> None:
-    """The arms in the hold (the start command: the squeezing targets) and, unless arms_only, the ball between the
-    palms with both hands closed on it, the rest of the world held still while they close (realhand's close_on)."""
+    """The arms in the settled hold, the start command the squeezing targets, the hands open, and, unless arms_only,
+    the ball between the palms where the squeeze holds it."""
     r, d = w.robot, w.d
     a = w.L.ARMS.start
     for idx, side in ((slice(a, a + 7), "left"), (slice(a + 7, a + 14), "right")):
@@ -145,58 +145,7 @@ def ball_in_hands(w, arms_only: bool = False) -> None:
     if arms_only:
         return
     w.put("ball", BALL_AT)
-    close_both(w)
-
-
-def close_both(w, settle_s: float = 0.3) -> None:
-    """Both hands closed on the ball together, the rest of the world held still (realhand's close_on for two hands):
-    the ball held in place while the fingers close at their drives' speeds until every drive has stalled or reached
-    its target, then let go to settle between the hands for settle_s. Raises unless both hands then touch it."""
-    m, d, hands = w.m, w.d, w.hands
-    qa, va = w.free["ball"]
-    keep_q = np.ones(m.nq, dtype=bool)
-    keep_v = np.ones(m.nv, dtype=bool)
-    for s_ in ("left", "right"):
-        hands.cmd[s_] = 1.0
-        keep_q[hands.hq[s_]] = keep_v[hands.hv[s_]] = False
-    mujoco.mj_forward(m, d)
-    q0 = d.qpos.copy()
-    arm0 = m.dof_armature.copy()
-    m.dof_armature[keep_v] = realhand.FREEZE_ARMATURE
-    m.dof_armature[va:va + 6] = arm0[va:va + 6]
-    free, still, settled = False, 0, 0
-    try:
-        for _ in range(int(round(2.0 / m.opt.timestep))):
-            sp0 = hands._sp.copy()
-            hands.substep()
-            mujoco.mj_step(m, d)
-            d.qpos[keep_q] = q0[keep_q]
-            d.qvel[keep_v] = 0.0
-            if not free:
-                d.qpos[qa:qa + 7] = q0[qa:qa + 7]
-                d.qvel[va:va + 6] = 0.0
-                still = still + 1 if np.allclose(hands._sp, sp0, atol=1e-9) else 0
-                if still >= 20:
-                    free = True
-                    keep_q[qa:qa + 7] = False
-                    keep_v[va:va + 6] = False
-            else:
-                settled += 1
-                if settled * m.opt.timestep >= settle_s:
-                    break
-    finally:
-        m.dof_armature[:] = arm0
-    for s_ in ("left", "right"):
-        d.qvel[hands.hv[s_]] = 0.0
-    d.qvel[va:va + 6] = 0.0
-    hands._vs[:] = 0.0
-    mujoco.mj_forward(m, d)
-    hands.update_held()
-    ball = set(np.flatnonzero(m.geom_bodyid == m.body("ball").id))
-    for s_ in ("left", "right"):
-        g = set(hands.group_geoms(w, s_, "hand"))
-        if not any((c.geom1 in g and c.geom2 in ball) or (c.geom2 in g and c.geom1 in ball) for c in d.contact[:d.ncon]):
-            raise RuntimeError(f"the {s_} hand does not touch the ball after closing")
+    mujoco.mj_forward(w.m, d)
 # ---- end of the hold ----
 
 
@@ -244,8 +193,7 @@ class Task(TaskBase):
              "above the floor. The ball is a size-7 basketball (" + f"{2 * BALL['radius']:.3f} m across, "
              f"{BALL['mass']:.2f} kg, it keeps {BALL['bounce']:.2f} of its speed in a bounce on the floor" + "); it "
              "flies in air (drag and spin lift). Your hands are five-finger hands that hold things only by contact and "
-             "friction: the ball starts in them, between your two palms, both hands closed on it and your arms "
-             "pressing it, and is at your disposal at the start; it can slip out. A hand is its fingers, thumb, palm and "
+             "friction: the ball starts in them, between your two open palms, your arms pressing it, and is at your disposal at the start; it can slip out. A hand is its fingers, thumb, palm and "
              "wrist; a hand is on the ball while "
              "it touches the ball, gaps shorter than {touch_gap_s} s included; the ball is in your hands while at "
              "least one hand is on it. The release is the moment the ball is no longer in your hands (no hand on it); "
@@ -265,13 +213,13 @@ class Task(TaskBase):
              "{start_behind_line_m} m behind the free-throw line's near edge and on the line through the ring's "
              "centre; the point under the ring's centre is {line_to_ring_m} m beyond that edge. Painted on the floor: "
              "the restricted area, the free-throw line and circle, the three-point line, the no-charge semi-circle. "
-             "The ball is in your hands in front of your chest, its centre about 1.15 m above the floor and 0.4 m "
-             "ahead of your pelvis: your palms on its two sides, your fingers spread up and forwards over it, both "
-             "hands closed on it (grip values 1); the start command turns your shoulders a little further in than "
+             "The ball is in your hands in front of your chest, its centre 1.13 m above the floor and 0.39 m "
+             "ahead of your pelvis: both hands open (grip values 0, the fingers straight), your palms on its two "
+             "sides (on these hands it bears on the two thumbs, which lie a little proud of the palms); the start command turns your shoulders a little further in than "
              "your arms stand (the difference is the squeeze that holds the ball). A grip value is that hand's closure "
              "command (0 open, 1 every finger and thumb drive closing; a finger stops on what it touches). The "
              "ball is a free body: `held` in your state says which hand holds it (its fingers and its thumb or palm "
-             "on it).")
+             "on it; the open-hand squeeze at the start touches no finger, so `held` is empty there).")
     difficulty = ("The 0.62 kg ball has to leave the hands at about 8 m/s on a steep arc to reach a ring 3.05 m high "
                   "and more than 4 m away, with a margin of a few centimetres in air that slows it; the hands, "
                   "smaller than the ball, have to push it and open in time, and both have to leave it at the same "
@@ -285,7 +233,6 @@ class Task(TaskBase):
         sc.ball("ball", "basketball", (0.42, 0.0, 1.28))         # nothing grippable: held by the hands' contact
         for side in ("left", "right"):                           # the H1-2's own Inspire hands (rfo.realhand)
             sc.real_hands[side] = "inspire"
-            sc.real_hand_options[side] = {"closed": dict(HAND_CLOSED)}
         sc.camera("venue", (-2.6, -3.6, 2.6), (hx * 0.55, 0.0, 1.7), fovy=55)
 
     def reset(self, w):

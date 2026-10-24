@@ -28,7 +28,15 @@ class Task(TaskBase):
         "the hands: the G1 has rubber fists without fingers; any part of the hand may touch the floor",
         "Art. 9.2.17 (feet together at the landing): the robot's legs are 0.24 m apart in its stance and its hips "
         "are not built to close them; a two-foot landing here is both feet touching down within {two_feet_s} s of "
-        "each other, not the feet within 10 cm",
+        "each other (judged after every 1 ms physics step; a foot counts as down until it has been off the floor "
+        "for more than {foot_gap_s} s), not the feet within 10 cm",
+        "the round-off is one continuous element, a half turn through the handstand without a stop (Art. 9.2.12-13 "
+        "recognise it through the handstand; a held handstand is another element). The Code sets no time, so here "
+        "the hand support, from the moment the feet leave the floor before it to the first foot's touchdown of the "
+        "landing, may last at most {hand_support_max_s} s (the number is this benchmark's: a gymnast's round-off "
+        "spends a few tenths of a second on the hands; the G1 falling from a straight handstand, its feet over its "
+        "hands, needs about 0.6 s to reach the floor with its feet); a kick-up to a handstand and a step down is not "
+        "a round-off",
         "a round-off is judged pass or fail, as one element without a run-up requirement or judges: hand support "
         "with the torso within {max_dev_deg} degrees of upside down, a two-foot landing facing back within "
         "{face_dev_deg} degrees, and a stand; height, speed and form are not scored",
@@ -38,7 +46,8 @@ class Task(TaskBase):
     fall_rule = True
     legal_ground = ("left_foot", "right_foot", "left_hand", "right_hand")
     stages = ["hand support", "landing", "stand"]
-    params = dict(max_dev_deg=45.0, face_dev_deg=45.0, two_feet_s=0.10, stand_s=1.0, stand_tilt_deg=20.0,
+    params = dict(max_dev_deg=45.0, face_dev_deg=45.0, two_feet_s=0.10, foot_gap_s=0.03, hand_support_max_s=0.70,
+                  stand_s=1.0, stand_tilt_deg=20.0,
                   stand_still_m_s=0.35, fall_pelvis_m=0.25, area_m=12.0)
 
     sentence = ("Do a round-off: go from your feet onto your hands, turn half round through the handstand and come "
@@ -46,13 +55,17 @@ class Task(TaskBase):
     rules = ("You face +x at the start. The hand support counts when only your hands touch the floor and your torso "
              "is upside down, its long axis (from the pelvis up to the neck) within {max_dev_deg} degrees of "
              "pointing straight down. After it, the landing: your feet come down with no hand on the floor, the "
-             "second foot within {two_feet_s} s of the first (both feet together), and when both feet are down "
+             "second foot within {two_feet_s} s of the first (both feet together; a foot off the floor again for "
+             "more than {foot_gap_s} s before the other is down starts the landing over), the first foot down at "
+             "most {hand_support_max_s} s after your feet left the floor for the hand support (one continuous "
+             "motion, not a held handstand), and when both feet are down "
              "your pelvis and your torso face back, -x, each within {face_dev_deg} degrees (landing facing +x or "
              "sideways is a cartwheel or a Tinsica, not a round-off). Then you stand for {stand_s} s without a "
              "break: only your feet on the floor, your torso within {stand_tilt_deg} degrees of vertical, your "
              "pelvis slower than {stand_still_m_s} m/s. You fail if any part of you other than your hands and feet "
              "touches the floor or your pelvis is lower than {fall_pelvis_m} m (a fall); if after the hand support "
-             "one foot lands and the other does not follow within {two_feet_s} s, or a hand is on the floor when "
+             "one foot lands and the other does not follow within {two_feet_s} s, or no foot is down "
+             "{hand_support_max_s} s after your feet left the floor, or a hand is on the floor when "
              "both feet are down, or you land not facing back; if a hand touches the floor after the landing; if "
              "any part of you touches the floor outside the {area_m} m x {area_m} m floor area; or after "
              "{time_limit_s} s. Before the hand support anything is free (steps, a hop, a hurdle).")
@@ -75,7 +88,11 @@ class Task(TaskBase):
 
     def referee_reset(self, w, ref):
         self.min_upright = math.cos(math.radians(self.p["stand_tilt_deg"]))
-        self.trackers = {"first_foot_t": None, "min_dev_deg": 180.0, "landed": False}
+        # judged after every physics step (1 ms): feet_off: since when no foot has touched the floor (before the hand
+        # support); support_t0: the start of the hand support's feet-free phase; foot_t: each foot's last floor
+        # contact; first_foot_t: the first foot's touchdown of the landing being judged
+        self.trackers = {"feet_off": None, "support_t0": None, "foot_t": [-1.0, -1.0], "first_foot_t": None,
+                         "min_dev_deg": 180.0, "landed": False}
 
     def facing_dev(self, w, body):
         """Degrees between the body's forward (x) axis, levelled, and -x."""
@@ -85,8 +102,15 @@ class Task(TaskBase):
             return 180.0
         return math.degrees(math.acos(max(-1.0, min(1.0, -f[0] / n))))
 
-    def step(self, w, ref):
+    def substep(self, w, ref):
         p, tr = self.p, self.trackers
+        if not (ref.failed or ref.success):              # the fall rule, also after every physics step (1 ms):
+            z = float(w.d.qpos[w.robot.fq + 2])            # a touch shorter than a control step is not missed
+            bad = ref.parts_touching(ref.ground) - set(self.legal_ground)
+            if z < self.fall_z:
+                return ref.fail("fell", pelvis_z=round(z, 3))
+            if bad:
+                return ref.fail("fell", on_the_ground=sorted(bad))
         half = p["area_m"] / 2
         pts = ref.contact_points(ref.robot_mask, ref.ground)
         if len(pts) and (np.abs(pts[:, :2]) > half + 1e-9).any():
@@ -94,23 +118,33 @@ class Task(TaskBase):
         parts = ref.parts_touching(ref.ground)
         feet = parts & {"left_foot", "right_foot"}
         hands = parts & {"left_hand", "right_hand"}
+        now = round(ref.time, 4)
         if not ref.has("hand support"):
-            u = w.d.xmat[w.robot.torso].reshape(3, 3)[:, 2]
-            dev = math.degrees(math.acos(max(-1.0, min(1.0, -u[2]))))
+            tr["feet_off"] = None if feet else (now if tr["feet_off"] is None else tr["feet_off"])
             if hands and not feet:
+                u = w.d.xmat[w.robot.torso].reshape(3, 3)[:, 2]
+                dev = math.degrees(math.acos(max(-1.0, min(1.0, -u[2]))))
                 tr["min_dev_deg"] = round(min(tr["min_dev_deg"], dev), 1)
                 if dev <= p["max_dev_deg"]:
+                    tr["support_t0"] = tr["feet_off"]
                     ref.stage("hand support", dev_deg=round(dev, 1))
             return
         if not tr["landed"]:
-            if not feet:
-                if tr["first_foot_t"] is not None:
-                    tr["first_foot_t"] = None             # a foot touched and left again: not yet the landing
+            for i, s in enumerate(("left_foot", "right_foot")):
+                if s in feet:
+                    tr["foot_t"][i] = now
+            down = [now - t <= p["foot_gap_s"] + 1e-9 for t in tr["foot_t"]]
+            if not any(down):                             # both feet off (for more than foot_gap_s): no landing yet
+                tr["first_foot_t"] = None
+                if now - tr["support_t0"] > p["hand_support_max_s"] + 1e-9:
+                    return ref.fail("not a round-off: the hand support lasted too long",
+                                    support_s=round(now - tr["support_t0"], 3))
                 return
             if tr["first_foot_t"] is None:
-                tr["first_foot_t"] = round(w.t, 3)
-            if len(feet) < 2:
-                if w.t - tr["first_foot_t"] > p["two_feet_s"] + 1e-9:
+                tr["first_foot_t"] = now
+                ref.metrics["hand_support_s"] = round(now - tr["support_t0"], 3)
+            if not (all(down) and min(tr["foot_t"]) >= tr["first_foot_t"]):
+                if now - tr["first_foot_t"] > p["two_feet_s"] + 1e-9:
                     return ref.fail("not a two-foot landing")
                 return
             tr["landed"] = True
@@ -124,6 +158,11 @@ class Task(TaskBase):
             return
         if hands:
             return ref.fail("hand on the floor after the landing")
+
+    def step(self, w, ref):
+        p = self.p
+        if not ref.has("landing"):
+            return
         still = ref.standing(max_speed=p["stand_still_m_s"], min_upright=self.min_upright)
         if ref.hold("stand", still, p["stand_s"]):
             if ref.stage("stand"):

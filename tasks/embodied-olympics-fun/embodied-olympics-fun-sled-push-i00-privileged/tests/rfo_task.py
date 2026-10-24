@@ -37,7 +37,7 @@ class Task(TaskBase):
         "turf: far beyond a 67 kg robot pushing at hip height.",
         "HYROX Sled Push (distance): one 12.5 m length, not four: one action, not the station.",
         "HYROX Sled Push (technique): the sled is pushed with the palms only, on the two upright handles; hands "
-        "cannot grip (the robot's hands are bare pads), and no other part of the body may touch the sled.",
+        "cannot grip (the H1-2's hands are its fixed hands, which do not close), and no other part of the body may touch the sled.",
         "Turf friction: MuJoCo has one friction coefficient per contact: the runners slide on the turf at mu "
         "{runner_mu}, the measured push-sled-on-AstroTurf static range (0.37-0.53, Hoffmann 2014) mid value, "
         "above the measured kinetic range (0.28-0.35): starting is as hard as on real turf, keeping it moving harder.",

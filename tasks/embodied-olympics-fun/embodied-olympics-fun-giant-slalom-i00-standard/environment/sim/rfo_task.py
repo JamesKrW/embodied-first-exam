@@ -1,4 +1,4 @@
-"""Alpine skiing, giant slalom (FIS International Competition Rules, Alpine): one run down a shortened giant slalom
+"""Alpine skiing, giant slalom (FIS International Competition Rules, Alpine): one run down a giant slalom
 course of open gates on a groomed slope, on the robot's own skis: both ski tips and both feet through every gate (between
 the inner poles of its two pole-and-panel pairs), then the finish."""
 import math
@@ -10,16 +10,23 @@ import mujoco
 
 from rfo.task import TaskBase
 
-# ==================================================================================== BEGIN ski-snow block
-# The equipment and the snow (the same block in alpine_slalom, giant_slalom, ski_jumping and snowboard; its master
-# copy is new-snow's block_skisnow.py). Ported, with its authors' permission, from the ski-snow model of the
-# RoboOlympics freeski sport (github.com/CHIGUI0/roboolympics, sports/freeski/skisnow.py, MIT): frictionless
-# condim-1 contacts of the planks' edge spheres with the snow, and, every 1 ms physics step, the tangential forces of
-# the snow on every contact in the plank's own frame, plus the air's drag on every link. Changes in the port: the
-# forces are written to d.xfrc_applied (at the bodies' centres of mass, torque included) instead of mj_applyFT; a
-# plank is a free body held to the boot by a weld (the binding: rigid, as a real binding is until it releases)
-# because the core mounts the robot after the family's build(); the plank is rigid (freeski's later flexing
-# fore- and afterbody are not ported).
+# ==================================================================================== BEGIN ski-snow block v3
+# The equipment and the snow (the same block in alpine_slalom, giant_slalom, ski_jumping, snowboard and the freeski
+# families; its master copy is /data/kangrui/tmp/eo1020/shared/freeski.py, first part). Ported, with its authors'
+# permission, from the ski-snow model of the RoboOlympics freeski sport (github.com/CHIGUI0/roboolympics PR #259,
+# branch sport-freeski, commit d566cffb4, sports/freeski/skisnow.py, MIT): frictionless condim-1 contacts of the planks'
+# edge spheres with the snow, and, every 1 ms physics step, the tangential forces of the snow on every contact in the
+# plank's own frame, plus the air's forces on every link (v3, 2026-10-21: lift). v2 (2026-10-20) follows that file's final version: 9 spheres
+# per edge, a ski of three bodies (its forebody and afterbody on hinges with the ski's bending stiffness), hard well-
+# damped snow (timeconst 5 ms, damping ratio 1.5), the forces' slope against the slip capped at K_V (the explicit
+# step's stability), and solid planks (boxes over the running surface, shovel and tail, in stiff contact with every
+# collision hull of the robot, the core's waist and shoulder shells, and the other plank). Changes in the port: the
+# forces are written to d.xfrc_applied (at the bodies' centres of mass, torque included) instead of mj_applyFT; a plank
+# is a free body held to the boot by a weld (the binding: rigid, as a real binding is until it releases) because the
+# core mounts the robot after the family's build(); the snow is a profile of thin boxes (straight pieces and circular
+# arcs in 25 cm steps), smooth enough that no snow pad (freeski's mocap boxes laid under each sphere) is needed; the
+# solids collide by contact bits instead of explicit pairs (the robot's geoms do not exist yet at build()); the boot is
+# mass on the plank, its forward-flex spring is not modelled; the air's drag is recomputed every physics step.
 #
 # Why a model of its own: MuJoCo's contact friction is isotropic in the tangent plane, a ski is not: it glides along
 # its length and holds across it when it is edged. Per contact of a plank segment with the snow (Fn its normal force):
@@ -32,39 +39,61 @@ from rfo.task import TaskBase
 #           can hold its platform only up to its shear strength over the groove; a flat plank skids on its base
 #   sidecut the "along" direction follows the arc of radius R_sc cos(phi) the edged plank is bent onto (Howe 2001;
 #           Lieu & Mote 1985): an edged plank carves a turn of that radius, a flat one runs straight
-# sat(v) = v / sqrt(v^2 + V0^2): each force opposes its own segment's sliding and never does positive work (an edged
-# plank cannot climb, a sliding one cannot push itself). The snow's normal reaction is MuJoCo's soft contact.
-# Air: drag 0.5 rho Cd A(u) |v| v on every link of the robot and on the planks, A(u) the link's area projected across
-# its velocity (|u_x| A_x + |u_y| A_y + |u_z| A_z, the convex hulls of its visual shapes along its own axes), times the
-# overlap factor (the robot's true silhouette over the links' summed areas, measured once standing), Cd 1.0 (a bluff
-# body); the venue's air density is that of a mountain venue at about 1500 m, 1.052 kg/m^3 (ISA). MuJoCo's own fluid
-# model is switched off in these worlds (it would count the air twice).
-SNOW_BIT, PLANK_BIT = 1, 2                   # the snow accepts the planks' edge spheres (2), the feet (1), the hulls (4)
+# sat(v) = v / sqrt(v^2 + V0^2), V0 = max(0.03 m/s, force / K_V): each force opposes its own segment's sliding and never
+# does positive work (an edged plank cannot climb, a sliding one cannot push itself). The snow's normal reaction is
+# MuJoCo's soft contact. Air (v3, 2026-10-21: lift): every link of the robot and of the planks feels the quasi-steady
+# normal-force aerodynamics of its hull's faces: along each of its own axes k, -0.5 rho C_N A_k |v| v_k (Hoerner's
+# cross-flow principle; A_k the convex hull of its visual shapes projected along its axis k; C_N 1.17, a flat plate's),
+# times the overlap factor (the robot's true silhouette over the links' summed areas, measured once standing). A flat
+# inclined link (a ski, a trunk laid over the skis) gets lift across the flow as well as drag along it, a compact one
+# drag: the posture decides both. Check (tests/test_air.py): a V-style elite jumper made of plates (body 1.75 x 0.40 m,
+# skis 2.60 x 0.11 m, a 35 degree V) gets L/q 0.63 m^2 and D/q 0.55 m^2 at 35 degrees of attack, inside what ski-jumping aerodynamics
+# reports for elite flight (Schmolzer & Muller 2005, J. Biomech. 38:1055; Virmavirta et al. 2005, J. Biomech.
+# 38:2157: lift areas about 0.6-0.8 m^2, drag areas about 0.5 m^2 at 30-40 degrees). The venue's air density is a
+# mountain venue's, 1.052 kg/m^3 (ISA, about 2000 m at -10 C). MuJoCo's own fluid model is off in these worlds (it
+# would count the air twice).
+SNOW_BIT, PLANK_BIT, SOLID_BIT = 1, 2, 16    # the snow accepts the edge spheres (2), the feet (1), the hulls (4)
 SNOW_CONAFF = 1 | 2 | 4 | 8
+SOLID_CONAFF = 4 | 16                        # a plank's solid: the robot's hulls (4) and the other plank's solid (16);
+#                                              the core's shells (SHELL_BIT) see it through its contype (world.py)
 SNOW_RGBA = (0.94, 0.95, 0.98, 1)            # groomed snow (drawn flat white: looks.py leaves white surfaces alone)
-SEG = 7                                      # contact spheres per edge along the running surface
+SEG = 9                                      # contact spheres per edge along the running surface
 SPHERE_R = 0.012
-PLANK_SOLREF = "0.03 1.3"                   # the snow's normal compliance and damping at the planks' contacts (freeski)
-PLANK_SOLIMP = "0.9 0.95 0.001"
-BIND_SOLREF = "0.002 1"                     # the binding (a weld): as stiff as the 1 ms step allows
+BIND_HALF = 0.18                             # the binding's half length: the rigid middle between the flex hinges (m)
+K_V = 3000.0                                 # N s/m: the largest slope of a ski-snow force against the slip
+PLANK_SOLREF = "0.005 1.5"                   # hard prepared snow: about 1 mm under a standing robot; well damped
+PLANK_SOLIMP = "0.95 0.99 0.002"
+SOLID_SOLREF = "0.004 1"                     # a plank against the robot's body and the other plank: stiff (freeski E11)
+SOLID_SOLIMP = "0.99 0.999 0.0005"
+BIND_SOLREF = "0.002 1"                      # the binding (a weld): as stiff as the 1 ms step allows
+BIND_SOLIMP = "0.99 0.999 0.001"            # (v2: 0.95 0.99 let a thrashing leg stretch it 2 cm: the stress test)
 AIR_RHO = 1.052
+C_N = 1.17                                   # a flat plate's normal-force coefficient across the flow (Hoerner 1965,
+#                                              Fluid-Dynamic Drag, ch. 3: 1.17 for a square plate normal to the flow)
 
 
 class Plank:
     """A ski or a snowboard: metres and kilograms. `mount`: the binding centre's offset from the middle of the running
     surface (negative: behind); widths at the tip, the waist and the tail; `radius` the sidecut radius. For a
-    snowboard `stance` is the distance between the two bindings' centres (0 for a ski)."""
+    snowboard `stance` is the distance between the two bindings' centres (0 for a ski). EI_fore / EI_aft: the bending
+    stiffness (N m^2) of the forebody and the afterbody; None: a rigid plank."""
 
     def __init__(self, model, length, tip_w, waist_w, tail_w, radius, mass, mount, binding_mass, stand_h,
-                 shovel=0.16, tail=0.10, tip_rise=0.06, tail_rise=0.025, thick=0.016, boot_mass=0.0, stance=0.0):
+                 shovel=0.16, tail=0.10, tip_rise=0.06, tail_rise=0.025, thick=0.016, boot_mass=0.0, stance=0.0,
+                 EI_fore=None, EI_aft=None):
         self.model, self.length, self.tip_w, self.waist_w, self.tail_w = model, length, tip_w, waist_w, tail_w
         self.radius, self.mass, self.mount, self.binding_mass, self.stand_h = radius, mass, mount, binding_mass, stand_h
         self.shovel, self.tail, self.tip_rise, self.tail_rise, self.thick = shovel, tail, tip_rise, tail_rise, thick
         self.boot_mass, self.stance = boot_mass, stance
+        self.EI_fore, self.EI_aft = EI_fore, EI_aft
 
     @property
     def run_len(self):
         return self.length - self.shovel - self.tail
+
+    @property
+    def flex(self):
+        return self.EI_fore is not None and self.EI_aft is not None
 
     def half_width(self, s):
         """Half the width at s along the running surface (s = 0 its middle, + forward): the sidecut's parabola."""
@@ -76,66 +105,126 @@ class Plank:
         """The front end of the plank (the shovel's tip) along it from the middle of the running surface."""
         return 0.5 * self.run_len + self.shovel
 
+    def sphere_s(self):
+        """(edge, name, s along the plank from its middle, z of the sphere's bottom, half width) of every contact
+        sphere: SEG along each edge, one at the shovel and one at the tail."""
+        H, L = 0.5 * self.run_len, self.run_len
+        out = []
+        for e in ("l", "r"):
+            for i in range(SEG):
+                s = -H + L * i / (SEG - 1)
+                out.append((e, f"{e}{i}", s, 0.0, self.half_width(s)))
+            out.append((e, f"{e}tipc", H + 0.55 * self.shovel, 0.55 * self.tip_rise, 0.42 * self.tip_w))
+            out.append((e, f"{e}tailc", -H - 0.55 * self.tail, 0.55 * self.tail_rise, 0.42 * self.tail_w))
+            # the shovel's and the tail's ends (v2: without them a ski pitched into the snow sank its tip, a solid
+            # that does not touch the snow, up to 8 cm: the stress test)
+            out.append((e, f"{e}tipe", H + self.shovel - SPHERE_R, self.tip_rise - SPHERE_R, 0.42 * self.tip_w))
+            out.append((e, f"{e}taile", -H - self.tail + SPHERE_R, self.tail_rise - SPHERE_R, 0.42 * self.tail_w))
+        return out
+
 
 def _f6(v):
     return " ".join(f"{float(x):.6g}" for x in v)
 
 
+def _box_inertia(m, a, b, c):
+    return m * (b * b + c * c) / 12, m * (a * a + c * c) / 12, m * (a * a + b * b) / 12
+
+
 def add_plank(sc, name, pk: Plank, rgba=(0.85, 0.12, 0.10, 1), top_rgba=(0.95, 0.95, 0.95, 1), n_bind=1):
-    """A free plank body `name` (its frame: the middle of the running surface, x forward along it, z up from its base)
-    with its binding(s) and boot shell(s) as mass, looks, two rows of edge spheres (the snow contacts) and raised
-    spheres at the shovel and the tail, and a solid plate (`<name>_plate`) for what the plank hits besides the snow
-    (the other plank, gate poles; explicit pairs). Returns the body element."""
+    """A free plank `name` (its frame: the middle of the running surface, x forward along it, z up from its base) with
+    its binding(s) and boot(s) as mass, looks, two rows of edge spheres (the snow contacts) and raised spheres at the
+    shovel and the tail, and solid boxes (`<name>_plate...`) for what the plank hits besides the snow. A flexing plank
+    (pk.flex) is three bodies: `name` (the middle under the binding, rigid), `<name>_fore` and `<name>_aft` on hinges
+    across the plank at the binding's ends, each with the torsional spring k = 3 EI / l of the ski's bending stiffness
+    (a cantilever of length l with the same tip deflection) and a little damping (damping ratio about 0.1). Returns
+    the parts' body names."""
     b = sc.body(name, (0.0, 0.0, -50.0), free=True)
     L, H, T = pk.run_len, 0.5 * pk.run_len, pk.thick
     mb = (pk.binding_mass + pk.boot_mass) * n_bind
-    m_tot = pk.mass + mb
-    w = pk.waist_w
-    Ixx = pk.mass * (w ** 2 + T ** 2) / 12 + mb * (0.07 ** 2 + 0.06 ** 2) / 12
-    Iyy = pk.mass * (pk.length ** 2 + T ** 2) / 12 + mb * ((0.3 ** 2 + 0.06 ** 2) / 12 + pk.mount ** 2)
-    Izz = pk.mass * (pk.length ** 2 + w ** 2) / 12 + mb * ((0.3 ** 2 + 0.07 ** 2) / 12 + pk.mount ** 2)
-    ET.SubElement(b, "inertial", pos=_f6((pk.mount * mb / m_tot, 0, T + 0.02)), mass=f"{m_tot:.5g}",
-                  diaginertia=_f6((Ixx, Iyy, Izz)))
+    tot = pk.length
+    if pk.flex:
+        xf, xb = pk.mount + BIND_HALF, pk.mount - BIND_HALF          # the hinges along the plank from its middle
+        segs = (("", xb, xf), ("_fore", xf, H + pk.shovel), ("_aft", -H - pk.tail, xb))
+    else:
+        xf, xb = H + pk.shovel, -H - pk.tail
+        segs = (("", xb, xf),)
+    parts, off = {"": b}, {"": 0.0}
+    for nm, x0, x1 in segs[1:]:
+        hinge = xf if nm == "_fore" else xb
+        bb = ET.SubElement(b, "body", name=f"{name}{nm}", pos=_f6((hinge, 0.0, 0.0)))
+        ln = abs(x1 - hinge) - (pk.shovel if nm == "_fore" else pk.tail)
+        EI = pk.EI_fore if nm == "_fore" else pk.EI_aft
+        k = 3.0 * EI / max(ln, 0.05)
+        seg_m = pk.mass * (x1 - x0) / tot
+        Iy = seg_m * (x1 - x0) ** 2 / 3.0
+        ET.SubElement(bb, "joint", name=f"{name}{nm}_flex", type="hinge", axis="0 1 0", stiffness=f"{k:.5g}",
+                      damping=f"{0.2 * math.sqrt(k * Iy):.4g}", range="-0.35 0.35", armature="0.0005")
+        parts[nm], off[nm] = bb, hinge
+    for nm, x0, x1 in segs:
+        seg_m = pk.mass * (x1 - x0) / tot
+        c = 0.5 * (x0 + x1) - off[nm]
+        if nm == "":                               # the binding(s) and the boot(s) ride on the middle
+            m_tot = seg_m + mb
+            Ixx, Iyy, Izz = _box_inertia(seg_m, x1 - x0, pk.waist_w, T)
+            dx = pk.mount - c
+            Ixx += mb * (0.07 ** 2 + 0.06 ** 2) / 12
+            Iyy += mb * ((0.3 ** 2 + 0.06 ** 2) / 12 + dx ** 2)
+            Izz += mb * ((0.3 ** 2 + 0.07 ** 2) / 12 + dx ** 2)
+            ET.SubElement(b, "inertial", pos=_f6(((seg_m * c + mb * pk.mount) / m_tot, 0, T + 0.02)),
+                          mass=f"{m_tot:.5g}", diaginertia=_f6((Ixx, Iyy, Izz)))
+        else:
+            ET.SubElement(parts[nm], "inertial", pos=_f6((c, 0, 0.5 * T)), mass=f"{seg_m:.5g}",
+                          diaginertia=_f6(_box_inertia(seg_m, x1 - x0, pk.waist_w, T)))
+
+    def part_of(s):
+        return "" if xb <= s <= xf else ("_fore" if s > xf else "_aft")
+
     n = 12
     for i in range(n):                         # the running surface with its sidecut (looks only)
         s0, s1 = -H + L * i / n, -H + L * (i + 1) / n
         sm = 0.5 * (s0 + s1)
+        p = part_of(sm)
         hw = pk.half_width(sm)
-        sc.geom(b, f"{name}_v{i}", type="box", pos=(sm, 0, 0.5 * T), size=(0.5 * (s1 - s0) + 2e-4, hw, 0.5 * T),
-                rgba=rgba, group=1, mass=0, contype=0, conaffinity=0)
-    sc.geom(b, f"{name}_top", type="box", pos=(0, 0, T + 0.0006), size=(H, 0.45 * w, 0.0007), rgba=top_rgba, group=1,
-            mass=0, contype=0, conaffinity=0)
+        sc.geom(parts[p], f"{name}_v{i}", type="box", pos=(sm - off[p], 0, 0.5 * T), size=(0.5 * (s1 - s0) + 2e-4, hw,
+                0.5 * T), rgba=rgba, group=1, mass=0, contype=0, conaffinity=0)
+        sc.geom(parts[p], f"{name}_t{i}", type="box", pos=(sm - off[p], 0, T + 0.0006), size=(0.5 * (s1 - s0) + 2e-4,
+                0.45 * pk.waist_w, 0.0007), rgba=top_rgba, group=1, mass=0, contype=0, conaffinity=0)
+    solid = dict(contype=SOLID_BIT, conaffinity=SOLID_CONAFF, condim=3, priority=1, friction=(0.5, 0.005, 0.0001),
+                 solref=SOLID_SOLREF, solimp=SOLID_SOLIMP, group=3, mass=0, rgba=(0.9, 0.3, 0.3, 0.3))
     for nm, sgn, ln, rise, wd in (("tip", 1, pk.shovel, pk.tip_rise, pk.tip_w), ("tail", -1, pk.tail, pk.tail_rise,
                                                                                    pk.tail_w)):
         ang = math.atan2(rise, ln)
-        sc.geom(b, f"{name}_{nm}", type="box", pos=(sgn * (H + 0.5 * ln), 0, 0.5 * T + 0.5 * rise),
-                euler=(0, -sgn * ang, 0), size=(0.5 * math.hypot(ln, rise), 0.45 * wd, 0.5 * T), rgba=rgba, group=1,
-                mass=0, contype=0, conaffinity=0)
-    # the solid plate: what the plank hits besides the snow (explicit pairs only)
-    sc.geom(b, f"{name}_plate", type="box", pos=(0, 0, 0.5 * T + 0.004), size=(H + 0.5 * pk.shovel, 0.5 * w, 0.5 * T),
-            rgba=(0, 0, 0, 0), group=4, mass=0, contype=0, conaffinity=0)
+        p = part_of(sgn * (H + 0.5 * ln))
+        kw = dict(type="box", pos=(sgn * (H + 0.5 * ln) - off[p], 0, 0.5 * T + 0.5 * rise), euler=(0, -sgn * ang, 0),
+                  size=(0.5 * math.hypot(ln, rise), 0.40 * wd, 0.5 * T))     # (inside the end spheres' cover)
+        sc.geom(parts[p], f"{name}_{nm}", rgba=rgba, group=1, mass=0, contype=0, conaffinity=0, **kw)
+        sc.geom(parts[p], f"{name}_plate_{nm}", **kw, **solid)        # the upturned shovel / tail: solid too
+    for nm, x0, x1 in segs:                    # the solids over the running surface, one per part
+        a, c_ = max(x0, -H), min(x1, H)
+        hw = min(pk.half_width(a), pk.half_width(c_), pk.half_width(0.5 * (a + c_)))
+        sc.geom(parts[nm], f"{name}_plate{nm}", type="box", pos=(0.5 * (a + c_) - off[nm], 0, 0.5 * T),
+                size=(0.5 * (c_ - a), hw, 0.5 * T), **solid)
     offs = [0.0] if n_bind == 1 else [-0.5 * pk.stance, 0.5 * pk.stance]
-    for k, off in enumerate(offs):             # binding(s): looks
-        x0 = pk.mount + off
+    for k, o in enumerate(offs):               # binding(s): looks
+        x0 = pk.mount + o
         sc.geom(b, f"{name}_bind{k}", type="box", pos=(x0, 0, T + 0.5 * pk.stand_h),
                 size=(0.15, 0.03, 0.5 * pk.stand_h - 0.002) if n_bind == 1 else (0.04, 0.13, 0.5 * pk.stand_h - 0.002),
                 rgba=(0.18, 0.18, 0.2, 1), group=1, mass=0, contype=0, conaffinity=0)
     r = SPHERE_R
-    for e, sgn in (("l", 1), ("r", -1)):
-        pts = [(f"{e}{i}", -H + L * i / (SEG - 1), 0.0, pk.half_width(-H + L * i / (SEG - 1))) for i in range(SEG)]
-        pts += [(f"{e}tipc", H + 0.55 * pk.shovel, 0.55 * pk.tip_rise, 0.42 * pk.tip_w),
-                (f"{e}tailc", -H - 0.55 * pk.tail, 0.55 * pk.tail_rise, 0.42 * pk.tail_w)]
-        for nm, s_, z, hw in pts:
-            sc.geom(b, f"{name}_e{nm}", type="sphere", size=(r,), pos=(s_, sgn * (hw - r), z + r),
-                    contype=PLANK_BIT, conaffinity=0, condim=1, priority=2, group=4, mass=0, solref=PLANK_SOLREF,
-                    solimp=PLANK_SOLIMP, rgba=(0.3, 0.3, 0.9, 0.5))
-    return b
+    for e, nm, s_, z, hw in pk.sphere_s():
+        sgn = 1 if e == "l" else -1
+        p = part_of(s_)
+        sc.geom(parts[p], f"{name}_e{nm}", type="sphere", size=(r,), pos=(s_ - off[p], sgn * (hw - r), z + r),
+                contype=PLANK_BIT, conaffinity=0, condim=1, priority=2, group=4, mass=0, solref=PLANK_SOLREF,
+                solimp=PLANK_SOLIMP, rgba=(0.3, 0.3, 0.9, 0.5))
+    return [f"{name}{nm}" for nm, _, _ in segs]
 
 
 def bind(sc, plank, foot, relpos, relquat=(1, 0, 0, 0), name=None):
     """The binding: a weld of the plank to the foot body; relpos / relquat: the plank's frame in the foot's frame."""
     ET.SubElement(sc.root.find("equality"), "weld", name=name or f"binding_{plank}_{foot}", body1=foot, body2=plank,
-                  relpose=_f6(tuple(relpos) + tuple(relquat)), solref=BIND_SOLREF, solimp="0.95 0.99 0.001")
+                  relpose=_f6(tuple(relpos) + tuple(relquat)), solref=BIND_SOLREF, solimp=BIND_SOLIMP)
 
 
 def no_fluid(sc):
@@ -196,10 +285,10 @@ class SnowModel:
     """The snow's tangential forces on the planks and the air's drag on the robot and the planks, written to
     d.xfrc_applied after every physics step from that step's contacts (the forces of the next step)."""
 
-    def __init__(self, w, planks: dict, snow_geoms, H_V=0.21e9, S_f=0.52e6, mu_opt=0.043, cd=1.0, v0=0.03,
+    def __init__(self, w, planks: dict, snow_geoms, H_V=0.21e9, S_f=0.52e6, mu_opt=0.043, cd=None, v0=0.03,
                  phi_max_deg=70.0):
         m = w.m
-        self.m, self.H_V, self.S_f, self.mu_opt, self.cd, self.v0 = m, H_V, S_f, mu_opt, cd, v0
+        self.m, self.H_V, self.S_f, self.mu_opt, self.cd, self.v0 = m, H_V, S_f, mu_opt, C_N if cd is None else cd, v0
         self.phi_max = math.radians(phi_max_deg)
         self.is_snow = np.zeros(m.ngeom, bool)
         self.is_snow[[m.geom(n).id for n in snow_geoms]] = True
@@ -208,24 +297,23 @@ class SnowModel:
         self.radius = np.ones(m.nbody) * 1e9
         self.plank_ids = []
         for name, pk in planks.items():
-            bid = m.body(name).id
-            self.plank_ids.append(bid)
-            self.radius[bid] = pk.radius
             L = pk.run_len
-            for e in ("l", "r"):
-                for i in range(SEG):
-                    g = m.geom(f"{name}_e{e}{i}").id
-                    s = float(m.geom_pos[g][0])
-                    self.seg_body[g], self.seg_s[g] = bid, s
-                    self.seg_len[g] = L / (SEG - 1) * (0.5 if i in (0, SEG - 1) else 1.0)
-                    self.seg_w[g] = 2 * pk.half_width(s)
-                for nm in ("tipc", "tailc"):
-                    g = m.geom(f"{name}_e{e}{nm}").id
-                    self.seg_body[g], self.seg_s[g] = bid, float(m.geom_pos[g][0])
+            for e, nm, s, _, hw in pk.sphere_s():
+                g = m.geom(f"{name}_e{nm}").id
+                bid = int(m.geom_bodyid[g])
+                if bid not in self.plank_ids:
+                    self.plank_ids.append(bid)
+                self.radius[bid] = pk.radius
+                self.seg_body[g], self.seg_s[g] = bid, s
+                if nm[1:] in ("tipc", "tailc", "tipe", "taile"):
                     self.seg_len[g] = 0.5 * L / (SEG - 1)
-                    self.seg_w[g] = pk.tip_w if nm == "tipc" else pk.tail_w
+                    self.seg_w[g] = pk.tip_w if nm[1:].startswith("tip") else pk.tail_w
+                else:
+                    i = int(nm[1:])
+                    self.seg_len[g] = L / (SEG - 1) * (0.5 if i in (0, SEG - 1) else 1.0)
+                    self.seg_w[g] = 2 * hw
         self.is_seg = self.seg_body >= 0
-        # the drag's links: the robot's bodies with visual shapes, and the planks
+        # the drag's links: the robot's bodies with visual shapes, and the planks' parts
         bs, cs, As, pts = [], [], [], []
         for b in sorted(set(w.robot.bodies) | set(self.plank_ids)):
             gs = [g for g in range(m.ngeom) if m.geom_bodyid[g] == b and m.geom_group[g] in (1, 2)]
@@ -240,6 +328,7 @@ class SnowModel:
         self.drag_b, self.drag_c, self.drag_A = np.array(bs, int), np.array(cs), np.array(As)
         self.drag_root = m.body_rootid[self.drag_b]
         self.overlap = self._overlap(w, pts)
+        self.bodies = np.unique(np.r_[self.drag_b, self.plank_ids]).astype(int)
         self.last = {}
 
     def _overlap(self, w, pts, res=0.01) -> float:
@@ -283,6 +372,7 @@ class SnowModel:
     def apply(self, d) -> None:
         m = self.m
         xf = d.xfrc_applied
+        xf[self.bodies] = 0.0
         # the air
         b = self.drag_b
         R = d.xmat[b].reshape(-1, 3, 3)
@@ -291,8 +381,11 @@ class SnowModel:
         vel = cv[:, 3:] + np.cross(cv[:, :3], cpos - d.subtree_com[self.drag_root])
         sp = np.linalg.norm(vel, axis=1)
         loc = np.einsum("bji,bj->bi", R, vel / np.maximum(sp, 1e-9)[:, None])
-        A = np.sum(np.abs(loc) * self.drag_A, axis=1)
-        F = -0.5 * AIR_RHO * self.cd * self.overlap * (A * sp)[:, None] * vel
+        # the quasi-steady normal-force model (v3): each face of a link's hull pushes back along its own normal with
+        # 0.5 rho C_N A_k |v| v_k (Hoerner's cross-flow principle): an inclined flat link (a ski, a flat trunk) gets lift
+        # across the flow as well as drag along it; a compact link, drag nearly along -v. F . v <= 0 always.
+        Fl = -0.5 * AIR_RHO * self.cd * self.overlap * sp[:, None] * (self.drag_A * (loc * sp[:, None]))
+        F = np.einsum("bij,bj->bi", R, Fl)
         xf[b, :3] = F
         xf[b, 3:] = np.cross(cpos - d.xipos[b], F)
         self.last = {"drag_n": float(np.linalg.norm(F.sum(0))), "n": 0}
@@ -341,8 +434,10 @@ class SnowModel:
         e_full = V / (ln * bw) + 0.5 * bw * np.sin(aphi)
         e = np.where(e_wedge <= bw * np.sin(aphi), e_wedge, e_full)
         cap = mu * fn + np.minimum(fn * tp, self.S_f * e * ln)
-        f_long = -mu * fn * vl / np.sqrt(vl * vl + self.v0 ** 2)
-        f_lat = -cap * vq / np.sqrt(vq * vq + self.v0 ** 2)
+        vl0 = np.maximum(self.v0, mu * fn / K_V)                 # the forces' slope at zero slip at most K_V
+        vq0 = np.maximum(self.v0, cap / K_V)
+        f_long = -mu * fn * vl / np.sqrt(vl * vl + vl0 ** 2)
+        f_lat = -cap * vq / np.sqrt(vq * vq + vq0 ** 2)
         Fc = f_long[:, None] * t + f_lat[:, None] * lat
         Tc = np.cross(pos - d.xipos[body], Fc)
         np.add.at(xf, (body, slice(0, 3)), Fc)
@@ -362,13 +457,14 @@ class Digest:
 
 
 class Profile:
-    """A snow surface's long profile z(x) of straight lines and circular arcs (freeski's profile.py), extruded across
-    the course: built as thin tilted boxes, one per piece (a 1 m-thick slab under the surface)."""
+    """A snow surface's long profile z(x) of straight lines and circular arcs (freeski's lines.py), extruded across
+    the course: built as thin tilted boxes, one per piece (a slab under the surface)."""
 
     def __init__(self, x0=0.0, z0=0.0, angle_deg=0.0):
         self.pts = [(x0, z0)]
         self.ang = math.radians(angle_deg)
         self.marks = {}
+        self.idx = {}
 
     @property
     def end(self):
@@ -376,6 +472,7 @@ class Profile:
 
     def mark(self, name):
         self.marks[name] = self.end
+        self.idx[name] = len(self.pts) - 1
         return self
 
     def line(self, length, angle_deg=None):
@@ -414,22 +511,31 @@ class Profile:
         i = int(np.clip(np.searchsorted(xs, x) - 1, 0, len(xs) - 2))
         return math.atan2(zs[i + 1] - zs[i], xs[i + 1] - xs[i])
 
-    def build(self, sc, prefix, half_width, rgba=SNOW_RGBA, thick=1.0, y=0.0):
-        """The snow: one box per piece, overlapping its neighbours by 2 cm. Returns the geoms' names."""
+    def build(self, sc, prefix, half_width, rgba=SNOW_RGBA, thick=1.0, y=0.0, i0=0, i1=None, material=None):
+        """The snow: one box per piece (pieces i0 .. i1 - 1), overlapping its neighbours by 2 mm (at a convex bend the
+        overlap is a ridge of 2 mm x the bend's angle: 0.06 mm on a 25 cm piece of an 8 m arc). half_width and thick
+        may be functions of the piece's middle x. Returns the geoms' names."""
         xs, zs = self.arrays()
+        i1 = len(xs) - 1 if i1 is None else i1
         names = []
-        for i in range(len(xs) - 1):
+        for i in range(i0, i1):
             dx, dz = xs[i + 1] - xs[i], zs[i + 1] - zs[i]
             L = math.hypot(dx, dz)
             a = math.atan2(dz, dx)
             ux, uz = dx / L, dz / L
             nx, nz = -uz, ux                       # the surface's normal
-            cx = 0.5 * (xs[i] + xs[i + 1]) - nx * 0.5 * thick
-            cz = 0.5 * (zs[i] + zs[i + 1]) - nz * 0.5 * thick
+            xm = 0.5 * (xs[i] + xs[i + 1])
+            th = thick(xm) if callable(thick) else thick
+            hw = half_width(xm) if callable(half_width) else half_width
+            cx = xm - nx * 0.5 * th
+            cz = 0.5 * (zs[i] + zs[i + 1]) - nz * 0.5 * th
             nm = f"{prefix}{i}"
-            sc.geom(sc.wb, nm, type="box", pos=(cx, y, cz), size=(0.5 * L + 0.02, half_width, 0.5 * thick),
-                    quat=(math.cos(-a / 2), 0.0, math.sin(-a / 2), 0.0), rgba=rgba, contype=SNOW_BIT,
-                    conaffinity=SNOW_CONAFF, friction=(0.35, 0.005, 0.0001), condim=3)
+            look = dict(material=material) if material else dict(rgba=rgba)
+            sc.geom(sc.wb, nm, type="box", pos=(cx, y, cz), size=(0.5 * L + 0.002, hw, 0.5 * th),
+                    quat=(math.cos(-a / 2), 0.0, math.sin(-a / 2), 0.0), **look, contype=SNOW_BIT,
+                    conaffinity=SNOW_CONAFF, friction=(0.35, 0.005, 0.0001), condim=3, solref=PLANK_SOLREF,
+                    solimp=PLANK_SOLIMP, priority=1)    # one snow for the skis and the body: its parameters win
+                    #                                     (v2: the body's soft default contact sank it 5-10 cm)
             names.append(nm)
         return names
 
@@ -445,10 +551,10 @@ def qmul(a, b):
 
 
 def place_on_slope(w, slope_rad, zfun, planks: dict, legs=None):
-    """t = 0: the robot standing perpendicular to the snow (the surface z = zfun(x), falling at slope_rad along +x),
-    its planks under its boots as the bindings hold them, resting on the snow. planks: name -> (foot body, relpos,
-    relquat) of its binding. legs: the 12 leg joint angles to start in (default: as they are); the leg motors hold
-    them (the arbiter's stand hold)."""
+    """t = 0: the robot standing perpendicular to the snow (the surface z = zfun(x), falling at slope_rad along +x;
+    0: a level start platform), its planks under its boots as the bindings hold them, resting on the snow. planks: name
+    -> (foot body, relpos, relquat) of its binding. legs: the 12 leg joint angles to start in (default: as they are);
+    the leg motors hold them (the arbiter's stand hold)."""
     m, d, r = w.m, w.d, w.robot
     a = r.arb
     if legs is not None:
@@ -463,7 +569,7 @@ def place_on_slope(w, slope_rad, zfun, planks: dict, legs=None):
     mujoco.mj_kinematics(m, d)
     c = math.cos(slope_rad)
     gaps = [(float(d.geom_xpos[g][2]) - float(zfun(float(d.geom_xpos[g][0])))) * c - SPHERE_R
-            for g in range(m.ngeom) if m.geom(g).name.rsplit("_e", 1)[0] in planks and "_e" in m.geom(g).name]
+            for g in range(m.ngeom) if "_e" in m.geom(g).name and m.geom(g).name.rsplit("_e", 1)[0] in planks]
     dz = -(min(gaps) + 0.0003) / c                # the lowest edge sphere 0.3 mm into the snow
     d.qpos[fq + 2] += dz
     for name in planks:
@@ -471,12 +577,80 @@ def place_on_slope(w, slope_rad, zfun, planks: dict, legs=None):
     L = a.GROUPS["legs"]
     a.q_a[L] = a.q_b[L] = d.qpos[a.qadr[L]]
     mujoco.mj_kinematics(m, d)
-# ====================================================================================== END ski-snow block
 
-# ==================================================================================== BEGIN alpine-race block
+
+# ------------------------------------------------------------------------ how a ski venue looks (and its solid fences)
+# Groomed snow: near-white with a fine grain and a faint corduroy of the piste machine (looks.py leaves white surfaces
+# alone, so the snow brings its own material); the course's fences are solid (a robot sliding off the course meets
+# them, it never passes through), their posts, banners and markers looks only (merged meshes: looks._Batch).
+SNOW_MAT = "eo_snow"
+FENCE_RGBA = (0.95, 0.35, 0.08, 0.55)        # an orange safety net
+FENCE_CONTACT = dict(contype=1, conaffinity=1 | 4 | 8 | 16, condim=3, friction=(0.6, 0.005, 0.0001),
+                     solref="0.02 1", solimp="0.9 0.95 0.001")   # a net: soft (it gives, about 2 cm under a body)
+
+
+def snow_material(sc) -> str:
+    asset = sc.root.find("asset")
+    if not any(t.get("name") == SNOW_MAT for t in asset.findall("material")):
+        ET.SubElement(asset, "texture", name=SNOW_MAT, type="2d", builtin="checker", rgb1="0.965 0.97 0.985",
+                      rgb2="0.935 0.945 0.97", mark="random", markrgb="0.88 0.9 0.95", random="0.06",
+                      width="512", height="512")
+        ET.SubElement(asset, "material", name=SNOW_MAT, texture=SNOW_MAT, texuniform="true", texrepeat="0.8 6",
+                      specular="0.25", shininess="0.3", reflectance="0.02")
+    return SNOW_MAT
+
+
+def snow_side_terrain(sc, pr, prefix, i0, i1, inner, outer, z_of=None, thick=2.0) -> list:
+    """Snow terrain beside the course (both sides, from the course's edge `inner` to `outer` m from its centre line),
+    flush with the profile's pieces i0 .. i1 - 1 (or with z_of(x), a flat level, when given). Returns the geoms."""
+    xs, zs = pr.arrays()
+    names = []
+    for side in (1, -1):
+        y = side * 0.5 * (inner + outer)
+        if z_of is None:
+            names += pr.build(sc, f"{prefix}{'L' if side > 0 else 'R'}", 0.5 * (outer - inner), thick=thick, y=y,
+                              i0=i0, i1=i1, material=snow_material(sc))
+        else:
+            x0, x1 = xs[i0], xs[i1]
+            nm = f"{prefix}{'L' if side > 0 else 'R'}"
+            sc.geom(sc.wb, nm, type="box", pos=(0.5 * (x0 + x1), y, z_of - 0.5 * thick),
+                    size=(0.5 * (x1 - x0) + 0.002, 0.5 * (outer - inner), 0.5 * thick), material=snow_material(sc),
+                    contype=SNOW_BIT, conaffinity=SNOW_CONAFF, friction=(0.35, 0.005, 0.0001), condim=3,
+                    solref=PLANK_SOLREF, solimp=PLANK_SOLIMP, priority=1)
+            names.append(nm)
+    return names
+
+
+def fence_line(sc, batch, prefix, zfun, x0, x1, y, height=1.2, step=2.0) -> None:
+    """A solid safety net along the course at y from x0 to x1, following the snow (zfun(x)): one thin panel per
+    `step` m and a post at each panel's end (looks)."""
+    n = max(1, int(math.ceil((x1 - x0) / step)))
+    for i in range(n):
+        a, b = x0 + (x1 - x0) * i / n, x0 + (x1 - x0) * (i + 1) / n
+        za, zb = float(zfun(a)), float(zfun(b))
+        L = math.hypot(b - a, zb - za)
+        ang = math.atan2(zb - za, b - a)
+        sc.geom(sc.wb, f"{prefix}{i}", type="box", pos=(0.5 * (a + b), y, 0.5 * (za + zb) + 0.5 * height),
+                size=(0.5 * L, 0.01, 0.5 * height), quat=(math.cos(-ang / 2), 0.0, math.sin(-ang / 2), 0.0),
+                rgba=FENCE_RGBA, group=1, **FENCE_CONTACT)
+        batch.add((0.25, 0.25, 0.27), (b, y, zb + 0.5 * height + 0.05), (0.025, 0.025, 0.5 * height + 0.05))
+
+
+def arch(batch, x, y, z, half_w, height=3.0, rgb=(0.12, 0.3, 0.75)) -> None:
+    """A banner arch across the course at x (looks): two posts and the banner."""
+    for s_ in (1, -1):
+        batch.add((0.2, 0.2, 0.22), (x, y + s_ * half_w, z + 0.5 * height), (0.08, 0.08, 0.5 * height))
+    batch.add(rgb, (x, y, z + height - 0.25), (0.05, half_w, 0.3))
+    batch.add((0.95, 0.95, 0.95), (x - 0.06, y, z + height - 0.25), (0.005, 0.8 * half_w, 0.12))
+# ====================================================================================== END ski-snow block v3
+
+# ==================================================================================== BEGIN alpine-race block v2
 # A race through gates on a groomed slope (the same block in alpine_slalom, giant_slalom and snowboard; its master
-# copy is new-snow's block_alpine.py): the slope, the flex poles and the gates, the start, the referee of gate
-# passing (FIS ICR 661.4), the finish and the falls.
+# copy is freeski-tricks' block_alpine_v2.py): the slope, the flex poles and the gates, the start, the referee of gate
+# passing (FIS ICR 661.4), the finish and the falls. v2 (2026-10-20): the start as the RoboOlympics freeski sport's
+# (github.com/CHIGUI0/roboolympics PR #259, sport.toml D6 / D8, MIT): no start gate and nothing that holds or
+# releases the robot: it stands on a level start platform (6 m) behind the start line, the platform's edge rounded
+# (the brink) onto the slope, and leaves it by its own action; the clock starts when its boots cross the start line.
 POLE_R = 0.014                 # m: a 28 mm slalom pole (ICR 680: a round pole; FIS children rules: 25-27 mm, ICR
 #                                803.2.1: light flex poles of 25-28.9 mm for U16-U14)
 POLE_H = 1.80                  # m above the snow (ICR 680; the poles' FIS specification: at least 1.80 m out of the snow)
@@ -490,13 +664,13 @@ RED, BLUE = (0.85, 0.12, 0.12, 1), (0.10, 0.25, 0.80, 1)
 FLAG_W, FLAG_H, FLAG_Z = 0.75, 0.50, 1.00    # m: a GS panel (ICR 901.2.2: about 75 x 50 cm, lower edge >= 1 m up)
 TRACK = ("left_tip", "right_tip", "left_foot", "right_foot")   # what must cross every gate line (ICR 661.4.1)
 TRACK_BOARD = ("nose", "tail", "left_foot", "right_foot")      # a snowboard's
+BRINK_BACK = 1.0               # m: the brink's arc meets the slope this far up the slope from x = 0 (the gates' origin)
 
 
 class AlpineRace(TaskBase):
     """The race: the profile and the gates from params; the referee. A family sets params, the plank(s) and texts."""
     category = "track-and-jumps"
     robot = "unitree_g1"
-    start = (0.0, 0.0, 0.0)
     fall_rule = False                                # the snow's own fall rule (step)
     legal_ground = ("left_foot", "right_foot", "left_hand", "right_hand")
     gate_kind = "sl"                                 # "sl": one flex pole per side; "gs": a pair with a panel; "psl":
@@ -509,21 +683,35 @@ class AlpineRace(TaskBase):
         return math.radians(self.p["slope_deg"])
 
     def profile(self) -> Profile:
+        """The level start platform ({platform_m} m), its edge (the start line) rounded by the brink's arc onto the
+        slope, the straight slope through (0, 0) (the gates are measured along it from there), the outrun."""
         p = self.p
         th = p["slope_deg"]
-        pr = Profile(-8.0, 0.0, 0.0)
-        pr.line(3.0, 0.0).mark("platform_end")
-        pr.arc(p["brink_radius_m"], -th)
-        # the straight slope: from the arc's end (just behind the start) to the finish and beyond
-        x_end = p["course_m"] * math.cos(math.radians(th)) + 6.0
-        pr.line((x_end - pr.end[0]) / math.cos(math.radians(th)), -th).mark("slope_end")
+        t = math.radians(th)
+        R = p["brink_radius_m"]
+        ex, ez = -BRINK_BACK * math.cos(t), BRINK_BACK * math.sin(t)        # the brink's end on the slope's line
+        sx, sz = ex - R * math.sin(t), ez + R * (1.0 - math.cos(t))         # the platform's edge
+        pr = Profile(sx - p["platform_m"], sz, 0.0)
+        pr.line(p["platform_m"], 0.0).mark("start_edge")
+        pr.arc(R, -th).mark("brink_end")
+        x_end = p["course_m"] * math.cos(t) + 6.0
+        pr.line((x_end - pr.end[0]) / math.cos(t), -th).mark("slope_end")
         pr.arc(p["outrun_radius_m"], 0.0).mark("outrun")
         pr.line(p["outrun_m"], 0.0).mark("end")
-        xs, zs = pr.arrays()
-        z0 = float(np.interp(0.0, xs, zs))            # the start: x = 0 on the surface, z = 0
-        pr.pts = [(x, z - z0) for x, z in pr.pts]
-        pr.marks = {k: (v[0], v[1] - z0) for k, v in pr.marks.items()}
         return pr
+
+    def start_x(self) -> float:
+        """The robot's x at t = 0: its front boot start_back_m behind the start line."""
+        return self.profile().marks["start_edge"][0] - self.p["start_back_m"] - self.boot_ahead()
+
+    def boot_ahead(self) -> float:
+        """How far the front boot's middle is ahead of the pelvis at t = 0 (along +x)."""
+        return G1_FOOT_X
+
+    @property
+    def start(self):
+        """On the level start platform, facing down the fall line (+x)."""
+        return (self.start_x(), 0.0, 0.0)
 
     def surf(self, s):
         """(x, z) of the point s metres down the slope from the start, along the surface's straight part."""
@@ -577,7 +765,9 @@ class AlpineRace(TaskBase):
         # the open ground (looks.py's floor) lowered under the lowest snow, so that it never meets the slope
         floor = next(g for g in sc.wb.findall("geom") if g.get("name") == "floor")
         floor.set("pos", f"0 0 {min(pr.arrays()[1]) - 3.0:.4g}")
-        self.snow = pr.build(sc, "snow", p["course_width_m"] / 2)
+        self.snow = pr.build(sc, "snow", p["course_width_m"] / 2, material=snow_material(sc))
+        # the mountain beside the piste (to 60 m from the centre line), flush with it
+        self.snow += snow_side_terrain(sc, pr, "side", 0, len(pr.pts) - 1, p["course_width_m"] / 2, 60.0)
         sc.ground = ["floor"] + list(self.snow)
         self._poles = []
         for g in self.gates():
@@ -599,6 +789,24 @@ class AlpineRace(TaskBase):
         sc.geom(sc.wb, "finish_line", type="box", pos=(fx, 0, fz + 0.002), size=(0.04, hw, 0.002),
                 quat=(math.cos(self.slope() / 2), 0, math.sin(self.slope() / 2), 0), rgba=(0.85, 0.1, 0.1, 1),
                 contype=0, conaffinity=0)
+        # the looks of a race piste: B-nets along both edges (solid), the start house over the start platform, the
+        # finish arch, the finish area's fenced corral beyond the line
+        from rfo import looks as _looks
+        b = _looks._Batch(sc, "alp_look")
+        xs, zs = pr.arrays()
+        for s_ in (1, -1):
+            fence_line(sc, b, f"bnet{'L' if s_ > 0 else 'R'}", pr.z_at, float(xs[0]) + 0.5, float(xs[-1]) - 1.0,
+                       s_ * (p["course_width_m"] / 2 + 0.3), height=1.8, step=4.0)
+        sx, sz = pr.marks["start_edge"]
+        b.add((0.3, 0.3, 0.35), (float(xs[0]) + 1.0, 0.0, sz + 1.5), (1.0, 3.0, 1.5))       # the start house
+        b.add((0.75, 0.1, 0.1), (float(xs[0]) + 1.0, 0.0, sz + 3.1), (1.3, 3.3, 0.12))
+        arch(b, sx + 0.6, 0.0, float(pr.z_at(sx + 0.6)), 2.5, height=3.0, rgb=(0.8, 0.1, 0.1))
+        arch(b, fx, 0.0, fz, hw, height=3.5)
+        fence_x1 = min(fx + 40.0, float(xs[-1]) - 2.0)
+        for s_ in (1, -1):
+            fence_line(sc, b, f"corral{'L' if s_ > 0 else 'R'}", pr.z_at, fx + 2.0, fence_x1, s_ * (hw + 2.0),
+                       height=1.2, step=4.0)
+        b.emit()
         # the planks and their bindings
         for name, (pk, foot, relpos, relquat) in self.planks.items():
             add_plank(sc, name, pk, n_bind=2 if pk.stance else 1, rgba=self.plank_rgba)
@@ -606,13 +814,15 @@ class AlpineRace(TaskBase):
             for f, rp in (foot if isinstance(foot, tuple) else ((foot, relpos),)):
                 bind(sc, name, f, rp, relquat)
         cont = sc.root.find("contact")
-        names = list(self.planks)
-        for i, a in enumerate(names):                 # the planks hit each other and the poles
-            for b2 in names[i + 1:]:
-                ET.SubElement(cont, "pair", geom1=f"{a}_plate", geom2=f"{b2}_plate", condim="3")
-            for pole in self._poles:
+        sx, sz = self.pr.marks["start_edge"]
+        sc.geom(sc.wb, "start_line", type="box", pos=(sx - 0.05, 0, sz + 0.002), size=(0.05, 3.0, 0.002),
+                rgba=(0.85, 0.1, 0.1, 1), contype=0, conaffinity=0)
+        solids = [g.get("name") for g in sc.root.iter("geom") if (g.get("name") or "").split("_plate")[0] in self.planks
+                  and "_plate" in (g.get("name") or "")]
+        for a in solids:                              # the planks' solids hit the poles (the planks and the robot: by
+            for pole in self._poles:                  # their contact bits, the ski-snow block)
                 for gn in (pole, f"{pole}_b", f"{pole}_panel") if self.gate_kind != "sl" else (pole,):
-                    ET.SubElement(cont, "pair", geom1=f"{a}_plate", geom2=gn, condim="3")
+                    ET.SubElement(cont, "pair", geom1=a, geom2=gn, condim="3")
 
     def plank_frames(self):
         """plank -> (foot body, relpos, relquat) of its (first) binding: where place_on_slope puts it."""
@@ -650,8 +860,8 @@ class AlpineRace(TaskBase):
             # per gate, per tracked point: None (not yet crossed downwards), True (its latest downward crossing was
             # inside the gate line), False (outside)
             "cross": [[None] * len(self.track) for _ in range(G)],
-            "prev": None, "passed": 0, "slow_k": 0, "started": False, "snow": Digest(w, list(self.plank_body.values())
-                                                                                    + list(self.ss.drag_b)),
+            "prev": None, "passed": 0, "slow_k": 0, "started": False, "t_start": None,
+            "snow": Digest(w, list(self.ss.bodies)),
         }
         self.ss.apply(w.d)                            # the forces of the first physics step, from the state at t = 0
 
@@ -679,10 +889,19 @@ class AlpineRace(TaskBase):
 
     def substep(self, w, ref):
         self.ss.apply(w.d)
+        if not (ref.failed or ref.success):              # the snow's fall rule, after every physics step (1 ms)
+            bad = ref.parts_touching(self.snow_mask) - set(self.legal_ground)
+            if bad:
+                return ref.fail("fell", on_the_snow=sorted(bad))
         tr = self.trackers
         P = self.points(w)
         prev, tr["prev"] = tr["prev"], P[:, :2].round(9).tolist()
         if prev is None or ref.failed:
+            return
+        if not tr["started"]:                         # the start: both boots past the start line, by its own action
+            if min(float(f[0]) for f in P[-2:]) > self.pr.marks["start_edge"][0]:
+                tr["started"], tr["t_start"] = True, round(ref.time, 3)
+                ref.stage("start")
             return
         prev = np.asarray(prev)
         fx, _ = self.finish()
@@ -718,8 +937,8 @@ class AlpineRace(TaskBase):
                 return ref.fail("missed a gate", gate=n_passed + 1,
                                 points=[self.track[i] for i, c in enumerate(tr["cross"][n_passed]) if c is not True])
             if all(abs(f[1]) <= self.p["finish_width_m"] / 2 for f in feet):
-                ref.metrics["time_s"] = round(ref.time, 3)
-                if ref.stage("finish", time_s=round(ref.time, 3)):
+                ref.metrics["time_s"] = round(ref.time - tr["t_start"], 3)       # the run's time from the start line
+                if ref.stage("finish", time_s=ref.metrics["time_s"]):
                     ref.succeed()
             else:
                 ref.fail("missed the finish", y=[round(float(f[1]), 2) for f in feet])
@@ -728,19 +947,19 @@ class AlpineRace(TaskBase):
         p, tr = self.p, self.trackers
         if ref.failed or ref.success:
             return
-        bad = ref.parts_touching(self.snow_mask) - set(self.legal_ground)
         pel = w.d.xpos[w.robot.pelvis]
         h = self.height(w, pel)
-        if bad:
-            return ref.fail("fell", on_the_snow=sorted(bad))
         if h < p["fall_h_m"]:
             return ref.fail("fell", pelvis_height_m=round(h, 3))
         v = float(np.linalg.norm(w.d.qvel[w.robot.fv:w.robot.fv + 3]))
         ref.metrics["speed_m_s"] = round(v, 3)
-        if v > p["stop_speed_m_s"]:
-            tr["started"] = True
+        if not tr["started"]:                         # on the start platform: no stop rule; a DNS after dns_s
+            tr["slow_k"] = 0
+            if w.t >= p["dns_s"] - 1e-9:
+                return ref.fail("did not start", t_s=round(w.t, 2))
+            return
         tr["slow_k"] = tr["slow_k"] + 1 if v < p["stop_speed_m_s"] else 0
-        if tr["slow_k"] * w.CONTROL_DT >= p["stop_s"] and w.t >= p["stop_s"]:
+        if tr["slow_k"] * w.CONTROL_DT >= p["stop_s"]:
             return ref.fail("stopped", speed_m_s=round(v, 3))
 
     def privileged(self, w):
@@ -748,10 +967,11 @@ class AlpineRace(TaskBase):
         return {"pelvis": w.pelvis().tolist(), "pelvis_height_m": self.height(w, pel), "slope_deg": self.p["slope_deg"],
                 "gates": [{k: g[k] for k in ("i", "x", "z", "colour", "y_turn", "y_out")} for g in self.gl],
                 "gates_passed": self.trackers.get("passed", 0), "finish_x": self.finish()[0],
+                "start_line_x": self.pr.marks["start_edge"][0],
                 "planks": {n: {"pos": w.d.xpos[b].tolist(), "xmat": w.d.xmat[b].tolist()}
                            for n, b in self.plank_body.items()},
                 "points": dict(zip(self.track, self.points(w).tolist())), "snow_model": dict(self.ss.last)}
-# ====================================================================================== END alpine-race block
+# ====================================================================================== END alpine-race block v2
 
 G1_SOLE_Z, G1_FOOT_X = -0.035, 0.035         # the G1's sole below its ankle-roll link, its foot's middle ahead of it
 # Atomic Redster G9 FIS J-RP2 138 (a junior FIS giant-slalom race ski; the maker's data: 138 cm, 100 / 65 / 83.5 mm,
@@ -759,7 +979,7 @@ G1_SOLE_Z, G1_FOOT_X = -0.035, 0.035         # the G1's sole below its ankle-rol
 # (1.75 kg) and its binding's (0.85 kg), the shovel and tail and the mounting point are estimates (after RoboOlympics'
 # freeski "race" ski); the stand height is within the 50 mm of the FIS Specifications for Competition Equipment.
 GS_SKI = Plank("Atomic Redster G9 FIS J-RP2 138 cm", 1.38, 0.100, 0.065, 0.0835, 14.5, 1.75, -0.06, 0.85, 0.045,
-               shovel=0.15, tail=0.05, tip_rise=0.055, tail_rise=0.012)
+               shovel=0.15, tail=0.05, tip_rise=0.055, tail_rise=0.012, EI_fore=60.0, EI_aft=80.0)
 
 
 def ski_relpos(pk):
@@ -782,40 +1002,50 @@ class Task(AlpineRace):
                 "consecutive gates, direction changes 11-15 % of the vertical drop), 902-903 (the course)")
     deviations = [
         "ICR 901.1 (vertical drop 250-450 m, U16-U14 200-350 m): the course is {course_m} m long on a slope of "
-        "{slope_deg} degrees with {n_gates} gates, a small fraction of the official drop, so that the robot's run "
-        "fits the episode; 901.2.4's direction changes (11-15 % of the vertical drop) are not kept: they would "
-        "allow only one change of direction on this drop, so the course keeps the gate spacing and widths instead.",
-        "ICR 902 (the terrain, a course about 40 m wide): a uniform groomed slope of {slope_deg} degrees, "
-        "{course_width_m} m wide.",
+        "{slope_deg} degrees, a vertical drop of about 200 m, the U16-U14 minimum (the category of racers the "
+        "robot's size), with {n_gates} gates: direction changes about 13 % of the vertical drop (901.2.4: "
+        "11-15 %).",
+        "ICR 902 (the terrain, a course about 40 m wide; the ICR gives the giant slalom no gradient): a uniform "
+        "groomed slope of {slope_deg} degrees, 33 %, the slalom's gentlest (ICR 802.1.1), {course_width_m} m wide.",
         "ICR 903 (the course setter's free choice of long, medium and short turns): open gates at a regular "
         "{gate_spacing_m} m, their turning poles alternately {offset_m} m left and right of the centre line.",
-        "ICR 805 / 905 (the start: the racer pushes out of the start gate, the start wand starts the clock): the "
-        "robot stands still on the slope at the start and is released at t = 0; the run's time is the episode's.",
+        "ICR 805 / 905 (the start: the racer pushes out of the start gate with the poles, the start wand starts the "
+        "clock): there is no start gate and nothing holds or releases the robot (the start of the "
+        "RoboOlympics freeski sport, MIT): it stands on its skis on a level start platform ({platform_m} m), "
+        "its boots {start_back_m} m behind the platform's edge (the start line), the edge rounded (radius "
+        "{brink_radius_m} m) onto the slope; the start signal is given at t = 0 and the robot must leave by "
+        "its own action within {dns_s} s (a DNS otherwise); the run's time starts when both boots cross the "
+        "start line.",
         "ICR 614.2.4 and 628 (a racer who falls may get up and go on): a fall ends the run here (the families' fall "
         "rule): a part of the robot other than its feet and its hands on the snow, or its pelvis less than "
         "{fall_h_m} m above the snow.",
         "Snow and air: the ski-snow contact is the freeski model of the CHIGUI0/roboolympics project (MIT, ported): kinetic friction along the "
         "plank after Wolfsperger et al. 2021, the edge's hold across it after Mossner et al. 2013 with race-piste "
-        "snow, the sidecut's arc after Howe 2001; the snow keeps no ruts. Still air at 1500 m (1.052 kg/m^3), "
-        "drag on every link; no lift.",
-        "Equipment: no ski poles (the robot's hands are bare pads that cannot hold one), no ski boots (the feet are "
-        "bound directly); the binding is rigid and never releases; the skis are rigid.",
+        "snow, the sidecut's arc after Howe 2001, hard well-damped snow (the model's final version, PR #259); the "
+        "snow keeps no ruts. Still air at a mountain venue (1.052 kg/m^3), drag and lift on every link (a normal-force model).",
+        "Equipment: no ski poles (the G1's hands are its rubber fists, which do not close: nothing to hold one with), no ski boots (the feet are "
+        "bound directly); the binding is rigid and never releases; each ski is three bodies, its forebody and "
+        "afterbody on hinges with the ski's bending stiffness (EI 60 / 80 N m^2: estimates, as the "
+        "RoboOlympics freeski sport's skis); the skis are solid against the robot's body and each other.",
         "Gates: each pole pair and its panel is one body on a sprung two-axis hinge at the snow (a real pair has a "
         "flex hinge per pole and a panel that tears off in a collision; ICR 690.1); stiffness and mass are "
         "estimates.",
     ]
-    time_limit_s = 60.0
-    stages = [f"gate {i + 1}" for i in range(4)] + ["finish"]
-    params = dict(slope_deg=8.0, brink_radius_m=6.0, outrun_radius_m=30.0, outrun_m=50.0, course_width_m=40.0,
-                  n_gates=4, first_gate_m=12.0, gate_spacing_m=22.0, offset_m=2.0, gate_width_m=5.0, first_side=1.0,
-                  course_m=90.0, finish_width_m=14.0, fall_h_m=0.35, stop_speed_m_s=0.10, stop_s=1.5)
+    time_limit_s = 150.0
+    stages = ["start"] + [f"gate {i + 1}" for i in range(26)] + ["finish"]
+    params = dict(platform_m=6.0, start_back_m=0.30, dns_s=20.0, slope_deg=18.3, brink_radius_m=6.0, outrun_radius_m=80.0, outrun_m=100.0, course_width_m=40.0,
+                  n_gates=26, first_gate_m=15.0, gate_spacing_m=24.0, offset_m=2.0, gate_width_m=5.0, first_side=1.0,
+                  course_m=640.0, finish_width_m=14.0, fall_h_m=0.35, stop_speed_m_s=0.10, stop_s=1.5)
     sentence = ("Ski the giant slalom: one run down the course on your skis, both ski tips and both feet through each "
                 "of the {n_gates} gates in order, then over the finish line.")
-    rules = ("FIS alpine giant slalom, one run (a shortened course). The course is a groomed slope falling at "
+    rules = ("FIS alpine giant slalom, one run (a course of the U16-U14 minimum vertical drop). The course is a groomed slope falling at "
              "{slope_deg} degrees along +x (the fall line), {course_width_m} m wide, centred on y = 0. Each of your "
-             "feet is bound to a giant-slalom ski. You stand still at the start at t = 0 and are released. There are "
-             "{n_gates} open gates: gate 1's line is {first_gate_m} m down the slope from your start (measured along "
-             "the slope), each next one {gate_spacing_m} m further. A gate is two pairs of flexible poles across the "
+             "feet is bound to a giant-slalom ski. You stand on your skis on the level start platform at the top of the course, your boots "
+             "{start_back_m} m behind its edge (the start line); the start signal is given at t = 0 and you "
+             "must leave the platform by your own action (nothing holds or pushes you) within {dns_s} s; your "
+             "run's time starts when both feet cross the start line. There are "
+             "{n_gates} open gates: gate 1's line is {first_gate_m} m down the slope (measured along it) from x = 0, "
+             "the slope's reference line, 1 m below where the brink's curve meets the slope; each next one {gate_spacing_m} m further. A gate is two pairs of flexible poles across the "
              "slope, each pair joined by a panel, red and blue in turn: the inner pole of its turning pair stands "
              "{offset_m} m from the centre line, on the left (y > 0) for gate 1 and then alternately right and left; "
              "the inner pole of its outside pair stands {gate_width_m} m further out on the same side. Its gate line "
@@ -824,15 +1054,16 @@ class Task(AlpineRace):
              "back up across a gate line must cross it again. Gates are passed in order: if any of those four points "
              "goes down past the next gate's line, or the finish line, while a gate is not passed, you missed it and "
              "the run fails. Hitting a pole or a panel is allowed. The finish line is {course_m} m down the slope "
-             "from the start, {finish_width_m} m wide and centred on y = 0: you succeed when, after every gate, both "
+             "from x = 0, {finish_width_m} m wide and centred on y = 0: you succeed when, after every gate, both "
              "feet cross it between its posts, within {time_limit_s} s. The run fails if you fall (a part of you "
              "other than your feet and your hands touches the snow, or your pelvis is less than {fall_h_m} m above "
-             "the snow, measured along the slope's normal), if you stop (your pelvis slower than {stop_speed_m_s} "
-             "m/s for {stop_s} s; ICR 614.2.3), if a foot crosses the finish line outside its posts, or at "
+             "the snow, measured along the slope's normal), if you stop after the start (your pelvis slower than "
+             "{stop_speed_m_s} m/s for {stop_s} s; ICR 614.2.3), if you do not start within {dns_s} s, if a foot crosses the finish line outside its posts, or at "
              "{time_limit_s} s.")
-    venue = ("You stand at the start, x = 0, y = 0, facing down the fall line (+x), perpendicular to the slope, on "
-             "your skis (138 cm junior giant-slalom skis, sidecut radius 14.5 m). Behind you is a short flat "
-             "platform; the slope falls at {slope_deg} degrees for the whole course and flattens out after the "
+    venue = ("You stand on the level start platform ({platform_m} m long) at the top, facing down the fall line "
+             "(+x), on your skis (138 cm junior giant-slalom skis, sidecut radius 14.5 m), your boots "
+             "{start_back_m} m behind its edge (the red start line, about 1.8 m before x = 0 and 0.2 m above "
+             "it); the edge rounds onto the slope, which falls at {slope_deg} degrees for the whole course and flattens out after the "
              "finish into an outrun. The gates' poles and panels are red and blue, the poles 1.8 m out of the snow; "
              "the finish has two posts and a banner.")
     difficulty = ("Giant-slalom skis carve long arcs: to turn, the robot must roll them onto their edges and lean its "

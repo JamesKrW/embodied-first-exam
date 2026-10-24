@@ -941,6 +941,11 @@ class Task(TaskBase):
 
     def substep(self, w, ref):
         p, tr = self.p, self.trackers
+        if ref.touching(ref.robot_mask, self.machine_sel):         # (after every physics step, 1 ms)
+            return ref.fail("touched a ball machine", parts=sorted(ref.parts_touching(self.machine_sel)))
+        for i in range(SHOTS):
+            if tr["kick_t"][i] is None and ref.touching(ref.robot_mask, self.balls[i]):
+                return ref.fail("touched a ball before its kick", ball=i + 1)
         xpos = w.d.xpos
         for i, bm in enumerate(self.machines):
             pos = xpos[self.bid[i]]
@@ -962,11 +967,6 @@ class Task(TaskBase):
 
     def step(self, w, ref):
         p, tr = self.p, self.trackers
-        if ref.touching(ref.robot_mask, self.machine_sel):         # (slow: checked every control step)
-            return ref.fail("touched a ball machine", parts=sorted(ref.parts_touching(self.machine_sel)))
-        for i in range(SHOTS):
-            if tr["kick_t"][i] is None and ref.touching(ref.robot_mask, self.balls[i]):
-                return ref.fail("touched a ball before its kick", ball=i + 1)
         pel = w.pelvis()
         if not (-p["goal_depth_m"] <= pel[0] <= p["goal_area_depth_m"] and abs(pel[1]) <= p["goal_area_half_m"]):
             return ref.fail("left the goal area")

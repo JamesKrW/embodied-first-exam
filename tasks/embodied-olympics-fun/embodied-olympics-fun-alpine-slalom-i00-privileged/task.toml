@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-alpine-slalom-i00-privileged"
-description = "Embodied Olympics alpine-slalom (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Ski the slalom: one run down the course on your skis, both ski tips and both feet through each of the 6 gates in order, then over the finish line. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics alpine-slalom (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Ski the slalom: one run down the course on your skis, both ski tips and both feet through each of the 32 gates in order, then over the finish line. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "alpine-slalom"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 16.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_alpine_slalom.py: positive by a real controller (leg IK for lean and edge on the snow, carved arcs, slip feedback; gains from a search) that passes all 6 gates and finishes in 20.84 s at its exact gains; an injection run (the heading re-aimed by hand) also finishes. It is fragile: 0 of 10 succeed with its gains scaled by 0.98 to 1.02 (typically 4-5 of 6 gates, falls at 5-6 m/s), so it is not shipped as a reference solution; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_alpine_slalom.py: A slalom at ICR's gentlest gradient (33 %, ICR 802.1.1) with the U16-U14 minimum vertical drop (100 m: 320 m of course, 32 open gates), a level start platform and a self-start. Positive by injection: pushed off the platform, the robot holds a slight crouch and slides straight between waypoints just outside each turning pole, re-aimed by hand at each gate; the sliding, the gate crossings and the finish are physics; deterministic. The reference skier (a carving controller after its own drop-in) passes 2 of 32 gates and falls. Negatives: nothing done (did not start), a straddle (missed gate), a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

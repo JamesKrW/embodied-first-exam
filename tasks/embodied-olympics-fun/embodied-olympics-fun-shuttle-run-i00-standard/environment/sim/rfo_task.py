@@ -48,6 +48,10 @@ class Task(TaskBase):
         "mesh on the plane of the start line, interpolated between 1 ms physics steps",
         "a fallen runner: a robot whose pelvis is below {down_z_m} m is down; it may get up and go on, but "
         "{down_limit_s} s down in a row end the attempt",
+        "the lane: ALPHA runs the test on a marked course between the two lines; here the turns and the finish "
+        "count only between the cones at the lines' ends (|y| <= {line_half_m} m), and the pelvis may not leave the "
+        "court ({court_half_m} m to either side of the centre line): a loop round the far line instead of a "
+        "reversal, or a finish past the cones, is not the shuttle",
         "the qualifying time, {time_limit_s} s, is this benchmark's own round number: school norms for this test are "
         "10 to 14 s",
     ]
@@ -55,7 +59,8 @@ class Task(TaskBase):
     start = (-(0.02 + G1_FOOT_FRONT), 0.0, 0.0)
     stages = ["turn 1", "turn 2", "turn 3", "finish"]
     fall_rule = False                # the run's own: a fallen runner may get up (the "down" rule)
-    params = dict(distance_m=10.0, toe_gap_m=0.02, down_z_m=0.40, down_limit_s=10.0)
+    params = dict(distance_m=10.0, toe_gap_m=0.02, down_z_m=0.40, down_limit_s=10.0, line_half_m=3.0,
+                  court_half_m=4.0)
 
     sentence = ("Run the 4 x 10 m shuttle: to the far line, back to the start line, to the far line again and back "
                 "through the start line, putting a foot on the ground beyond the line at each turn, as fast as you can.")
@@ -64,15 +69,19 @@ class Task(TaskBase):
              "legs: to the far line, back to the start line, to the far line, back to the start line. At each of the "
              "three turns you must put a foot on the ground wholly beyond the line: every part of that foot at "
              "x > {distance_m} m at the far line (turns 1 and 3), at x < 0 at the start line (turn 2); a foot on the "
-             "line does not count. The turns count in this order only. After the third turn you finish at the "
-             "moment the leading point of your torso (not the head, arms, legs or feet) reaches the start line. Which "
+             "line does not count, and the foot must be between the cones at the line's ends (every point where it "
+             "touches the ground at |y| <= {line_half_m} m). The turns count in this order only. After the third "
+             "turn you finish at the moment the leading point of your torso (not the head, arms, legs or feet) "
+             "reaches the start line between its cones (|y| <= {line_half_m} m at that point). Which "
              "way you face and how you turn is up to you. You succeed when you finish within {time_limit_s} s of robot time. A "
              "fall does not end the attempt: you are down while your pelvis is below {down_z_m} m, you may get up "
-             "and go on, but {down_limit_s} s down in a row end it. You fail when down for {down_limit_s} s, or "
+             "and go on, but {down_limit_s} s down in a row end it. You fail when down for {down_limit_s} s, when "
+             "your pelvis leaves the court (more than {court_half_m} m to either side of the centre line y = 0, or more than 10 m beyond either line), or "
              "after {time_limit_s} s.")
     venue = ("You stand facing the far line (+x), the front ends of your feet {toe_gap_m} m behind the start line "
              "(your pelvis 0.13 m behind it). Both lines are white, 5 cm wide and 6 m long, on a level sports floor "
-             "that goes on for 10 m beyond each line; a cone stands at each end of each line.")
+             "that goes on for 10 m beyond each line and {court_half_m} m to either side of the centre line y = 0 "
+             "(the court); a cone stands at each end of each line.")
     difficulty = ("Forty metres with three reversals in {time_limit_s} s: the walking gait covers 19 m in that time, "
                   "and the running gait turns slowly, needs metres to stop, and falls when it is handed over to "
                   "another gait at speed, so every leg has to be braked and reversed without losing seconds.")
@@ -105,17 +114,29 @@ class Task(TaskBase):
         R = w.d.geom_xmat[g].reshape(3, 3)
         return float(w.d.geom_xpos[g][0] + np.min(self.torso_pts @ R[0]))
 
+    def torso_low_y(self, w) -> float:
+        """The y of the torso's leading point on the way back (the point of the link's mesh of smallest x)."""
+        g = self.torso_geom
+        R = w.d.geom_xmat[g].reshape(3, 3)
+        k = int(np.argmin(self.torso_pts @ R[0]))
+        return float(w.d.geom_xpos[g][1] + self.torso_pts[k] @ R[1])
+
     def substep(self, w, ref):
         tr, D = self.trackers, self.p["distance_m"]
         b0, b1 = tr["back"], self.torso_low_x(w)         # MuJoCo's positions after a step are one physics step old
         tr["back"] = b1
+        x, y = (float(v) for v in w.pelvis()[:2])
+        if abs(y) > self.p["court_half_m"] or not -10.0 <= x <= D + 10.0:
+            return ref.fail("left the court", pelvis=[round(x, 3), round(y, 3)])
         if tr["leg"] < 3:
             far = tr["leg"] % 2 == 0
             for s in SIDES:
                 if not ref.touching(self.sole[s], ref.ground):
                     continue
                 lo, hi = span(w, self.foot_ids[s], (1.0, 0.0, 0.0))
-                if (lo > D) if far else (hi < 0.0):
+                cy = ref.contact_points(self.sole[s], ref.ground)[:, 1]
+                between = bool(len(cy)) and float(np.max(np.abs(cy))) <= self.p["line_half_m"]
+                if between and ((lo > D) if far else (hi < 0.0)):
                     tr["leg"] += 1
                     ref.stage(f"turn {tr['leg']}", foot=s, t=round(ref.time, 3))
                     ref.metrics["turns"] = tr["leg"]
@@ -123,6 +144,9 @@ class Task(TaskBase):
         elif b0 is not None and b0 > 0.0 >= b1:
             dt = w.m.opt.timestep
             t = ref.time - 2 * dt + b0 / (b0 - b1) * dt
+            yl = self.torso_low_y(w)
+            if abs(yl) > self.p["line_half_m"]:
+                return ref.fail("finished outside the cones of the start line", y=round(yl, 3))
             ref.metrics["time_s"] = round(t, 3)
             if ref.stage("finish", time_s=round(t, 3)):
                 ref.succeed()

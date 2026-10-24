@@ -91,7 +91,8 @@ class Task(TaskBase):
         self.min_upright = math.cos(math.radians(self.p["stand_tilt_deg"]))
         m = w.m
         self.ankles = [m.body(f"{s}_ankle_roll_link").id for s in ("left", "right")]
-        self.trackers = {"best_hold_s": 0.0, "in_handstand": False, "hold_n": 0}
+        # off_hands: something other than the hands touched the floor during this control step (seen every 1 ms)
+        self.trackers = {"best_hold_s": 0.0, "in_handstand": False, "hold_n": 0, "off_hands": False}
 
     def geometry(self, w, ref):
         """(in a handstand now, the two lines' deviations in degrees, the hands' support middle)."""
@@ -112,14 +113,28 @@ class Task(TaskBase):
               and float(np.linalg.norm(ank - pel)) >= self.p["min_leg_m"])
         return ok, devs, h
 
-    def step(self, w, ref):
+    def substep(self, w, ref):
         p, tr = self.p, self.trackers
+        if not (ref.failed or ref.success):              # the fall rule, also after every physics step (1 ms):
+            z = float(w.d.qpos[w.robot.fq + 2])            # a touch shorter than a control step is not missed
+            bad = ref.parts_touching(ref.ground) - set(self.legal_ground)
+            if z < self.fall_z:
+                return ref.fail("fell", pelvis_z=round(z, 3))
+            if bad:
+                return ref.fail("fell", on_the_ground=sorted(bad))
         half = p["area_m"] / 2
-        pts = ref.contact_points(ref.robot_mask, ref.ground)
+        pts = ref.contact_points(ref.robot_mask, ref.ground)       # after every physics step (1 ms)
         if len(pts) and (np.abs(pts[:, :2]) > half + 1e-9).any():
             return ref.fail("outside the floor area")
+        if ref.parts_touching(ref.ground) - {"left_hand", "right_hand"}:
+            tr["off_hands"] = True
+
+    def step(self, w, ref):
+        p, tr = self.p, self.trackers
+        off, tr["off_hands"] = tr["off_hands"], False
         if not ref.has("held 2 s"):
             ok, devs, h = self.geometry(w, ref)
+            ok = ok and not off                            # a foot down in between breaks the handstand
             tr["in_handstand"] = bool(ok)
             if ok:
                 ref.stage("handstand", dev_deg=[round(x, 1) for x in devs])

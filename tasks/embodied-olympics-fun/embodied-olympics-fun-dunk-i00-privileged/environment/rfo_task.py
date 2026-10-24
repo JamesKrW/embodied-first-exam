@@ -1,6 +1,6 @@
 """Basketball two-hand dunk on a lowered basket (FIBA): the ring at 2.39 m, below FIBA Mini-Basketball's 2.60 m,
 set at the robot's measured reach, and the start 0.75 m from the point under the ring. The ball is held in the H1-2's
-own Inspire five-finger hands (rfo.realhand), between the two palms with the fingers closed round it, by contact and
+own Inspire five-finger hands (rfo.realhand), squeezed between the two open palms, by contact and
 friction alone (no weld); the robot jumps, forces it down through the ring from above with both hands on it, and
 lands on its feet. Official court, size-7 ball, full-size backboard and ring lowered by 0.66 m;
 the Unitree H1-2."""
@@ -10,7 +10,6 @@ import xml.etree.ElementTree as ET
 import mujoco
 import numpy as np
 
-from rfo import realhand
 from rfo.referee import Crossing, HoopPass
 from rfo.scene import HITTABLE, OFFICIAL, VISUAL, bounce_solref
 from rfo.task import TaskBase
@@ -220,26 +219,27 @@ class Travel:
 
 # ---- the two-hand hold (the H1-2's own Inspire hands, rfo.realhand "inspire"; the same in free-throw,
 # catch-and-shoot, dunk and dunk-between-legs) ----
-# A two-handed hold as for a chest pass or a two-handed set shot: the palms on the ball's two sides, the fingers spread
-# up and forwards over it, both hands closed on it (a finger stops on what it touches), and the arms pressing the
-# palms in: the hold targets (the start command) turn the shoulders SQUEEZE_RAD further in (roll and yaw) than the
-# pose the arms stand in, so the shoulder servos squeeze the ball; nothing else holds it but the hands' contact and
-# friction (measured with the core of 10-21, H2-class arms and the Inspire at its 20 / 30 N defaults: held at 0.06
-# rad, the ball settling about 8 cm in the first 0.3 s onto the two thumbs and the palms' heels; with 0.03 rad, no
-# squeeze, or the fingers straight forwards or up, it drops within a second; one hand alone cannot hold it: the
-# Inspire spans about 0.2 m, the ball 0.24 m). HOLD_LEFT / HOLD_RIGHT: the arms' 7 joints (shoulder pitch, roll, yaw,
-# elbow pitch, roll, wrist pitch, yaw), from numerical inverse kinematics on the hands' grasp frames (each palm 1 cm
-# clear of the ball, the ball's centre BALL_AT ahead of and above the pelvis' start).
-BALL_AT = (0.40, 0.0, 1.20)
-HOLD_LEFT = (-0.43, 0.3529, -1.0318, 0.4546, 0.2074, -0.44, 1.24)
-HOLD_RIGHT = (-0.4301, -0.3529, 1.0321, 0.4546, -0.2073, -0.44, -1.24)
-SQUEEZE_RAD = 0.06
-HAND_CLOSED = {}                             # the hands' synergy: where each drive closes to (realhand's "closed")
+# A two-handed hold as for a chest pass or a two-handed set shot, the hands open (the fingers straight): the palms on
+# the ball's two sides, the fingers up and forwards beside it, and the arms pressing the palms in: the start command
+# (hold_targets) turns the shoulders SQUEEZE_RAD further in (roll and yaw) than TOUCH_LEFT / TOUCH_RIGHT, the pose in
+# which the palms just clear the ball, so the shoulder servos squeeze it; nothing else holds it but the hands' contact
+# and friction. On the Inspire the open thumb lies a little proud of the palm, so the ball bears on the two thumbs'
+# proximal and middle links (measured with the core of 10-22, H2-class arms, self-collision on: about 57 N normal per
+# hand, half the friction used, the elbows 8.6 cm off the torso; with the fingers closed over the ball it rests on
+# the thumbs alone, about 8 cm lower). HOLD_LEFT / HOLD_RIGHT: where the arms stand under that squeeze with the
+# ball's centre at BALL_AT (ahead of and above the pelvis' start): the settled hold, measured, so the start is at
+# rest. The arms' 7 joints: shoulder pitch, roll, yaw, elbow pitch, roll, wrist pitch, yaw.
+BALL_AT = (0.39, 0.0, 1.13)
+TOUCH_LEFT = (-0.43, 0.3529, -1.0318, 0.4546, 0.2074, -0.44, 1.24)
+TOUCH_RIGHT = (-0.4301, -0.3529, 1.0321, 0.4546, -0.2073, -0.44, -1.24)
+HOLD_LEFT = (-0.3867, 0.3303, -1.0768, 0.5032, 0.1042, -0.4638, 1.2792)
+HOLD_RIGHT = (-0.3867, -0.3303, 1.0768, 0.5032, -0.1042, -0.4638, -1.2792)
+SQUEEZE_RAD = 0.10
 
 
 def hold_targets(side: str) -> np.ndarray:
-    """The squeezing targets of an arm: its hold pose with the shoulder's roll and yaw SQUEEZE_RAD further in."""
-    q = np.array(HOLD_RIGHT if side == "right" else HOLD_LEFT, float)
+    """The squeezing targets of an arm: the touching pose with the shoulder's roll and yaw SQUEEZE_RAD further in."""
+    q = np.array(TOUCH_RIGHT if side == "right" else TOUCH_LEFT, float)
     s = 1.0 if side == "right" else -1.0
     q[1] += s * SQUEEZE_RAD
     q[2] += s * SQUEEZE_RAD
@@ -247,8 +247,8 @@ def hold_targets(side: str) -> np.ndarray:
 
 
 def ball_in_hands(w, arms_only: bool = False) -> None:
-    """The arms in the hold (the start command: the squeezing targets) and, unless arms_only, the ball between the
-    palms with both hands closed on it, the rest of the world held still while they close (realhand's close_on)."""
+    """The arms in the settled hold, the start command the squeezing targets, the hands open, and, unless arms_only,
+    the ball between the palms where the squeeze holds it."""
     r, d = w.robot, w.d
     a = w.L.ARMS.start
     for idx, side in ((slice(a, a + 7), "left"), (slice(a + 7, a + 14), "right")):
@@ -258,58 +258,7 @@ def ball_in_hands(w, arms_only: bool = False) -> None:
     if arms_only:
         return
     w.put("ball", BALL_AT)
-    close_both(w)
-
-
-def close_both(w, settle_s: float = 0.3) -> None:
-    """Both hands closed on the ball together, the rest of the world held still (realhand's close_on for two hands):
-    the ball held in place while the fingers close at their drives' speeds until every drive has stalled or reached
-    its target, then let go to settle between the hands for settle_s. Raises unless both hands then touch it."""
-    m, d, hands = w.m, w.d, w.hands
-    qa, va = w.free["ball"]
-    keep_q = np.ones(m.nq, dtype=bool)
-    keep_v = np.ones(m.nv, dtype=bool)
-    for s_ in ("left", "right"):
-        hands.cmd[s_] = 1.0
-        keep_q[hands.hq[s_]] = keep_v[hands.hv[s_]] = False
-    mujoco.mj_forward(m, d)
-    q0 = d.qpos.copy()
-    arm0 = m.dof_armature.copy()
-    m.dof_armature[keep_v] = realhand.FREEZE_ARMATURE
-    m.dof_armature[va:va + 6] = arm0[va:va + 6]
-    free, still, settled = False, 0, 0
-    try:
-        for _ in range(int(round(2.0 / m.opt.timestep))):
-            sp0 = hands._sp.copy()
-            hands.substep()
-            mujoco.mj_step(m, d)
-            d.qpos[keep_q] = q0[keep_q]
-            d.qvel[keep_v] = 0.0
-            if not free:
-                d.qpos[qa:qa + 7] = q0[qa:qa + 7]
-                d.qvel[va:va + 6] = 0.0
-                still = still + 1 if np.allclose(hands._sp, sp0, atol=1e-9) else 0
-                if still >= 20:
-                    free = True
-                    keep_q[qa:qa + 7] = False
-                    keep_v[va:va + 6] = False
-            else:
-                settled += 1
-                if settled * m.opt.timestep >= settle_s:
-                    break
-    finally:
-        m.dof_armature[:] = arm0
-    for s_ in ("left", "right"):
-        d.qvel[hands.hv[s_]] = 0.0
-    d.qvel[va:va + 6] = 0.0
-    hands._vs[:] = 0.0
-    mujoco.mj_forward(m, d)
-    hands.update_held()
-    ball = set(np.flatnonzero(m.geom_bodyid == m.body("ball").id))
-    for s_ in ("left", "right"):
-        g = set(hands.group_geoms(w, s_, "hand"))
-        if not any((c.geom1 in g and c.geom2 in ball) or (c.geom2 in g and c.geom1 in ball) for c in d.contact[:d.ncon]):
-            raise RuntimeError(f"the {s_} hand does not touch the ball after closing")
+    mujoco.mj_forward(w.m, d)
 # ---- end of the hold ----
 
 
@@ -326,15 +275,18 @@ class Task(TaskBase):
     deviations = [
         "Basketball Equipment (basket): the basket is lowered: the ring's top edge is {ring_height_m} m above the "
         "floor, below FIBA Mini-Basketball's 2.60 m (FIBA's own ring: 3.05 m), set at the robot's measured reach "
-        "(H1-2 with H2-class leg actuators: the ball pressed overhead between bare palms reached a centre height of "
-        "2.58 m in its own jump; the ring plus the ball's radius plus 0.02 m of entry is 0.05 m below that; held in "
-        "its own hands, which hold it lower, it reaches at most 2.36 m in a searched jump: the dunk is out of "
-        "reach); the "
+        "(H1-2 with H2-class leg actuators, the ball squeezed between its own open hands: raised from the chest "
+        "during its own jump, the ball's centre reached 2.56 m in searched open-loop jumps, above the 2.53 m of the "
+        "ring plus the ball's radius plus 0.02 m of entry, but none brought it nearer than 0.24 m to the ring's "
+        "axis while high enough to pass over the rim, even with the ring lowered to 2.23 m and the start 0.45 to "
+        "0.75 m from it; an agent's own-motor dunk at this height is recorded: the ball pinched between the two "
+        "thumbs, a deep squat and an arm swing, the ball's centre at 2.56 m, through the ring 2.78 s into the episode, "
+        "the energy paid for by the actuators' work: the ring is at the edge of the robot's reach); the "
         "full-size backboard keeps its size and its height relative to the ring (lower edge {board_bottom_m} m). "
         "The ball stays the size-7 ball.",
         "Art. 3 (equipment, the hands): the hands are the H1-2's own Inspire five-finger hands (six drives: four "
         "fingers, the thumb's flexion and rotation), closed by one command per hand; the ball is held by the hands' "
-        "contact and friction alone (the palms pressed on its sides by the arms, the fingers closed over it) and "
+        "contact and friction alone (the open palms pressed on its sides by the arms) and "
         "slips or drops when they do not hold it.",
         "Basketball Equipment (basket): the ring is rigid (no pressure release) and the net is only drawn: it does not "
         "slow the ball. The ball is through the basket when its centre has gone down through the ring's plane inside "
@@ -367,7 +319,7 @@ class Task(TaskBase):
              "above the floor. The ball is a size-7 basketball (" + f"{2 * BALL['radius']:.3f} m across, "
              f"{BALL['mass']:.2f} kg, it keeps {BALL['bounce']:.2f} of its speed in a bounce on the floor" + "). Your "
              "hands are five-finger hands; the ball starts held between them, the palms pressed on its sides and the "
-             "fingers closed over it, and only the hands' contact and friction hold it; it can slip out. A hand is "
+             "hands open, and only the hands' contact and friction hold it; it can slip out. A hand is "
              "on the ball while it touches the ball, gaps shorter than {touch_gap_s} s included (a hand is the palm, "
              "the fingers and the wrist); the ball is in your hands while at least one hand is on it. The ball must stay in your hands from the start until its "
              "centre has gone down into the ring: no dribble, no throw, no drop. The dunk: the ball's centre goes down "
@@ -394,13 +346,14 @@ class Task(TaskBase):
     venue = ("A FIBA court. You stand under the basket's front, facing it (+x), inside the no-charge semi-circle: the "
              "point under the ring's centre is {start_to_ring_m} m ahead of your pelvis, the backboard's face "
              "{ring_centre_to_board_m} m beyond it. The ring's top edge is {ring_height_m} m above the floor. The ball "
-             "is held between your two hands in front of your chest, its centre 1.20 m above the floor and 0.40 m "
-             "ahead of your pelvis: the palms on its two sides, the fingers spread up and forwards over it and "
-             "closed on it (grip values 1), and the arms pressing the palms in (the start command's shoulder roll and "
-             "yaw are a little further in than the arms stand: the difference is the squeeze). A grip value is that "
+             "is held between your two hands in front of your chest, its centre 1.13 m above the floor and 0.39 m "
+             "ahead of your pelvis: the hands open (grip values 0, the fingers straight), the palms on its two sides "
+             "(on these hands it bears on the two thumbs, which lie a little proud of the palms), and the arms "
+             "pressing the palms in (the start command's shoulder roll and yaw are a little further in than the arms "
+             "stand: the difference is the squeeze). A grip value is that "
              "hand's closure command (0 open, 1 every finger and thumb joint closing towards its closed angle; a "
              "finger stops on what it touches).")
-    difficulty = ("With both arms up and the ball held between the hands its centre is about 2.15 m above the "
+    difficulty = ("With both arms up and the ball held between the hands its centre is about 2.19 m above the "
                   "floor; the ring is at 2.39 m, so the whole 67 kg body has to rise about 0.4 m (the ball's centre to "
                   "about 2.53 m) while the hands keep the ball through the jump's accelerations, and the hands, wrists and forearms have to go "
                   "into a ring only 0.21 m wider than the ball, then the robot has to come down on its feet. The robot "

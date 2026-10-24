@@ -5,8 +5,8 @@ You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 34 kg
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Return the service: after the table tennis ball has bounced once on your court, strike it with the paddle held in your right hand so that it touches the opponent's court, without letting go of the paddle.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You stand at your end of the table facing it (+x), on its centre line, your pelvis 0.5 m behind your end line; the net is 1.37 m beyond the end line and the server's end line 2.74 m. A table-tennis ball machine stands behind the server's end line; the ball leaves its wheels where a server strikes it: 3.288919 m ahead of your pelvis, -0.199863 m to your left (negative: to your right) and 0.899714 m above the floor. The service reproduces one of a library of legal robot services: they leave the server's racket at 2.2 to 4.5 m/s with up to 34 rad/s of spin and bounce on your court between 0.2 and 0.8 s after the strike; short services bounce a second time on your court if you do not strike them. Your arms hang; the paddle's handle lies across your right palm in a shakehand grip, the fingers and the thumb closed round it, the blade beyond the index finger's side and its faces looking the way your palm does (forehand) and the back of your hand (backhand).
@@ -35,7 +35,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

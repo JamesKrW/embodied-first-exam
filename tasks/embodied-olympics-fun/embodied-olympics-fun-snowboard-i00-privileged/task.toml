@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-snowboard-i00-privileged"
-description = "Embodied Olympics snowboard (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Ride the parallel slalom on your snowboard: one run down the course, the board and both feet through each of the 6 gates in order, then over the finish line. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics snowboard (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Ride the parallel slalom on your snowboard: one run down the course, the board and both feet through each of the 18 gates in order, then over the finish line. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "snowboard"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 24.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_snowboard.py: positive by injection (straight runs re-aimed by hand: 6 gates passed, finished in 15.61 s). The ski controller adapted to the board (heel and toe edge by leg IK) passes no gate: an edge command without the matching lean tips the robot over the other edge (static test, flat snow); human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_snowboard.py: A parallel slalom run with the minimum vertical drop (80 m: 256 m at 33 %, 18 gates), a level start platform and a self-start. Positive by injection: pushed off the platform, straight runs re-aimed by hand 0.8 m outside each turning pole; sliding, crossings and finish are physics; deterministic. Negatives: did not start, a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

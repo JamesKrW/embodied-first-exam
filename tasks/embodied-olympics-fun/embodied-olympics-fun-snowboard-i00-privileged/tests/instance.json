@@ -2,18 +2,21 @@
  "family": "snowboard",
  "seed": 0,
  "params": {
-  "slope_deg": 8.0,
+  "platform_m": 6.0,
+  "start_back_m": 0.3,
+  "dns_s": 20.0,
+  "slope_deg": 18.3,
   "brink_radius_m": 6.0,
-  "outrun_radius_m": 25.0,
-  "outrun_m": 40.0,
+  "outrun_radius_m": 60.0,
+  "outrun_m": 80.0,
   "course_width_m": 40.0,
-  "n_gates": 6,
-  "first_gate_m": 10.0,
-  "gate_spacing_m": 12.0,
+  "n_gates": 18,
+  "first_gate_m": 12.0,
+  "gate_spacing_m": 13.5,
   "offset_m": 1.0,
   "gate_width_m": 4.0,
   "first_side": 1.0,
-  "course_m": 82.0,
+  "course_m": 256.0,
   "finish_width_m": 12.0,
   "stance_m": 0.4,
   "fall_h_m": 0.35,
@@ -22,30 +25,43 @@
  },
  "title": "Snowboard: parallel slalom",
  "category": "track-and-jumps",
- "time_limit_s": 60.0,
+ "time_limit_s": 90.0,
  "stages": [
+  "start",
   "gate 1",
   "gate 2",
   "gate 3",
   "gate 4",
   "gate 5",
   "gate 6",
+  "gate 7",
+  "gate 8",
+  "gate 9",
+  "gate 10",
+  "gate 11",
+  "gate 12",
+  "gate 13",
+  "gate 14",
+  "gate 15",
+  "gate 16",
+  "gate 17",
+  "gate 18",
   "finish"
  ],
  "rulebook": "FIS International Competition Rules (ICR), Snowboard, edition 2024/25, parallel slalom (PSL): Art. 2507.2 (turning poles of consecutive gates 10-14 m apart; vertical drop 80-120 m, at least 18 gates), the gate passed when the board and both feet pass outside the gate's turning pole in the direction of the turn (as alpine ICR 661.4.2 for parallel events), flex turning poles (alpine ICR 680), no continuing after a missed gate, a fall",
  "deviations": [
   "Parallel format: one rider on one course against the clock (no opponent, no heats, no blue and red courses side by side).",
-  "Vertical drop and gates (80-120 m, at least 18 gates): the course is 82.0 m long on a slope of 8.0 degrees with 6 gates, so that the robot's run fits the episode.",
+  "Vertical drop and gates (80-120 m, at least 18 gates): the course is 256.0 m long on a slope of 18.3 degrees (33 %, the alpine slalom's gentlest, ICR 802.1.1: the snowboard ICR gives none we could cite), a vertical drop of about 80 m with 18 gates, the minimum of both.",
   "Gates: a turning pole and an outside pole 4.0 m further out (PSL gates carry a panel on their poles; drawn as plain poles here); a flex pole is a 28 mm pole on a sprung two-axis hinge at the snow (stiffness and mass are estimates). The gate is judged like an alpine gate: the board's nose and tail and both feet must cross the gate line from the turning pole to the outside pole.",
-  "Snowboard ICR (the start gate: the rider pushes out of it, the gate starts the clock): the robot stands still on the slope at the start and is released at t = 0; the run's time is the episode's.",
+  "Snowboard ICR (the start gate: the rider pushes out of it, the gate starts the clock): there is no start gate and nothing holds or releases the robot (the start of the RoboOlympics freeski sport, MIT): it stands on its board on a level start platform (6.0 m), its front boot 0.3 m behind the platform's edge (the start line), the edge rounded (radius 6.0 m) onto the slope; the start signal is given at t = 0 and the robot must leave by its own action within 20.0 s (a DNS otherwise); the run's time starts when both boots cross the start line.",
   "A rider who falls may get up and go on: a fall ends the run here (the families' fall rule): a part of the robot other than its feet and its hands on the snow, or its pelvis less than 0.35 m above the snow.",
-  "Snow and air: the board-snow contact is the freeski ski-snow model of the CHIGUI0/roboolympics project (MIT, ported): kinetic friction along the board after Wolfsperger et al. 2021, the edge's hold across it after Mossner et al. 2013 with race-piste snow, the sidecut's arc after Howe 2001; the snow keeps no ruts. Still air at 1500 m (1.052 kg/m^3), drag on every link; no lift.",
-  "Equipment: a children's all-mountain board (not a hard-boot race board); bindings at 0 / 0 degrees with a 0.4 m stance, rigid (no boots: the feet are bound directly; a binding never releases); the board is rigid."
+  "Snow and air: the board-snow contact is the freeski ski-snow model of the CHIGUI0/roboolympics project (MIT, ported): kinetic friction along the board after Wolfsperger et al. 2021, the edge's hold across it after Mossner et al. 2013 with race-piste snow, the sidecut's arc after Howe 2001, hard well-damped snow (the model's final version, PR #259); the snow keeps no ruts. Still air at a mountain venue (1.052 kg/m^3), drag and lift on every link (a normal-force model).",
+  "Equipment: a children's all-mountain board (not a hard-boot race board); bindings at 0 / 0 degrees with a 0.4 m stance, rigid (no boots: the feet are bound directly; a binding never releases); the board is rigid (no bending: freeski's flexing ski has no snowboard counterpart) and solid against the robot's body."
  ],
  "texts": {
-  "sentence": "Ride the parallel slalom on your snowboard: one run down the course, the board and both feet through each of the 6 gates in order, then over the finish line.",
-  "rules": "FIS snowboard parallel slalom, one run on one course (a shortened course). The course is a groomed slope falling at 8.0 degrees along +x (the fall line), 40.0 m wide, centred on y = 0. Both your feet are bound to one snowboard, the left foot forward (regular), across the board. You stand still at the start at t = 0, sideways to the fall line with the board's nose pointing down it, and are released. There are 6 gates: gate 1's line is 10.0 m down the slope from your start (measured along the slope), each next one 12.0 m further. A gate is two flexible poles across the slope, red and blue in turn: its turning pole stands 1.0 m from the centre line, on the left (y > 0) for gate 1 and then alternately right and left, its outside pole 4.0 m further out on the same side; its gate line is the line on the snow between them. A gate is passed when the board's nose and tail and both feet have crossed its gate line going down the slope; a point that comes back up across a gate line must cross it again. Gates are passed in order: if any of those four points goes down past the next gate's line, or the finish line, while a gate is not passed, you missed it and the run fails. Hitting or folding a pole is allowed. The finish line is 82.0 m down the slope from the start, 12.0 m wide and centred on y = 0: you succeed when, after every gate, both feet cross it between its posts, within 60 s. The run fails if you fall (a part of you other than your feet and your hands touches the snow, or your pelvis is less than 0.35 m above the snow, measured along the slope's normal), if you stop (your pelvis slower than 0.1 m/s for 1.5 s), if a foot crosses the finish line outside its posts, or at 60 s.",
-  "venue": "You stand at the start, x = 0, y = 0, facing the right side of the course (-y), the board's nose (under your left foot) pointing down the fall line (+x), perpendicular to the slope (a 120 cm children's board, sidecut radius 6 m). Behind you is a short flat platform; the slope falls at 8.0 degrees for the whole course and flattens out after the finish into an outrun. The gates' poles are red and blue, 1.8 m out of the snow; the finish has two posts and a banner.",
+  "sentence": "Ride the parallel slalom on your snowboard: one run down the course, the board and both feet through each of the 18 gates in order, then over the finish line.",
+  "rules": "FIS snowboard parallel slalom, one run on one course (of the minimum vertical drop). The course is a groomed slope falling at 18.3 degrees along +x (the fall line), 40.0 m wide, centred on y = 0. Both your feet are bound to one snowboard, the left foot forward (regular), across the board. You stand on your board on the level start platform at the top of the course, sideways to the fall line with the board's nose pointing down it, your front boot 0.3 m behind the platform's edge (the start line); the start signal is given at t = 0 and you must leave the platform by your own action (nothing holds or pushes you) within 20.0 s; your run's time starts when both feet cross the start line. There are 18 gates: gate 1's line is 12.0 m down the slope (measured along it) from x = 0, the slope's reference line, 1 m below where the brink's curve meets the slope; each next one 13.5 m further. A gate is two flexible poles across the slope, red and blue in turn: its turning pole stands 1.0 m from the centre line, on the left (y > 0) for gate 1 and then alternately right and left, its outside pole 4.0 m further out on the same side; its gate line is the line on the snow between them. A gate is passed when the board's nose and tail and both feet have crossed its gate line going down the slope; a point that comes back up across a gate line must cross it again. Gates are passed in order: if any of those four points goes down past the next gate's line, or the finish line, while a gate is not passed, you missed it and the run fails. Hitting or folding a pole is allowed. The finish line is 256.0 m down the slope from x = 0, 12.0 m wide and centred on y = 0: you succeed when, after every gate, both feet cross it between its posts, within 90 s. The run fails if you fall (a part of you other than your feet and your hands touches the snow, or your pelvis is less than 0.35 m above the snow, measured along the slope's normal), if you stop after the start (your pelvis slower than 0.1 m/s for 1.5 s), if you do not start within 20.0 s, if a foot crosses the finish line outside its posts, or at 90 s.",
+  "venue": "You stand on the level start platform (6.0 m long) at the top, facing the right side of the course (-y), the board's nose (under your left foot) pointing down the fall line (+x) (a 120 cm children's board, sidecut radius 6 m), your front boot 0.3 m behind the platform's edge (the red start line, about 1.8 m before x = 0 and 0.2 m above it); the edge rounds onto the slope, which falls at 18.3 degrees for the whole course and flattens out after the finish into an outrun. The gates' poles are red and blue, 1.8 m out of the snow; the finish has two posts and a banner.",
   "difficulty": "A snowboard turns on its toe edge and its heel edge: the robot must tip the board by leaning forwards or back over it, its feet locked to one plank, with no walking policy; toe-side turns ask it to balance over the narrow board's front edge at speed, heel-side turns to sit back without falling."
  },
  "robot": "unitree_g1",
@@ -54,9 +70,9 @@
   "mujoco": "3.3.7"
  },
  "t0": {
-  "state_sha": "ea22dd10aabce2676960ace1fca6faae47e918f626461ebf23a4065bd32faf5a",
+  "state_sha": "ab824f25a7fea965e3bb62dd365d3ea731932b8604e1c134efcc29d55e410d0d",
   "control_dt": 0.01,
-  "horizon_steps": 6000,
+  "horizon_steps": 9000,
   "raw_dim": 151,
   "action_types": {
    "stand": {
@@ -1176,23 +1192,23 @@
     "fovy_deg": 58.0,
     "position_m": [
      0.076,
-     0.0852,
-     1.2338
+     0.16,
+     1.9323
     ],
     "forward": [
      0.9394,
-     -0.0477,
-     -0.3396
+     -0.1077,
+     -0.3256
     ],
     "up": [
      0.3429,
-     0.1307,
-     0.9302
+     0.295,
+     0.8919
     ],
     "right": [
      0.0,
-     -0.9903,
-     0.1392
+     -0.9494,
+     0.314
     ]
    },
    "head_right": {
@@ -1200,23 +1216,23 @@
     "fovy_deg": 58.0,
     "position_m": [
      0.076,
-     0.0356,
-     1.2408
+     0.1125,
+     1.948
     ],
     "forward": [
      0.9394,
-     -0.0477,
-     -0.3396
+     -0.1077,
+     -0.3256
     ],
     "up": [
      0.3429,
-     0.1307,
-     0.9302
+     0.295,
+     0.8919
     ],
     "right": [
      0.0,
-     -0.9903,
-     0.1392
+     -0.9494,
+     0.314
     ]
    },
    "venue": {
@@ -1224,7 +1240,7 @@
     "fovy_deg": 60.0,
     "position_m": [
      14.0,
-     -6.0,
+     -2.6666,
      9.0
     ],
     "forward": [
@@ -1652,9 +1668,9 @@
   },
   "grippable": [],
   "pelvis": [
+   -3.3334,
    0.0,
-   0.0,
-   0.8075,
+   1.5281,
    -1.5708
   ]
  }

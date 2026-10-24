@@ -271,7 +271,7 @@ class Task(TaskBase):
                 "a player holds a live ball), Art. 16 (goal), Art. 25 (travelling)")
     deviations = [
         "the player's hands: the H1-2's own Inspire five-finger hands (six drives each: four fingers, the thumb's "
-        "flexion and rotation; fingertip forces 10 N, the thumb 15 N), each closed by one command; the ball is held "
+        "flexion and rotation; fingertip forces 20 N, the thumb 30 N), each closed by one command; the ball is held "
         "in the two hands by contact and friction alone (nothing is welded) and can slip or drop; it is let go when no "
         "hand has been on it for {touch_gap_s} s.",
         "Art. 3 (equipment, the hand): the palm is modelled as the soft part of a hand: it absorbs the ball (a ball "
