@@ -5,8 +5,8 @@ You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 33 kg
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Take a penalty kick: with one kick of a foot, send the ball that lies on the penalty mark into the official goal 11 m away, past the goalkeeper dummy.
 
-**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You stand facing the goal (+x), 3.0 m behind the penalty mark, on the line through the mark and the centre of the goal. The ball lies on the mark. The penalty area, the goal area and the arc are painted on the grass; the dummy stands in the middle of the goal.
@@ -31,7 +31,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;
