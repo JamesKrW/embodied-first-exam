@@ -20,8 +20,8 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
 expert_time_estimate_hours = 6.0
-oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_paddle_bounce.py: Reference: the mirror-law controller, the paddle held by contact and friction in the G1's own right Dex3-1 hand at the device's joint torques (a shakehand grip, no weld, no force factor): 20 bounces at 14.97 s of the 20 s limit, the hand's hold broken for at most 0.028 s, the handle at most 0.93 mm into the fingers; 10 of 10 perturbed instances (drop point +-1 cm, height +-2 cm, drop time +-0.1 s) succeed; the same state hash twice. Negatives: nop (the floor), a still level blade (no counted bounce), the hand opened (the paddle left the hand), resting on the blade, the ball dropped onto the handle, touched before the drop, on the dropper after the drop, a fall, sixty bounces asked (no success in the time). Realtime: physics-only RTF on the shared cluster 0.62 against 0.82-0.92 for a reference dynamic family whose workstation RTF is 3.07: about 1.5 (with the 2.4-times speed ratio measured earlier) to 2.2 (with the same run's reference) on the workstation.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle = "full"
+oracle_evidence = "Reference: a mirror-law controller, the paddle held by contact and friction in the G1's own right Dex3-1 hand at the device's joint torques (a shakehand grip, no weld, no force factor), its nine gains from a random search (20 of 32 gain sets succeed). 20 bounces at 14.94 s of the 20 s limit, the hand's hold broken for at most 0.016 s; no arm into the robot's own body (the thumb rests on the hip from t = 0: a contact, no overlap); live, replay and the state hash agree. 5 of 5 neighbours succeed (servo gains x0.97 / x1.03, the drop point 1 cm off in x both ways and in y). Measured (make_oracles.py): success after 14.94 s of the 20 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = []
+oracle = [0]
 
 [verifier]
 timeout_sec = 900.0

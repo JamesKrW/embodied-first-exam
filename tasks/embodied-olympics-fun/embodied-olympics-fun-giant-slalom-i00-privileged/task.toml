@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-giant-slalom-i00-privileged"
-description = "Embodied Olympics giant-slalom (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Ski the giant slalom: one run down the course on your skis, both ski tips and both feet through each of the 4 gates in order, then over the finish line. A referee of events, geometry and contact rules decides the success."
+description = "Embodied Olympics giant-slalom (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Ski the giant slalom: one run down the course on your skis, both ski tips and both feet through each of the 26 gates in order, then over the finish line. A referee of events, geometry and contact rules decides the success."
 authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "giant-slalom"]
 
@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 20.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_giant_slalom.py: positive by injection (straight runs re-aimed by hand at the gates: 4 gates passed, finished in 16.55 s). The slalom controller re-searched for this course reaches gate 3 of 4 (it falls at about 7 m/s on the 14.5 m-radius skis); human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_giant_slalom.py: A giant slalom with the U16-U14 minimum vertical drop (200 m: 640 m at 33 %, 26 open gates with panels), a level start platform and a self-start. Positive by injection: pushed off the platform, straight runs re-aimed by hand at each gate; sliding, crossings and finish are physics; deterministic. Negatives: did not start, a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

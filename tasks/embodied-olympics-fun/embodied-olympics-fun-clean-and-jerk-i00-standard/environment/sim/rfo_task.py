@@ -7,13 +7,20 @@ turn in the hands and drop.
 
 The load (a deviation): American Barbell's ATB-5-E aluminium technique bar, 5 kg (49 N), 1.835 m, 25 mm
 (ironcompany.com / americanbarbell.com listing: aluminium shaft and sleeves, 25 mm, 1835 mm), resting by its sleeves
-on two lifting blocks 0.20 m high, which put its axis 0.225 m above the platform: the height of a competition bar on
-its 0.45 m discs. The IWF's women's bar is 15 kg and the lightest competition barbell 21 kg (IWF TCRR 2020).
+on two lifting blocks 0.35 m high, which put its axis 0.375 m above the platform (a competition bar on its 0.45 m
+discs lies at 0.225 m). The IWF's women's bar is 15 kg and the lightest competition barbell 21 kg (IWF TCRR 2020).
 
 Why the blocks: the Inspire hand closes its fingers round a bar from above; on its inner collars the bar's axis is
 0.04 m above the platform, and there the closing fingers touch the platform (measured: the reference's grasp, its
 arms brought as low as they go, ended with a hand on the platform). Lifting from blocks is a standard weightlifting
 exercise.
+
+Why 0.35 m and not 0.20 m (a deviation; a block clean & jerk, a standard training form): on 0.20 m blocks (the bar at a
+competition bar's 0.225 m) the squat to the bar is out of reach of the robot's own body with its self-collision: the
+hips would have to flex past where the hip links meet the pelvis (the planner's bottom poses put them 15 to 46 mm into
+it, or the thumbs into the knees), and every squat tried (52: knee and trunk angles, grip width, descent time,
+balance point) fell back onto a thigh or knocked the bar off before both hands held it. From 0.35 m a shallower squat
+(knees 1.2 rad, the pelvis pitched 0.8 rad) reaches the bar.
 
 Why not heavier (measured and computed in the simulator image):
 - with the women's 15 kg bar the clean's turnover is out of reach: every path from the hang (the bar below the elbows)
@@ -28,10 +35,10 @@ Why not heavier (measured and computed in the simulator image):
 The reference solution (oracles/clean-and-jerk: `lowcmd` rows; a whole-body plan with the feet flat and the centre of
 mass, the bar's included, over the soles; static feed-forward torques; the arms by inverse kinematics of the hands'
 grasp centres with the bar along the hands' grasp axes, the fingers pointing forwards and a little down near the
-blocks): squats to the bar, closes both hands round it (palms down on it), stands up with straight arms, the bar's
-path 0.04 m ahead of where it lay so that it clears the shins (the attempt begins at 4.9 s), straightens the knees,
-brings the bar up in front of the hips and the trunk to the shoulders (the clean, 11.3 s), presses it overhead with
-the arms' null space drawn smoothly to straight arms (overhead at 17.5 s) and holds until the down signal (19.4 s).
+blocks): squats to the bar (knees 1.2 rad, the pelvis pitched 0.8 rad), closes both hands round it (palms down on it), stands up with straight arms, the bar's
+path 0.04 m ahead of where it lay so that it clears the shins, straightens the knees, brings the bar up in front of
+the hips and the trunk to the shoulders (the clean), presses it overhead with the arms' null space drawn smoothly to
+straight arms and holds until the down signal: success at 20.3 s.
 
 The hold's other surfaces: the bar touches every collision geom of the robot (it may rest on the trunk, as in a front
 rack); the fingers' pads win the contact parameters on it (priority 2, friction 1.0, realhand.py)."""
@@ -77,14 +84,17 @@ class Task(TaskBase):
         "topples at the turnover, so neither a heavier bar nor a faster turnover is open. There is no choice of "
         "weight and no progression of attempts, because the task is one attempt",
         "3.1 and 3.3 (the bar on the platform, on its discs): the bar rests by its sleeves on two lifting blocks "
-        "{block_height_m} m high, so that its axis is 0.225 m above the platform, the height of a competition bar on "
-        "its 0.45 m discs; without discs it would lie on its inner collars 0.04 m above the platform, where the hands' "
+        "{block_height_m} m high (a block clean & jerk, a standard training form), so that its axis is 0.375 m above "
+        "the platform; a competition bar on its 0.45 m discs lies at 0.225 m, but the squat to that height is out of "
+        "the robot's reach: its hips would have to flex past where the hip links meet the pelvis (the robot's own "
+        "body collides with itself), and every squat tried fell back onto a thigh. Without discs or blocks the bar "
+        "would lie on its inner collars 0.04 m above the platform, where the hands' "
         "curled fingers cannot close round it without touching the platform",
         "3.3 (what the maker does not give): the bar's {bar_mass_kg} kg are split {shaft_mass_kg} kg for the shaft "
         "and the rest between the two revolving sleeves with their inner collars (0.08 m across, 0.03 m wide); "
         "these are estimates",
-        "3.3 (the grip): each hand is the H1-2's own Inspire five-finger hand (six self-locking drives; 10 N at each "
-        "fingertip, 15 N at the thumb), open at the start; it holds the bar by its fingers' and palm's contact and "
+        "3.3 (the grip): each hand is the H1-2's own Inspire five-finger hand (six self-locking drives; 20 N at each "
+        "fingertip, 30 N at the thumb), open at the start; it holds the bar by its fingers' and palm's contact and "
         "friction alone (nothing is welded; no chalk, no hook grip with the thumb under the fingers), and the bar "
         "can slip, turn in the hand and drop. A hand holds the bar while the grip section touches that hand's "
         "fingers (closed round it; a break of up to {off_bar_s} s, the contact flickering under a load, is not "
@@ -125,7 +135,7 @@ class Task(TaskBase):
                   lift_tolerance_m=0.03, knee_height_m=0.48, clean_rack_m=0.15, clean_hold_s=0.5, overhead_m=0.25,
                   elbow_lock_deg=10.0, knee_lock_deg=10.0, feet_line_m=0.05, bar_tilt_max_deg=60.0, still_m_s=0.10,
                   upright_cos=0.94, bar_centre_m=0.25, bar_align_deg=20.0,
-                  hold_s=2.0, off_bar_s=0.05, block_height_m=0.20, block_y_m=0.80)
+                  hold_s=2.0, off_bar_s=0.05, block_height_m=0.35, block_y_m=0.80)
 
     sentence = ("Clean and jerk the barbell: lift it from its blocks to your shoulders, then to locked arms "
                 "overhead, and hold it there motionless until the down signal.")
@@ -170,7 +180,7 @@ class Task(TaskBase):
              "floor, in the rest pose (upper arms down, forearms forward). The barbell lies across your front, "
              "parallel to your shoulders and centred on you, its sleeves on two blocks (0.30 m along x, 0.20 m along "
              "y, {block_height_m} m high, centred {block_y_m} m to either side of you): its axis is {bar_ahead_m} m "
-             "ahead of your pelvis and 0.225 m above the platform, just beyond your toes (they reach 0.164 m ahead of "
+             "ahead of your pelvis and 0.375 m above the platform, just beyond your toes (they reach 0.164 m ahead of "
              "your pelvis). Your shoulder joints are "
              "1.46 m above the platform when you stand, 0.30 m apart; the centre of your head is at 1.70 m, its "
              "top at 1.79 m; your knee joints are at 0.48 m. In "
@@ -207,7 +217,7 @@ class Task(TaskBase):
         r_rest = max([FLANGE_R_M, r_sleeve] + [r for mass, r in loaded if mass > 0])    # what it lies on
         bh = p["block_height_m"]
         if bh > 0:                                           # lifting blocks under the sleeves: the bar's axis at the
-            r_rest = r_sleeve                                # competition height (0.225 m: a bar on 0.45 m discs)
+            r_rest = r_sleeve                                # blocks' height + the sleeve's radius (0.375 m on 0.35 m)
             for s, tag in ((1, "L"), (-1, "R")):
                 sc.box(f"block{tag}", (p["bar_ahead_m"], s * p["block_y_m"], H + bh / 2), (0.15, 0.10, bh / 2),
                        rgba=(0.55, 0.38, 0.22, 1), solid="hit", friction=(0.8, 0.005, 0.001), **RIGID)

@@ -36,8 +36,8 @@ protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 5
 expert_time_estimate_hours = 6.0
-oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/roboolympics/tests/test_boxing.py: Reference: a straight punch from the guard with the trunk's turn behind it, the wrist pitched so that the end of the fist leads, then the walking policy at zero command; the bag receives 15.5 N s (12 required) at 1.28 m in a 0.056 s touch and the fist is back at the guard at 4.0 s. All 10 variations tried around it score (13.0-16.8 N s: trunk angles, punch timing, wrist angle, the bag 1.5 cm nearer or farther), but the working region is narrow: in a wider grid of timing, trunk turn and wrist angle 26 of 36 settings score (the others touch with the hand first, land below the band or are too weak).; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle = "full"
+oracle_evidence = "Reference: a straight punch from a guard with the upper arm raised 0.04 rad, the trunk's turn behind it and the wrist pitched +0.31 rad so that the knuckle part leads, then the walking policy at zero command; its parameters come from a random search over the guard, the trunk's wind and turn, the wrist, the punch's end pose and its duration (96 tries, 10 scoring). The bag receives 15.9 N s (12 required) at 1.25 m in a 0.030 s touch; the fist is back at the guard at 4.0 s; no arm into the robot's own body; live, replay and the state hash agree. 3 of 4 neighbours succeed (servo gains x0.97 / x1.03 and the bag 1.5 cm farther pass; with the bag 1.5 cm nearer the blow lands early in the stroke: 10.7 N s, too weak). The privileged twin's reference rows (401 control steps, success after 4.01 s) streamed through the client."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -77,7 +77,7 @@ sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = []
+oracle = [0]
 
 [verifier]
 timeout_sec = 900.0

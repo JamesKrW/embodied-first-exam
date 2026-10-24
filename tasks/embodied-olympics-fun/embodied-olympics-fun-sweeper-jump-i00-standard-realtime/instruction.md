@@ -5,8 +5,8 @@ You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 33 kg
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Jump the sweeper: standing on your podium, jump over the padded boom each time it sweeps round, 3 times in a row without being hit, then stand still on the podium.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 A Meltdown sweeper on a level bed: the motion base, a column 0.4 m in radius, stands 3.2 m in front of you (you face it); you stand in the middle of your podium, its top 0.4 m above the bed. The boom sticks out from the base at shin height and turns counter-clockwise seen from above: it comes at you from your left. At the start it points 200.0 degrees of its turn before your podium (on the far side of the base), turning; it will be over your podium in about 4.17 s.
@@ -34,7 +34,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

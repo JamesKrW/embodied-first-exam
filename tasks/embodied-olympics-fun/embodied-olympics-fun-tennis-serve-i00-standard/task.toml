@@ -36,8 +36,8 @@ protocol = "eai-standard/2.1"
 instance_seed = 0
 reset_budget = 5
 expert_time_estimate_hours = 12.0
-oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/roboolympics/tests/test_tennis_serve.py: Reference re-found for the H1-2's own Inspire hands at the device's forces (the racket's handle across the right palm, the ball in the left hand; no weld): the earlier underarm technique with the right arm's swing keys, two key times and the release re-searched by CMA-ES; the left hand opens at 1.27 s while the robot stands at rest, the ball falls and meets the racket (the frame, rule-legal) at 3.3 m/s, leaves at 16.3 m/s, clears the net by 0.28 m and lands in the box at (15.46, 4.04); success at 2.76 s; the same state hash twice. Also a declared magic-action run (the toss moved onto the head's path, the outgoing velocity set) for the referee's details. Negatives: nop (time, the ball held), the left hand opened (the ball dropped unstruck), the right hand opened (the racket left the hand at 0.36 s); stress: random arm targets with the hands closed, the handle at most 0.43 mm into the fingers.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle = "full"
+oracle_evidence = "Reference: an underarm key-pose technique with the H1-2's own Inspire hands at their default forces (20 N per fingertip, 30 N the thumb; the racket's handle across the right palm, the ball in the left hand; no weld), the right arm's swing keys, three key times and the release searched by CMA-ES (any arm more than 3 mm into the body rejected), then a narrow search around the first success. The left hand opens at 1.27 s while the robot stands at rest, the racket meets the ball and sends it off at 12.3 m/s over the net into the box at (14.40, 2.22); success at 3.20 s; deepest self-overlap 0.1 mm; live, replay and the state hash agree. It is fragile in time: it also succeeds with all servo gains x0.97 and x1.03, but the key times 10 ms earlier or later miss (0 of 2). The privileged twin's reference rows (320 control steps, success after 3.2 s) streamed through the client."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -77,7 +77,7 @@ sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = []
+oracle = [0]
 
 [verifier]
 timeout_sec = 900.0

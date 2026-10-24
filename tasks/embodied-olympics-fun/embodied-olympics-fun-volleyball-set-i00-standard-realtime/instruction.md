@@ -5,8 +5,8 @@ You control a simulated Unitree H1-2 humanoid robot (27 joints, 1.78 m tall, 67 
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Set the pass: with one overhead contact of your hands, send the volleyball that comes down above you at least a metre above the net and into the outside hitter's target along the net.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You face +x, along the net, which is 1 m to your right; the back court is to your left. A volleyball machine stands in the back court, its wheels 0.9 m above the floor, 5.5 m to your left and 1.5 m ahead of you, aimed up towards you. About 3.0 s after the start it tosses the ball; it climbs to about 3.8 m and comes down steeply (about 56 degrees below the horizontal) at just under 7 m/s, travelling from your left to your right. About 1.3 s after the toss it is 2.1 m above the floor about 0.25 m in front of your head; untouched it lands beside the centre line to your right. The hitter's target is painted on the floor 5 m ahead of you.
@@ -33,7 +33,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

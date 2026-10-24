@@ -5,8 +5,8 @@ You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 33 kg
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Juggle the football on your head: a ball machine in front of you lobs it onto your head; keep it in the air with ten headers in a row, touching it with nothing but your head, without it touching the ground.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You stand at the centre of the 4.572 m grid facing +x, its edges half that to your front, back and sides. A ball machine stands on the grass in front of you, its two wheels 1.0 m ahead of where your pelvis starts and 0.6 m above the ground, aimed up and back towards you, with the ball in its chute. Its gate opens at 1.0 s; about 0.28 s later the ball leaves the wheels, rises to about 2 m and comes down on the top of your head (if you stand still) at about 3.5 m/s, moving towards you at about 1.1 m/s.
@@ -33,7 +33,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

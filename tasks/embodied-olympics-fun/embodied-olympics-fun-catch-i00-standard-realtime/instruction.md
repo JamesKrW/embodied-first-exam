@@ -5,8 +5,8 @@ You control a simulated Unitree H1-2 humanoid robot (27 joints, 1.78 m tall, 67 
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Catch the fly ball: close one of your hands on the baseball before it touches the ground or your body, and keep it there.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You stand on a level field facing the pitching machine (+x), 40.0 m away, its head tilted up towards you. The ball rises to about 11 m and comes down steeply, about three seconds after the launch, somewhere within 3.0 m of you. Your hands are open, the fingers pointing forwards along your forearms. Still air.
@@ -17,7 +17,7 @@ Directions are from the robot at the start: +x is the way you face, +y is to you
 ## The rules
 **Rule book:** Official Baseball Rules (MLB, 2024 edition): 3.01 (the ball), Definitions of Terms: "catch" (secure possession in the hand before the ball touches the ground, held long enough to show control), "in flight". Where this task departs from it:
 
-- Definitions (catch): no glove; both hands are the H1-2's own Inspire five-finger hands (six self-locking drives; 10 N at each fingertip, 15 N at the thumb; a full close in about 0.8 s), bare. A catch is one hand enclosing the ball: its fingers and its thumb or palm touching the ball at the same time from opposite sides (the mean directions of the two contacts at least 90.0 degrees apart: the hand closed on it, not a ball lying on an open hand), at the latest 0.5 s after the ball first touched you; "held long enough" is 1.0 s in which the ball stays enclosed in that hand (breaks of at most 0.02 s) and touches nothing else, without falling. Nothing is welded: the ball is held only by the fingers' contact and friction and can slip out.
+- Definitions (catch): no glove; both hands are the H1-2's own Inspire five-finger hands (six self-locking drives; 20 N at each fingertip, 30 N at the thumb; a full close in about 0.8 s), bare. A catch is one hand enclosing the ball: its fingers and its thumb or palm touching the ball at the same time from opposite sides (the mean directions of the two contacts at least 90.0 degrees apart: the hand closed on it, not a ball lying on an open hand), at the latest 0.5 s after the ball first touched you; "held long enough" is 1.0 s in which the ball stays enclosed in that hand (breaks of at most 0.02 s) and touches nothing else, without falling. Nothing is welded: the ball is held only by the fingers' contact and friction and can slip out.
 - Definitions (catch): a ball that touches the body (any part other than the hands and the forearms) before it is caught is not a catch here (the rule would allow trapping it against the body), and neither is a ball held at the end by anything but the hand that caught it (the other hand, a forearm, the body).
 - The fly ball is not batted: a two-wheel pitching machine 40.0 m away throws it at about 21.35 m/s, about 45.0 degrees above the horizon, about 1.0 s after the start, with the little spin its wheels give it; where it comes down (within 3.0 m of where you stand) is this instance's draw.
 - Flight: quasi-steady aerodynamics (MuJoCo's ellipsoid fluid model: drag and Magnus lift), still air.
@@ -31,7 +31,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

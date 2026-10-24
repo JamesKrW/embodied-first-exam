@@ -27,12 +27,15 @@ services:
     environment:
       RCB_INSTANCE: /srv/instance.json
       RCB_DATA: /data
+      OMP_NUM_THREADS: "1"                              # one thread per numeric library: the world steps on one core
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
       RCB_WALL_CLOCK_S: "7200"
       RCB_STARTUP_TIMEOUT_S: "300"                      # the scene builds in under a second
       # Knobs: ${NAME:-default} takes NAME from the shell that runs harbor. The defaults are the standard
       # configuration; results under other settings are reported separately.
-      RCB_SLOWDOWN: "${RCB_SLOWDOWN:-1}"                # S = 1: the world runs at 1/S of real speed (the family's measured RTF; PROTOCOL §4b)
-      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-5}"        # 5: Embodied Olympics' attempts (tasks/embodied-olympics-fun/README.md); 0: one attempt
+      RCB_SLOWDOWN: "${RCB_SLOWDOWN:-2}"                # S = 2: the world runs at 1/S of real speed (one S for every family; PROTOCOL §4b)
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-5}"       # 5: RoboOlympics' attempts (docs/benchmarks/roboolympics.md); 0: one attempt
       RCB_SESSION_LOG: ""
       PYTHONPATH: /srv
       MUJOCO_GL: egl

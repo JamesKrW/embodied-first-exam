@@ -5,8 +5,8 @@ You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 33 kg
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Dodge: five cloth dodgeballs are thrown at you by ball machines that aim at you; do not let a live ball touch you, stay inside your court and on your feet.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 A wooden sports floor with the 18 m x 9 m court painted on it; you stand in the middle of your half, 5 m behind the centre line, facing the opponents' half (+x), where the five machines stand in a row 8 m in front of you, their heads at about head height, turning to follow you. The side lines are 4.5 m to your left and right, your back line 4 m behind you.
@@ -31,7 +31,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

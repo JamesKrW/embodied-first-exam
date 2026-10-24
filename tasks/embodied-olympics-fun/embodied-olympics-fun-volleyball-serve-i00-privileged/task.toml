@@ -20,8 +20,8 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
 expert_time_estimate_hours = 6.0
-oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_volleyball_serve.py: Reference, re-found on the core with Unitree's actuator data (H2-class legs, rotor inertia, joint friction): a tiny toss off the open left palm by the arm's own movement (no pin, no launch); then the same arm swings up with the trunk's turn and strikes the ball 0.12 s after the toss with the upper arm and forearm (Rule 12.4.1 allows any part of the arm). Key times, arm keys and trunk lean come from CMA-ES, with a penalty for any arm passing more than 3 mm into the body. The ball comes in at 0.50 m/s and leaves at 11.4 m/s; it lands 11.6 m ahead (2.1 m beyond the net), 3.3 m right of the middle; success after 1.8 s. The deepest self-overlap is 2.8 mm (the left wrist into the trunk). 3 of 4 perturbations succeed (servo gains x0.97 / x1.03 and the keys after the strike 10 ms earlier pass; 10 ms later fails).; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle = "full"
+oracle_evidence = "Reference: a tiny toss off the open left palm by the arm's own movement (no pin, no launch), then the same arm swings up with the trunk's turn and strikes the ball about 0.1 s after the toss with the upper arm and forearm (Rule 12.4.1 allows any part of the arm). Key times, arm keys and trunk lean come from CMA-ES, any arm more than 3 mm into the body rejected. The ball comes in at 0.66 m/s and leaves at 13.6 m/s; it lands 14.2 m ahead (4.7 m beyond the net), 3.8 m right of the middle; success after 1.61 s; live, replay and the state hash agree. The deepest self-overlap is 3.0 mm (the right wrist on the right hip at 0.11 s). 4 of 4 perturbations succeed (servo gains x0.97 / x1.03, the keys after the strike 10 ms earlier / later). Measured (make_oracles.py): success after 1.61 s of the 12 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
@@ -60,7 +60,7 @@ main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = []
+oracle = [0]
 
 [verifier]
 timeout_sec = 900.0

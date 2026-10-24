@@ -5,8 +5,8 @@ You control a simulated Unitree H1-2 humanoid robot (27 joints, 1.78 m tall, 67 
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Return the serve: after the tennis ball has bounced once in your service box, hit it with the racket held in your right hand back over the net so that it lands in the singles court on the far side, without letting go of the racket.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You stand as the receiver: 2.75 m to the right of the court's centre line, your pelvis 0.5 m behind your baseline, facing the net (+x), which is 12.385 m ahead of you. Painted on the court, all 0.05 m wide and inside the measurements: the two baselines, the two singles sidelines, the two service lines, the centre service line between them and a 0.10 m centre mark on each baseline; there are no doubles lines. The far baseline is 23.77 m beyond yours. The server is a ball machine on a stand: the ball leaves its two wheels where a server strikes it, 2.7 m above the ground, 0.2 m behind the far baseline and 0.8 m to the server's right of the centre mark (your left of the centre line). The net gives a little when something meets it. The serve is flat, with a little topspin; it bounces in your right service box, the one between the centre line and the right sideline, and reaches your baseline about a second after it was struck. The racket's handle lies across your right palm near its butt, held by the closed fingers and thumb, the butt just beyond your little finger; the strings face the way your palm faces, and the racket points up, square to your forearm.
@@ -18,7 +18,7 @@ Directions are from the robot at the start: +x is the way you face, +y is to you
 **Rule book:** ITF Rules of Tennis 2024: Rule 1 (the court), Rule 3 and Appendix I (the ball), Rule 4 and Appendix II (the racket), Rule 12 (a ball on a line), Rules 24 and 25 (losing the point, a good return). Where this task departs from it:
 
 - Rules 16-21 (the service): the server is a ball machine, not a player: a two-wheel machine on a stand behind the far baseline throws the serve from the server's strike point (2.7 m up) at about 3.0 s; there is no opponent, the attempt ends when your return lands
-- Rule 4 (the racket held in the hand): the hand is the H1-2's own Inspire five-finger hand (six drives, fingertip forces 10 N, the thumb 15 N), closed by one command; the handle lies across the palm, and the racket is held by the fingers' contact and friction alone, as a hand holds it
+- Rule 4 (the racket held in the hand): the hand is the H1-2's own Inspire five-finger hand (six drives, fingertip forces 20 N, the thumb 30 N), closed by one command; the handle lies across the palm, and the racket is held by the fingers' contact and friction alone, as a hand holds it
 - Rules 4 and 24 (the ball hit with the racket held in the hand; a thrown racket does not play the ball): "in the hand" is defined by contact: the racket's handle touches the hand's fingers and its thumb or palm; a break of up to 0.05 s (the jolt of an impact or a hard swing) is not a release
 - Rule 12 (a ball touching a line is in): the ball's footprint is one point, the point under its centre at its first contact with the ground (a real ball's footprint is about 5 cm across)
 - Rule 24 f (deliberately touching the ball twice, carrying it): intention cannot be judged: racket contacts less than 0.05 s apart are one hit, a later one is a second hit, and a contact longer than 0.05 s is a carry
@@ -34,7 +34,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

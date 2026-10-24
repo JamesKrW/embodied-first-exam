@@ -1,5 +1,6 @@
 """High jump (World Athletics TR 26-27): a 4.00 m bar on its supports between uprights 4.02 m apart, the 6 m x 4 m x
 0.7 m landing mat behind it; a take-off from one foot, over the bar, and the bar stays on."""
+import mujoco
 import numpy as np
 
 from rfo.referee import Flights
@@ -67,8 +68,13 @@ class Task(TaskBase):
                 "bar's nearer edge without first clearing the bar), TR 27.3 (a runway of at least 15 m), TR 27.10 "
                 "(a landing area of at least 6 m x 4 m x 0.7 m), TR 25.17 (one minute for a trial)")
     deviations = [
-        "TR 27.1 (one foot) is judged by a number: in the last {single_support_s} s before the lift-off of the "
-        "jump's flight only one foot touches the ground, and nothing else does",
+        "TR 27.1 (\"The athlete shall take off from one foot\") is judged on the ground's forces, after every 1 ms "
+        "physics step: during the last {takeoff_window_s} s before the lift-off of the jump's flight the other "
+        "(free) foot's ground force stays below {free_foot_force_frac} of the robot's weight, or the free foot is "
+        "off the ground for the whole of the take-off foot's last ground contact; nothing else of the robot touches "
+        "the ground in that time (or in that contact); a break of at most {contact_gap_s} s in a foot's contact "
+        "is not a new contact. A staggered two-foot push, with the free foot leaving just "
+        "before the lift-off, is a take-off from both feet",
         "TR 27.2(b) is judged geometrically, in one flight: the robot's pelvis and feet (the ankle joints) must "
         "pass the plane between the uprights and above the height of the bar's upper side, and every part of the "
         "robot must get beyond the plane, all in the same flight (from the take-off to the first contact with "
@@ -100,7 +106,8 @@ class Task(TaskBase):
     fall_rule = False                # no rule of the event says a fall is a failure; the contacts below judge it
     params = dict(bar_height_m=1.00, bar_length_m=4.00, bar_diameter_m=0.030, bar_mass_kg=2.0, upright_gap_m=4.02,
                   support_width_m=0.04, support_length_m=0.06, mat_length_m=4.0, mat_width_m=6.0, mat_height_m=0.70,
-                  mat_gap_m=0.10, **MAT_CONTACT, runway_m=15.0, single_support_s=0.05,
+                  mat_gap_m=0.10, **MAT_CONTACT, runway_m=15.0, takeoff_window_s=0.15, free_foot_force_frac=0.05,
+                  contact_gap_s=0.03,
                   min_air_s=0.05, rise_min_m=0.08, bar_drop_m=0.05, bar_wait_s=2.0, bar_touch_max_s=0.3)
 
     sentence = ("Do a high jump: approach the bar, take off from one foot, go over the bar between the uprights "
@@ -115,8 +122,9 @@ class Task(TaskBase):
              "(any direction, any distance on the {runway_m} m of level runway). A flight is a time of at least "
              "{min_air_s} s in which nothing of you touches anything but the bar. Your jump is the flight in which "
              "your pelvis crosses the bar's plane. Its take-off must be from one foot: in the last "
-             "{single_support_s} s before lift-off only one foot touches the ground and nothing else of you does; and "
-             "in it your pelvis must rise at least {rise_min_m} m above its height at lift-off. The clearance is "
+             "{takeoff_window_s} s before lift-off your other foot presses on the ground with less than "
+             "{free_foot_force_frac} of your weight (or it is off the ground for the whole of the take-off foot's "
+             "last ground contact), and nothing else of you touches the ground; and in it your pelvis must rise at least {rise_min_m} m above its height at lift-off. The clearance is "
              "judged in that one flight, between the take-off and your first contact with anything but the bar: "
              "your pelvis and both feet (the ankle joints) must cross the plane between the uprights and higher "
              "than the bar's upper side (one that comes back over the plane has not passed it and must pass it "
@@ -165,11 +173,13 @@ class Task(TaskBase):
                        "pelvis": w.robot.pelvis}
         self.bar_mask = ref.geoms(body="bar")
         self.robot = ref.part("robot")
+        self.weight = float(m.body_subtreemass[w.robot.pelvis]) * float(-m.opt.gravity[2])
         # phase: approach -> jump (its take-off judged) ; crossed: who has passed the plane; prev: the points one
         # physics step ago; last_on / at_t0: the feet's last ground contact (now / at the start of the current flight)
         self.trackers = {"flights": Flights(ref, min_air=self.p["min_air_s"], also_allowed=self.bar_mask),
                          "phase": "approach", "crossed": [], "prev": None, "last_on": {"left": -1.0, "right": -1.0},
-                         "other_on": -1.0, "at_t0": None, "t_land": None, "t_clear": None, "bar_z0": None, "bar_s": 0.0}
+                         "other_on": -1.0, "force_t": {"left": -1.0, "right": -1.0},
+                         "contact_t0": {"left": None, "right": None}, "at_t0": None, "t_land": None, "t_clear": None, "bar_z0": None, "bar_s": 0.0}
 
     def _takeoff(self, w, ref) -> bool:
         """Judge the take-off of the jump's flight (TR 27.1: one foot). False: the attempt has failed."""
@@ -177,13 +187,31 @@ class Task(TaskBase):
         t0 = tr["at_t0"]
         foot = max(SIDES, key=lambda s: t0[s])
         other = "right" if foot == "left" else "left"
-        if t0[foot] - max(t0[other], t0["other"]) < p["single_support_s"]:
-            ref.fail("the take-off was not from one foot", feet_left_apart_s=round(t0[foot] - t0[other], 3),
-                     other_part_s=round(t0[foot] - t0["other"], 3))
+        lift, c0, win = t0[foot], t0["contact_t0"][foot], p["takeoff_window_s"]
+        c0 = lift if c0 is None else c0
+        free = lift - t0["force_t"][other] >= win - 1e-9 or t0[other] < c0     # the free foot: unloaded, or off
+        alone = lift - t0["other"] >= win - 1e-9 or t0["other"] < c0           # nothing else on the ground
+        if not (free and alone):
+            ref.fail("the take-off was not from one foot", free_foot_loaded_s_before=round(lift - t0["force_t"][other], 3),
+                     free_foot_left_s_before=round(lift - t0[other], 3), other_part_s=round(lift - t0["other"], 3),
+                     takeoff_contact_s=round(lift - c0, 3))
             return False
         tr["phase"] = "jump"
         ref.stage("take-off", foot=foot)
         return True
+
+    def ground_force(self, w, ref, side) -> float:
+        """The normal force (N) of the ground on that foot in the physics step just taken (mj_contactForce)."""
+        d, m = w.d, w.m
+        n = d.ncon
+        g = d.contact.geom[:n]
+        A, B = self.sole[side], ref.ground
+        f, tot = np.zeros(6), 0.0
+        for i in np.flatnonzero((A[g[:, 0]] & B[g[:, 1]]) | (A[g[:, 1]] & B[g[:, 0]])):
+            if d.contact.efc_address[i] >= 0:
+                mujoco.mj_contactForce(m, d, int(i), f)
+                tot += float(f[0])
+        return tot
 
     def substep(self, w, ref):
         tr, p = self.trackers, self.p
@@ -202,12 +230,17 @@ class Task(TaskBase):
         was_air = fl.air
         done = fl.update()                               # a flight of at least min_air_s that lands now, or None
         if fl.air and not was_air:
-            tr["at_t0"] = {**tr["last_on"], "other": tr["other_on"]}
+            tr["at_t0"] = {**tr["last_on"], "other": tr["other_on"], "force_t": dict(tr["force_t"]),
+                           "contact_t0": dict(tr["contact_t0"])}
             if not ref.has("clearance"):                 # TR 27.2(b) in one flight: a new flight starts the count again
                 tr["crossed"] = []
         for s in SIDES:
             if ref.touching(self.sole[s], ref.ground):
+                if tr["contact_t0"][s] is None or ref.time - tr["last_on"][s] > p["contact_gap_s"] + 1e-9:
+                    tr["contact_t0"][s] = ref.time       # a new ground contact of this foot begins
                 tr["last_on"][s] = ref.time
+                if self.ground_force(w, ref, s) >= p["free_foot_force_frac"] * self.weight:
+                    tr["force_t"][s] = ref.time
         if ref.parts_touching(~ref.robot_mask & ~self.bar_mask) - {"left_foot", "right_foot"}:
             tr["other_on"] = ref.time
         pts = {k: [float(x) for x in w.d.xpos[b]] for k, b in self.points.items()}

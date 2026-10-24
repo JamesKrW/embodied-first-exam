@@ -37,6 +37,27 @@ DISCUS_IN_HAND_M = (0.0045, -0.06)             # the discus' centre from the han
 FLUID = (0.2, 0.0, 1.5, 0.9, 1.0)
 
 
+# (the same function as javelin.py's)
+def contact_dv(w, prop: np.ndarray, who: np.ndarray, mass: float) -> float:
+    """The size of the velocity change (m/s) that the contacts between the geoms `prop` and `who` gave the prop in the
+    physics step just taken: MuJoCo's contact forces of that step (mj_contactForce, in each contact's frame) summed in
+    the world frame, times the step, over the prop's mass."""
+    d, m = w.d, w.m
+    n = d.ncon
+    if not n:
+        return 0.0
+    g = d.contact.geom[:n]
+    a, b = prop[g[:, 0]] & who[g[:, 1]], prop[g[:, 1]] & who[g[:, 0]]
+    J, f = np.zeros(3), np.zeros(6)
+    for i in np.flatnonzero(a | b):
+        if d.contact.efc_address[i] < 0:
+            continue
+        mujoco.mj_contactForce(m, d, int(i), f)
+        F = d.contact.frame[i].reshape(3, 3).T @ f[:3]
+        J += F if b[i] else -F                    # the force on geom2, along the normal from geom1 to geom2
+    return float(np.linalg.norm(J)) * m.opt.timestep / mass
+
+
 def set_arm(w, **angles) -> None:
     """Put arm joints (names without "_joint") at angles for t = 0, and their held targets with them."""
     r, d = w.robot, w.d
@@ -97,8 +118,8 @@ class Task(TaskBase):
                 "discus), TR 35 (the discus cage)")
     deviations = [
         "TR 34 (the discus; the thrower's hand): the right hand is the H1-2's own Inspire five-finger hand (six "
-        "drives: four fingers, the thumb's flexion and rotation; fingertip forces 10 N, the thumb 15 N, at "
-        "{grip_scale} times the device's forces; one closure command for the whole hand). The discus lies flat on its "
+        "drives: four fingers, the thumb's flexion and rotation; fingertip forces 20 N, the thumb 30 N, at "
+        "{grip_scale} times these forces; one closure command for the whole hand). The discus lies flat on its "
         "palm, the fingertips curled over the rim, held by contact and friction only: nothing is welded or grippable, "
         "and the discus slips, turns in the hand or flies out when the throw pulls harder than the fingers hold. The "
         "release is the hand's last hold (the discus touching the hand's fingers and its thumb or palm) before it is "
@@ -113,6 +134,11 @@ class Task(TaskBase):
         "TR 32.20: the mark is the point where the discus first touches the ground.",
         "TR 32.15 (interrupting a trial, laying the implement down): not modelled; the first release is the throw, "
         "and the discus may not be gripped again.",
+        "TR 34 / TR 32 (the throw is the hand's alone): the rule book has no article on touching the discus after it "
+        "has left the hand; here the right hand may still brush it during {retouch_grace_s} s after the release, but "
+        "those touches may change its velocity by at most {retouch_dv_m_s} m/s in all (the sum of their contact "
+        "impulses over its mass): a harder touch is a second propulsion of a released implement, and fails the "
+        "throw.",
         "TR 32.14 names no fall: here a fall ends the trial as a failure, as in every task of this benchmark; the "
         "trial ends when the robot has left the circle correctly and stands.",
         "TR 25.17 (one minute for a trial): the whole trial, leaving the circle included, has {time_limit_s} s.",
@@ -126,7 +152,7 @@ class Task(TaskBase):
     stages = ["release", "landing", "exit"]
     fall_z = 0.50
     params = dict(discus_mass_kg=2.000, discus_diameter_m=0.220, discus_thickness_m=0.045, circle_diameter_m=2.50,
-                  rim_height_m=0.02, rim_edge_m=0.003, sector_deg=34.92, qualifying_mark_m=15.0, retouch_grace_s=0.20, carry_s=0.20,
+                  rim_height_m=0.02, rim_edge_m=0.003, sector_deg=34.92, qualifying_mark_m=15.0, retouch_grace_s=0.20, retouch_dv_m_s=0.5, carry_s=0.20,
                   release_gap_s=0.03, stand_s=1.0,
                   fall_pelvis_m=0.50, grip_scale=1.0)
 
@@ -145,7 +171,9 @@ class Task(TaskBase):
              "for more than {carry_s} s. The release is the hand's last hold before the discus has touched nothing "
              "of you for {release_gap_s} s; there is one release: after it the discus may not be held by the hand "
              "again, nothing of you but the right hand may touch it, and the right hand only "
-             "during the first {retouch_grace_s} s (brushing it as it leaves). Its first touch of the ground must be "
+             "during the first {retouch_grace_s} s (brushing it as it leaves), if those touches change its velocity by at "
+             "most {retouch_dv_m_s} m/s in all (the sum of their contact impulses over its mass: the release must be "
+             "clean). Its first touch of the ground must be "
              "inside the sector lines (on a line is out); the throw is measured from that point to the inside of the "
              "rim along the line through the circle's centre. You succeed when a valid throw measures at least "
              "{qualifying_mark_m} m and you have then left the circle correctly and stood for {stand_s} s. Leaving "
@@ -205,9 +233,11 @@ class Task(TaskBase):
         self.apron = ref.geoms(prefix="apron")
         self.floor = ref.geoms(names=["floor"])
         self.disc_id = w.m.body("discus").id
+        self.disc_mass = float(w.m.body_subtreemass[self.disc_id])
         # last: the discus' state when the hand last held it (time, centre, velocity, axis, spin about the axis);
         # clear: since when it has touched nothing of the robot after the hold ended
-        self.trackers = {"released": None, "landed": None, "exit": False, "last": self._state(w, 0.0), "clear": None}
+        self.trackers = {"released": None, "landed": None, "exit": False, "last": self._state(w, 0.0), "clear": None,
+                         "dv": 0.0}
 
     def _state(self, w, t) -> list:
         ax = w.d.xmat[self.disc_id].reshape(3, 3)[:, 2]
@@ -274,6 +304,12 @@ class Task(TaskBase):
             return ref.fail("the discus was gripped again after the release")
         elif on - {"right_hand"} or (on and ref.time - tr["released"] > p["retouch_grace_s"]):
             return ref.fail("the discus was touched after the release", parts=sorted(on))
+        elif on and ref.failed is None:                        # a brush in the grace: it may not throw it again
+            tr["dv"] = round(tr["dv"] + contact_dv(w, self.disc, self.robot, self.disc_mass), 6)
+            ref.metrics["retouch_dv_m_s"] = round(tr["dv"], 3)
+            if tr["dv"] > p["retouch_dv_m_s"]:
+                return ref.fail("the discus was struck after the release (not a clean release)",
+                                dv_m_s=round(tr["dv"], 3))
         pts = ref.contact_points(self.disc, ref.ground)
         if not len(pts):
             return

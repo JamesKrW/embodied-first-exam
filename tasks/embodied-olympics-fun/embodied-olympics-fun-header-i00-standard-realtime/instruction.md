@@ -5,8 +5,8 @@ You control a simulated Unitree H1-2 humanoid robot (27 joints, 1.78 m tall, 67 
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Head the cross: meet the football that is crossed to you from the wing with your head and send it into the official goal 5.5 m away, past the goalkeeper dummy.
 
-**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You face the goal (+x) from the edge of the goal area. The ball machine stands on the grass about 3 m ahead of you and 20 m to your left, aimed across the goal area. About 2.9 s after the start the cross leaves it; it climbs to about 4.4 m and comes down at about 33 degrees below the horizontal and roughly 11.7 m/s, travelling from your left to your right, almost parallel to the goal line. About 1.8 s after it has left the machine it passes about 0.45 m in front of you at the height of your head (its centre 1.65 m above the grass); untouched it lands about 2 m to your right.
@@ -34,7 +34,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

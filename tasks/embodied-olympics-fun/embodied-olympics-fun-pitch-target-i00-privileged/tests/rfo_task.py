@@ -37,6 +37,27 @@ BALL_IN_HAND_M = (0.020, 0.030)                # the ball's centre from the hand
 #                                                the fingers (it rests on the palm, the fingers round it; a search)
 
 
+# (the same function as javelin.py's)
+def contact_dv(w, prop: np.ndarray, who: np.ndarray, mass: float) -> float:
+    """The size of the velocity change (m/s) that the contacts between the geoms `prop` and `who` gave the prop in the
+    physics step just taken: MuJoCo's contact forces of that step (mj_contactForce, in each contact's frame) summed in
+    the world frame, times the step, over the prop's mass."""
+    d, m = w.d, w.m
+    n = d.ncon
+    if not n:
+        return 0.0
+    g = d.contact.geom[:n]
+    a, b = prop[g[:, 0]] & who[g[:, 1]], prop[g[:, 1]] & who[g[:, 0]]
+    J, f = np.zeros(3), np.zeros(6)
+    for i in np.flatnonzero(a | b):
+        if d.contact.efc_address[i] < 0:
+            continue
+        mujoco.mj_contactForce(m, d, int(i), f)
+        F = d.contact.frame[i].reshape(3, 3).T @ f[:3]
+        J += F if b[i] else -F                    # the force on geom2, along the normal from geom1 to geom2
+    return float(np.linalg.norm(J)) * m.opt.timestep / mass
+
+
 def set_arm(w, **angles) -> None:
     """Put arm joints (names without "_joint") at angles for t = 0, and their held targets with them."""
     r, d = w.robot, w.d
@@ -58,7 +79,7 @@ class Task(TaskBase):
                 "Terms: \"strike zone\", \"in flight\"")
     deviations = [
         "3.01 (the ball in the pitcher's hand): the hand is the H1-2's own Inspire five-finger hand (six drives for "
-        "four fingers and a thumb, fingertip forces 10 N, the thumb 15 N, one closure command for the whole hand); "
+        "four fingers and a thumb, fingertip forces 20 N, the thumb 30 N, one closure command for the whole hand); "
         "the ball starts held against its palm by the fingers' and thumb's contact and friction only (no seams: no "
         "grip-made spin beyond what the fingers' motion gives). The release is the moment the ball last touched you "
         "before it had touched nothing of you for {release_s} s.",
@@ -75,6 +96,10 @@ class Task(TaskBase):
         "No batter, catcher or umpire: a backstop behind home plate; one pitch (a ball dropped or caught again is no "
         "second chance), and a fall before the call ends the attempt as a failure.",
         "Flight: quasi-steady aerodynamics (MuJoCo's ellipsoid fluid model: drag and Magnus lift), still air.",
+        "The pitch is the hand's alone: the rule book has no article on the pitcher touching the ball in flight after "
+        "the release; here the right arm may still brush it during {retouch_grace_s} s after the release, but those "
+        "touches may change its velocity by at most {retouch_dv_m_s} m/s in all (the sum of their contact impulses "
+        "over its mass): a harder touch is a second propulsion, and fails the pitch.",
     ]
     time_limit_s = 20.0
     start = (-0.09, 0.0, 0.0)
@@ -82,7 +107,8 @@ class Task(TaskBase):
     fall_z = 0.75
     params = dict(plate_distance_m=18.44, mound_height_m=0.254, mound_diameter_m=5.486, pitchers_plate_width_m=0.610,
                   pitchers_plate_depth_m=0.152, home_plate_width_m=0.432, zone_width_m=0.432, zone_low_m=0.46,
-                  zone_high_m=1.07, release_limit_s=15.0, release_s=0.02, retouch_grace_s=0.20, fall_pelvis_m=0.75)
+                  zone_high_m=1.07, release_limit_s=15.0, release_s=0.02, retouch_grace_s=0.20, retouch_dv_m_s=0.5,
+                  fall_pelvis_m=0.75)
 
     sentence = ("Pitch a strike: from the pitcher's plate on the mound, with a foot on the plate, throw the baseball "
                 "held in your right hand through the strike zone over home plate, on the fly.")
@@ -100,7 +126,9 @@ class Task(TaskBase):
              "the start, and at that moment at least one of your feet is in contact with the pitcher's plate (it "
              "touches the mound and part of its sole is over the plate). After the release no part of you may touch "
              "the ball and your right hand may not hold it again (its fingers and its thumb or palm on it), except "
-             "that your right arm and its hand may still brush it during the first {retouch_grace_s} s. You succeed when the ball's centre "
+             "that your right arm and its hand may still brush it during the first {retouch_grace_s} s, if those touches change its velocity by at "
+             "most {retouch_dv_m_s} m/s in all (the sum of their contact impulses over its mass: the release must be "
+             "clean). You succeed when the ball's centre "
              "then crosses the plane of the zone inside the zone, before the ball has touched the ground. You fail "
              "if no foot is on the plate at the release; if the ball is not released in time; if it touches the "
              "ground (the mound included) at any time before home plate, also before the release; if it crosses the "
@@ -188,7 +216,9 @@ class Task(TaskBase):
         self.soles = {s: w.m.geom(f"{s}_foot_strike").id for s in ("left", "right")}
         # free: (time, speed, height, feet on the plate) of the ball's first step touching nothing of you, while the
         # release is not yet confirmed
-        self.trackers = {"released": None, "free": None, "plane": Crossing((1, 0, 0), g["zone_x"], direction=1)}
+        self.ball_mass = float(w.m.body_subtreemass[w.m.body("ball").id])
+        self.trackers = {"released": None, "free": None, "plane": Crossing((1, 0, 0), g["zone_x"], direction=1),
+                         "dv": 0.0}
 
     def may_grip(self, w, side, name):
         return False                                          # (no weld grip: nothing is grippable)
@@ -249,6 +279,12 @@ class Task(TaskBase):
         if (ref.touching(self.ball, self.not_arm)
                 or (ref.time - tr["released"] > p["retouch_grace_s"] and ref.touching(self.ball, self.arm))):
             return ref.fail("the ball was touched after the release", parts=sorted(ref.parts_touching(self.ball)))
+        if ref.failed is None and ref.touching(self.ball, self.arm):     # a brush in the grace: no second throw
+            tr["dv"] = round(tr["dv"] + contact_dv(w, self.ball, self.robot, self.ball_mass), 6)
+            ref.metrics["retouch_dv_m_s"] = round(tr["dv"], 3)
+            if tr["dv"] > p["retouch_dv_m_s"]:
+                return ref.fail("the ball was struck after the release (not a clean release)",
+                                dv_m_s=round(tr["dv"], 3))
         x = tr["plane"].update(w.pos("ball"))
         if x is None:
             return

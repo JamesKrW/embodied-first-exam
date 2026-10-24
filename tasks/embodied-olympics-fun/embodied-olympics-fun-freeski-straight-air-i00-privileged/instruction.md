@@ -1,0 +1,182 @@
+# embodied-olympics freeski-straight-air — instance i00
+
+You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 33 kg; the Embodied Olympics simulator on MuJoCo)
+via Python. **Task:** Drop in from the start platform, ride the in-run, take off from the kicker, do a straight air in the air, land on your skis and ride away past the finish line.
+
+This is a *fixed instance*: the same venue and start every time. You may reset and retry as many times as you want.
+Your deliverable is **one replayable trajectory**, not a general policy.
+
+## The venue
+x runs down the course from the start platform's back edge; you stand facing +x near the platform's front edge (the start line, 6.0 m from its back) with your boots 0.3 m behind it; the platform is level, 8 m wide. Past the edge the in-run falls at 35.0 degrees for 38.0 m, bends (radius 30.0 m) into a 5.0 m flat, and the kicker (6.0 m wide) rises from it (radius 18.0 m) to a 1.0 m lip at 25.0 degrees; the lip is about 59 m down the course and about 23 m below the platform. Behind the lip the table runs 15.0 m from the lip at the flat's level to the knoll (blue line), the landing falls at 36.0 degrees for 30.0 m (24.0 m wide), bends (radius 30.0 m) into the flat outrun (45.0 m, 30.0 m wide); the finish line (green) is 15.0 m into the outrun. Red lines mark the start line and the lip.
+
+Frame: metres; the origin is on the floor under your pelvis at the start, +x is the way you face at the start, +y is
+to your left, +z is up; the floor is z = 0. 
+
+## The rules
+**Rule book:** FIS International Competition Rules (ICR) Book VI (Joint Regulations for Snowboard, Freestyle, Freeski and Ski Cross), edition June 2026: 3101.3 (the start platform: a completely flat, level area), 3102.4.1 (the big air site, level A: start area at least 5 m, in-run at least 30 m at 20 degrees or more, a 5-10 m flat before the kicker, a kicker at least 2.0 m high with a take-off angle of 25 degrees or more, at least 15 m from the take-off to the landing, a landing of 28 degrees or more, at least 20 m long and wide, an outrun of at least 25 m), 3402 (big air judging: difficulty, execution, amplitude, the landing), 3610 (the start: the competitor drops in on the start referee's signal); FIS Snowboard & Freeski Park & Pipe Judges Handbook, edition 2025, 8-11 (tricks by their rotation: spins in 180 degree units, flips; a trick counts when it is landed on the skis and ridden away); FIS Specifications for Competition Equipment 2026/27 B.2.2 (freestyle skis: no limits). Where this task departs from it:
+
+- ICR 3402 / Park & Pipe Judges Handbook 8-11 (judges score each jump 0-100 by impression): one task is one trick, pass or fail: the trick is measured, not judged (the method of the Embodied Olympics freeski sport, MIT): the pelvis's angular velocity integrated over the flight only (from the last contact with the snow to the next), so a rotation on the snow never counts and a wobble back and forth cancels; the spin is the rotation about the vertical, counted in 180 degree units; the flip is the rotation about the horizontal axis across the take-off direction less the straight air's own forward turn (61.0 degrees: the lip's plus the landing's angle), counted in 360 degree units and only if the body went upside down; each to the nearest unit, so up to half a unit short or over still counts as that unit (a judge would deduct; a rotation half a unit or more off is the next or the previous trick). A flip with half a turn of spin is still that flip (freeski's rule: its own twist). A twist made while inverted is measured about the vertical like any spin (a cork and a twisting flip are not told apart). Grabs, amplitude, style and execution are not judged.
+- Park & Pipe Judges Handbook (a landed trick: on the skis, riding away in control): the landing must be clean: the first contact after the flight is the skis', no other part of the robot (hands included; the boots on their skis are allowed) touches the snow from then until the finish line 15.0 m past the outrun's start, the robot is not down (on the snow with the pelvis less than 0.4 m above it or the trunk more than 70.0 degrees from its normal) for 1.0 s in all (freeski's fall rule; a judge would deduct for sitting back), the landing is past the table (a landing on the table or the knuckle before the knoll fails), and the skis cross the finish line pointing along the course (within 30.0 degrees, forwards or backwards).
+- ICR 3102.4.1 (the big air site): the course is the Embodied Olympics freeski big air (MIT): a level start platform 6.0 m long, its edge rounded (radius 8.0 m, an estimate) onto a 38.0 m in-run at 35.0 degrees, a 30.0 m transition, a 5.0 m flat, a kicker of transition radius 18.0 m with a 1.0 m straight lip at 25.0 degrees (2.1 m above the flat, 6.0 m wide), a table 15.0 m long at the flat's level, an 8.0 m knoll rounding, a 36.0 degree landing 30.0 m long and 24.0 m wide, a 30.0 m transition and a 45.0 m outrun (30.0 m wide); every length within level A's limits, the transitions' radii estimates (FIS gives none); the snow is a profile of boxes (pieces of 25 cm along the arcs).
+- ICR 3610 (the start): there is no start gate and nothing holds or pushes the robot: it stands on its skis on the level start platform, its boots 0.3 m behind the platform's edge (the start line), and the start referee's signal is given at t = 0; the robot leaves by its own action (it must work itself over the edge); not started within 20.0 s is a DNS.
+- Equipment (EQ B.2.2): no limits for freestyle skis; the skis are the Faction Prodigy 1 Grom 135 cm (115/84/111 mm, radius 10 m, 1.19 kg), each three bodies (the middle rigid under the binding, the forebody and the afterbody on hinges with the ski's bending stiffness, EI 60 and 80 N m^2: estimates); binding 0.65 kg (stand height 35 mm) and boot 1.2 kg as mass on the ski (estimates); the binding holds the foot rigidly and never releases; the boot's forward flex is not modelled (the ankle joint moves inside it); no poles (big air athletes ski without them). The skis are solid against the robot's body and each other.
+- Snow and air: the ski-snow model of the Embodied Olympics freeski sport (MIT, ported): kinetic friction after Wolfsperger et al. 2021, the edge's hold after Mossner et al. 2013 with Federolf's race-piste snow, hard well-damped snow; still air at a mountain venue (1.052 kg/m^3), the air's drag and lift on every link (a normal-force model); no wind, no snow is moved.
+- Competition format (ICR 3501-3504: qualification and final runs, the best scores added): one jump, one attempt.
+
+FIS big air, one jump, judged on one trick: the straight air: no spin (less than half a turn about the vertical) and no flip. Your feet are bound to freestyle skis (1.35 m twin tips). You stand on the level start platform with your boots 0.3 m behind its edge (the start line); the start signal is given at t = 0 and you must leave the platform by your own action (nothing holds or pushes you) within 20.0 s. The course: the platform's edge rounds onto the in-run (38.0 m at 35.0 degrees), a transition and a 5.0 m flat, then the kicker (it rises to its lip at 25.0 degrees, 2.1 m above the flat), a table 15.0 m long at the flat's level, the knoll, the landing (36.0 degrees, 30.0 m long), a transition and the flat outrun. The jump is your flight off the kicker: it starts within 4.0 m of the lip, rising at 10.0 degrees or more. The trick is measured from your pelvis's rotation in the air only (from the moment your last contact with the snow ends until the next contact): the spin about the vertical, counted in half turns of 180 degrees; the flip about the horizontal axis across your take-off direction, after removing the 61.0 degrees a straight air turns forward anyway, counted in full turns of 360 degrees and only if your body went upside down; each to the nearest unit (up to half a unit short or over still counts as that unit). A flip with half a turn of spin is still that flip. You succeed when the jump's rotation is the straight air and the landing is clean: the first contact after the flight is your skis', on the knoll or the landing hill (past the table); from then until both boots cross the finish line (15.0 m past the start of the outrun) no part of you but the boots touches the snow and you are not down for 1.0 s in all (down: on the snow with your pelvis less than 0.4 m above it, measured along its normal, or your trunk more than 70.0 degrees from its normal; the time down shrinks again at a quarter of the rate while you are up); and at the finish line your pelvis is at least 0.4 m above the snow and your skis point along the course (within 30.0 degrees, forwards or backwards). You fail: on any other trick (more or less rotation, a flip where none is asked, a different direction of flip, a take-off riding backwards), on a fall at any time (a part of you other than your boots on the snow, or down for 1.0 s in all), a landing on the table, the body first, a run with no jump, a stop (slower than 0.3 m/s for 3.0 s after the start), no start within 20.0 s, or at 40 s.
+
+A referee decides this from the simulator's state after every physics step (1 ms): the events that must happen, in
+order, are **start → take-off → landing → ride-away**. The attempt ends at the success (that moment is the success), at the first rule violation,
+or after 40 s (4000 control steps). `s.status()` shows the referee's record at any time:
+`stages`, `failed` (the rule that ended the attempt), `metrics`, `events`.
+
+## Deliverable
+Leave three files under `/app/output/`. **Only the first is scored**; the other two are how a human reads your work
+afterwards, so keep them short and factual.
+
+| file | what goes in it |
+|---|---|
+| `trajectory.npz` | the trajectory, written with `s.save_trajectory()` (below): `actions`, one sim row of 151 floats per control step. Replayed open-loop from the frozen start in two fresh processes, one row per control step until the referee ends the attempt; scored 1 if both replays succeed and end in the same state, else 0. The rows must reach the success: when they run out the attempt is judged as it stands. At most 4000 rows are used; every one of them must be finite, also those after the attempt's end (a file with a NaN or an infinite value scores 0) |
+| `gen.py` | the script that produced it. It must **run and reproduce `trajectory.npz`**, reading nothing but `/app/instance.json` and files under `/app/output/` |
+| `NOTES.md` | **at most 20 lines**: your final approach and why it works, the approaches that failed and what each told you, and what you downloaded or installed, if anything |
+
+The tooling also appends its own log, `rcb_session_log.jsonl`, to `/app/output/`: leave it there and do not set
+`RCB_SESSION_LOG`.
+
+**Write `trajectory.npz` as soon as you have any trajectory at all, and overwrite it (with `gen.py` and `NOTES.md` to
+match) whenever you have a better one.** The time limit (`## Time limit`) ends without warning; a run
+that ends with no file scores zero. Do not stop early: keep improving until the time is up.
+
+## Tooling (already installed; run `python` from any directory)
+```python
+from rcb_rfo import Session
+s = Session()                          # /app/instance.json; under a second
+s.action_types                         # every action type: dim, layout, lower, upper, meaning (table below)
+typ, row = s.hold()                    # the row that keeps the command in force with zero velocity (stand still)
+done = s.step("walk", row)             # one control step (10 ms) of one row; True once the attempt is over
+s.rows                                 # the sim rows of every step since the last reset: what save_trajectory() writes
+s.status()                             # the referee: success, done, failed, stages, progress, metrics, events
+s.state()                              # privileged state: pelvis (x, y, z, yaw), centre of mass, joints, the palms,
+                                       # what each hand holds, and the task's objects under "task"
+s.world                                # everything: s.world.m, s.world.d (MuJoCo model and data), s.world.robot
+                                       # (addresses, limits), s.world.ref (the referee), s.world.task (the rules)
+s.image("head_left")                   # a camera's RGB image (270 x 480; the cameras: `head_left`, `head_right`, `venue`, `start`, `kicker`)
+s.proprio()                            # the robot's own sensors as one row (s.ep.proprio_layout)
+s.reset()                              # back to the frozen start (unlimited, instant); clears s.rows
+s.replay()                             # what the verifier does with s.rows, here, in a fresh world
+s.save_trajectory()                    # writes the SCORED file /app/output/trajectory.npz from s.rows
+```
+The simulator is deterministic on the CPU: the same rows from the frozen start give the same state, so a trajectory you
+generate closed-loop (reading `s.state()`, `s.world`) replays exactly. `python /opt/tools/rcb_rfo.py replay --instance
+/app/instance.json --traj /app/output/trajectory.npz --out /tmp/r.json` runs the verifier's replay from the shell. The
+world's source is in `/opt/tools/rfo/` (the robot and action layer `world.py`, the referee's toolkit `referee.py`) and
+this task's rules, as code, in `/opt/tools/rfo_task.py`; the robot library (model, meshes, limits, the walking and
+running policies' weights) is in `/opt/roboolympics/`. You may build your own copies of the world to plan or learn in.
+
+## Actions
+One row is one control step (10 ms; the physics runs at 1 kHz). Every row ends with `grip_left`, `grip_right`.
+
+| type | row (then `grip_left`, `grip_right`) | floats | who drives what |
+|---|---|---|---|
+| `stand` | waist 3 + arms 14 joint targets | 19 | the platform holds the legs in the stance; you give the waist's 3 and the arms' 14 joint targets (rad) |
+| `walk` | `vx`, `vy`, `wz` + waist 3 + arms 14 joint targets | 22 | Unitree's walking policy drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets |
+| `run` | `vx`, `vy`, `wz` | 5 | the running policy drives all 29 joints from the velocity command (it swings the arms) |
+| `run_arms` | `vx`, `vy`, `wz` + arms 14 joint targets | 19 | the running policy drives the legs and the waist; you give the 14 arm joint targets |
+| `joints` | all 29 joint targets | 31 | you give all 29 joint targets (rad); the default PD gains, no feed-forward |
+| `lowcmd` | all 29 joints × (`q`, `dq`, `tau`, `kp`, `kd`): 29 targets, then 29 velocities, 29 torques, 29 kp, 29 kd | 147 | Unitree's LowCmd for all 29 joints: position targets (rad), velocity targets (rad/s), feed-forward torques (N m), kp, kd; the motor torque is kp (q - q_measured) + kd (dq - dq_measured) + tau, evaluated at 1 kHz |
+| `walk_falcon` | `vx`, `vy`, `wz` + waist 3 + arms 14 joint targets (as `walk`) | 22 | FALCON's walking policy (LeCAR-Lab, trained with arm motions and forces on the hands; it also nudges the wrists) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets |
+| `walk_agile` | `vx`, `vy`, `wz` + waist 3 + arms 14 joint targets (as `walk`) | 22 | AGILE's velocity-height walking policy (NVIDIA WBC-AGILE, trained while the arms and the waist moved) drives the legs from the velocity command (vx forward, vy to the left, m/s; wz turning left, rad/s; the robot's own frame); you give the waist and arm joint targets |
+
+Velocity commands are in the robot's own frame (`vx` forward, `vy` to its left, m/s; `wz` turning left, rad/s). Bounds: `walk` |vx| ≤ 0.8, |vy| ≤ 0.5, |wz| ≤ 1.57; `walk_falcon` -0.8 ≤ vx ≤ 0.8, -0.5 ≤ vy ≤ 0.5, -1 ≤ wz ≤ 1; `walk_agile` -0.5 ≤ vx ≤ 0.8, -0.5 ≤ vy ≤ 0.5, -1 ≤ wz ≤ 1; `run` and `run_arms` 0 ≤ vx ≤ 5, |vy| ≤ 0.12, |wz| ≤ 0.5. Joint targets are absolute angles (rad). Values outside the bounds are clipped. `grip_left`, `grip_right`: ≥ 0.5 closes the hand's grip, < 0.5 opens it. At the start the robot stands in `stand` mode with the arms at rest: the `stand` row with the table's start angles and both grips open keeps it there.
+
+Joint order everywhere (Unitree's SDK order), with each joint's range, speed limit, torque limit and default gains:
+
+| # | joint | range (rad) | speed (rad/s) | torque (N m) | kp | kd | at the start (rad) |
+|---|---|---|---|---|---|---|---|
+| 0 | `left_hip_pitch` | [-2.5307, 2.8798] | 32 | 88 | 700 | 12 | -0.1 |
+| 1 | `left_hip_roll` | [-0.5236, 2.9671] | 20 | 139 | 700 | 12 | 0 |
+| 2 | `left_hip_yaw` | [-2.7576, 2.7576] | 32 | 88 | 500 | 8 | 0 |
+| 3 | `left_knee` | [-0.0873, 2.8798] | 20 | 139 | 900 | 15 | 0.3 |
+| 4 | `left_ankle_pitch` | [-0.8727, 0.5236] | 37 | 50 | 300 | 6 | -0.2 |
+| 5 | `left_ankle_roll` | [-0.2618, 0.2618] | 37 | 50 | 300 | 6 | 0 |
+| 6 | `right_hip_pitch` | [-2.5307, 2.8798] | 32 | 88 | 700 | 12 | -0.1 |
+| 7 | `right_hip_roll` | [-2.9671, 0.5236] | 20 | 139 | 700 | 12 | 0 |
+| 8 | `right_hip_yaw` | [-2.7576, 2.7576] | 32 | 88 | 500 | 8 | 0 |
+| 9 | `right_knee` | [-0.0873, 2.8798] | 20 | 139 | 900 | 15 | 0.3 |
+| 10 | `right_ankle_pitch` | [-0.8727, 0.5236] | 37 | 50 | 300 | 6 | -0.2 |
+| 11 | `right_ankle_roll` | [-0.2618, 0.2618] | 37 | 50 | 300 | 6 | 0 |
+| 12 | `waist_yaw` | [-2.618, 2.618] | 32 | 88 | 400 | 10 | 0 |
+| 13 | `waist_roll` | [-0.52, 0.52] | 37 | 50 | 400 | 10 | 0 |
+| 14 | `waist_pitch` | [-0.52, 0.52] | 37 | 50 | 400 | 10 | 0 |
+| 15 | `left_shoulder_pitch` | [-3.0892, 2.6704] | 37 | 25 | 300 | 6 | 0.2 |
+| 16 | `left_shoulder_roll` | [-1.5882, 2.2515] | 37 | 25 | 300 | 6 | 0.2 |
+| 17 | `left_shoulder_yaw` | [-2.618, 2.618] | 37 | 25 | 300 | 6 | 0 |
+| 18 | `left_elbow` | [-1.0472, 2.0944] | 37 | 25 | 300 | 6 | 1.28 |
+| 19 | `left_wrist_roll` | [-1.9722, 1.9722] | 37 | 25 | 100 | 2 | 0 |
+| 20 | `left_wrist_pitch` | [-1.6144, 1.6144] | 22 | 5 | 60 | 1 | 0 |
+| 21 | `left_wrist_yaw` | [-1.6144, 1.6144] | 22 | 5 | 60 | 1 | 0 |
+| 22 | `right_shoulder_pitch` | [-3.0892, 2.6704] | 37 | 25 | 300 | 6 | 0.2 |
+| 23 | `right_shoulder_roll` | [-2.2515, 1.5882] | 37 | 25 | 300 | 6 | -0.2 |
+| 24 | `right_shoulder_yaw` | [-2.618, 2.618] | 37 | 25 | 300 | 6 | 0 |
+| 25 | `right_elbow` | [-1.0472, 2.0944] | 37 | 25 | 300 | 6 | 1.28 |
+| 26 | `right_wrist_roll` | [-1.9722, 1.9722] | 37 | 25 | 100 | 2 | 0 |
+| 27 | `right_wrist_pitch` | [-1.6144, 1.6144] | 22 | 5 | 60 | 1 | 0 |
+| 28 | `right_wrist_yaw` | [-1.6144, 1.6144] | 22 | 5 | 60 | 1 | 0 |
+
+What the platform does and does not do for you:
+
+- **`stand`** holds the legs at the standing pose with stiff gains and a gravity-support torque. It is not a balance
+  controller: it does not step and it has no feedback. After an arm movement the body sways a few centimetres for a
+  few seconds; a hard or fast swing of the arms, a push or a load can tip the robot over within a second or two.
+- **`walk`** runs Unitree's own G1 walking policy (50 Hz) on the legs. At the largest forward command (0.8) it walks at
+  about 0.6 m/s; `vy` up to 0.5 and `wz` up to 1.57 rad/s; it follows with lag and barely moves in its first second.
+  At a zero command it marks time on the spot (the pelvis sways and drifts a centimetre or two per second) and
+  recovers from small disturbances, which `stand` does not. When the legs come to it from another mode it first blends
+  them to the stance (0.3 s) and holds a zero command until the robot is steady (up to 2 s). It was trained with the
+  arms at rest: moving the arms and the waist disturbs it.
+- **`walk_falcon`** and **`walk_agile`** are two more walking policies for the G1's legs, with the same row as `walk`
+  (you keep the waist and the arms): FALCON (LeCAR-Lab, MIT; trained with arm motions and forces on the hands) and
+  AGILE's velocity-height policy (NVIDIA WBC-AGILE, Apache-2.0; trained while the arms and the waist moved), the
+  released weights run in numpy at 50 Hz on their own leg gains (kp 100 / 100 / 100 / 200 / 20 / 20 per leg). Both
+  hold still and follow the command better than `walk` while the arms move or carry something; FALCON also adds a small
+  correction to the wrists. FALCON zeroes speeds below 0.2 m/s and turns below 0.2 rad/s and stands with the pelvis at
+  about 0.74 m; AGILE zeroes commands of norm below 0.1, stands lower (about 0.68 m) and barely turns on the spot below
+  about 0.7 rad/s (walking at 0.2 m/s or more it turns as asked). Their command ranges are in the action table. A
+  walker takes the legs at once, from where they are (its memory starts afresh); `walk`, the other walker and `run`
+  take them from it the same way. Going from a walker straight to `stand` usually ends in a fall (`stand` holds
+  Unitree's stance and does not balance): give `walk` a zero command for about 2 s first.
+- **`run`** runs Embodied Olympics' athletics running policy (50 Hz) on all 29 joints: `vx` from 0 to about 4 m/s (it falls
+  above that; the command changes at most 1.5 m/s per second), `|vy|` ≤ 0.12 m/s, `|wz|` ≤ 0.5 rad/s. `run_arms` gives
+  you the arms while it keeps the legs and the waist; taking the arms away from its swing disturbs it. Switching to
+  `stand`, `walk` or `joints` above about 0.6 m/s usually ends in a fall: slow down first (from 2.4 m/s that takes
+  about 2 s and 2.3 m).
+- **`joints` / `lowcmd`** are yours: each motor's torque is `kp (q − q_measured) + kd (dq − dq_measured) + tau`, evaluated
+  at 1 kHz with your row held for its 10 ms, then limited by the motor's torque-speed curve and torque limit. `joints`
+  uses the default gains of the table and zero `dq` and `tau`; `lowcmd` takes yours (kp up to 1000 / 500 / 400 and kd up to
+  20 / 15 / 10 for legs / waist / arms). Nothing balances the robot in these modes but your own targets.
+- **Every joint target** is clipped into the joint's range and moves at most the joint's speed limit × 10 ms per step
+  from the target in force. Joints a type does not name keep their targets. The speed limit is a limit on targets;
+  what bounds the joint itself is the motor's torque-speed curve (a `lowcmd` feed-forward torque can turn a joint up to
+  about 1.15 times that speed, where the motor's torque has fallen to zero).
+- **The hands** have no working fingers here; each carries a fist pad (a box of 4.4 × 8 × 10 cm beyond the wrist, the
+  10 cm along the forearm) with a grip: while `grip_left` / `grip_right` ≥ 0.5 the hand holds the nearest grippable
+  object whose surface is within 3.5 cm of the palm point (the middle of the pad, 4.5 cm beyond the wrist flange along
+  the forearm) and that moves at most 6 m/s relative to it; below 0.5 it lets go at once. Since the palm point is inside
+  the pad, an object can be gripped where it touches one of the pad's two broad faces, not at its narrow sides or its
+  far end. What is grippable is the task's own equipment, named in the rules.
+- **A tool on a hand** (a racket, a paddle, a club; where the task has one) is fixed to the wrist in place of the pad.
+  It collides with the world, the ball and the rest of your own body.
+- **The air** is real: balls and implements feel drag and, when they spin, lift.
+- **If the physics diverges** (a numerical blow-up, typically from a violent joint command), the attempt ends as a
+  failure: "the simulation became unstable".
+
+## External material
+The network is open. You may install packages (pip, apt), and you may search for, download and use public tools, robot models and pretrained controllers (for example a published Unitree G1 walking, jumping or whole-body policy): finding existing work and adapting it to this robot is encouraged. Say in your notes what you used. You may read anything installed in your container, this benchmark's own source code included. The one thing not to look up is a ready-made solution to this exact task, such as this benchmark's reference solutions. This is an honour rule; trials are reviewed.
+
+## Resource limits
+Limits for the whole trial, all its processes together (every simulator you start included): at most **13 GiB of memory**, **512 processes** and **20 GiB** of new files under `/app`, `/tmp` and `/root`; the task has no GPU. These limits may be enforced (from protocol v1.2 on): when enforcement is on, exceeding one for 60 s within any 2 minutes, or a process killed for lack of memory, ends the trial as a failure (reward 0), whatever the deliverable. A monitor outside your container measures every few seconds; the current values are in `/run/rcb-limits/usage.json`. CPU is capped at 8 cores for your container; the cap only slows you down.
+
+## Time limit
+You have 7200 seconds to complete this task. Do not cheat by using online solutions or hints specific to this task.
+
+This is wall-clock time from the start of your session; the time a simulator takes to start counts. When it is up you are stopped without warning and only what is in `/app/output/` at that moment is graded, so save a deliverable as soon as you have one and overwrite it whenever you have a better one. Your session started when you received this task. `/run/rcb-limits/usage.json`, rewritten every few seconds, gives the time left on this limit (`time_left_s`) and its end (`deadline_utc`), counted from a little before your session started, so it never gives you more time than you have: read it (or run `date`) before you decide that time is short, never guess. Waiting counts too: a tool call that sends input to a process that keeps running (an interactive interpreter, a simulator loop, a server) can wait for the whole wait or yield time you give it (for example Codex's `yield_time_ms`) even when the answer is printed at once, so give such calls a short wait and poll again if the output is not complete, or run one-shot scripts that exit when they are done. Installing packages is not cheating (`## External material` above).

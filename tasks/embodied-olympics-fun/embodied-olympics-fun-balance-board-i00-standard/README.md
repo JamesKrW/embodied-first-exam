@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-balance-board-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `balance_board` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_balance_board.py: the start is just after a mount: the deck 3 degrees from level with its left end low, the robot standing square on it and tilted with it, its centre of mass 4.2 cm left of the roller's line of contact; left alone the deck is down at 0.8 s. Positive by injection (a spring-damper force on the torso, a helper's hand, for the 30 s: the deck brought level, at most 3.0 degrees); negatives: the do-nothing agent, the walking policy, the weight over one end, left alone after 20 s, off the board, lying on the deck. An agent's earlier success, a feedback tuned for the old exactly level start that held the board without visible motion, falls at 0.85 s from this start, as does our linear ride; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_balance_board.py: the start is just after a mount: the deck 3 degrees from level with its left end low, the robot standing square on it and tilted with it, its centre of mass 4.2 cm left of the roller's line of contact; left alone the deck is down at 0.8 s. Positive by injection (a spring-damper force on the torso, a helper's hand, for the 30 s: the deck brought level, at most 3.0 degrees); negatives: the do-nothing agent, the walking policy, the weight over one end, left alone after 20 s, off the board, lying on the deck. A feedback tuned for an exactly level start, which holds the board there without visible motion, falls at 0.85 s from this start, as does a linear ride; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -49,4 +49,4 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
 | Episode | 3050 control steps (30.5 s at 100 Hz); 5 resets, the last attempt graded |
-| Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |
+| Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |
