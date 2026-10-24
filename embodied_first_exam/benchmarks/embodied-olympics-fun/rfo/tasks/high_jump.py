@@ -81,8 +81,12 @@ class Task(TaskBase):
         "anything but the bar); a crossing made while touching the ground or the mat, or after a landing, never "
         "counts; any contact with the ground or the mat beyond the plane before that clearance is the rule's "
         "failure; the rule's allowance for a foot that touches the landing area without advantage is not used",
-        "TR 27.2(a): the bar is judged {bar_wait_s} s after the clearance and the landing; it is off its supports "
-        "when its centre is more than {bar_drop_m} m below its resting height",
+        "TR 27.2(a) (the bar does not remain on the supports): judged {bar_wait_s} s after the clearance and the "
+        "landing, the bar must lie on its supports: touching both, its centre within half a support's width "
+        "({support_width_m}/2 m) of its resting place along the runway and within {bar_rest_dz_m} m of its resting "
+        "height, and at rest (its centre slower than {bar_still_m_s} m/s, turning slower than {bar_still_rad_s} "
+        "rad/s); at any time before, it is off its supports when its centre is more than {bar_drop_m} m below its "
+        "resting height",
         "TR 27.10 (the landing area): the mat is one box whose contact follows soft polyurethane foam (about 5 kPa "
         "at 25 % compression, then a plateau: a body landing at 4 m/s sinks about 0.4 m and does not bounce back); "
         "MuJoCo's contact fitted to it on this robot: a time constant of {mat_timeconst_s} s, damping ratio "
@@ -108,7 +112,8 @@ class Task(TaskBase):
                   support_width_m=0.04, support_length_m=0.06, mat_length_m=4.0, mat_width_m=6.0, mat_height_m=0.70,
                   mat_gap_m=0.10, **MAT_CONTACT, runway_m=15.0, takeoff_window_s=0.15, free_foot_force_frac=0.05,
                   contact_gap_s=0.03,
-                  min_air_s=0.05, rise_min_m=0.08, bar_drop_m=0.05, bar_wait_s=2.0, bar_touch_max_s=0.3)
+                  min_air_s=0.05, rise_min_m=0.08, bar_drop_m=0.05, bar_wait_s=2.0, bar_touch_max_s=0.3,
+                  bar_rest_dz_m=0.005, bar_still_m_s=0.05, bar_still_rad_s=0.5)
 
     sentence = ("Do a high jump: approach the bar, take off from one foot, go over the bar between the uprights "
                 "without knocking it off its supports, and come down on the landing mat.")
@@ -132,9 +137,13 @@ class Task(TaskBase):
              "or the mat, or after the flight has ended, never counts. You have cleared the bar when all of that "
              "has happened in the flight. You may touch the bar, for at most {bar_touch_max_s} s in all (it does "
              "not carry you), and after the clearance you may land on any part of your body, on the mat or not. You "
-             "succeed when you have cleared the bar and landed, and {bar_wait_s} s later the bar is still on its "
-             "supports. A fall is not a failure by itself. You fail if the bar drops more than {bar_drop_m} m at "
-             "any time; if you are in contact with the bar for more than {bar_touch_max_s} s in all; if you touch "
+             "succeed when you have cleared the bar and landed, and {bar_wait_s} s later the bar still lies on its "
+             "supports: touching both, its centre within half a support's width of its resting place along x and "
+             "within {bar_rest_dz_m} m of its resting height, and at rest (its centre slower than {bar_still_m_s} "
+             "m/s, turning slower than {bar_still_rad_s} rad/s); a bar knocked up or off counts as off. A fall is not a "
+             "failure by itself. You fail if the bar drops more than {bar_drop_m} m at "
+             "any time, or is not lying on its supports at that judgement; if you are in contact with the bar for "
+             "more than {bar_touch_max_s} s in all; if you touch "
              "the ground or the mat beyond the plane before you have cleared the bar, with or without a jump; if "
              "your jump's flight ends (you touch anything but the bar) before you have cleared the bar; if the "
              "take-off is not from one foot; if the flight is not a jump; if your pelvis or a foot passes the plane "
@@ -172,6 +181,7 @@ class Task(TaskBase):
         self.points = {"left foot": m.body("left_ankle_roll_link").id, "right foot": m.body("right_ankle_roll_link").id,
                        "pelvis": w.robot.pelvis}
         self.bar_mask = ref.geoms(body="bar")
+        self.supports = [ref.geoms(names=[f"bar_support{t}"]) for t in ("L", "R")]
         self.robot = ref.part("robot")
         self.weight = float(m.body_subtreemass[w.robot.pelvis]) * float(-m.opt.gravity[2])
         # phase: approach -> jump (its take-off judged) ; crossed: who has passed the plane; prev: the points one
@@ -304,10 +314,27 @@ class Task(TaskBase):
             ref.event("landing", parts=sorted(ref.parts_touching(~ref.robot_mask & ~self.bar_mask)),
                       on_the_mat=bool(ref.touching(self.robot, ref.geoms(names=["mat"]))))
 
+    def bar_on_supports(self, w, ref) -> dict:
+        """TR 27.2(a) at the judgement: the bar lies on its supports (touching both, near its resting place) and is
+        at rest. A bar knocked upwards, or still moving, is not on them."""
+        p, d = self.p, w.d
+        pos = w.pos("bar")
+        _, va = w.free["bar"]
+        v, om = float(np.linalg.norm(d.qvel[va:va + 3])), float(np.linalg.norm(d.qvel[va + 3:va + 6]))
+        on = [ref.touching(self.bar_mask, s) for s in self.supports]
+        dx, dz = float(pos[0]) - self.bar["x"], float(pos[2]) - self.bar["rest_z"]
+        ok = (all(on) and abs(dx) <= p["support_width_m"] / 2 and abs(dz) <= p["bar_rest_dz_m"]
+              and v <= p["bar_still_m_s"] and om <= p["bar_still_rad_s"])
+        return dict(ok=bool(ok), on_supports=on, dx_m=round(dx, 4), dz_m=round(dz, 4), speed_m_s=round(v, 3),
+                    turn_rad_s=round(om, 3))
+
     def step(self, w, ref):
         tr, p = self.trackers, self.p
         if ref.has("clearance") and tr["t_land"] is not None:
             if ref.time - max(tr["t_clear"], tr["t_land"]) >= p["bar_wait_s"]:
+                bar = self.bar_on_supports(w, ref)
+                if not bar.pop("ok"):
+                    return ref.fail("the bar did not stay on its supports", **bar)
                 if ref.stage("bar stays"):
                     ref.succeed()
 
