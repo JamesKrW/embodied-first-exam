@@ -5,8 +5,8 @@ You control a simulated Unitree H1-2 humanoid robot (27 joints, 1.78 m tall, 67 
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Receive the serve: pass the volleyball that is served over the net to you with your forearms, in one contact, above net height and into the setter's target at the net.
 
-**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You face the net (+x), which is 6 m ahead of you; your end line is 3 m behind you. A volleyball machine stands on the floor behind the far end line, its wheels 2.6 m above the floor, 15.6 m ahead of you and 1.5 m to your left, aimed at your court. About 3.0 s after the start it serves the ball at about 14 m/s; it climbs to a little over 4 m, clears the net by more than a metre and comes down at about 40 degrees below the horizontal and 11.4 m/s. About 1.4 s after the serve it is 1 m above the floor about 0.9 m in front of you and 0.8 m to your left; untouched it lands level with you, about 0.75 m to your left. The setter's target is painted on the floor at the net, ahead of you and to your right.
@@ -32,7 +32,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;

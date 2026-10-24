@@ -5,8 +5,8 @@ You control a simulated Unitree G1 humanoid robot (29 joints, 1.32 m tall, 33 kg
 client, and like a real venue it does not wait for you: once an attempt is running, the robot, the ball and the venue
 move while you think. **Task:** Win a sumo bout: force the opponent robot out of the ring, or make any part of it other than its feet touch the ground, before the same happens to you.
 
-**Slowdown: S = 2.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
-S x 10 ms of wall-clock time. `spec()["timing"]["slowdown"]` states it.
+**Slowdown: S = 1.** The world runs at 1/S of real speed: one control step (10 ms of robot time) every
+S x 10 ms of wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
 
 ## The venue
 You stand on the dohyo's clay, 0.55 m above the arena floor, facing +x, at the middle of the ring sideways; the ring's centre is ahead of you, 0.71 m in front of your pelvis. The two starting lines cross the ring's middle 0.7 m apart; the opponent stands the same distance beyond the centre, facing you. The ring of bales is 4.55 m across inside; the clay goes on beyond the bales to the mound's square edge, 3.35 m from the centre.
@@ -34,7 +34,7 @@ A referee in the service decides this from the simulator's state. The events tha
 ## Real-robot rules
 - **Time does not stop.** An attempt starts paused, on the frozen start, the robot holding its starting command. Its
   clock starts at your first `submit` (or `get_obs(seconds=s)`) and from then on the simulator runs at 100 Hz of robot
-  time (S = 2), whether or not you send anything, until the attempt ends: the venue's timed events (the
+  time (S = 1), whether or not you send anything, until the attempt ends: the venue's timed events (the
   launch, the serve, the release) happen on that clock. Between your commands the robot executes what you planned,
   then holds the last command in force; nothing pauses for you, not your thinking, not your tool calls.
 - **You are far too slow to steer it turn by turn.** One turn of yours (a model response, a tool call) takes seconds;
