@@ -1428,7 +1428,7 @@ task = "embodied-olympics-fun-dunk-i00"
 default_mode = "standard"
 
 [[task]]
-task = "embodied-olympics-fun-first-time-shot-i00"
+task = "embodied-olympics-fun-long-jump-i00"
 default_mode = "standard"
 
 [[task]]
@@ -1536,11 +1536,11 @@ task = "embodied-olympics-fun-steeplechase-i00"
 default_mode = "standard"
 
 [[task]]
-task = "embodied-olympics-fun-sumo-i00"
+task = "embodied-olympics-fun-boxing-i00"
 default_mode = "standard"
 
 [[task]]
-task = "embodied-olympics-fun-sweeper-jump-i00"
+task = "embodied-olympics-fun-high-bar-swing-i00"
 default_mode = "standard"
 
 [[task]]
