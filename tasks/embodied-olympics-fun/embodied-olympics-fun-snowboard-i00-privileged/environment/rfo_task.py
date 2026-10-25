@@ -992,7 +992,7 @@ BOARD_QUAT = (math.cos(math.pi / 4), 0.0, 0.0, math.sin(math.pi / 4))   # the bo
 
 _DEV_COMMON = [
     "Snowboard ICR (the start gate: the rider pushes out of it, the gate starts the clock): there is no start gate "
-    "and nothing holds or releases the robot (the start of the RoboOlympics freeski sport, MIT): it stands on its "
+    "and nothing holds or releases the robot (the start of the Embodied Olympics freeski sport, MIT): it stands on its "
     "board on a level start platform ({platform_m} m), its front boot {start_back_m} m behind the platform's edge "
     "(the start line), the edge rounded (radius {brink_radius_m} m) onto the slope; the start signal is given at "
     "t = 0 and the robot must leave by its own action within {dns_s} s (a DNS otherwise); the run's time starts "

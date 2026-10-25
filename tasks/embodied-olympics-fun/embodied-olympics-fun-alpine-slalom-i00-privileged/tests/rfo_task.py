@@ -1011,7 +1011,7 @@ class Task(AlpineRace):
         "left and right of the course's centre line (the course setter's choice; ICR sets no offset).",
         "ICR 805 (the start: the racer pushes out of the start gate with the poles, the start wand starts the "
         "clock): there is no start gate and nothing holds or releases the robot (the start of the "
-        "RoboOlympics freeski sport, MIT): it stands on its skis on a level start platform ({platform_m} m), "
+        "Embodied Olympics freeski sport, MIT): it stands on its skis on a level start platform ({platform_m} m), "
         "its boots {start_back_m} m behind the platform's edge (the start line), the edge rounded (radius "
         "{brink_radius_m} m) onto the slope; the start signal is given at t = 0 and the robot must leave by "
         "its own action within {dns_s} s (a DNS otherwise); the run's time starts when both boots cross the "
@@ -1022,7 +1022,7 @@ class Task(AlpineRace):
         "Equipment: no ski poles (the G1's hands are its rubber fists, which do not close: nothing to hold one with), no ski boots (the feet are "
         "bound directly); the binding is rigid and never releases; each ski is three bodies, its forebody and "
         "afterbody on hinges with the ski's bending stiffness (EI 60 / 80 N m^2: estimates, as the "
-        "RoboOlympics freeski sport's skis); the skis are solid against the robot's body and each other.",
+        "Embodied Olympics freeski sport's skis); the skis are solid against the robot's body and each other.",
         "Snow and air: the ski-snow contact is the freeski model of the CHIGUI0/roboolympics project (MIT, ported): kinetic friction along the "
         "ski after Wolfsperger et al. 2021, the edge's hold across it after Mossner et al. 2013 with race-piste "
         "snow, the sidecut's arc after Howe 2001, hard well-damped snow (the model's final version, PR #259); the "

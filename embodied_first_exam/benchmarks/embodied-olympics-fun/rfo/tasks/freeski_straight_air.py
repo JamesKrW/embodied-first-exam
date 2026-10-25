@@ -850,7 +850,7 @@ class FreeskiTask(TaskBase):
                 "Specifications for Competition Equipment 2026/27 B.2.2 (freestyle skis: no limits)")
     deviations = [
         "ICR 3402 / Park & Pipe Judges Handbook 8-11 (judges score each jump 0-100 by impression): one task is one "
-        "trick, pass or fail: the trick is measured, not judged (the method of the RoboOlympics freeski sport, MIT, with "
+        "trick, pass or fail: the trick is measured, not judged (the method of the Embodied Olympics freeski sport, MIT, with "
         "the spin taken from the skis), over the flight only (from the last contact with the snow to the next), so a "
         "rotation on the snow never counts and a wobble back and forth cancels; the spin is the skis' heading change "
         "(each ski's long axis, tail to tip, followed in the horizontal plane every 1 ms and unwrapped, so whole turns "
@@ -880,7 +880,7 @@ class FreeskiTask(TaskBase):
         "judge would deduct for sitting back), the landing is past the table (a landing on the table "
         "or the knuckle before the knoll fails), and the skis cross the finish line pointing the way the trick "
         "landed (within {ride_heading_deg} degrees).",
-        "ICR 3102.4.1 (the big air site): the course is the RoboOlympics freeski big air (MIT): a level start platform "
+        "ICR 3102.4.1 (the big air site): the course is the Embodied Olympics freeski big air (MIT): a level start platform "
         "{start_len} m long, its edge rounded (radius {rollin_R} m, an estimate) onto a {inrun_len} m in-run at "
         "{inrun_angle} degrees, a {inrun_R} m transition, a {flat_len} m flat, a kicker of transition radius "
         "{kicker_R} m with a {lip_len} m straight lip at {takeoff} degrees (2.1 m above the flat, {w_kicker} m wide), "
@@ -898,7 +898,7 @@ class FreeskiTask(TaskBase):
         "(stand height 35 mm) and boot 1.2 kg as mass on the ski (estimates); the binding holds the foot rigidly and "
         "never releases; the boot's forward flex is not modelled (the ankle joint moves inside it); no poles (big air "
         "athletes ski without them). The skis are solid against the robot's body and each other.",
-        "Snow and air: the ski-snow model of the RoboOlympics freeski sport (MIT, ported): kinetic friction after "
+        "Snow and air: the ski-snow model of the Embodied Olympics freeski sport (MIT, ported): kinetic friction after "
         "Wolfsperger et al. 2021, the edge's hold after Mossner et al. 2013 with Federolf's race-piste snow, hard "
         "well-damped snow; still air at a mountain venue (1.052 kg/m^3), the air's drag and lift on every link (a normal-force model); no "
         "wind, no snow is moved.",
