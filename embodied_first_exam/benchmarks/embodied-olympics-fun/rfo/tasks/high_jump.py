@@ -101,8 +101,11 @@ class Task(TaskBase):
         "and one leg gives at most half that push's work (an estimate of about 0.1 m of rise off one foot); a "
         "human's jump raises it far more",
         "the bar is rigid and its supports are fixed, so unlike a real bar it would carry a body: touching it is "
-        "allowed, as in the rules, but contact with it for more than {bar_touch_max_s} s in all is a failure (a real "
-        "bar sags and falls under any weight); a pelvis or a foot that comes back over the plane has not passed it",
+        "allowed, as in the rules, but contact with it for more than {bar_touch_max_s} s in all is a failure, and so "
+        "is a push from it: the normal impulse of the bar on the robot, summed over the attempt, may be at most "
+        "{bar_impulse_max_Ns} N s (a real bar sags and falls under any weight; a free 2 kg bar given that much "
+        "momentum across its 4 cm supports slides off them, and here one already leaves them at about 0.7 N s; "
+        "on the 67 kg robot it is 0.03 m/s); a pelvis or a foot that comes back over the plane has not passed it",
     ]
     time_limit_s = 60.0
     start = (-8.0, 0.0, 0.0)
@@ -113,7 +116,8 @@ class Task(TaskBase):
                   mat_gap_m=0.10, **MAT_CONTACT, runway_m=15.0, takeoff_window_s=0.15, free_foot_force_frac=0.05,
                   contact_gap_s=0.03,
                   min_air_s=0.05, rise_min_m=0.08, bar_drop_m=0.05, bar_wait_s=2.0, bar_touch_max_s=0.3,
-                  bar_rest_dz_m=0.005, bar_still_m_s=0.05, bar_still_rad_s=0.5)
+                  bar_rest_dz_m=0.005, bar_still_m_s=0.05, bar_still_rad_s=0.5,
+                  bar_impulse_max_Ns=2.0)
 
     sentence = ("Do a high jump: approach the bar, take off from one foot, go over the bar between the uprights "
                 "without knocking it off its supports, and come down on the landing mat.")
@@ -135,15 +139,16 @@ class Task(TaskBase):
              "than the bar's upper side (one that comes back over the plane has not passed it and must pass it "
              "again), and every part of you must get beyond the plane. A crossing made while you touch the ground "
              "or the mat, or after the flight has ended, never counts. You have cleared the bar when all of that "
-             "has happened in the flight. You may touch the bar, for at most {bar_touch_max_s} s in all (it does "
-             "not carry you), and after the clearance you may land on any part of your body, on the mat or not. You "
+             "has happened in the flight. You may touch the bar, for at most {bar_touch_max_s} s in all, and it "
+             "may push you with a normal impulse of at most {bar_impulse_max_Ns} N s in all (a real bar falls "
+             "under any weight: it does not carry you or throw you up), and after the clearance you may land on any part of your body, on the mat or not. You "
              "succeed when you have cleared the bar and landed, and {bar_wait_s} s later the bar still lies on its "
              "supports: touching both, its centre within half a support's width of its resting place along x and "
              "within {bar_rest_dz_m} m of its resting height, and at rest (its centre slower than {bar_still_m_s} "
              "m/s, turning slower than {bar_still_rad_s} rad/s); a bar knocked up or off counts as off. A fall is not a "
              "failure by itself. You fail if the bar drops more than {bar_drop_m} m at "
              "any time, or is not lying on its supports at that judgement; if you are in contact with the bar for "
-             "more than {bar_touch_max_s} s in all; if you touch "
+             "more than {bar_touch_max_s} s in all, or it pushes you with more than {bar_impulse_max_Ns} N s; if you touch "
              "the ground or the mat beyond the plane before you have cleared the bar, with or without a jump; if "
              "your jump's flight ends (you touch anything but the bar) before you have cleared the bar; if the "
              "take-off is not from one foot; if the flight is not a jump; if your pelvis or a foot passes the plane "
@@ -189,7 +194,8 @@ class Task(TaskBase):
         self.trackers = {"flights": Flights(ref, min_air=self.p["min_air_s"], also_allowed=self.bar_mask),
                          "phase": "approach", "crossed": [], "prev": None, "last_on": {"left": -1.0, "right": -1.0},
                          "other_on": -1.0, "force_t": {"left": -1.0, "right": -1.0},
-                         "contact_t0": {"left": None, "right": None}, "at_t0": None, "t_land": None, "t_clear": None, "bar_z0": None, "bar_s": 0.0}
+                         "contact_t0": {"left": None, "right": None}, "at_t0": None, "t_land": None, "t_clear": None, "bar_z0": None, "bar_s": 0.0,
+                         "bar_J": 0.0}
 
     def _takeoff(self, w, ref) -> bool:
         """Judge the take-off of the jump's flight (TR 27.1: one foot). False: the attempt has failed."""
@@ -209,6 +215,19 @@ class Task(TaskBase):
         tr["phase"] = "jump"
         ref.stage("take-off", foot=foot)
         return True
+
+    def bar_force(self, w, ref) -> float:
+        """The bar's normal force (N) on the robot in the physics step just taken (mj_contactForce, summed)."""
+        d, m = w.d, w.m
+        n = d.ncon
+        g = d.contact.geom[:n]
+        A, B = self.robot, self.bar_mask
+        f, tot = np.zeros(6), 0.0
+        for i in np.flatnonzero((A[g[:, 0]] & B[g[:, 1]]) | (A[g[:, 1]] & B[g[:, 0]])):
+            if d.contact.efc_address[i] >= 0:
+                mujoco.mj_contactForce(m, d, int(i), f)
+                tot += float(f[0])
+        return tot
 
     def ground_force(self, w, ref, side) -> float:
         """The normal force (N) of the ground on that foot in the physics step just taken (mj_contactForce)."""
@@ -231,6 +250,11 @@ class Task(TaskBase):
             tr["bar_z0"] = float(w.pos("bar")[2])
         if float(w.pos("bar")[2]) < tr["bar_z0"] - p["bar_drop_m"]:
             return ref.fail("the bar did not stay on its supports")
+        if ref.touching(self.robot, self.bar_mask):      # the bar's push on the robot (the rigid supports carry it)
+            tr["bar_J"] += self.bar_force(w, ref) * w.m.opt.timestep
+            ref.metrics["bar_impulse_Ns"] = round(tr["bar_J"], 3)
+            if tr["bar_J"] > p["bar_impulse_max_Ns"]:
+                return ref.fail("the bar pushed the robot", bar_impulse_Ns=round(tr["bar_J"], 3))
         if ref.has("clearance") and tr["t_land"] is not None:
             return
         if ref.touching(self.robot, self.bar_mask):      # the rigid bar would carry a body: a real one would not
