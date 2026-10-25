@@ -1300,7 +1300,7 @@ def normalize_slowdown(task: Path) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# PROTOCOL v2.0 §2 (owner, 2026-10-14): the settings a task declares, and the effective configuration of a
+# PROTOCOL v2.1 §2 (owner, 2026-10-14): the settings a task declares, and the effective configuration of a
 # trial, recorded with every result so that results are ranked only within one comparable configuration (docs/protocol/running.md
 # "Results"). Standard library only: scripts/write_task_results.py, scripts/dataset_manifest.py and the scheduler's run
 # policy (the evaluation pool's) read these.

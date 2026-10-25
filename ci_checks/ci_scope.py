@@ -65,7 +65,7 @@ UNITS: dict[str, list[str]] = {
     "LIBERO-MAX": _own("libero-max"),
     "RoboARC": _own("roboarc", "images/roboarc-files/", "images/ikea-mujoco/", "images/ikea-mujoco-files/"),   # the IKEA suite's images keep their name
     "Embodied Olympics - Fun": _own("embodied-olympics-fun", "images/embodied-olympics-fun-files/"),
-    "Embodied Olympics - Match": ["images/olympiad/", "images/embodied-olympics-match-files/"],   # the olympiad image: built from Embodied Olympics' tree, not here
+    "Embodied Olympics - Match": ["images/embodied-olympics-match-files/"],   # its simulator images are built from Embodied Olympics' tree, not here
     "BiGym 2.0": _own("bigym2"),
     "YAMLab": _own("yamlab"),
     "LabUtopia": _own("labutopia"),

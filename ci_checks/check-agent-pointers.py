@@ -58,10 +58,10 @@ ALLOW = [
 ]
 
 
-# (source directory, image name, its files): several images may share one source directory (a benchmark's files image and
-# its sidecars' image); a file is reported under the first that lists it, sidecar images last
-SOURCES = [(ROOT / s["source"], f.parent.name, set(s["files"])) for f in sorted((ROOT / "images").glob("*/FILES.json"),
-           key=lambda f: (f.parent.name.endswith("-sim-files"), f.parent.name)) for s in [files_image.spec(f.parent.name)]]
+# (source directory, image name, its files): several images may share one source directory; a file is reported under
+# the first (by image name) that lists it
+SOURCES = [(ROOT / s["source"], f.parent.name, set(s["files"])) for f in sorted((ROOT / "images").glob("*/FILES.json"))
+           for s in [files_image.spec(f.parent.name)]]
 
 
 def files_name(src: pathlib.Path) -> str:

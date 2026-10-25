@@ -55,7 +55,8 @@ The rule is PROTOCOL Appendix H.5; how the runner applies it:
   gives no verdict on the agent: no, an unreadable or an unfinalized `final.json` (`finalized`: the verdict is on
   disk, written before any video); the sidecar gave up after crashes that were not all inside the agent's calls
   (`sim_crashed`), could not restore the episode after a crash (`resume_failed`, whatever crashed) or ended a native
-  call that hung past its deadline (`call_watchdog`); the scene did not start from the frozen instance, at the start or
+  call still unfinished 60 s (by default) past the service's own per-call cap, `max_call_wall_s` (`call_watchdog`, 2.4; never counted
+  from the request's deadline); the scene did not start from the frozen instance, at the start or
   after a reset (`instance_mismatch`). Only what the service itself records as `infra_error = 1` (or a missing,
   unreadable or unfinalized record) is one; a grader never infers it from missing fields. What the agent's commands
   caused stays a result, never an infrastructure failure (a retry would be a free second attempt): crashes all inside
@@ -72,7 +73,8 @@ Results are not committed (published on the [results site](https://www.embodied-
 in the metadata). `scripts/write_task_results.py` writes, per task and run id, `README.md`, `config.json` (the trial's
 effective configuration: `protocol_version`, `mode`, `cutoff_s`, `reset_budget`, `slowdown`, `seed`, `network`,
 `validated`, `set`, `oracle`, `service_protocol`, `digest`, the result, the first-attempt result `first_success`
-(standard modes) and whether it counts; a result dir from before v2.0
+(standard modes: reward.json's `first_success`; a verifier that does not write it, the graded success when no reset
+was made, else 0) and whether it counts; a result dir from before v2.0
 gets its fields from the task at that digest, else `"legacy"`) and `attempts.json`. Rankings (the batch summary,
 the results site) compare trials only within one comparable configuration (`task_conventions.config_key`: protocol
 version, mode, cutoff, reset budget, S, network), report success together with cost (tokens, money, turns, wall clock,
@@ -144,10 +146,15 @@ Codex session (`agent/sessions/`). Run Codex with `--ak reasoning_summary=detail
   recording where the benchmark's simulator is not verified bit-wise replayable (PROTOCOL §4). Either way the verdict is on
   disk first (`final.json` `finalized`; `video_pending` while the video is made) and `final.json` says `video_source`
   (`live` / `render`). Published videos follow the same rule and keep the label.
+- **First attempt (standard modes with resets):** only benchmarks on the shared 2.1 sidecar service (`rcb_service.py`,
+  standard_mode.md "Evidence and grading") graded by the shared grader (`embodied_first_exam/standard/v2_1/grade.py`)
+  keep the first episode (`trajectory.first.npz`, `replay.first.mp4`) and how it ended. A benchmark with a service of
+  its own reports `resets` only: its `first_success` is the graded success when `resets` = 0, else 0, and the first
+  episode is not kept.
 - **Standard mode (RoboTwin):** the sim service records `live.mp4` (six views, frames only while physics runs and something moves,
   each stamped with the agent's call and wall/sim time; rendered from the trajectory after the verdict, in the same pass
   as `replay.mp4`, so it costs the agent nothing; `RCB_LIVE=realtime` captures during the episode instead), the exact actions of every call,
-  and a crash-safe trajectory. Details: `standard_mode.md` (Live recording). Protocol 2.1 also gives the
+  and a crash-safe trajectory. Details: `standard_mode.md` (Live recording). The wire protocol `eai-standard/2.1` also gives the
   agent measured proprioception (encoders, gripper opening, TCP pose, drive effort) and optional depth noise.
 - **Privileged mode:** the agent owns the simulator, so nothing it produces is evidence. `rcb_traj.Session` still dumps every
   rollout's per-step drive targets to `/app/output/rcb_trace/` (`RCB_AGENT_TRACE_DIR`, capped at 300 files / 400 MB),

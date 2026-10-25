@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Task-protocol conformance report (docs/protocol/README.md): the protocol version each mode may declare, the `oracle` fields,
-no placeholder solve.sh, base images from the one registry, no results/ in the repository, no personal paths. Prints
+no placeholder solve.sh, base images from the one registry, no results/ in the repository, no personal paths, internal
+names or host /data/ paths. Prints
 one summary line per rule with a count and a few examples; every rule fails the check. Names, modes and the other
 task.toml fields are check-task-fields.sh's; that test.sh clears /logs/verifier first is check-verifier-isolation.sh's.
 
@@ -46,7 +47,13 @@ def own_protocols(name: str, mode: str | None) -> set[str]:
 
 
 PERSONAL_PATH = re.compile(rb"/(home|Users)/[A-Za-z0-9_.-]+/")
-TEXT_SUFFIXES = {".md", ".toml", ".py", ".sh", ".yaml", ".yml", ".json", ".jsonl", ".txt", ".cfg", ".xml", ".urdf", ""}
+# the maintainers' internal user name (in paths, logins) never reaches a tracked file; the author's name (capitalised) may
+INTERNAL_NAME = re.compile(rb"kangrui")
+# an absolute /data/<dir>/ path is a host path, except the sim sidecar's own data directory inside its container
+# (/data/<file>, and its subdirectories calls/, live_video/, operations/)
+HOST_DATA_PATH = re.compile(rb"(?<![\w./~-])/data/(?!(?:calls|live_video|operations)/)[A-Za-z0-9_.-]+/")
+TEXT_SUFFIXES = {".md", ".toml", ".py", ".sh", ".yaml", ".yml", ".json", ".jsonl", ".txt", ".TXT", ".cfg", ".xml", ".urdf", ".env",
+                 ".lock", ".patch", ".in", ".example", ".c", ".svg", ".sha256", ""}
 
 hits: dict[str, list[str]] = defaultdict(list)
 
@@ -134,8 +141,13 @@ def check_repository() -> None:
             continue
         if f == "ci_checks/check-protocol.py":
             continue
-        if PERSONAL_PATH.search(p.read_bytes()):
+        data = p.read_bytes()
+        if PERSONAL_PATH.search(data):
             warn("personal absolute path (/home/<user>/ or /Users/<user>/)", f)
+        if INTERNAL_NAME.search(data) or INTERNAL_NAME.search(f.encode()):
+            warn("internal user name", f)
+        if HOST_DATA_PATH.search(data):
+            warn("host path under /data/ (inside a container only the sim sidecar's /data/ is used)", f)
 
 
 def main() -> int:

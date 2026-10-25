@@ -59,7 +59,7 @@ def entry(t: Path) -> dict:
     """One task's row of the list: what its own files say."""
     md = tomllib.loads((t / "task.toml").read_text()).get("metadata", {})
     r = md.get("resources") or {}
-    # the settings results are grouped by (PROTOCOL v2.0 §2, docs/protocol/running.md "Results"): rankings compare only tasks
+    # the settings results are grouped by (PROTOCOL v2.1 §2, docs/protocol/running.md "Results"): rankings compare only tasks
     # and results of one configuration; `validated` is a marker, ranked together. The same fields a result records.
     cfg = tc.effective_config(t)
     return {"name": t.name, "benchmark": tc.bench_of(t), "mode": cfg["mode"], "base": tc.base_of(t),

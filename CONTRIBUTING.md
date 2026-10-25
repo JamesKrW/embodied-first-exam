@@ -129,7 +129,7 @@ The checklist is in PROTOCOL §4.
    `embodied_first_exam/standard/`, `images/monitor/`, `images/VERSION`, the protocol documents (`docs/protocol/`), or a
    path the scope table does not know -- runs the full suite, as does every push to `main`, the nightly run and a manual
    run (`workflow_dispatch`). The CI mutation self-test (`check-ci-selftest.py`) runs with the full suite.
-   The checks are in two tiers (PROTOCOL v2.0): the job **`invariants`** (`ci_checks/run_invariants.sh`: the checks
+   The checks are in two tiers (PROTOCOL v2.1): the job **`invariants`** (`ci_checks/run_invariants.sh`: the checks
    that enforce PROTOCOL Appendix H) is the only one that blocks a merge, and it fails on any failure, error or
    incomplete run; the job **`advisories`** (`ci_checks/run_all.sh --tier advisory`) reports every other finding as a
    warning (annotations, the job summary). Locally, `bash ci_checks/run_all.sh` runs both: exit 0 clean, 1 an invariant
@@ -157,8 +157,9 @@ The checklist is in PROTOCOL §4.
   a new digest; results under the earlier cutoff are ranked separately (PROTOCOL §2, H.8).
 - A sidecar's directory (`environment/sim/`, `environment/scorer/`, served at `/srv`) holds only what is the task's own:
   its frozen instance, per-task grader data, files no other task has. Files it shares with other tasks come from a
-  pinned files-only image, the benchmark's one `images/<folder>-files/` (sources under `embodied_first_exam/benchmarks/<folder>/`; the same image
-  serves its agent and verifier images),
+  pinned files-only image, the benchmark's `images/<folder>-files/` (sources under `embodied_first_exam/benchmarks/<folder>/`; the same image
+  serves its agent and verifier images; besides it, a benchmark may have files images that hold only data, such as goal
+  pictures or build inputs, and one per further simulator image it runs on, as RoboARC's IKEA suite),
   or `images/standard-files/` for the 2.2 / 2.4 / realtime layers: the sidecar is built from its directory
   (`build: context: sim`, its `Dockerfile`: `COPY . /srv/`, then `COPY --from=<image@digest>` of those files at their paths
   under `/srv`; `.dockerignore` keeps the two build files out). A private evaluator's own data (hidden plants, case banks)

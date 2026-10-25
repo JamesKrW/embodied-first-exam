@@ -143,12 +143,15 @@ and writes the verdict into `final.json` (`success`, the verdict; `live_success`
 any settle or hold check; `graded_by` = `live`, `replays` = 0); nothing is
 replayed to grade it (PROTOCOL H.4). The video is a post-hoc replay of `trajectory.npz` after the verdict by default, and a live
 recording where the simulator is not verified bit-wise replayable (`video_source`, PROTOCOL §4); it never decides
-anything. With resets, the first episode is kept as evidence too:
-`trajectory.first.npz` (its rows from the journal) and `replay.first.mp4`, rendered after the graded video; `final.json`
-says how it ended (`first_success`, `first_reason`; a success ends the trial, so after a reset `first_success` is 0) and
-decides nothing with it. A separate verifier transcribes `final.json` into `reward.json` (`graded_by_live` = 1,
-`first_success`: the first-attempt, no-reset result reported beside the graded one; without the field, `success` when
-no reset was made, else 0). `infra_error = 1` means there is no verdict on the agent: `final.json` is
+anything. With resets, the shared 2.1 sidecar service (`rcb_service.py`, one file copied unchanged into each benchmark
+that runs it, also under the 2.3 realtime layer) keeps the first episode as evidence too: `trajectory.first.npz` (its
+rows from the journal) and `replay.first.mp4`, rendered after the graded video; `final.json` says how it ended
+(`first_success`, `first_reason`; a success ends the trial, so after a reset `first_success` is 0) and decides nothing
+with it. A separate verifier transcribes `final.json` into `reward.json` (`graded_by_live` = 1); the shared grader
+(`embodied_first_exam/standard/v2_1/grade.py`) also writes `first_success`, the first-attempt, no-reset result reported
+beside the graded one, and copies the first episode's files. A service of a benchmark's own keeps no first episode and
+reports `resets` only; `first_success` is then `success` when no reset was made, else 0 (running.md "Results").
+`infra_error = 1` means there is no verdict on the agent: `final.json` is
 missing, unreadable or not finalized, or the service reported `sim_crashed`, `resume_failed`, `instance_mismatch` or
 (2.4) `call_watchdog`.
 
@@ -350,7 +353,7 @@ when the scene is built, the service waits for it (the agent's own time) instead
 ### 12. Per-call bounds (2.2)
 No step cap, and the wall clock stays the episode's only budget. Two bounds keep one call from holding the
 single-threaded service:
-- **`max_call_wall_s`** (`/spec`, default 900 s, below the client's 1800 s read timeout; task env `RCB_MAX_CALL_WALL_S`): a
+- **`max_call_wall_s`** (`/spec`, default 900 s, below the client's read timeout, which is at least `max_call_wall_s` + 120 s and at least 1800 s; task env `RCB_MAX_CALL_WALL_S`): a
   `/submit` or `/observe` that runs longer stops at the next control step and returns normally, with `meta.stopped =
   "max_call_wall_s"` and `executed_rows` below the rows sent.
 - **Client hang-up**: when the client closes the connection (its read timeout, a killed process), the call stops at the

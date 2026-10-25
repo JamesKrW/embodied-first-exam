@@ -1,7 +1,7 @@
 """Standard-mode verifier (AutoBio): reads what the sim service (which the agent could not touch) wrote: /data/final.json
 (the LIVE episode's result and the crash-recovery fields), /data/trajectory.npz, /data/replay.mp4. The trial is graded by
-its live episode (docs/protocol/README.md H.4; no grading replay): success = the live episode's success and no
-infrastructure failure. Numeric-only reward.json; a reward is always written.
+its live episode (docs/protocol/README.md H.4; no grading replay): success = the live episode's success, no
+infrastructure failure and no simulator error. Numeric-only reward.json; a reward is always written.
 
 infra_error = 1 (no verdict on the agent, PROTOCOL §2.6) when final.json is missing (the service writes it as soon as
 its scene is up, so the agent cannot make it disappear), unreadable, or not finalized (the collect hook did not
@@ -34,7 +34,7 @@ def grade(d: dict) -> tuple[bool, dict]:
     reason = str(d.get("reason") or "")
     unfinished = not d.get("finalized")  # the collect hook never completed final.json
     infra = bool(d.get("infra_error")) or bool(d.get("instance_mismatch")) or unfinished
-    ok = bool(d.get("success")) and not infra
+    ok = bool(d.get("success")) and not infra and reason != "error"   # PROTOCOL §4: a simulator error is the agent's 0
     return ok, {
         "success": int(ok),
         "live_success": int(bool(d.get("success"))),
