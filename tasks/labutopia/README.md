@@ -202,7 +202,8 @@ PhysX runs on the CPU (LabUtopia's default backend, `numpy`). Measured in the im
     1/60 s) is a 400 and the episode goes on. Null for `dt`, `seconds`, `video_fps`, `cameras` or `note` means the
     default.
 - **Grading, standard mode.** The trial is graded by its live episode (docs/protocol/README.md H.4): `success` = the
-  live episode's success, judged by the sim service on the episode the agent ran, with no grading replay. The collect
+  live episode's success, judged by the sim service on the episode the agent ran, with no grading replay; an
+  episode that ended in a simulator error scores 0. The collect
   hook (`environment/sim/finalize.sh`) ends the episode, writes `final.json` from the service's record and then, after
   the verdict is on disk, replays the recorded trajectory once to render `replay.mp4` (a failed video replay costs the
   video only). Its `timeout_sec` is 4800 = 2700 (the episode's end, through a resume) + the video replay (at most

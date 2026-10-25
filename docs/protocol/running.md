@@ -74,8 +74,9 @@ in the metadata). `scripts/write_task_results.py` writes, per task and run id, `
 effective configuration: `protocol_version`, `mode`, `cutoff_s`, `reset_budget`, `slowdown`, `seed`, `network`,
 `validated`, `set`, `oracle`, `service_protocol`, `digest`, the result, the first-attempt result `first_success`
 (standard modes: reward.json's `first_success`; a verifier that does not write it, the graded success when no reset
-was made, else 0) and whether it counts; a result dir from before v2.0
-gets its fields from the task at that digest, else `"legacy"`) and `attempts.json`. Rankings (the batch summary,
+was made, else 0) and whether it counts; a trial of another version of the task, whose digest is neither the task's
+DIGEST nor that of the runner's copy of it, keeps only what its name says, and its other fields, `protocol_version`
+included, are `"legacy"`) and `attempts.json`. Rankings (the batch summary,
 the results site) compare trials only within one comparable configuration (`task_conventions.config_key`: protocol
 version, mode, cutoff, reset budget, S, network), report success together with cost (tokens, money, turns, wall clock,
 simulation steps), and align reasoning effort, `max_turns` and the token budget before comparing agents. Validated and
@@ -148,8 +149,8 @@ Codex session (`agent/sessions/`). Run Codex with `--ak reasoning_summary=detail
   (`live` / `render`). Published videos follow the same rule and keep the label.
 - **First attempt (standard modes with resets):** only benchmarks on the shared 2.1 sidecar service (`rcb_service.py`,
   standard_mode.md "Evidence and grading") graded by the shared grader (`embodied_first_exam/standard/v2_1/grade.py`)
-  keep the first episode (`trajectory.first.npz`, `replay.first.mp4`) and how it ended. A benchmark with a service of
-  its own reports `resets` only: its `first_success` is the graded success when `resets` = 0, else 0, and the first
+  keep the first episode (`trajectory.first.npz`, `replay.first.mp4`) and how it ended. A task whose sidecar runs a
+  service of its own reports `resets` only: its `first_success` is the graded success when `resets` = 0, else 0, and the first
   episode is not kept.
 - **Standard mode (RoboTwin):** the sim service records `live.mp4` (six views, frames only while physics runs and something moves,
   each stamped with the agent's call and wall/sim time; rendered from the trajectory after the verdict, in the same pass

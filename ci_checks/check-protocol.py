@@ -7,6 +7,7 @@ task.toml fields are check-task-fields.sh's; that test.sh clears /logs/verifier 
 
 Usage: check-protocol.py [task dirs...]   (default: every task under tasks/ plus repository-wide checks)
 """
+import hashlib
 import os
 import re
 import subprocess
@@ -47,13 +48,22 @@ def own_protocols(name: str, mode: str | None) -> set[str]:
 
 
 PERSONAL_PATH = re.compile(rb"/(home|Users)/[A-Za-z0-9_.-]+/")
-# the maintainers' internal user name (in paths, logins) never reaches a tracked file; the author's name (capitalised) may
-INTERNAL_NAME = re.compile(rb"kangrui")
+# the maintainers' internal user names (in paths, logins) never reach a tracked file; the author's name (capitalised) may.
+# Matched by the sha256 of each lower-case word of that length, so the check itself does not publish the names.
+INTERNAL_NAME_SHA256 = {"788b431f94ca453b95744650bb8de5bba2bfb7fe7194d91289ddf4929080ee96"}
+INTERNAL_NAME_WORD = re.compile(rb"(?<![a-z])[a-z]{7}(?![a-z])")
+
+
+def has_internal_name(data: bytes) -> bool:
+    return any(hashlib.sha256(m.group()).hexdigest() in INTERNAL_NAME_SHA256 for m in INTERNAL_NAME_WORD.finditer(data))
+
+
 # an absolute /data/<dir>/ path is a host path, except the sim sidecar's own data directory inside its container
 # (/data/<file>, and its subdirectories calls/, live_video/, operations/)
 HOST_DATA_PATH = re.compile(rb"(?<![\w./~-])/data/(?!(?:calls|live_video|operations)/)[A-Za-z0-9_.-]+/")
 TEXT_SUFFIXES = {".md", ".toml", ".py", ".sh", ".yaml", ".yml", ".json", ".jsonl", ".txt", ".TXT", ".cfg", ".xml", ".urdf", ".env",
-                 ".lock", ".patch", ".in", ".example", ".c", ".svg", ".sha256", ""}
+                 ".lock", ".patch", ".in", ".example", ".c", ".svg", ".sha256", ".js", ".html", ".csv", ".ipynb",
+                 ".cpp", ".h", ""}
 
 hits: dict[str, list[str]] = defaultdict(list)
 
@@ -144,7 +154,7 @@ def check_repository() -> None:
         data = p.read_bytes()
         if PERSONAL_PATH.search(data):
             warn("personal absolute path (/home/<user>/ or /Users/<user>/)", f)
-        if INTERNAL_NAME.search(data) or INTERNAL_NAME.search(f.encode()):
+        if has_internal_name(data) or has_internal_name(str(f).encode()):
             warn("internal user name", f)
         if HOST_DATA_PATH.search(data):
             warn("host path under /data/ (inside a container only the sim sidecar's /data/ is used)", f)
@@ -159,9 +169,9 @@ def main() -> int:
     if not args:
         check_repository()
     if not hits:
-        print(f"protocol v1.2-rc: {len(tasks)} task(s) conform")
+        print(f"protocol v{tc.PROTOCOL_VERSION}: {len(tasks)} task(s) conform")
         return 0
-    print("protocol v1.2-rc: violations (docs/protocol/README.md):")
+    print(f"protocol v{tc.PROTOCOL_VERSION}: violations (docs/protocol/README.md):")
     for rule, where in sorted(hits.items(), key=lambda kv: -len(kv[1])):
         examples = ", ".join(where[:3]) + (", ..." if len(where) > 3 else "")
         print(f"  FAIL {len(where):4d}  {rule}: {examples}")

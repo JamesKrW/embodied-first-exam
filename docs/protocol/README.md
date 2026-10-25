@@ -125,7 +125,8 @@ off by default). Derivation, enforcement and the reward fields: running.md "Reso
 
 This text is **v2.1**; like the wire protocol's, its minor versions only add (a recommended field, evidence). A
 result's `config.json` records `protocol_version`: `PROTOCOL_VERSION` in `scripts/task_conventions.py` of the checkout
-that writes the result, one of the keys results are compared by (`CONFIG_KEYS`, running.md "Results"). The wire protocol's versions:
+that writes the result (`"legacy"` for a trial of another version of the task), one of the keys results are compared
+by (`CONFIG_KEYS`, running.md "Results"). The wire protocol's versions:
 `eai-standard/2.1` (the base: `/spec`, `/status`, `/observe`, `/submit`, RCB1 frames), 2.2 (depth, kinematics, per-call
 bounds; shared layer `embodied_first_exam/standard/`), 2.3 (2.2 + realtime), 2.4 (2.3 + operation ids and deadlines; layer
 `embodied_first_exam/standard/v2_4/`). Minor versions only add; `/spec.protocol` equals `metadata.protocol`. A protocol change is
