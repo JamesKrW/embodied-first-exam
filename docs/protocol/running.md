@@ -75,7 +75,7 @@ effective configuration: `protocol_version`, `mode`, `cutoff_s`, `reset_budget`,
 `validated`, `set`, `oracle`, `service_protocol`, `digest`, the result, the first-attempt result `first_success`
 (standard modes: reward.json's `first_success`; a verifier that does not write it, the graded success when no reset
 was made, else 0) and whether it counts; a trial of another version of the task, whose digest is neither the task's
-DIGEST nor that of the runner's copy of it, keeps only what its name says, and its other fields, `protocol_version`
+DIGEST nor that of the runner's copy of it and whose seed is not known from a runner's copy, keeps only what its name says, and its other fields, `protocol_version`
 included, are `"legacy"`) and `attempts.json`. Rankings (the batch summary,
 the results site) compare trials only within one comparable configuration (`task_conventions.config_key`: protocol
 version, mode, cutoff, reset budget, S, network), report success together with cost (tokens, money, turns, wall clock,

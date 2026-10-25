@@ -73,7 +73,7 @@ def dress(sc) -> None:
         for el in vis.findall(tag):
             vis.remove(el)
     ET.SubElement(vis, "headlight", ambient="0.30 0.32 0.36", diffuse="0.12 0.12 0.12", specular="0 0 0")
-    ET.SubElement(vis, "quality", shadowsize="2048", offsamples="4")   # (software GL: about twice the old frame time)
+    ET.SubElement(vis, "quality", shadowsize="2048", offsamples="4")   # (software GL: about twice the frame time)
     # One visual scale for every venue (MuJoCo would take it from the venue's size): the clipping planes are 0.08 m and
     # 500 m, and the sun's shadows are drawn within 60 m of what a camera looks at (a shorter range speckles the
     # ground with self-shadowing, as a lower sun does).

@@ -22,7 +22,7 @@ N_WEDGE = 48
 # ---- the hold ----
 # The right hand is the H1-2's Inspire hand (rfo/realhand.py). The discus lies flat on its palm (its axis along the
 # palm's normal), the fingers' tips curled over the rim, the forearm level and rolled palm up: a thrower's hold at rest.
-# Searched (the hand closed on it, then held 1.5 s standing): hanging below the hand from the fingers (the arm down)
+# Measured (the hand closed on it, then held 1.5 s standing): hanging below the hand from the fingers (the arm down)
 # the 2 kg discus slides out of the hand wherever it is placed; on the upturned palm it stays (moved 7 mm).
 ARM_START = dict(right_elbow_roll=1.57)        # the right arm at t = 0: the rest pose (the forearm level, forwards),
 #                                                the forearm rolled palm up: the discus rests on the palm
