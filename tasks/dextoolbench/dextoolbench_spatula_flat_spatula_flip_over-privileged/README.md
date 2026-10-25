@@ -7,7 +7,7 @@
 | Twin | `dextoolbench_spatula_flat_spatula_flip_over-standard` |
 | Simulator / robot | `mujoco` / `kuka-iiwa14-sharpa-ha4` |
 | Family / instance | `dextoolbench/spatula/flat_spatula/flip_over` / seed 0 |
-| Oracle | `partial` — SimToolReal's pretrained policy, replayed in this scene, reaches 7/45 goals (solution/; README of dextoolbench_spatula_flat_spatula_flip_over-privileged) |
+| Oracle | `partial` — SimToolReal's pretrained policy, replayed in this scene, reaches 22/45 goals (solution/; README of dextoolbench_spatula_flat_spatula_flip_over-privileged) |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:mujoco-0.1.2` |
 
@@ -15,10 +15,10 @@
 DexToolBench task `spatula / flat_spatula / flip_over` (SimToolReal, MIT) ported to plain MuJoCo for this benchmark.
 
 ## Difficulty
-Dexterous tool use: a KUKA iiwa 14 arm with a 22-DoF Sharpa HA4 hand (29 position-controlled joints) must carry the tool along DexToolBench's goal trajectory, every goal within 1.5 cm on all keypoints, and success needs every goal. SimToolReal's pretrained policy reaches 7/45 goals here.
+Dexterous tool use: a KUKA iiwa 14 arm with a 22-DoF Sharpa HA4 hand (29 position-controlled joints) must carry the tool along DexToolBench's goal trajectory, every goal within 1.5 cm on all keypoints, and success needs every goal. SimToolReal's pretrained policy reaches 22/45 goals here.
 
 ## Reference solution
-`solution/`: SimToolReal's pretrained policy run in this exact scene, recorded targets replayed: **7/45 goals** in 1284 control steps (the policy's own sim2sim progress; a task's reference, not a ceiling); nop 0/45
+`solution/`: SimToolReal's pretrained policy run in this exact scene, recorded targets replayed: **22/45 goals** in 1829 control steps (the policy's own sim2sim progress; a task's reference, not a ceiling); nop 0/45
 
 ## Verification
 DexToolBench task progress: goal reached when all 8 grasp-box keypoints are within 1.5 cm; 30 s per goal (upstream 10 s); `reward.txt` = 1 iff every goal is reached (both replays agreeing); `progress` = goals / 45 in `reward.json`
@@ -45,3 +45,6 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | deliverable | `(T, 29)` joint targets per control step; bit-exact replay |
 | table props | bowl + plate (table_narrow_bowl_plate; primitive stand-ins, the YCB meshes are not in the SimToolReal repo) |
 | egress | allowlist (the model APIs and the package registries): the pretrained policy is publicly downloadable |
+
+### Change Log
+- 2026-10-25: **new start pose** (`instance.json` `start_pose`; the goals are unchanged). The demo's start pose lays the spatula flat on the bare table, but this scene has the bowl and plate stand-ins under it: the blade went 3.4 cm into the bowl wall and the handle 1.25 cm into the plate, so at the first physics steps (t ≈ 0.017 s, before the hand moves) contact pushed the spatula up 17 cm at about 2 m/s and it landed 9 cm away, turned over (178°). The new start is where the spatula comes to rest when it is dropped from just above the old pose: on the plate and the bowl rim, 2.0 cm higher, 0.3 cm aside, tilted 13°; from it the spatula settles by under 1 mm and 0.4°. The oracle (SimToolReal's pretrained policy, re-recorded in the new scene) reaches 22/45 goals (before: 7/45); nop 0. Results from before this date ran from the old start and are not comparable.
