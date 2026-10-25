@@ -2,7 +2,7 @@
 # frozen instance baked in. Nothing the agent did in its container reaches this one -- Harbor uploads only the declared
 # artifacts (/app/output/), so a patched success check or a swapped interpreter in the agent container cannot influence
 # the verdict.
-FROM ghcr.io/mll-lab-nu/efe:pandadyn-0.1.0
+FROM ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0
 COPY instance.json test.sh /tests/
 COPY --from=ghcr.io/mll-lab-nu/efe:pandadyn-files-0.3.1@sha256:10402de7d64c0a8eb13ae52959cb48169193548ed46ca947a51edc121e4059ff /privileged/environment/rcb_pandadyn.py /privileged/tests/grade.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
