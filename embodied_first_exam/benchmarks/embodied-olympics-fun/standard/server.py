@@ -1,7 +1,7 @@
-"""eai-standard/2.1 sim service for RoboOlympics -- the sidecar's entry point (`python /srv/server.py`).
+"""eai-standard/2.1 sim service for Embodied Olympics - Fun -- the sidecar's entry point (`python /srv/server.py`).
 
 The simulator-specific half only: `RoboFun` implements rcb_service.Sim for one frozen instance, through rcb_rfo.Episode
-(the RoboOlympics Unitree G1 in the family's venue, with the family's referee). The protocol, the episode, crash recovery
+(the Unitree G1 or H1-2 in the family's venue, with the family's referee). The protocol, the episode, crash recovery
 and the finalize live in rcb_service.py, which imports no simulator.
 Grading (owner, 2026-10-17): the live episode's referee call is the verdict; nothing is replayed to grade
 it. The referee latches a success the moment it happens and ends the attempt, so the live rule is the one the replay
@@ -48,7 +48,7 @@ DEPTH_MAX_M = 10.0
 
 
 class RoboFun:
-    """One frozen RoboOlympics instance behind the rcb_service.Sim contract."""
+    """One frozen Embodied Olympics - Fun instance behind the rcb_service.Sim contract."""
 
     def __init__(self, instance: str):
         self.instance = load_instance(instance)
@@ -77,7 +77,7 @@ class RoboFun:
                               "clipped and reported; a joint target moves at most the joint's speed limit per step; "
                               "joints a type does not name keep their current targets")
         return {
-            "simulator": "RoboOlympics simulator (MuJoCo 3.3.7 on the CPU, 1 ms physics, 10 ms control)",
+            "simulator": "Embodied Olympics - Fun simulator (MuJoCo 3.3.7 on the CPU, 1 ms physics, 10 ms control)",
             "robot": self.facts["model"],
             "task_text": self.task_text,
             "rules": self.rules,

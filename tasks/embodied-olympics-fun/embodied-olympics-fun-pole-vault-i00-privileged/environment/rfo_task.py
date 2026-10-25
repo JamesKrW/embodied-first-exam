@@ -8,8 +8,7 @@ Spirit, 2.35 m (7 ft 8 in), rated 90 lb (40.8 kg), the makers' rule being a pole
 weight (athleticsdirect.co.uk, UCS Junior Spirit poles: 2.35 m rated 55/65/75/90 lb; a top-hand grip 6 to 18 in
 below the top); its mass (1.1 kg) and thickness (32 mm) are estimates. The bar is at 1.00 m, set for this robot.
 
-FEASIBILITY (measured and computed in the simulator image; tests/test_pole_vault.py, tests/pv_hang_bound.py,
-tests/pv_plant.py, tests/pv_carry.py): no reference solution; this robot with these hands cannot vault, at any bar
+FEASIBILITY (measured and computed in the simulator image): this robot with these hands cannot vault, at any bar
 height or pole length.
 - The hang (the vault's take-off, TR 28: the athlete hangs on the planted pole; the referee also asks the pole to carry
   at least half the robot's weight then, or a jump with a pole in the hands would pass; and, so that a standing jump
@@ -57,7 +56,7 @@ from rfo.task import TaskBase
 # (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid
 # prop on the robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its
 # own bounce. With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 27 mm into the mats' sides
-# and 16 mm into a foot (stress test 2026-10-21).
+# and 16 mm into a foot (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 SIDES = ("left", "right")
@@ -73,7 +72,7 @@ CARRY_ARM = (0.0, -0.5, 0.5, 1.0, 0.633, 0.5, 0.0)       # the right arm carryin
 FREE_ARM_ROLL = 0.2                                       # rad: the free left arm's shoulder roll above the G1's rest
 #                                                          pose: at rest (0.2) the Dex3-1's thumb lies 32.8 mm inside
 #                                                          the hip's hull; at 0.4 it clears it by 46 mm (38 mm over 2 s
-#                                                          of the start command; tests/pv_stance.py)
+#                                                          of the start command)
 # The box (TR 28.8), in the vertical plane of the runway's middle: the bottom is 1.00 m long and slopes from the
 # runway's level at the front down to 0.20 m below it at the stop board; the stop board stands at 105 degrees to the
 # bottom, so it leans towards the landing area and its top inside edge (the "zero line", x = 0) is 0.10 m beyond its

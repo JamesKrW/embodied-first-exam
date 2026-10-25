@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 12.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_taekwondo_kick.py: positive by a real front kick (lowcmd: 14.2 N s in 0.027 s on the protector, the threshold is 7.2 N s, peak 990 N) with an injected recovery (the robot put back at its start pose 0.25 s after the kick). No recovery was found: the robot falls within 0.6 s in every one of about 60 settings tried; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested: positive by a real front kick (lowcmd: 14.2 N s in 0.027 s on the protector, the threshold is 7.2 N s, peak 990 N) with an injected recovery (the robot put back at its start pose 0.25 s after the kick). No recovery was found: the robot falls within 0.6 s in every one of about 60 settings tried; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

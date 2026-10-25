@@ -25,10 +25,10 @@ N_WEDGE = 48
 # physics over the arm's angles, its targets and where the shot touches the neck, every angle and target inside the
 # joints' ranges (a target outside them would make every plan be refused), then settled for 8 s: under the start
 # command the shot moves 4 mm relative to the hand and then rests, and the robot stands.
-# Re-settled with the robot's self-collision (world.py, 2026-10-21): that stance had the hand's thumb (a look-only
+# Re-settled with the robot's self-collision (world.py): that stance had the hand's thumb (a look-only
 # finger then) 23 mm inside the shoulder's hull. Under the same start command, with the self-collision on, the arm
-# settles within 1 s with the thumb resting against the shoulder and the shot on the palm, and stays there for 8 s
-# (tests/sp_settle.py): SETTLED and SHOT_AT are that rest (the shot's centre 0.159 m from the neck line).
+# settles within 1 s with the thumb resting against the shoulder and the shot on the palm, and stays there for 8 s:
+# SETTLED and SHOT_AT are that rest (the shot's centre 0.159 m from the neck line).
 SETTLED = dict(shoulder_pitch=-0.6882, shoulder_roll=0.1622, shoulder_yaw=0.2701, elbow_pitch=-0.8693,
                elbow_roll=-0.9159, wrist_pitch=-0.4214, wrist_yaw=-1.1029)
 HOLD = dict(shoulder_pitch=-0.7315, shoulder_roll=0.1587, shoulder_yaw=0.3103, elbow_pitch=-0.8292,
@@ -41,7 +41,7 @@ PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness a
 # dropped 5.5 m (10.4 m/s) onto the hand of a player whose wrist rests on a table keeps 0.10 of its speed with the hand
 # relaxed, 0.14 strained, 0.17 as a clenched fist; ball impacts last 5 to 20 ms. The pad is passive rubber (no muscle
 # tone), so here the relaxed hand's 0.10: a critically damped spring of time constant 5 ms (MuJoCo's solref; solimp
-# 0.99-0.999), measured against a pad fixed in space (tests/probe_palm.py; every official ball alike: MuJoCo's contact
+# 0.99-0.999), measured against a pad fixed in space (every official ball alike: MuJoCo's contact
 # is mass-normalised): a ball thrown head-on at 1 to 10.4 m/s keeps 0.09 to 0.11 of its speed (0.093 at 10.4 m/s)
 # after 19 ms of contact. Friction 0.7 (rubber on a ball's cover; not separately measured). With elliptic friction
 # cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py) a squeezed or resting

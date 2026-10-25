@@ -37,7 +37,7 @@ instance_seed = 0
 reset_budget = 5
 expert_time_estimate_hours = 26.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_snowboard.py: A parallel slalom run with the minimum vertical drop (80 m: 256 m at 33 %, 18 gates), a level start platform and a self-start. Positive by injection: pushed off the platform, straight runs re-aimed by hand 0.8 m outside each turning pole; sliding, crossings and finish are physics; deterministic. Negatives: did not start, a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested: A parallel slalom run with the minimum vertical drop (80 m: 256 m at 33 %, 18 gates), a level start platform and a self-start. Positive by injection: pushed off the platform, straight runs re-aimed by hand 0.8 m outside each turning pole; sliding, crossings and finish are physics; deterministic. Negatives: did not start, a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

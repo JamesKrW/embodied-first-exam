@@ -53,7 +53,7 @@ PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness a
 # dropped 5.5 m (10.4 m/s) onto the hand of a player whose wrist rests on a table keeps 0.10 of its speed with the hand
 # relaxed, 0.14 strained, 0.17 as a clenched fist; ball impacts last 5 to 20 ms. The pad is passive rubber (no muscle
 # tone), so here the relaxed hand's 0.10: a critically damped spring of time constant 5 ms (MuJoCo's solref; solimp
-# 0.99-0.999), measured against a pad fixed in space (tests/probe_palm.py; every official ball alike: MuJoCo's contact
+# 0.99-0.999), measured against a pad fixed in space (every official ball alike: MuJoCo's contact
 # is mass-normalised): a ball thrown head-on at 1 to 10.4 m/s keeps 0.09 to 0.11 of its speed (0.093 at 10.4 m/s)
 # after 19 ms of contact. Friction 0.7 (rubber on a ball's cover; not separately measured). With elliptic friction
 # cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py) a squeezed or resting
@@ -79,7 +79,7 @@ def pad_face(w, side: str) -> tuple[np.ndarray, np.ndarray]:
 # command) are SQUEEZE further in, so the shoulder servos press the ball: nothing else holds it. The arms have no
 # gravity feed-forward, so under that command they sag to SETTLED (measured: 4 s of the start command, twice): the
 # robot starts there, the ball where it then sits (BALL_OFFSET from the middle between the two pads).
-# Measured (tests/test_bowling.py; the PNG/MP4 script of the family's report): the start command presses
+# Measured: the start command presses
 # about 45 N on each palm (a still ball needs 19 N at the palms' friction 0.7) and holds the ball for the whole
 # 40 s episode, and under an extra 1.6 g; without the squeeze (the arms at the touching pose) the ball slips out of
 # the palms within 0.2 s. Held higher, at the waist or the chest (0.3 to 0.45 m ahead of the pelvis), the 2.7 kg ball
@@ -136,11 +136,11 @@ class Task(TaskBase):
         "too). The lane, the gutters and the pins keep their own contact parameters.",
         "Equipment (pins): each pin is six stacked cylinders and capsules that follow the official profile, with the "
         "official mass, centre of gravity and the profile's moments of inertia.",
-        "Lane condition: RoboOlympics' house pattern as friction zones (oil, friction {mu_oil}, for {oil_length_m} m "
+        "Lane condition: Embodied Olympics' house pattern as friction zones (oil, friction {mu_oil}, for {oil_length_m} m "
         "in the middle of the lane and 3 m shorter on the outside boards; a 1.2 m transition; then dry boards, "
-        "friction {mu_dry}); the values are RoboOlympics' assumptions after Frohlich (2004), not a measured lane.",
+        "friction {mu_dry}); the values are Embodied Olympics' assumptions after Frohlich (2004), not a measured lane.",
         "Pinfall and the pin count: a pin is down when it is tilted more than {pin_down_tilt_deg} degrees or is off "
-        "the lane's surface (RoboOlympics' rule: a pin leaning on a wall counts as down); the count is taken "
+        "the lane's surface (Embodied Olympics' rule: a pin leaning on a wall counts as down); the count is taken "
         "{settle_s} s after the ball first touches a pin. No pinsetter, no sweep; the pit is " + f"{LANE_Z:g} m deep.",
         "Rule 5: the foul is judged at any time, not only during or after the delivery; a fall also ends the attempt "
         "as a failure, as in every task of this benchmark.",

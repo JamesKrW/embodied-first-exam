@@ -15,12 +15,12 @@ import mujoco
 from rfo.task import TaskBase
 
 # ==================================================================================== BEGIN ski-snow block v3
-# The equipment and the snow (the same block in alpine_slalom, giant_slalom, ski_jumping, snowboard and the freeski
-# families; its master copy is /data/kangrui/tmp/eo1020/shared/freeski.py, first part). Ported, with its authors'
+# The equipment and the snow (the same block in alpine_slalom, giant_slalom, snowboard and the freeski
+# families). Ported, with its authors'
 # permission, from the ski-snow model of the RoboOlympics freeski sport (github.com/CHIGUI0/roboolympics PR #259,
 # branch sport-freeski, commit d566cffb4, sports/freeski/skisnow.py, MIT): frictionless condim-1 contacts of the planks'
 # edge spheres with the snow, and, every 1 ms physics step, the tangential forces of the snow on every contact in the
-# plank's own frame, plus the air's forces on every link (v3, 2026-10-21: lift). v2 (2026-10-20) follows that file's final version: 9 spheres
+# plank's own frame, plus the air's forces on every link (v3: lift). v2 follows that file's final version: 9 spheres
 # per edge, a ski of three bodies (its forebody and afterbody on hinges with the ski's bending stiffness), hard well-
 # damped snow (timeconst 5 ms, damping ratio 1.5), the forces' slope against the slip capped at K_V (the explicit
 # step's stability), and solid planks (boxes over the running surface, shovel and tail, in stiff contact with every
@@ -45,12 +45,12 @@ from rfo.task import TaskBase
 #           Lieu & Mote 1985): an edged plank carves a turn of that radius, a flat one runs straight
 # sat(v) = v / sqrt(v^2 + V0^2), V0 = max(0.03 m/s, force / K_V): each force opposes its own segment's sliding and never
 # does positive work (an edged plank cannot climb, a sliding one cannot push itself). The snow's normal reaction is
-# MuJoCo's soft contact. Air (v3, 2026-10-21: lift): every link of the robot and of the planks feels the quasi-steady
+# MuJoCo's soft contact. Air (v3: lift): every link of the robot and of the planks feels the quasi-steady
 # normal-force aerodynamics of its hull's faces: along each of its own axes k, -0.5 rho C_N A_k |v| v_k (Hoerner's
 # cross-flow principle; A_k the convex hull of its visual shapes projected along its axis k; C_N 1.17, a flat plate's),
 # times the overlap factor (the robot's true silhouette over the links' summed areas, measured once standing). A flat
 # inclined link (a ski, a trunk laid over the skis) gets lift across the flow as well as drag along it, a compact one
-# drag: the posture decides both. Check (tests/test_air.py): a V-style elite jumper made of plates (body 1.75 x 0.40 m,
+# drag: the posture decides both. Check: a V-style elite jumper made of plates (body 1.75 x 0.40 m,
 # skis 2.60 x 0.11 m, a 35 degree V) gets L/q 0.63 m^2 and D/q 0.55 m^2 at 35 degrees of attack, inside what ski-jumping aerodynamics
 # reports for elite flight (Schmolzer & Muller 2005, J. Biomech. 38:1055; Virmavirta et al. 2005, J. Biomech.
 # 38:2157: lift areas about 0.6-0.8 m^2, drag areas about 0.5 m^2 at 30-40 degrees). The venue's air density is a
@@ -650,10 +650,9 @@ def arch(batch, x, y, z, half_w, height=3.0, rgb=(0.12, 0.3, 0.75)) -> None:
 
 
 # ==================================================================================== BEGIN freeski block
-# Big air on skis, one jump, one trick (the same block in every freeski_<trick>.py; its master copy is
-# /data/kangrui/tmp/eo1020/shared/freeski.py, second part). The course, the start and the trick's measurement follow
-# the RoboOlympics freeski sport (github.com/CHIGUI0/roboolympics PR #259, branch sport-freeski, commit d566cffb4, MIT,
-# same owner): sports/freeski/course.py BIGAIR (the FIS numbers), the level start platform with a self-start
+# Big air on skis, one jump, one trick (the same block in every freeski_<trick>.py). The course, the start and the trick's measurement follow
+# the RoboOlympics freeski sport (github.com/CHIGUI0/roboolympics PR #259, branch sport-freeski, commit d566cffb4, MIT):
+# sports/freeski/course.py BIGAIR (the FIS numbers), the level start platform with a self-start
 # (sport.toml D6, D8), and referee.py's trick measurement (D14): the parts marked "verbatim" are copied byte for byte.
 #
 # Rule book: FIS International Competition Rules (ICR) Book VI, Joint Regulations for Snowboard, Freestyle, Freeski
@@ -777,9 +776,9 @@ D_CORK_PER_FLIP, D_SWITCH = 10.0, 5.0
 
 
 def classify(f, base_deg):
-    """The flight's trick as the judges name it, with its credited and measured rotations. (QC2 fix, 2026-10-24: the
+    """The flight's trick as the judges name it, with its credited and measured rotations. The
     spin is the skis' heading change over the flight, f.spin, not the pelvis's integrated yaw rate f.rot[2]; the rest
-    is verbatim.)"""
+    is verbatim."""
     lat, along = f.e_axes
     spin_m = math.degrees(float(f.spin))
     flip_m = math.degrees(float(f.rot @ lat)) - base_deg  # + forward, - backward, the straight air's own removed

@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md ย
 instance_seed = 0
 expert_time_estimate_hours = 6.0
 oracle = "full"
-oracle_evidence = "Reference: a scripted G1 dive (stand with the arms overhead, a balanced crouch, a 0.37 s lean with soft ankles, a lowcmd push with the hips opened, a straight entry shape), the lean time found by bisection: a half somersault of 167 deg at the first touch, the body line 8.5 deg off vertical when the hips reach the surface, entry 2.29 m out. Referee test: 12 negatives, incl. over- and under-rotation, a topple, a scrape, arms down, legs apart, toes, a twist and a side entry (injected kicks), too far, a step, a hop (double jump). Measured (make_oracles.py): success after 6.32 s of the 20 s limit, live and in a fresh replay, ending in the same state."
+oracle_evidence = "Reference: a scripted G1 dive (stand with the arms overhead, a balanced crouch, a 0.37 s lean with soft ankles, a lowcmd push with the hips opened, a straight entry shape), the lean time found by bisection: a half somersault of 167 deg at the first touch, the body line 8.5 deg off vertical when the hips reach the surface, entry 2.29 m out. Referee test: 12 negatives, incl. over- and under-rotation, a topple, a scrape, arms down, legs apart, toes, a twist and a side entry (injected kicks), too far, a step, a hop (double jump). Measured: success after 6.32 s of the 20 s limit, live and in a fresh replay, ending in the same state."
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md ยง2.9)

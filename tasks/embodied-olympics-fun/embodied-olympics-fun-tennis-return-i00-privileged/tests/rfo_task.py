@@ -16,7 +16,7 @@ Where the numbers come from:
   the ball fed from its throat by a gate and a force-limited ram; no pin, no velocity written) whose exit is the
   server's strike point, on a stand behind the far baseline. Its aim (machine_elevation_deg, machine_azimuth_deg) is
   the launch asked of its calibration table, trimmed in this world so that the serve lands on that target
-  (tests/test_tennis_return.py checks the landing within 5 cm): the ball leaves at 30.0 m/s, 2.3 degrees down;
+  (the landing checked to 5 cm): the ball leaves at 30.0 m/s, 2.3 degrees down;
   with no spin asked of it the machine gives the serve about 58 rad/s of topspin (two wheels' spin on a tennis ball
   is irregular; the module's ACCURACY);
 * the racket: a free body (FREE_RACKET below): 0.685 m long (Appendix II: at most 73.7 cm), strung surface an ellipse
@@ -49,13 +49,12 @@ from rfo.task import TaskBase
 # GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99
 # 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins
 # over a default-contact geom; a ball (priority 1) keeps its own bounce. With MuJoCo's default soft contact (solref
-# 0.02 1, solimp 0.9 0.95) it sank 75 mm into the robot and 66 mm into the court (stress test 2026-10-21).
+# 0.02 1, solimp 0.9 0.95) it sank 75 mm into the robot and 66 mm into the court (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 
 # ===================================================================================== ball machine (shared block)
-# Source: /data/kangrui/tmp/eo1020/shared/ball_machine.py (Embodied Olympics - Fun, realism round 2026-10-20, group
-# machines-rackets). Copied byte for byte into each family module that feeds a ball; a task directory holds one module.
+# A shared block: the same code in each family module that feeds a ball; a task directory holds one module.
 #
 # A physical ball machine in place of a ball that is pinned and then given a velocity. Real ball machines (tennis:
 # Lobster, Spinshot; table tennis: two-wheel robots; baseball / softball: JUGS-type two-wheel pitching machines;
@@ -150,7 +149,7 @@ PRESETS = {
                      motor_torque_n_m=0.5, motor_kv=0.15, max_rim_speed_m_s=15.0),
 }
 
-# FIT[preset]: the calibration table measured with calibrate() (tests/bm_calib.py), elevation 20 deg; feed_s: from
+# FIT[preset]: the calibration table measured with calibrate(), elevation 20 deg; feed_s: from
 # feed() to the ball leaving the wheels (mean).
 FIT = {
     "tennis": dict(
@@ -214,7 +213,7 @@ FIT = {
         feed_s=0.214,
     ),
 }
-ACCURACY = {   # measured with tests/bm_acc.py (machines-rackets), azimuth 30 deg, 8 perturbations per launch
+ACCURACY = {   # measured, azimuth 30 deg, 8 perturbations per launch
     "tennis 30 m/s -2.2 deg spin 42": dict(speed_err_pct=-0.93, dir_err_deg=2.69, spin=87.2, sd_speed_pct=0.78, sd_dir_deg=0.77, sd_spin=16.9, feed_to_exit_s=0.085),
     "tennis 20 m/s 10 deg spin 0": dict(speed_err_pct=1.66, dir_err_deg=1.94, spin=3.8, sd_speed_pct=0.81, sd_dir_deg=0.35, sd_spin=5.5, feed_to_exit_s=0.09),
     "tennis 12 m/s 25 deg spin 0": dict(speed_err_pct=0.3, dir_err_deg=1.41, spin=-0.8, sd_speed_pct=0.6, sd_dir_deg=0.44, sd_spin=1.3, feed_to_exit_s=0.098),
@@ -836,7 +835,7 @@ def build_court(sc, nx: float, cy: float, balls=("ball",)) -> None:
 # contact (NET_SOLREF: the cord and mesh locally, so that a 30 m/s ball cannot pass through it); the give is the
 # panel's. Numbers: NET_CABLE_T_N = 2.0 kN (an estimate: ITF Rule 1 sets the net's heights, not its tension; a
 # tournament net cable is wound tight, of the order of kilonewtons), NET_MASS_KG = 6 kg (an estimate for a braided
-# polyethylene tournament net with its cable, about 12.8 m x 1.07 m). Measured with this model (tests/net_check.py): a
+# polyethylene tournament net with its cable, about 12.8 m x 1.07 m). Measured with this model: a
 # 30 m/s ball into the middle of a half moves its panel 2 cm and comes back at about 3 m/s (a tenth of its speed;
 # a real net, whose mesh gives locally by decimetres, keeps more of the ball); the panel's mass is the net's share, not
 # the few hundred grams of mesh a ball really meets.

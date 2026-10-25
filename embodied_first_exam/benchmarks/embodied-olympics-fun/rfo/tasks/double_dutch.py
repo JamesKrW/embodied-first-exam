@@ -22,12 +22,10 @@ ROPES = ("rope_a", "rope_b")      # a: the cranks at +x (the turners' right / le
 PREROLL_S = 6.0                   # the turners spin the ropes up from rest this long before t = 0
 RAMP_S = 0.8                      # ... the spin-up at the start of that
 
-# rope_turner v2: copied byte-identically from /data/kangrui/tmp/eo1020/shared/rope_turner.py
-# (groups new-dyn-body, stress)
+# rope_turner v2 (a shared block)
 # ---------------------------------------------------------------------------------------------- rope_turner (shared)
-# Shared block (owner: group new-dyn-body, 2026-10-20; v2: group stress, 2026-10-21;
-# /data/kangrui/tmp/eo1020/shared/rope_turner.py): physical rope turners and a physical rope. Copy it byte-identically
-# into a family module (a task directory holds one module) and name this source in a comment. Needs: math,
+# Shared block (v2): physical rope turners and a physical rope, the same code in each family module that uses
+# them (a task directory holds one module). Needs: math,
 # xml.etree.ElementTree as ET, numpy as np, mujoco.
 #
 # A turner's hand is a motor-driven crank, the way automatic rope-turning machines work: a crank arm on a horizontal
@@ -46,7 +44,7 @@ RAMP_S = 0.8                      # ... the spin-up at the start of that
 # cylinder's inertia. Between segments the joint is a universal joint (two hinges across the rope), not a ball joint:
 # a cord's torsional stiffness is large against a 15 cm segment's twist inertia, so its segments do not twist against
 # each other (v2; with ball joints a robot's hip rubbing the rope spun single segments about their own axis to 380
-# rad/s and the chain diverged, stress test 2026-10-21). The mid-rope `connect` holds as the rope does: solimp 0.99
+# rad/s and the chain diverged, stress test). The mid-rope `connect` holds as the rope does: solimp 0.99
 # 0.999 (v2; with MuJoCo's default impedance, whose force scales with the few grams of a segment, a robot leaning on
 # the rope pulled the tie 4 m apart). The air: RopeDrag applies quadratic drag on each segment as a force, the drag of
 # a cylinder in cross flow (C_d 1.2 on the flow across the segment, the air's density 1.225 kg/m^3), every physics
@@ -109,7 +107,7 @@ def rope_xml(name, n_seg, free_len, diameter, lin_density, contype=2, conaffinit
     swivel there (a ball joint f"{name}{i}"), the others universal joints (f"{name}{i}_z", f"{name}{i}_y"). The two
     halves meet mid-rope at a `connect` (the equality): a loop of chains closed where the masses on its two sides are
     equal (closed at a crank's pin, against the crank's far larger inertia, the 5 g end segment's tie diverged when a
-    robot leaned on the rope: stress test 2026-10-21). Sites: f"{name}{i}" at the rope's point i (its start, along the
+    robot leaned on the rope: stress test). Sites: f"{name}{i}" at the rope's point i (its start, along the
     rope) and f"{name}_end" at its far end (the second pin), so the nodes read in order whichever chain holds them."""
     L, r = free_len / n_seg, diameter / 2
     h = n_seg // 2

@@ -18,7 +18,7 @@ BALL = OFFICIAL["basketball"]            # size 7: 0.1195 m radius, 0.62 kg, reb
 # backboard's face 1.20 m, so the centre is 0.375 m in front of the face and the ring's inner edge 0.150 m (the
 # equipment appendix: 151 mm +- 2). Ring metal 16-20 mm: 18 mm. The ring's rebound: the equipment appendix asks for an
 # energy absorption of 35 to 50 % of the impact energy: 42.5 % here, a restitution of sqrt(1 - 0.425) = 0.76 (measured
-# on this ring with this ball: 0.76, with the contact's nominal value 0.81; tests/test_free_throw.py).
+# on this ring with this ball: 0.76, with the contact's nominal value 0.81).
 COURT = dict(length=28.0, width=15.0, line=0.05, ring_x=1.575, board_x=1.20, ft_line=5.80, key_half=2.45,
              ft_radius=1.80, three_radius=6.75, three_side=0.90, no_charge=1.25, net_length=0.42)
 RING_RESTITUTION, RING_NOMINAL = math.sqrt(1.0 - 0.425), 0.81

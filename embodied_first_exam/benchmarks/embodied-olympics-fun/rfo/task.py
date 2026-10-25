@@ -1,4 +1,4 @@
-"""What a RoboOlympics family is: a venue, a start, and a referee (rfo/referee.py's toolkit). One module per family,
+"""What an Embodied Olympics - Fun family is: a venue, a start, and a referee (rfo/referee.py's toolkit). One module per family,
 `rfo_task.py` in a task directory, defines `Task(TaskBase)`.
 
 The referee's verdict is `success` = every stage latched in order under the task's conditions, with no rule violated;
@@ -70,7 +70,7 @@ class TaskBase:
         """Task state for privileged mode's tooling (object poses, the referee's geometry)."""
         return {}
 
-    # ------------------------------------------------------------------ texts (scripts/roboolympics/gen_tasks.py)
+    # ------------------------------------------------------------------ texts (the task's instruction and README)
     sentence = ""                   # one sentence: what to do
     rules = ""                      # the rule book, with {param} placeholders: every number the referee uses
     venue = ""                      # where things are at t = 0 in the robot's starting frame (privileged: exact;

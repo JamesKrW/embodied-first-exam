@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-juggling-feet-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `juggling_feet` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_juggling_feet.py: positive by injection (the ball held for real between the palms while the right leg rises; the drop: the ball taken from the palms to 0.25 m over the toe, the pelvis held where it stands; ten real strikes of the right foot by its own motors, about 3 m/s in and out); negatives: a still foot, soft strikes, the knee-height rule, shin, thigh, chest, head, hands, a ball resting on the toe, a carry, a hand during a touch, the real drop to the ground, trapped between the feet, out of the grid, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the ball held for real between the palms while the right leg rises; the drop: the ball taken from the palms to 0.25 m over the toe, the pelvis held where it stands; ten real strikes of the right foot by its own motors, about 3 m/s in and out); negatives: a still foot, soft strikes, the knee-height rule, shin, thigh, chest, head, hands, a ball resting on the toe, a carry, a hand during a touch, the real drop to the ground, trapped between the feet, out of the grid, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -49,4 +49,4 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
 | Episode | 6000 control steps (60 s at 100 Hz); 5 resets, the last attempt graded |
-| Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |
+| Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

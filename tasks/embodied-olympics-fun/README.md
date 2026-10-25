@@ -96,7 +96,8 @@ official runs; trial rows stay private (a passing trajectory is a complete solut
 
 ## Compute
 
-CPU only; one world steps about 0.8 to 3.6 times real time on one core, depending on the host (the finger-hand families slowest) and holds about 0.4 GB.
+Privileged and standard: CPU only (MuJoCo on the CPU, OSMesa rendering); one world steps about 0.8 to 3.6 times real time on one core, depending on the host (the finger-hand families slowest) and holds about 0.4 GB.
+Standard-realtime: the sidecar needs an NVIDIA GPU, which renders the cameras with EGL (the physics stays on the CPU).
 Privileged: agent 8 CPUs / 16 GiB, verifier 4 CPUs / 8 GiB; standard: sidecar 4 CPUs / 8 GiB, agent 4 CPUs / 10 GiB
 (author estimates, `scripts/task_resources.toml`).
 
@@ -129,7 +130,7 @@ One row per family; "ref." marks the 19 with a reference solution. The robot is 
 | `pole-vault` | G1 | Pole vault |  | `catch` | H1-2 | Baseball: catch a fly ball |  |
 | `alpine-slalom` | G1 | Alpine skiing: slalom |  | `juggle-three` | G1 | Juggling: a three-ball cascade |  |
 | `giant-slalom` | G1 | Alpine skiing: giant slalom |  | `wall-ball` | H1-2 | Wall ball: throw, rebound, catch |  |
-| `freeski-360` | G1 | Freeski big air: a 360 |  | `boxing` | H1-2 | Boxing: one clean punch on the heavy bag | yes |
+| `freeski-360` | G1 | Freeski big air: 360 spin |  | `boxing` | H1-2 | Boxing: one clean punch on the heavy bag | yes |
 | `snowboard` | G1 | Snowboard: parallel slalom |  | `kick-target` | H1-2 | Kick the heavy bag at trunk height |  |
 | `freeski-straight-air` | G1 | Freeski big air: straight air |  | `taekwondo-kick` | G1 | Taekwondo: a scoring kick to the trunk protector |  |
 | `double-dutch` | G1 | Double Dutch (enter two turning ropes and jump them) |  | `dodgeball` | G1 | Dodgeball: dodge five throws | yes |

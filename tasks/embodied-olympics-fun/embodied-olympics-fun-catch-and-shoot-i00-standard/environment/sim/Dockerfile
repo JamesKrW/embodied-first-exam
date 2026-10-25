@@ -3,14 +3,14 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.3.3@sha256:d853c1827560de3db25a329df46387f64bf71050389729369df80951b4dc405e /rfo/tasks/catch_and_shoot.py /srv/rfo_task.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.3.4@sha256:03440edb1a5bf4ed470ddf7e9bd9d47d08135fd3f34e62a10d1df494b0b1d998 /rfo/tasks/catch_and_shoot.py /srv/rfo_task.py
 COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.3.1@sha256:77cfe73759fc3961ef393bfa6f119d635a29ea905175a12e4001298018ec2e56 /rcb1.py /srv/rcb1.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.3.3@sha256:d853c1827560de3db25a329df46387f64bf71050389729369df80951b4dc405e \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.3.4@sha256:03440edb1a5bf4ed470ddf7e9bd9d47d08135fd3f34e62a10d1df494b0b1d998 \
      /rcb_rfo.py \
      /standard/rcb_service.py \
      /standard/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.3.3@sha256:d853c1827560de3db25a329df46387f64bf71050389729369df80951b4dc405e \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.3.4@sha256:03440edb1a5bf4ed470ddf7e9bd9d47d08135fd3f34e62a10d1df494b0b1d998 \
      /rfo/__init__.py \
      /rfo/looks.py \
      /rfo/realhand.py \

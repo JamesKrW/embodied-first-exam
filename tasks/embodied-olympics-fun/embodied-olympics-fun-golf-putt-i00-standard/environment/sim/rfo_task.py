@@ -30,7 +30,7 @@ z = 0: four slabs around a square of 0.28 m, and inside that square 24 wedge box
 vertical face on a side of a regular 24-gon. The polygon is inscribed in the official 108 mm circle (its corners are
 on the circle, its flats 0.46 mm inside it), so the opening is nowhere wider than the official hole.
 
-Measured in the simulator (tests/test_golf_putt.py asserts the first two):
+Measured in the simulator:
 - stimp: with the ball's rolling resistance GREEN_ROLL_M a ball that starts rolling at 1.83 m/s (the speed a USGA
   Stimpmeter releases it at) stops after 3.05 m (10 ft): stimp 10; its deceleration is 0.55 m/s^2;
 - the hole takes a ball that rolls over its centre at up to about 1.5 m/s at the lip (a real hole: 1.63 m/s, the speed
@@ -38,13 +38,13 @@ Measured in the simulator (tests/test_golf_putt.py asserts the first two):
   1.1 m/s, 40 mm off only below 0.7 m/s; faster or wider balls lip out or jump it;
 - a ball struck by the putter leaves without spin, skids, and rolls on at about 5/7 of its launch speed (as on a real
   green): a putt that dies at the hole needs a launch of about 2.6 m/s, a head speed of about 1.7 m/s;
-- the G1 can address this ball with the unscaled putter in its hand (the reference solution does): the forearm
+- the G1 can address this ball with the unscaled putter in its hand: the forearm
   forwards and down, the shaft about 5 degrees from vertical (the toe 10 degrees down); with the sole flat the hand
   would have to be where the arm does not reach.
 
 The world uses elliptic friction cones (set in build): with MuJoCo's default pyramids a ball rolling at an angle to
 the world's axes drifted off its line (by a quarter of the angle over 3 m); the real hand adds impratio 100
-(realhand.IMPRATIO), which applies to the ball's roll too: the test measures the stimp again (10 ft from 1.83 m/s).
+(realhand.IMPRATIO), which applies to the ball's roll too: the stimp is measured with it (10 ft from 1.83 m/s).
 """
 import math
 
@@ -59,7 +59,7 @@ from rfo.task import TaskBase
 # SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
 # robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
 # With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 62 mm into the green and 26 mm into the
-# robot (stress test 2026-10-21).
+# robot (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 BALL = OFFICIAL["golf"]                 # R&A / USGA: at least 42.67 mm, at most 45.93 g

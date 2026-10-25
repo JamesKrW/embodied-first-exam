@@ -13,7 +13,7 @@ from rfo.task import TaskBase
 # SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
 # robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
 # With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 69 mm into the palm pad and 31 mm into
-# the pitch (stress test 2026-10-21).
+# the pitch (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 BALL = OFFICIAL["football"]
@@ -116,7 +116,7 @@ class Task(TaskBase):
              "penalty area, the goal area and the arc are painted on the grass.")
     difficulty = ("The wall hides the near half of the goal: the ball has to be driven past or over its end along a "
                   "narrow line, or round it into the far half, some 21 m, which needs well over 6 m/s off the foot "
-                  "(over the wall about 11 m/s). The robot has no kicking skill: RoboOlympics' balanced model-based "
+                  "(over the wall about 11 m/s). The robot has no kicking skill: Embodied Olympics' balanced model-based "
                   "kick sends the ball off at about 4 m/s, and a swing hard enough (10 to 16 m/s measured) throws the "
                   "33 kg body round on its standing foot.")
 
@@ -134,7 +134,7 @@ class Task(TaskBase):
         r = p["wall_distance_m"] + p["base_d_m"] / 2          # the mannequins' centres
         # side by side: neighbouring bases touch at their inner corners (spaced by the base's width on the arc through
         # their front faces, r - depth / 2); spaced on the centres' arc instead, the corners overlapped by 11 mm at the
-        # start and the wall shoved itself apart (stress test 2026-10-21)
+        # start and the wall shoved itself apart (stress test)
         step = max(p["mannequin_w_m"], p["base_w_m"]) / (r - p["base_d_m"] / 2)
         a0 = a_near - p["wall_cover_m"] / p["wall_distance_m"]  # the outer mannequin's right edge, past that line
         wall = []

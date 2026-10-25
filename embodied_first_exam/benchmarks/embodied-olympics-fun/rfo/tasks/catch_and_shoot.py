@@ -6,7 +6,7 @@ The pass is thrown by a machine standing where the passer would stand, on the le
 (the shared ball machine block below, preset "football" with the size-7 basketball's data, BB_MACHINE: 0.40 m
 pneumatic wheels on speed-controlled, torque-limited motors; the ball fed from its throat by a gate and a
 force-limited ram; nothing pinned, no velocity written). Its head is aimed and its wheel speed set (machine_* params,
-trimmed in this world: tests/test_catch_and_shoot.py) so that the ball leaves the wheels at about pass_time_s,
+trimmed in this world) so that the ball leaves the wheels at about pass_time_s,
 chest high, at about pass_speed_m_s on a flat arc, through the point pass_to_x_m ahead of the robot's pelvis."""
 import math
 
@@ -18,8 +18,7 @@ from rfo.scene import HITTABLE, OFFICIAL, VISUAL, bounce_solref
 from rfo.task import TaskBase
 
 # ===================================================================================== ball machine (shared block)
-# Source: /data/kangrui/tmp/eo1020/shared/ball_machine.py (Embodied Olympics - Fun, realism round 2026-10-20, group
-# machines-rackets). Copied byte for byte into each family module that feeds a ball; a task directory holds one module.
+# A shared block: the same code in each family module that feeds a ball; a task directory holds one module.
 #
 # A physical ball machine in place of a ball that is pinned and then given a velocity. Real ball machines (tennis:
 # Lobster, Spinshot; table tennis: two-wheel robots; baseball / softball: JUGS-type two-wheel pitching machines;
@@ -114,7 +113,7 @@ PRESETS = {
                      motor_torque_n_m=0.5, motor_kv=0.15, max_rim_speed_m_s=15.0),
 }
 
-# FIT[preset]: the calibration table measured with calibrate() (tests/bm_calib.py), elevation 20 deg; feed_s: from
+# FIT[preset]: the calibration table measured with calibrate(), elevation 20 deg; feed_s: from
 # feed() to the ball leaving the wheels (mean).
 FIT = {
     "tennis": dict(
@@ -178,7 +177,7 @@ FIT = {
         feed_s=0.214,
     ),
 }
-ACCURACY = {   # measured with tests/bm_acc.py (machines-rackets), azimuth 30 deg, 8 perturbations per launch
+ACCURACY = {   # measured, azimuth 30 deg, 8 perturbations per launch
     "tennis 30 m/s -2.2 deg spin 42": dict(speed_err_pct=-0.93, dir_err_deg=2.69, spin=87.2, sd_speed_pct=0.78, sd_dir_deg=0.77, sd_spin=16.9, feed_to_exit_s=0.085),
     "tennis 20 m/s 10 deg spin 0": dict(speed_err_pct=1.66, dir_err_deg=1.94, spin=3.8, sd_speed_pct=0.81, sd_dir_deg=0.35, sd_spin=5.5, feed_to_exit_s=0.09),
     "tennis 12 m/s 25 deg spin 0": dict(speed_err_pct=0.3, dir_err_deg=1.41, spin=-0.8, sd_speed_pct=0.6, sd_dir_deg=0.44, sd_spin=1.3, feed_to_exit_s=0.098),
@@ -758,7 +757,7 @@ BB_MACHINE = dict(ball_radius_m=BALL["radius"], ball_mass_kg=BALL["mass"], conta
 # backboard's face 1.20 m, so the centre is 0.375 m in front of the face and the ring's inner edge 0.150 m (the
 # equipment appendix: 151 mm +- 2). Ring metal 16-20 mm: 18 mm. The ring's rebound: the equipment appendix asks for an
 # energy absorption of 35 to 50 % of the impact energy: 42.5 % here, a restitution of sqrt(1 - 0.425) = 0.76 (measured
-# on this ring with this ball: 0.76, with the contact's nominal value 0.81; tests/test_free_throw.py).
+# on this ring with this ball: 0.76, with the contact's nominal value 0.81).
 COURT = dict(length=28.0, width=15.0, line=0.05, ring_x=1.575, board_x=1.20, ft_line=5.80, key_half=2.45,
              ft_radius=1.80, three_radius=6.75, three_side=0.90, no_charge=1.25, net_length=0.42)
 RING_RESTITUTION, RING_NOMINAL = math.sqrt(1.0 - 0.425), 0.81

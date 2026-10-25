@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-volley-shot-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `volley_shot` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_volley_shot.py: positive by injection (the robot teleported 0.3 m forward and the ball's velocity set at the foot contact, in 11.9, out 19.4 m/s, then into the goal); the cross comes from a football machine on the left wing (exit 14.2 m/s with backspin, apex 4.5 m) and comes down knee-high 0.6 m in front at 11.7 m/s; the keeper is the physical board of header; negatives: a still leg (at most 0.89 of the speed back), a body contact, carried, wide, at the keeper (saved), a second touch, too close to the machine, touching the machine, a goal without a volley, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the robot teleported 0.3 m forward and the ball's velocity set at the foot contact, in 11.9, out 19.4 m/s, then into the goal); the cross comes from a football machine on the left wing (exit 14.2 m/s with backspin, apex 4.5 m) and comes down knee-high 0.6 m in front at 11.7 m/s; the keeper is the physical board of header; negatives: a still leg (at most 0.89 of the speed back), a body contact, carried, wide, at the keeper (saved), a second touch, too close to the machine, touching the machine, a goal without a volley, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -47,5 +47,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Instance | `environment/instance.json` = `tests/instance.json`: the family's parameters, t = 0 state hash `7db9405a827f2e0048258b7bc010471c94a25f20fb6a6ed13c493b4d72eccf99` |
 | Episode | 1000 control steps (10 s at 100 Hz) |
 | Action | sim rows of 141 floats per control step (`rfo/world.py`); six action types are views of it |
-| Tooling | `/opt/tools/rcb_rfo.py`, `/opt/tools/rfo/` (the world, the action layer, the referee's toolkit; from the files-only image images/embodied-olympics-fun-files/, built from embodied_first_exam/embodied-olympics-fun/) and `environment/rfo_task.py` (this family's rules), the same files in the verifier's `/tests/` |
+| Tooling | `/opt/tools/rcb_rfo.py`, `/opt/tools/rfo/` (the world, the action layer, the referee's toolkit; from the files-only image images/embodied-olympics-fun-files/, built from embodied_first_exam/benchmarks/embodied-olympics-fun/) and `environment/rfo_task.py` (this family's rules), the same files in the verifier's `/tests/` |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

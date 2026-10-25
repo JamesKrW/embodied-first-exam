@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-volleyball-spike-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `volleyball_spike` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_volleyball_spike.py: positive by injection (a 3.2 m/s ghost jump, the ball's velocity set on the fist at 2.70 m, the landing softened); the set comes from a volleyball machine on a stand at the setter's place (exit 7.7 m/s, 55 deg, at 2.3 m), peaks at 4.49 m and comes down 0.5 m from the net at 2.8 m height, 1.21 s after it leaves; negatives: a leg tuck, a lift without a jump, a still fist in a jump (0.87 back), from the floor, below the net, before the apex, upward, into the net, long, the antenna, outside the antenna, a second touch, held, the net, the centre line, a fall, touching the machine. No jump or landing controller exists for the H1-2; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (a 3.2 m/s ghost jump, the ball's velocity set on the fist at 2.70 m, the landing softened); the set comes from a volleyball machine on a stand at the setter's place (exit 7.7 m/s, 55 deg, at 2.3 m), peaks at 4.49 m and comes down 0.5 m from the net at 2.8 m height, 1.21 s after it leaves; negatives: a leg tuck, a lift without a jump, a still fist in a jump (0.87 back), from the floor, below the net, before the apex, upward, into the net, long, the antenna, outside the antenna, a second touch, held, the net, the centre line, a fall, touching the machine. No jump or landing controller exists for the H1-2; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -49,4 +49,4 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
 | Episode | 1200 control steps (12 s at 100 Hz); 5 resets, the last attempt graded |
-| Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |
+| Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

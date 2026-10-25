@@ -28,7 +28,7 @@ from rfo.task import TaskBase
 # SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
 # robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
 # With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 197 mm into the floor at 65 m/s (and
-# then spun up and diverged) and 165 mm into the torso (stress test 2026-10-21).
+# then spun up and diverged) and 165 mm into the torso (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 # The implement: World Athletics' women's javelin (TR 38.3-38.6, the 600 g implement; this family's deviation: the

@@ -5,7 +5,7 @@ hands on the bar throughout. Nothing is welded: both hands are the G1's own Dex3
 jump; the bar stays in a hand only by the contact of its closed fingers (their drives' torque limits) and friction,
 and it can be torn out of the hand.
 
-THE GRIP FORCE (declared deviation; measured in the simulator image, tests/hands): the Dex3-1's own drives (0.49 N m
+THE GRIP FORCE (declared deviation; measured in the simulator image): the Dex3-1's own drives (0.49 N m
 closing, 1.37 N m back-driven per finger joint; the thumb's rotation 0.86 / 3.1 N m) hold the hanging G1 but not the
 bottom of a giant swing, which pulls about four body weights or more (the extended G1, centre of mass about 0.8 m
 below the bar; gymnasts measure 3.5 to 3.7, Kopp & Reid 1980, strain gauges on the bar). This family raises the
@@ -186,7 +186,7 @@ class BarGrip:
 # ------------------------------------------------------------------------------- (end of the shared bar block)
 
 GRIP_SCALE = 5.0              # the Dex3-1 drives x this (declared): the measured need (4.5 lets go, 5 holds; see
-#                               deviations); an owner-approved exception to the families' 2 x cap
+#                               deviations); a declared exception to the families' 2 x cap
 
 
 class Task(BarGrip, TaskBase):

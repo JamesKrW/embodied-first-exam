@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 6.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_free_kick_wall.py: positive by a real kick (a standing power kick through lowcmd: 14.8 m/s off the foot, in at the near post); a fall after the kick does not fail; but only 8 of 13 gain and ball-offset perturbations score (the ball rebounds off the wall into the fallen robot, or goes wide), below the 9 of 10 bar, so it is not shipped as a reference solution; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested: positive by a real kick (a standing power kick through lowcmd: 14.8 m/s off the foot, in at the near post); a fall after the kick does not fail; but only 8 of 13 gain and ball-offset perturbations score (the ball rebounds off the wall into the fallen robot, or goes wide), below the 9 of 10 bar, so it is not shipped as a reference solution; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

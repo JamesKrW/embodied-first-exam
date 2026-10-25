@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-juggling-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `juggling` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_juggling.py: positive by injection (the drop: the ball, held for real between the palms, taken to 0.35 m above the head; ten real head contacts, the ball sent up at 2.6 m/s each time); negatives: nop (the ball stays between the palms 30 s), arms opened (it drops to the ground), passive bouncing, rises too small, the real drop to the ground, a hand after the drop, the trunk, the head before the drop (only hands may hold), a carry, a fall. Nothing built in stands on one leg; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the drop: the ball, held for real between the palms, taken to 0.35 m above the head; ten real head contacts, the ball sent up at 2.6 m/s each time); negatives: nop (the ball stays between the palms 30 s), arms opened (it drops to the ground), passive bouncing, rises too small, the real drop to the ground, a hand after the drop, the trunk, the head before the drop (only hands may hold), a carry, a fall. Nothing built in stands on one leg; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -47,5 +47,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Instance | `environment/instance.json` = `tests/instance.json`: the family's parameters, t = 0 state hash `de155c696a0c16bd9e87e9aa1f20ab6d58cecdcd5f8a229cbe6a9698ee3cef75` |
 | Episode | 3000 control steps (30 s at 100 Hz) |
 | Action | sim rows of 151 floats per control step (`rfo/world.py`); six action types are views of it |
-| Tooling | `/opt/tools/rcb_rfo.py`, `/opt/tools/rfo/` (the world, the action layer, the referee's toolkit; from the files-only image images/embodied-olympics-fun-files/, built from embodied_first_exam/embodied-olympics-fun/) and `environment/rfo_task.py` (this family's rules), the same files in the verifier's `/tests/` |
+| Tooling | `/opt/tools/rcb_rfo.py`, `/opt/tools/rfo/` (the world, the action layer, the referee's toolkit; from the files-only image images/embodied-olympics-fun-files/, built from embodied_first_exam/benchmarks/embodied-olympics-fun/) and `environment/rfo_task.py` (this family's rules), the same files in the verifier's `/tests/` |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

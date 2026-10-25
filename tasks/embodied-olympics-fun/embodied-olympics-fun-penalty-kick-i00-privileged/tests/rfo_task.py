@@ -13,7 +13,7 @@ BALL = OFFICIAL["football"]
 GRASS = (0.16, 0.50, 0.20, 1)
 
 
-# ---- shared block "keeper" (owner: group keepers-ropes; source /data/kangrui/tmp/eo1020/shared/keeper.py, v1) ----
+# ---- shared block "keeper" (v1) ----
 # Copy this block byte-identically into a family module (it needs `math`, `xml.etree.ElementTree as ET`, `numpy as np`
 # imported by the module). Usage:
 #   build(sc):          self.keeper = Keeper("keeper", x=goal_x, y=0.0, rail_half=goal_half - width / 2); self.keeper.build(sc)

@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-long-jump-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `long_jump` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_long_jump.py: positive by injection (at the board, 3.6 m/s forward and 2.5 m/s up: a mark of 1.50 m in the sand); negatives: running through, walking over the line, a foot over the line, short, beside the pit, beside the board, feet pulled up (no rise), into the sand without a flight, back out behind the mark. The sand follows a published resistive-force law of dry silica sand (2.02 N/cm^3, phi 34 deg): the G1 sinks 7.4 mm standing and 75 mm landing at 2.5 m/s, with a 0.10 m/s rebound. Nothing known jumps out of a run; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (at the board, 3.6 m/s forward and 2.5 m/s up: a mark of 1.50 m in the sand); negatives: running through, walking over the line, a foot over the line, short, beside the pit, beside the board, feet pulled up (no rise), into the sand without a flight, back out behind the mark. The sand follows a published resistive-force law of dry silica sand (2.02 N/cm^3, phi 34 deg): the G1 sinks 7.4 mm standing and 75 mm landing at 2.5 m/s, with a 0.10 m/s rebound. Nothing known jumps out of a run; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -47,5 +47,5 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Instance | `environment/instance.json` = `tests/instance.json`: the family's parameters, t = 0 state hash `794671b9f864c3f102835ebb88dfaa67f4e2a80c4c747fa9358ac0fa85a2ea9a` |
 | Episode | 6000 control steps (60 s at 100 Hz) |
 | Action | sim rows of 151 floats per control step (`rfo/world.py`); six action types are views of it |
-| Tooling | `/opt/tools/rcb_rfo.py`, `/opt/tools/rfo/` (the world, the action layer, the referee's toolkit; from the files-only image images/embodied-olympics-fun-files/, built from embodied_first_exam/embodied-olympics-fun/) and `environment/rfo_task.py` (this family's rules), the same files in the verifier's `/tests/` |
+| Tooling | `/opt/tools/rcb_rfo.py`, `/opt/tools/rfo/` (the world, the action layer, the referee's toolkit; from the files-only image images/embodied-olympics-fun-files/, built from embodied_first_exam/benchmarks/embodied-olympics-fun/) and `environment/rfo_task.py` (this family's rules), the same files in the verifier's `/tests/` |
 | Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

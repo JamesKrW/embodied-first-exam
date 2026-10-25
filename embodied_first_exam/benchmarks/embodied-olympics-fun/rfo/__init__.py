@@ -1,10 +1,10 @@
-"""RoboOlympics: single-humanoid sports tasks on the RoboOlympics simulator (docs/benchmarks/roboolympics.md)."""
+"""Embodied Olympics - Fun: single-humanoid sports tasks on the Embodied Olympics simulator (tasks/embodied-olympics-fun/README.md)."""
 import importlib
 
 
 def load_task(name: str | None = None):
     """The family's Task: `rfo_task.py` next to the package (a task directory holds exactly one family), or, in the
-    repository's scripts/roboolympics/shared/, rfo.tasks.<name>."""
+    repository's embodied_first_exam/benchmarks/embodied-olympics-fun/, rfo.tasks.<name>."""
     try:
         mod = importlib.import_module("rfo_task")
     except ModuleNotFoundError:

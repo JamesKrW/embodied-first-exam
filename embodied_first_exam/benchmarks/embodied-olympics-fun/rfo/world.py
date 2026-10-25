@@ -1,4 +1,4 @@
-"""The RoboOlympics world: one RoboOlympics Unitree G1 (the robot library's g1-4: Menagerie's 29-joint G1, its real
+"""The Embodied Olympics - Fun world: one Unitree G1 of the RoboOlympics robot library (its g1-4: Menagerie's 29-joint G1, its real
 joint, speed and torque limits, its motor torque-speed curves, its self-collision) in a sports venue, the action
 layer every task shares, the hands' grip, and the stepping that the referee (referee.py) watches.
 
@@ -122,25 +122,25 @@ MAX_SPEED = 150.0                              # m/s: the robot or a prop faster
 # timesteps stable), solimp 0.99 0.999 0.0005 (MuJoCo's default soft contact let a heavy bar sink 12-44 mm), and a
 # solmix that makes them win against a prop of default priority; a prop with a priority of its own (a ball: its bounce,
 # scene.py) keeps its own parameters.
-# Source: roboolympics-all-80's weightlifting fix (CHIGUI0/roboolympics PR #179 at f54e26a8, sports/weightlifting/
-# venue.py `_shells` and BAR_CONTACT, MIT, same owner; library issue CHIGUI0/roboolympics #268): <= 3.2 mm at 190 kg.
+# Source: the RoboOlympics weightlifting fix (CHIGUI0/roboolympics PR #179 at f54e26a8, sports/weightlifting/
+# venue.py `_shells` and BAR_CONTACT, MIT; library issue CHIGUI0/roboolympics #268): <= 3.2 mm at 190 kg.
 # The robot's own collision geoms (the body hulls, the palm pads, the feet's strike boxes, a real hand's housing and
 # fingers) get the same stiff contact (ROBOT_CONTACT) against props, mechanisms and fixtures (not the ground:
 # GROUND_SOLMIX): with MuJoCo's default (solref 0.02 1, solimp 0.9 0.95 0.001) a rigid prop or a machine's part sank
-# 20-75 mm into them (stress test, 2026-10-21). Not the soles (contype 1: the G1's four sole
+# 20-75 mm into them (a stress test). Not the soles (contype 1: the G1's four sole
 # spheres, the H1-2's sole hulls; SOLE_CONTACT, below) nor a geom with a priority of its own (the real hand's pads).
 SHELL_BIT = 128                                 # a bit no family uses (they use 1-64)
 SHELL_CONTACT = dict(solref="0.004 1", solimp="0.99 0.999 0.0005 0.5 2", solmix="1e+06")
 ROBOT_CONTACT = SHELL_CONTACT
 # The soles (SOLE_CONTACT) keep the robot model's own contact (MuJoCo's default; the G1's sole spheres priority 1):
 # they sink 6 mm walking, 15 mm under FALCON, 54 mm stamping (random leg torques), the H1-2's 14 / 37 mm (114 mm in
-# the stress test). Stiffer soles were measured (stress test tests/soles.py, 2026-10-21; solref 0.01 / 0.005 / 0.004,
+# the stress test). Stiffer soles were measured (a stress test; solref 0.01 / 0.005 / 0.004,
 # solimp 0.95-0.99 / 0.99-0.999, priority 1): every policy still does its job at every setting (G1: walk, FALCON and
 # AGILE 10 m, turn 360 deg, run 50 m; H1-2: walk 10 m, turn 360 deg) and at 0.004 / 0.99-0.999 the soles sink 0.4 mm
-# standing, 1.3 walking, 4.0 stamping, but 9 of the 27 reference solutions (open-loop throws, kicks, serves, sets
-# tuned on these soles) then fail; kept until they are re-tuned (an owner's decision).
+# standing, 1.3 walking, 4.0 stamping, but open-loop controllers tuned on these soles (throws, kicks, serves,
+# sets) then fail; the soles keep the model's own contact.
 SOLE_CONTACT: dict | None = None
-# The ground keeps its own contact with everything (owner, 2026-10-21): the ground and the fixed surfaces one stands
+# The ground keeps its own contact with everything: the ground and the fixed surfaces one stands
 # on (sc.ground, planes, height fields, fixed STANDABLE geoms: a beam, a platform, a vaulting table) of no priority
 # get GROUND_SOLMIX, so that in a contact with any geom of no priority (the robot's stiffened geoms, a family's rigid
 # prop) their own parameters (MuJoCo's default, or a mat's) win, as before the stiffening; a geom with a priority
@@ -245,7 +245,7 @@ def _shells(root: ET.Element, ground: set, skip: set = frozenset()) -> None:
 # tool or a real hand, added here after the library: none of them touched the robot itself. A limb went through the
 # body: a shot-put stance with the thumb 2.3 cm inside the shoulder, a search's put 4.7 cm into it and the other hand
 # 6.8 cm into the hip, a volleyball set with the hands 5.7-6.4 cm into each other, the H1-2's arms through each other,
-# a flailing G1's knee 9 cm into its pelvis (2026-10-21).
+# a flailing G1's knee 9 cm into its pelvis.
 # Now every collision geom and every shell of the robot takes part (the shells are the visual meshes' convex hulls:
 # the visible body), by the library's parts and rules (body.toml [self_collision]: arm x body (torso, pelvis, head,
 # legs), left arm x right arm (hands, pads, tools and real hands included: hand x hand), left leg x right leg, shin x
@@ -264,7 +264,7 @@ SELF_PAIR = dict(condim="3", solref=SHELL_CONTACT["solref"], solimp=SHELL_CONTAC
 # (its fingers close into the palm, whose hull is the wrist link's; a finger hand's own pairs, realhand.py); the
 # hand against the rest of its own arm (a thumb into its shoulder) stays enabled.
 HAND_CARRIER = re.compile(r"(left|right)_wrist_(roll|pitch|yaw)_link")
-# SELF_EXCLUDE: measured (tests/sccheck2.py, 2026-10-21): every enabled body pair at the rest pose, and over 100 random
+# SELF_EXCLUDE: measured: every enabled body pair at the rest pose, and over 100 random
 # poses of only the joints between the two bodies (the rest at rest). Excluded are the pairs two joints apart whose
 # hulls overlap in that sample (a housing round the joint between them: the convex hull fills the recess the other
 # link turns in); every pair three or more joints apart stays (an upper arm into the chest is a real collision).
@@ -402,7 +402,7 @@ def _yaw(quat) -> float:
 
 
 # The motors' rotor inertia, friction and (the H1-2's hips, torso and knees) torque-speed curves from Unitree's own
-# actuator data (owner 2026-10-21: adopt Unitree's data; no battery cap: Unitree publishes no discharge limit).
+# actuator data (no battery cap: Unitree publishes no discharge limit).
 # Source for every number in UNITREE_ACTUATORS: unitree_rl_lab, source/unitree_rl_lab/unitree_rl_lab/assets/robots/
 # unitree_actuators.py, commit 4960b84732b0c2ec593dccbfe963fda1bcd7b1e3 (S6 of the G1's body.toml, S8 of the H1-2's):
 # per actuator class `armature` (rotor inertia x gear ratio^2, kg m^2), `Fs` (static friction, N m: MuJoCo
@@ -454,7 +454,7 @@ def unitree_actuators(m, robot) -> None:
     a._env = a.act.env = (X1, X2, Y1, Y2)
 
 
-# The H1-2 body with Unitree H2 / H2-X-class leg actuators, from the H2's official URDF (owner 2026-10-21: the H2-X is
+# The H1-2 body with Unitree H2 / H2-X-class leg actuators, from the H2's official URDF (the H2-X is
 # shown with "high-torque joints"; Unitree publishes no H2 / H2-X motor data, so its legs are inferred from what is
 # published). Torque limits (the hard cap, as the URDF effort is for every Unitree robot): Unitree's H2.urdf
 # (unitreerobotics/unitree_ros robots/h2_description/H2.urdf, last commit 2026-07-08; unitree_mujoco h2_mujoco.xml has
@@ -517,7 +517,7 @@ def h2x_legs(m, robot, keys, X1, X2, Y1, Y2) -> None:
                     rig.tau_lim[n] = eff
 
 
-# The H1-2's arms with Unitree H2-class arm actuators (owner 2026-10-21: the whole H1-2 H2-class). Torque limits from
+# The H1-2's arms with Unitree H2-class arm actuators (the whole H1-2 H2-class). Torque limits from
 # Unitree's H2.urdf (unitree_ros robots/h2_description/H2.urdf, 2026-07-08; unitree_mujoco h2_mujoco.xml the same):
 # shoulder pitch 130 N m; shoulder roll, shoulder yaw, elbow, wrist roll 60 N m; wrist pitch and yaw 10 N m; waist yaw
 # 120, roll / pitch 180 N m. Mapped onto the H1-2's joints (the same chain: shoulder pitch, roll, yaw, elbow, then the

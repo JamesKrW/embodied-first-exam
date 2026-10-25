@@ -13,9 +13,8 @@ BALL = OFFICIAL["football"]
 GRASS = (0.16, 0.50, 0.20, 1)
 
 
-# The goalkeeper dummy: shared block "keeper", copied byte for byte from /data/kangrui/tmp/eo1020/shared/keeper.py
-# (group keepers-ropes, v1, sha256 fd98b604...).
-# ---- shared block "keeper" (owner: group keepers-ropes; source /data/kangrui/tmp/eo1020/shared/keeper.py, v1) ----
+# The goalkeeper dummy: shared block "keeper" (v1).
+# ---- shared block "keeper" (v1) ----
 # Copy this block byte-identically into a family module (it needs `math`, `xml.etree.ElementTree as ET`, `numpy as np`
 # imported by the module). Usage:
 #   build(sc):          self.keeper = Keeper("keeper", x=goal_x, y=0.0, rail_half=goal_half - width / 2); self.keeper.build(sc)
@@ -129,10 +128,9 @@ class Keeper:
 # ---- end of shared block "keeper" ----
 
 
-# >>> shared block "ball machine": a byte-for-byte copy of /data/kangrui/tmp/eo1020/shared/ball_machine.py (group machines-rackets), sha256 d7af3e6123174399
+# >>> shared block "ball machine" (VERSION 4, the same in every family module that feeds a ball)
 # ===================================================================================== ball machine (shared block)
-# Source: /data/kangrui/tmp/eo1020/shared/ball_machine.py (Embodied Olympics - Fun, realism round 2026-10-20, group
-# machines-rackets). Copied byte for byte into each family module that feeds a ball; a task directory holds one module.
+# A shared block: the same code in each family module that feeds a ball; a task directory holds one module.
 #
 # A physical ball machine in place of a ball that is pinned and then given a velocity. Real ball machines (tennis:
 # Lobster, Spinshot; table tennis: two-wheel robots; baseball / softball: JUGS-type two-wheel pitching machines;
@@ -227,7 +225,7 @@ PRESETS = {
                      motor_torque_n_m=0.5, motor_kv=0.15, max_rim_speed_m_s=15.0),
 }
 
-# FIT[preset]: the calibration table measured with calibrate() (tests/bm_calib.py), elevation 20 deg; feed_s: from
+# FIT[preset]: the calibration table measured with calibrate(), elevation 20 deg; feed_s: from
 # feed() to the ball leaving the wheels (mean).
 FIT = {
     "tennis": dict(
@@ -291,7 +289,7 @@ FIT = {
         feed_s=0.214,
     ),
 }
-ACCURACY = {   # measured with tests/bm_acc.py (machines-rackets), azimuth 30 deg, 8 perturbations per launch
+ACCURACY = {   # measured, azimuth 30 deg, 8 perturbations per launch
     "tennis 30 m/s -2.2 deg spin 42": dict(speed_err_pct=-0.93, dir_err_deg=2.69, spin=87.2, sd_speed_pct=0.78, sd_dir_deg=0.77, sd_spin=16.9, feed_to_exit_s=0.085),
     "tennis 20 m/s 10 deg spin 0": dict(speed_err_pct=1.66, dir_err_deg=1.94, spin=3.8, sd_speed_pct=0.81, sd_dir_deg=0.35, sd_spin=5.5, feed_to_exit_s=0.09),
     "tennis 12 m/s 25 deg spin 0": dict(speed_err_pct=0.3, dir_err_deg=1.41, spin=-0.8, sd_speed_pct=0.6, sd_dir_deg=0.44, sd_spin=1.3, feed_to_exit_s=0.098),
@@ -910,8 +908,8 @@ def stiff_machine(sc, name) -> None:
     """A ball machine's (or a dropper's) slides (the ram, the gate, a carriage) end on steel stops: their range limits
     get the stiff contact of the core's shells (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005)
     instead of MuJoCo's default limit, with which a robot leaning on the ram pushed it 53-128 mm past its stroke
-    (stress test 2026-10-21; here and in goalkeeper-save / volley-shot, where it showed: in the other machine
-    families the stiff stop changed the launch and their reference solutions failed). The machine's geoms keep their
+    (stress test; here and in goalkeeper-save / volley-shot, where it showed: in the other machine
+    families the stiff stop would change the calibrated launch). The machine's geoms keep their
     contact: its launch calibration is built on it."""
     from rfo.world import SHELL_CONTACT
     for j in sc.root.iter("joint"):

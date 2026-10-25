@@ -156,7 +156,7 @@ class Task(TaskBase):
         # (contype 8) the same with conaffinity 4 | 8 only, so that, as on the robot, they pass through the ground and
         # the opponent stands on its sole spheres, which accept the robot's hulls and feet too.
         # Its contact is the robot's (rfo/world.py): the hulls stiff (ROBOT_CONTACT; with MuJoCo's default they sank
-        # 84 mm into the clay, stress test 2026-10-21), the soles as the robot's (SOLE_CONTACT).
+        # 84 mm into the clay, stress test), the soles as the robot's (SOLE_CONTACT).
         from rfo import world as W
         for dc in sc.root.iter("default"):              # the hulls and the soles are set by the model's classes
             g = dc.find("geom")

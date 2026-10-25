@@ -466,10 +466,10 @@ DEX3_THUMB = ("thumb_0", "thumb_1", "thumb_2")
 
 # --- the Inspire RH56DFX (Unitree's h1_2 joints; L_ / R_ bodies of the H1-2 model)
 # drive: (name, driven joint, coupled joints [(joint, ratio)], open, closed, speed rad/s, fingertip force N, group)
-# The fingertip forces are H2-class (owner 2026-10-21: the H1-2 made H2-class): 2 x the RH56DFX's 10 N per finger and
+# The fingertip forces are H2-class (the H1-2 made H2-class): 2 x the RH56DFX's 10 N per finger and
 # 15 N the thumb, i.e. 20 N and 30 N. Basis: Unitree's H2 Plus is offered with Sharpa Wave hands of 20 N fingertip
-# force; Inspire's own RH56E2 gives 28 / 30 N; the hands of this size in the humanoid-specs survey are 2-3 x the
-# RH56DFX (/data/kangrui/tmp/eo1020/humanoid-specs/table.md). The kinematics, speeds, the self-locking passive load
+# force; Inspire's own RH56E2 gives 28 / 30 N; the hands of this size in a survey of humanoid hands' specifications are
+# 2-3 x the RH56DFX. The kinematics, speeds, the self-locking passive load
 # (8 kg per finger) and the mass stay the RH56DFX's. A family's grip_scale multiplies these defaults.
 INSPIRE_TIP_N = {"thumb": 30.0, "fingers": 20.0}
 INSPIRE_TIP_DEVICE_N = {"thumb": 15.0, "fingers": 10.0}  # the RH56DFX itself (the maker's listing)
@@ -494,14 +494,14 @@ INSPIRE_LEVER = {"thumb_yaw": 0.053, "thumb_pitch": 0.224, "index": 0.117, "midd
 INSPIRE_KP, INSPIRE_KD, INSPIRE_ARMATURE, INSPIRE_DAMPING = 200.0, 0.5, 0.001, 0.01
 INSPIRE_COUPLE_SOLREF, INSPIRE_COUPLE_SOLIMP = "0.002 1", "0.95 0.99 0.001"
 INSPIRE_GRASP = (0.160, -0.046, -0.006)         # (left, wrist frame) a 34 mm handle's axis on the palm, under the
-#                                                 fingers (the best hold of a search, tests/hands inspire_grasp.py)
+#                                                 fingers (the best hold of a search)
 INSPIRE_MASS = 0.54                             # the maker's; the model keeps Unitree's link masses (see facts)
 
 
 # Collision shapes: each link collides as its mesh's convex hull (Menagerie's choice for the Dex3-1; the Inspire's palm
 # is the robot model's own hull). Primitives fitted to the meshes (boxes, capsules) were measured and saved nothing:
 # a finger-hand world's extra cost is its degrees of freedom (the H1-2 with two Inspire hands: 67 instead of 47), not
-# its contacts (tests/hands variants.py, 2026-10-21).
+# its contacts.
 
 
 def _wrist_frame_site(parent: ET.Element, name: str, pos, side: str, mount: ET.Element | None) -> None:
@@ -1057,8 +1057,8 @@ def dex3_meshes() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     return out
 
 
-# The Dex3-1's meshes (dex3_meshes): Menagerie unitree_g1/assets/left_hand_*_link.STL (BSD-3-Clause), decimated by
-# tests/hands tooling (fast_simplification, then vertex clustering), int16 vertices at 0.01 mm then uint16 faces per
+# The Dex3-1's meshes (dex3_meshes): Menagerie unitree_g1/assets/left_hand_*_link.STL (BSD-3-Clause), decimated
+# (fast_simplification, then vertex clustering), int16 vertices at 0.01 mm then uint16 faces per
 # part, zlib, base64.
 DEX3_MESH_INDEX = [('palm', 552, 1113), ('thumb_0', 90, 176), ('thumb_1', 130, 256), ('thumb_2', 119, 243), ('middle_0', 130, 256), ('middle_1', 119, 243), ('index_0', 130, 256), ('index_1', 119, 243)]
 DEX3_MESH = """

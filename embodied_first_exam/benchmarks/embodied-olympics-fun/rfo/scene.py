@@ -1,5 +1,5 @@
-"""Scene building for the RoboOlympics worlds: the venue's XML (floor, lines, balls, goals, hoops, nets, bars,
-boxes) around one RoboOlympics Unitree G1. Plain MJCF through ElementTree; no simulator state here.
+"""Scene building for the Embodied Olympics - Fun worlds: the venue's XML (floor, lines, balls, goals, hoops, nets, bars,
+boxes) around one Unitree G1 of the RoboOlympics robot library. Plain MJCF through ElementTree; no simulator state here.
 
 Collision classes (MuJoCo contype / conaffinity bits), the RoboOlympics G1's own scheme extended to props:
   1   the floor, the feet's four sole spheres, every prop

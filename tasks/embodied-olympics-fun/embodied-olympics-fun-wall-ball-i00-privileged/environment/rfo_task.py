@@ -21,11 +21,11 @@ HOLD_REACH_M = 0.12                            # a held ball's centre within thi
 # ball itself. R. Cross, "Dynamic properties of tennis balls", Sports Engineering 2 (1999) 23-33, Figs 7-8 (a ball
 # fired at a rigid force plate, 2-17 m/s): the impact lasts 4.0-4.5 ms at 10-17 m/s and the ball's centre of mass
 # comes at most 16.5 mm closer to the surface at 17 m/s (about 10 mm at 10 m/s). The ball's own contact (rfo/scene.py:
-# a spring of 250 rad/s, a 12.6 ms impact) let its centre sink 57-73 mm into the wall at 17-21 m/s (QC2), more than
+# a spring of 250 rad/s, a 12.6 ms impact) let its centre sink 57-73 mm into the wall at 17-21 m/s, more than
 # its diameter. The wall's contact wins over the ball's (priority 2) and is that impact: a spring-damper of natural
 # frequency WALL_W (pi / WALL_W = 4.5 ms, the measured duration) whose damping ratio WALL_ZETA keeps, on average, the
 # ITF rebound (BALL["bounce"]) that the rules quote, measured in this simulator (1 ms physics, the ball shot at the
-# wall from 10 arrival phases at 10, 17 and 21 m/s, 2026-10-24): it keeps 0.747-0.756 on average (0.70-0.80 by
+# wall from 10 arrival phases at 10, 17 and 21 m/s): it keeps 0.747-0.756 on average (0.70-0.80 by
 # phase), its centre comes 12 / 21 / 25 mm closer (at most 14 / 23 / 28 mm), the impact lasts 4-5 ms. The ball's
 # friction and rolling resistance are kept (condim 6). The robot never reaches the wall (it stays behind the line).
 WALL_W, WALL_ZETA = 700.0, 0.096

@@ -30,11 +30,10 @@ HANDS = {"left_hand", "right_hand"}
 # against the ball in about 2 s (measured offline: 2.5 s with the ball held at its start, then let go); the robot
 # starts there, at rest (SETTLED: the pelvis' height and orientation, every joint), the ball where it then sits
 # (BALL_AT: its centre in the right mount's frame). The drop is the hands' own movement: the palms parting (or the
-# arms lowering, turning) until the ball falls free. Measured (tests/test_juggling.py): the squeeze presses
+# arms lowering, turning) until the ball falls free. Measured: the squeeze presses
 # about 6.6 N on each palm and holds the ball still for a whole episode (it creeps 3 to 4 mm in 60 s); with the
 # command at HOLD (the palms only touching) the ball slips out at once.
-# Re-derived 2026-10-21 for the fists (each hand 21 mm further out along its palm normal, the same squeeze;
-# derive_juggle.py of the stress test): the ball creeps 6 mm in 20 s.
+# Re-derived for the fists (each hand 21 mm further out along its palm normal, the same squeeze): the ball creeps 6 mm in 20 s.
 HOLD = dict(right_shoulder_pitch=-0.0299, right_shoulder_roll=-0.0282, right_shoulder_yaw=0.005, right_elbow=0.2272,
             right_wrist_roll=1.6012, right_wrist_pitch=-0.0067, right_wrist_yaw=0.1985, left_shoulder_pitch=-0.0299,
             left_shoulder_roll=0.0282, left_shoulder_yaw=-0.005, left_elbow=0.2272, left_wrist_roll=-1.6012,
@@ -56,7 +55,7 @@ PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness a
 # dropped 5.5 m (10.4 m/s) onto the hand of a player whose wrist rests on a table keeps 0.10 of its speed with the hand
 # relaxed, 0.14 strained, 0.17 as a clenched fist; ball impacts last 5 to 20 ms. The pad is passive rubber (no muscle
 # tone), so here the relaxed hand's 0.10: a critically damped spring of time constant 5 ms (MuJoCo's solref; solimp
-# 0.99-0.999), measured against a pad fixed in space (tests/probe_palm.py; every official ball alike: MuJoCo's contact
+# 0.99-0.999), measured against a pad fixed in space (every official ball alike: MuJoCo's contact
 # is mass-normalised): a ball thrown head-on at 1 to 10.4 m/s keeps 0.09 to 0.11 of its speed (0.093 at 10.4 m/s)
 # after 19 ms of contact. Friction 0.7 (rubber on a ball's cover; not separately measured). With elliptic friction
 # cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py) a squeezed or resting

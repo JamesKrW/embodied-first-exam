@@ -21,7 +21,7 @@ network = "open"                 # the agent's egress (docs/protocol/README.md �
 instance_seed = 0
 expert_time_estimate_hours = 120.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_inline_slalom.py: positive by injection (the floating base written every control step along a weaving path, one skate rolling, the other lifted; cones, skates and wheels are physics); the real run-up only: a scripted swizzle (IK) skates from the start box over the 12 m run-up in 12.3 s on two feet, which the referee voids at the second cone (7.4.2.2). No one-foot controller exists for the G1: one-skate glides steered by capture point last at most 2.2 s at 2 m/s; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
+oracle_evidence = "no reference solution; the referee is tested: positive by injection (the floating base written every control step along a weaving path, one skate rolling, the other lifted; cones, skates and wheels are physics); the real run-up only: a scripted swizzle (IK) skates from the start box over the 12 m run-up in 12.3 s on two feet, which the referee voids at the second cone (7.4.2.2). No one-foot controller exists for the G1: one-skate glides steered by capture point last at most 2.2 s at 2 m/s; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)

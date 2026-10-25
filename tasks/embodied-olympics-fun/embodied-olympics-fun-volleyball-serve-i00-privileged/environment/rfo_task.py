@@ -131,8 +131,7 @@ def centre_line_fault(w, ref, centre, yaw) -> str | None:
 # (SETTLED: the pelvis' height and orientation, every joint), the ball resting on the palm where it then rests
 # (BALL_ON_PALM: its centre in the mount's frame, from the middle of the palm's face). Started straight from the
 # command, the first 0.1 s of the stand settling would drop the palm away from the ball.
-# tests/test_volleyball_serve.py checks that the ball stays on the palm, still, for the whole 8 s of the
-# service.
+# Measured: the ball stays on the palm, still, for the whole 8 s of the service.
 PALM_UP = dict(left_shoulder_pitch=-0.0161, left_shoulder_roll=0.0002, left_elbow_pitch=-0.0239,
                left_elbow_roll=-1.5709, left_wrist_yaw=-0.0138)
 SETTLED_Z_QUAT = (1.02075, 1.0, 0.00231, -0.0008, -0.00137)
@@ -147,7 +146,7 @@ PAD_HALF, PAD_Z = 0.022, 0.05                  # the palm pad's half thickness a
 # dropped 5.5 m (10.4 m/s) onto the hand of a player whose wrist rests on a table keeps 0.10 of its speed with the hand
 # relaxed, 0.14 strained, 0.17 as a clenched fist; ball impacts last 5 to 20 ms. The pad is passive rubber (no muscle
 # tone), so here the relaxed hand's 0.10: a critically damped spring of time constant 5 ms (MuJoCo's solref; solimp
-# 0.99-0.999), measured against a pad fixed in space (tests/probe_palm.py; every official ball alike: MuJoCo's contact
+# 0.99-0.999), measured against a pad fixed in space (every official ball alike: MuJoCo's contact
 # is mass-normalised): a ball thrown head-on at 1 to 10.4 m/s keeps 0.09 to 0.11 of its speed (0.093 at 10.4 m/s)
 # after 19 ms of contact. Friction 0.7 (rubber on a ball's cover; not separately measured). With elliptic friction
 # cones and impratio 100 for the whole world (as in the worlds with a real gripper, realhand.py) a squeezed or resting

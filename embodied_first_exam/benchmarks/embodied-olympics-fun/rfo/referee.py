@@ -1,4 +1,4 @@
-"""The referee's toolkit: what every RoboOlympics task judges with. A task's verdict is an ordered sequence of
+"""The referee's toolkit: what every Embodied Olympics - Fun task judges with. A task's verdict is an ordered sequence of
 events (stages) under geometric conditions and contact rules, decided from the simulator's state after every physics
 step (1 ms), so a fast ball cannot pass a plane unseen and one touch that lasts many steps is one touch.
 

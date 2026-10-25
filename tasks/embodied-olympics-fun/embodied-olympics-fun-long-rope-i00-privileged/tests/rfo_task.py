@@ -33,7 +33,7 @@ TWIST_INERTIA = 2e-6           # kg m^2: a segment's inertia about its own axis 
 EQ_SOLREF = "0.004 1"          # the connects' constraint time constant (s) and damping ratio
 EQ_SOLIMP = "0.99 0.999 0.0005 0.5 2"   # ... and their impedance: the rope does not stretch at a tie (with MuJoCo's
 #                                default, whose force scales with a segment's 5 g, a robot leaning on the rope pulled a
-#                                tie 19 cm apart: stress test 2026-10-21; as rfo's shared rope_turner v2's swivel)
+#                                tie 19 cm apart: stress test; as rfo's shared rope_turner v2's swivel)
 CONTACT_SOLREF = "0.005 1"     # the rope's contacts (priority 1: the rope's numbers win)
 ROPE_RGBA = (0.85, 0.12, 0.10, 1)
 # the air on each segment, MuJoCo's ellipsoid model on the capsule's own size (not the body's inertia box, which the
@@ -47,7 +47,7 @@ _PREROLL: dict = {}            # the pre-rolled rope state, by its parameters
 # tip on a swivel). The crank arm: a 25 mm aluminium tube of hand_circle_radius_m with its hub and swivel, 0.5 kg (about
 # 0.027 kg m^2 about the axle). The motor: a geared DC motor of the 60 W class, at most CRANK_TORQUE_N_M at the output
 # shaft (the stall/peak torque of such a 24 V worm or planetary gear motor at 60-120 rpm output; the rope's own load
-# at 1 rev/s peaks at about 3 N m, measured over the reference jumper's 11 s: Task.privileged()["crank_torque_n_m"]); its servo is a PD on the turning setpoint
+# at 1 rev/s peaks at about 3 N m, measured over 11 s of jumping: Task.privileged()["crank_torque_n_m"]); its servo is a PD on the turning setpoint
 # (KP, KV: stiff and about critically damped on the arm's inertia), saturated at the torque limit. The axle's bearings:
 # 0.05 N m of friction.
 CRANK_ARM_MASS = 0.5           # kg

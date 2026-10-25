@@ -62,7 +62,7 @@ from rfo.task import TaskBase
 # SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
 # robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
 # With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 48 mm into the hand, 80 mm into the
-# floor (stress test 2026-10-21).
+# floor (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 # ------------------------------------------------------------------------------------------------ the court (Law 1)
@@ -170,7 +170,7 @@ def build_net(sc, net, top, half_span, anchor_y, bottom, strip_w, n_seg, area_de
             seg = sc.body(f"net_seg{i}_{kk}", (0.0, 0.0, z0), parent=parent)
             # a panel folds against the one above it at most to the horizontal: the mesh is one sheet, tied along its
             # sides to the neighbouring strips (not modelled), so a strip cannot turn over; free hinges let a hit spin
-            # a light panel round its cord at 124 rad/s (stress test 2026-10-21). The limit is the sheet's ties, taut:
+            # a light panel round its cord at 124 rad/s (stress test). The limit is the sheet's ties, taut:
             # stiff (the core's shells' solref 0.004 s, solimp 0.99 0.999; MuJoCo's default limit let a hand push a
             # panel 0.75 rad past it)
             ET.SubElement(seg, "joint", name=f"net_seg{i}_{kk}", type="hinge", axis="0 1 0", damping="1e-4",
@@ -322,7 +322,7 @@ def build_racket(sc, pos=(0.3, -0.4, 0.8)) -> None:
     # The strings' and the frame's bounce (STRINGS_SOLREF: 785 rad/s, e = 0.5) is the shuttle's contact with them only:
     # explicit pairs (the shuttle's own contact with the racket excluded). As the geoms' own contact it also held for
     # the hand, the floor and the robot, where a racket twisted in the hand took up to 160 kN and 595 J and flew off
-    # at 32 m/s (stress test 2026-10-21); everywhere else the racket is a rigid graphite frame (RIGID).
+    # at 32 m/s (stress test); everywhere else the racket is a rigid graphite frame (RIGID).
     contact = sc.root.find("contact")
     ET.SubElement(contact, "exclude", body1=SHUTTLE, body2="racket")
     for g in ["racket_strings"] + [f"racket_frame{i}" for i in range(n)]:

@@ -46,7 +46,7 @@ from rfo.task import TaskBase
 # GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99
 # 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins
 # over a default-contact geom; a ball (priority 1) keeps its own bounce. With MuJoCo's default soft contact (solref
-# 0.02 1, solimp 0.9 0.95) it sank 75 mm into the robot and 66 mm into the court (stress test 2026-10-21).
+# 0.02 1, solimp 0.9 0.95) it sank 75 mm into the robot and 66 mm into the court (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 BALL = OFFICIAL["tennis"]
@@ -162,7 +162,7 @@ def build_net(sc, net, top, half_span, anchor_y, bottom, strip_w, n_seg, area_de
             seg = sc.body(f"net_seg{i}_{kk}", (0.0, 0.0, z0), parent=parent)
             # a panel folds against the one above it at most to the horizontal: the mesh is one sheet, tied along its
             # sides to the neighbouring strips (not modelled), so a strip cannot turn over; free hinges let a hit spin
-            # a light panel round its cord at 124 rad/s (stress test 2026-10-21). The limit is the sheet's ties, taut:
+            # a light panel round its cord at 124 rad/s (stress test). The limit is the sheet's ties, taut:
             # stiff (the core's shells' solref 0.004 s, solimp 0.99 0.999; MuJoCo's default limit let a hand push a
             # panel 0.75 rad past it)
             ET.SubElement(seg, "joint", name=f"net_seg{i}_{kk}", type="hinge", axis="0 1 0", damping="1e-4",

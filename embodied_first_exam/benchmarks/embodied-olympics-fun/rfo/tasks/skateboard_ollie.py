@@ -26,7 +26,7 @@ from rfo.task import TaskBase
 # aluminium) with a solmix that wins over a default-contact geom; a ball (priority 1) keeps its own bounce. With
 # MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 50 mm (a wheel through the palm pad: the
 # trucks did not accept the robot's hulls and pads, conaffinity 1; now 1 | 4, the strike boxes still pass as on a
-# standable deck) (stress test 2026-10-21).
+# standable deck) (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 ROBOT_START = (0.0, 0.0, -math.pi / 2)

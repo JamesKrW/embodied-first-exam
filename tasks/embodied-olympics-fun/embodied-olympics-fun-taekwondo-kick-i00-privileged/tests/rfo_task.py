@@ -12,7 +12,7 @@ from rfo.task import TaskBase
 # the core's shells (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics'
 # weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins over a default-contact geom; a
 # ball (priority 1) keeps its own bounce. With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank
-# 53 mm into a foot (stress test 2026-10-21).
+# 53 mm into a foot (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 MAT = (0.20, 0.35, 0.65, 1)

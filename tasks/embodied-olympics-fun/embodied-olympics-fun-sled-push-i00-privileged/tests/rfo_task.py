@@ -11,7 +11,7 @@ from rfo.task import TaskBase
 # contact of the core's shells (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from
 # roboolympics' weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins over a default-
 # contact geom; a ball (priority 1) keeps its own bounce. With MuJoCo's default soft contact (solref 0.02 1, solimp
-# 0.9 0.95) it sank 49 mm into the robot and 38 mm into the turf (stress test 2026-10-21).
+# 0.9 0.95) it sank 49 mm into the robot and 38 mm into the turf (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
 
 TURF = (0.18, 0.42, 0.22, 1)
@@ -48,7 +48,7 @@ class Task(TaskBase):
     fall_z = 0.50
     params = dict(length_m=12.5, lane_half_m=1.0, sled_empty_kg=5.0, plates_kg=0.0, runner_mu=0.45,
                   sled_length_m=0.919, sled_width_m=0.620, pole_height_m=1.041, pole_diameter_m=0.05,
-                  sled_gap_m=0.50, move_m=0.10, robot_mass_kg=67.0, load_percent_bm=49, sled_total_kg=33.0,
+                  sled_gap_m=0.50, move_m=0.10, robot_mass_kg=67.0, load_percent_bm=7, sled_total_kg=5.0,   # these two: _derive()
                   hyrox_force_n=450, fall_pelvis_m=0.50)
 
     sentence = ("Push the weighted sled with your palms on its two upright handles until the whole sled is over the "

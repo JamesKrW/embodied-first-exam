@@ -1,5 +1,5 @@
 """50 m: the straight sprint of the World Athletics rules, from the starter's commands to the torso on the finish line
-(the short indoor distance; owner, 2026-10-12: the benchmark shows what a robot can do, it does not stage the Olympic
+(the short indoor distance: the benchmark shows what a robot can do, it does not stage the Olympic
 programme, and 100 m was half a minute of the same thing).
 
 The start procedure, the false-start rule, the lane rule, the "down" rule and the timing are RoboOlympics' athletics

@@ -22,7 +22,7 @@ BALL = OFFICIAL["basketball"]            # size 7: 0.1195 m radius, 0.62 kg, reb
 # backboard's face 1.20 m, so the centre is 0.375 m in front of the face and the ring's inner edge 0.150 m (the
 # equipment appendix: 151 mm +- 2). Ring metal 16-20 mm: 18 mm. The ring's rebound: the equipment appendix asks for an
 # energy absorption of 35 to 50 % of the impact energy: 42.5 % here, a restitution of sqrt(1 - 0.425) = 0.76 (measured
-# on this ring with this ball: 0.76, with the contact's nominal value 0.81; tests/test_free_throw.py).
+# on this ring with this ball: 0.76, with the contact's nominal value 0.81).
 COURT = dict(length=28.0, width=15.0, line=0.05, ring_x=1.575, board_x=1.20, ft_line=5.80, key_half=2.45,
              ft_radius=1.80, three_radius=6.75, three_side=0.90, no_charge=1.25, net_length=0.42)
 RING_RESTITUTION, RING_NOMINAL = math.sqrt(1.0 - 0.425), 0.81
@@ -274,15 +274,9 @@ class Task(TaskBase):
                 "hanging on the ring); FIBA Mini-Basketball Rules (the ring at 2.60 m)")
     deviations = [
         "Basketball Equipment (basket): the basket is lowered: the ring's top edge is {ring_height_m} m above the "
-        "floor, below FIBA Mini-Basketball's 2.60 m (FIBA's own ring: 3.05 m), set at the robot's measured reach "
-        "(H1-2 with H2-class leg actuators): from this start, the ball squeezed between the open hands, a "
-        "searched trajectory on the robot's own motors dunks and lands: a deep squat, a jump with an arm swing (the "
-        "pelvis 0.43 m above its standing height), the fingers half closed over the ball in the air, the ball's "
-        "centre at most 2.53 m, carried down into the ring by both hands about 0.10 m from its axis and through it "
-        "2.74 s into the episode, then a landing on the walking policy, standing at 4.8 s; the energy is paid for by "
-        "the actuators' work (in the take-off +671 J of actuator work for +605 J of mechanical energy). The ring is "
-        "at the edge of the robot's reach: searched open-loop jumps with the ball raised from the chest brought it no "
-        "nearer than 0.24 m to the ring's axis while high enough to pass over the rim); the "
+        "floor, below FIBA Mini-Basketball's 2.60 m (FIBA's own ring: 3.05 m), set at the robot's measured own-motor "
+        "reach (H1-2 with H2-class leg actuators): a searched own-motor dunk from this start hold puts the ball's "
+        "centre 0.10 m from the ring's axis at 2.53 m, and lands, so the ring is at the edge of the robot's reach; the "
         "full-size backboard keeps its size and its height relative to the ring (lower edge {board_bottom_m} m). "
         "The ball stays the size-7 ball.",
         "Art. 3 (equipment, the hands): the hands are the H1-2's own Inspire five-finger hands (six drives: four "

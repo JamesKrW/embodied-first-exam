@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-taekwondo-kick-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `taekwondo_kick` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested by scripts/embodied-olympics/tests/test_taekwondo_kick.py: positive by a real front kick (lowcmd: 14.2 N s in 0.027 s on the protector, the threshold is 7.2 N s, peak 990 N) with an injected recovery (the robot put back at its start pose 0.25 s after the kick). No recovery was found: the robot falls within 0.6 s in every one of about 60 settings tried; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by a real front kick (lowcmd: 14.2 N s in 0.027 s on the protector, the threshold is 7.2 N s, peak 990 N) with an injected recovery (the robot put back at its start pose 0.25 s after the kick). No recovery was found: the robot falls within 0.6 s in every one of about 60 settings tried; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
@@ -49,4 +49,4 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Service | `environment/sim/server.py` (the Embodied Olympics adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_rfo.py`, `rfo/`, `rfo_task.py`, `instance.json` (= the privileged twin's) |
 | Observations | `head_left`, `head_right` (RGB 270 × 480, depth on `head_left`), `venue` (fixed); proprioception: joints, torques, targets, two IMUs, grip state |
 | Episode | 1500 control steps (15 s at 100 Hz); 5 resets, the last attempt graded |
-| Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; docs/benchmarks/embodied-olympics.md) |
+| Network | open: agents may search for and download public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md) |

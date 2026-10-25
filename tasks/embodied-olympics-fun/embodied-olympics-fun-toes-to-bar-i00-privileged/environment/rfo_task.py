@@ -9,9 +9,9 @@ Official setting: the FIG horizontal bar (2.80 m high, 2.40 m between the uprigh
 CrossFit standard's rules. Nothing is scaled to the robot.
 
 THE GRIP FORCE (measured in the simulator image): the two Dex3-1 hold about one body weight on the bar at the device's
-drive torques (the dead hang slips out within 3 s), 1.55 at 1.5 times, 2.05 at 2 times. The strict toes-to-bar of
-the reference solution needs 1.4 times (1.3 lets go in the fifth repetition); GRIP_SCALE = 1.5 (realhand's
-grip_scale: the drives' active and passive limits, kp and kd), declared in the deviations.
+drive torques (the dead hang slips out within 3 s), 1.55 at 1.5 times, 2.05 at 2 times. GRIP_SCALE = 1.5
+(realhand's grip_scale: the drives' active and passive limits, kp and kd) is the hands' declared force margin
+over the device's rating, declared in the deviations.
 
 The bar's and the venue's block (build_bar, swing_state, wrist_radius, bar_contacts, hang, BarGrip) is shared,
 identically, with high-bar-swing (a task directory holds one module)."""
@@ -204,9 +204,9 @@ class Task(BarGrip, TaskBase):
         "of it (fingers, thumb or palm: a hook grip counts); a break of up to {off_bar_s} s (contacts flickering "
         "under a load) is not letting go",
         "the grip force: the hands' drives are {grip_scale} times the Dex3-1's, because at the device's torques the "
-        "two hands hold about one body weight on the bar (measured: the dead hang itself slips out within 3 s), and "
-        "the strict toes-to-bar of the reference solution needs 1.4 times (1.3 times lets go in the fifth "
-        "repetition, measured); {grip_scale} keeps a margin. No Unitree hand is rated for this",
+        "two hands hold about one body weight on the bar (measured: the dead hang itself slips out within 3 s), at "
+        "1.5 times about 1.55 body weights (measured): {grip_scale} times is the hands' declared force margin "
+        "over the device's rating. No Unitree hand is rated for this",
         "CrossFit standard (the full hang is judged by eye: arms extended, heels behind the bar): the hang is judged "
         "by where the feet are (both feet's centres at least {hang_feet_below_bar_m} m below the bar, about "
         "nine tenths of the dead hang's, and behind the bar), because the referee has positions, not a judge's eye",
