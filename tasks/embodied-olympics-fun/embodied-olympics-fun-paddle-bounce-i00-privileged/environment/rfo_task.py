@@ -4,7 +4,7 @@ only by the contact and friction of the right hand, the G1's own Dex3-1 three-fi
 hand and be dropped.
 
 The ball: the official 40 mm, 2.7 g ball with Google DeepMind's identified fluid coefficients and thin-shell inertia,
-and RoboOlympics' ball-blade contact pair (roboolympics/sports/tabletennis/sim/scene/tt_scene.xml, Apache-2.0;
+and Embodied Olympics' ball-blade contact pair (roboolympics/sports/tabletennis/sim/scene/tt_scene.xml, Apache-2.0;
 hand-picked, not identified). The drop is a machine's: the ball rests in the cup of a dropper (the shared ball machine
 block below, Dropper: a ring round the ball and two trapdoor leaves under it on force-limited slides, at the end of an
 arm on a column); at drop_time_s the leaves slide apart and the ball falls from rest by gravity alone, and 0.15 s
@@ -45,7 +45,7 @@ from rfo.task import TaskBase
 # A rigid paddle (wooden blade and handle; the ball's own contact with the blade is the explicit pair)'s contact with
 # the robot, the venue's fixtures and the other props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the
 # stiff contact of the core's shells (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from
-# roboolympics' weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins over a default-
+# Embodied Olympics' weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins over a default-
 # contact geom; a ball (priority 1) keeps its own bounce. With MuJoCo's default soft contact (solref 0.02 1, solimp
 # 0.9 0.95) it sank 48 mm into the floor and the robot (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402

@@ -7,7 +7,7 @@ ankles and hip rolls corrected by the pelvis' pitch, roll, velocity and drift); 
 the robot both legs extend at once with raised gains (`lowcmd`), tuck in the air (hips and knees bent: the feet go
 up), reach for a landing crouch, hold it at the touchdown with landing gains, and hand back to the walking policy.
 After the third jump the walking policy holds the stand. The numbers come from a random local search over perturbed
-starts and +-3 % of its own gains (tests/sw_rrs.py). Measured: soles 4-8 cm over the boom, success at 21.1 s; 9 of 11
+starts and +-3 % of its own gains. Measured: soles 4-8 cm over the boom, success at 21.1 s; 9 of 11
 perturbed starts and 15 of 20 runs with its own gains varied by 3 % succeed (the landing on the 0.9 m podium is the
 weak point)."""
 import math

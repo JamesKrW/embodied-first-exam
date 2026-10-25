@@ -32,20 +32,20 @@ RAMP_S = 0.8                      # ... the spin-up at the start of that
 # axle on a post, driven by a geared motor; the rope's end hangs from the crank pin on a swivel (a ball joint: the
 # rope may twist and swing about it freely). The arm meets the robot (contype 64, conaffinity 4 | 8), not the rope
 # tied to it nor the floor. The motor is a position servo with a torque limit (MuJoCo `position` actuator: kp, kv,
-# forcerange), the axle damped by the motor's back-EMF (crank_xml's damping, v2): its controller follows a steady
+# forcerange), the axle damped by the motor's back-EMF (crank_xml's damping): its controller follows a steady
 # angle ramp (TurnerDrive.angle), so the hands at the two ends of a rope stay in phase, as on a machine with a common
 # drive; a rope caught on a body loads the motor, which stalls at its torque limit and the crank lags (the robot is
 # pulled, the rope stops on it).
 #
 # The rope: N segments (capsules) in two chains, one hanging from each crank's pin (the swivel there is the chain's
-# first joint), the two halves joined mid-rope by a `connect` (v2: a loop closed between two like segments, not at a
+# first joint), the two halves joined mid-rope by a `connect` (a loop closed between two like segments, not at a
 # pin against a crank's inertia, where the 5 g end segment's tie diverged when a robot leaned on the rope); free to
 # bend (a cord has almost no bending stiffness), each segment with the rope's mass for its length and a solid
 # cylinder's inertia. Between segments the joint is a universal joint (two hinges across the rope), not a ball joint:
 # a cord's torsional stiffness is large against a 15 cm segment's twist inertia, so its segments do not twist against
-# each other (v2; with ball joints a robot's hip rubbing the rope spun single segments about their own axis to 380
+# each other (with ball joints a robot's hip rubbing the rope spun single segments about their own axis to 380
 # rad/s and the chain diverged, stress test). The mid-rope `connect` holds as the rope does: solimp 0.99
-# 0.999 (v2; with MuJoCo's default impedance, whose force scales with the few grams of a segment, a robot leaning on
+# 0.999 (with MuJoCo's default impedance, whose force scales with the few grams of a segment, a robot leaning on
 # the rope pulled the tie 4 m apart). The air: RopeDrag applies quadratic drag on each segment as a force, the drag of
 # a cylinder in cross flow (C_d 1.2 on the flow across the segment, the air's density 1.225 kg/m^3), every physics
 # step. A family using it builds its venue without MuJoCo's fluid model (Scene option density 0): with it on, the
@@ -64,10 +64,10 @@ ROPE_TWIST_INERTIA = 2e-6        # kg m^2: at least this about a segment's own a
 #                                  real twist inertia makes the twist mode stiff at 1 ms; its twist plays no part)
 ROPE_ARMATURE = 1e-6             # kg m^2 on each joint (numerical)
 ROPE_DAMPING = 1e-3              # N m s / rad on each joint: a braided cord's bending loss (its fibres rub), an
-#                                  estimate: a kink between two 18 cm segments relaxes in about 50 ms (v2; 1e-4 in v1:
+#                                  estimate: a kink between two 18 cm segments relaxes in about 50 ms (at 1e-4
 #                                  a robot pinching the rope against its hip set the chain chattering until it diverged)
 ROPE_EQ_SOLREF = "0.004 1"       # the mid-rope connect's constraint time constant (s) and damping ratio
-ROPE_EQ_SOLIMP = "0.99 0.999 0.0005 0.5 2"     # ... and its impedance: it holds as the rope does (v2)
+ROPE_EQ_SOLIMP = "0.99 0.999 0.0005 0.5 2"     # ... and its impedance: it holds as the rope does
 ROPE_CONTACT_SOLREF = "0.005 1"  # the rope's contacts (priority 1: the rope's numbers win)
 ROPE_CD = 1.2                    # drag coefficient of a cylinder in cross flow (Re ~ 10^3: Hoerner, Fluid-Dynamic Drag)
 AIR_DENSITY = 1.225              # kg/m^3 (sea level, 15 C)
@@ -85,7 +85,7 @@ def crank_xml(name, centre, phi0, radius, kp, kv, torque, rope="", rgba=(0.30, 0
     at centre + radius (cos phi, 0, sin phi). The motor: a position servo on q with a torque limit (torque);
     damping: the axle's (N m s / rad): a DC gear motor's back-EMF gives the slope of its torque-speed line, stall
     torque / no-load speed (with the stall torque as the servo's limit, the torque left at speed w is torque - damping
-    w: the motor's line; v2). rope: a rope's chain (rope_xml) hanging from this crank's pin."""
+    w: the motor's line). rope: a rope's chain (rope_xml) hanging from this crank's pin."""
     c, s = math.cos(phi0), math.sin(phi0)
     pin = (radius * c, 0.0, radius * s)
     body = (f'<body name="{name}" pos="{_rt_fmt(centre)}"><joint name="{name}" type="hinge" axis="0 -1 0" '

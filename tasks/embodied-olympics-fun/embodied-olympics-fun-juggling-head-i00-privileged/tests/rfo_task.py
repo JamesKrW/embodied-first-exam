@@ -9,7 +9,7 @@ from rfo.scene import OFFICIAL
 from rfo.task import TaskBase
 # A rigid cone (PVC; its shell's flex not modelled)'s contact with the robot, the venue's fixtures and the other props
 # (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
-# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
+# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from Embodied Olympics' weightlifting fix, a rigid prop on the
 # robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
 # With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 31 mm into a foot (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
@@ -795,7 +795,7 @@ class Task(TaskBase):
                   # that the ball comes down on the top of the standing robot's head)
                   machine_x_m=1.0, machine_y_m=0.0, machine_z_m=0.6, launch_speed_m_s=5.1214,
                   launch_elevation_deg=76.1749, launch_azimuth_deg=180.775,
-                  # what the texts quote (measured with the machine; the test checks them)
+                  # what the texts quote (measured with the machine)
                   feed_s=0.28, arrive_speed_m_s=3.5, arrive_vx_m_s=1.1)
 
     sentence = ("Juggle the football on your head: a ball machine in front of you lobs it onto your head; keep it in "

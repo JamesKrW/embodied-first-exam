@@ -10,26 +10,11 @@ The load (a deviation): American Barbell's ATB-5-E aluminium technique bar, 5 kg
 on two lifting blocks 0.35 m high, which put its axis 0.375 m above the platform (a competition bar on its 0.45 m
 discs lies at 0.225 m). The IWF's women's bar is 15 kg and the lightest competition barbell 21 kg (IWF TCRR 2020).
 
-Why the blocks: the Inspire hand closes its fingers round a bar from above; on its inner collars the bar's axis is
-0.04 m above the platform, and there the closing fingers touch the platform (measured: a grasp with the arms
-brought as low as they go ended with a hand on the platform). Lifting from blocks is a standard weightlifting
-exercise.
+The blocks (a deviation; a block clean & jerk is a standard training form, its reason in the deviations): on its
+inner collars the bar's axis would be 0.04 m above the platform.
 
-Why 0.35 m and not 0.20 m (a deviation; a block clean & jerk, a standard training form): on 0.20 m blocks (the bar at a
-competition bar's 0.225 m) the squat to the bar is out of reach of the robot's own body with its self-collision: the
-hips would have to flex past where the hip links meet the pelvis (the planner's bottom poses put them 15 to 46 mm into
-it, or the thumbs into the knees), and every squat tried (52: knee and trunk angles, grip width, descent time,
-balance point) fell back onto a thigh or knocked the bar off before both hands held it. From 0.35 m the bar is within
-reach of a shallower squat.
-
-Why not heavier (measured and computed in the simulator image):
-- with the women's 15 kg bar the clean's turnover is out of reach: every path from the hang (the bar below the elbows)
-  to the rack passes a pose with the bar level with the elbow joint, and there the best arm pose found (with the
-  earlier gripper, whose grip was 0.11 m further from the wrist) needs 1.08 to 1.17 times the elbow and shoulder
-  motors' torque; with 5 kg that bound is 0.54;
-- 10 kg (the bar on two 2.5 kg technique discs) was tried: the robot topples backwards at the turnover;
-- each Inspire hand holds a 25 mm bar against about 73 N pulled along its fingers and about 92 N out of the palm
-  before the bar moves 2 cm in the hand (measured with the hand alone at the device's forces).
+The hold: each Inspire hand holds a 25 mm bar against about 73 N pulled along its fingers and about 92 N out of the
+palm before the bar moves 2 cm in the hand (measured with the hand alone at the device's forces).
 
 The hold's other surfaces: the bar touches every collision geom of the robot (it may rest on the trunk, as in a front
 rack); the fingers' pads win the contact parameters on it (priority 2, friction 1.0, realhand.py)."""

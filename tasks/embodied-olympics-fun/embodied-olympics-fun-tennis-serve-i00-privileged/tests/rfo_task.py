@@ -14,7 +14,7 @@ Magnus lift with the tennis coefficient, below), a free 0.685 m, 0.30 kg racket 
 
 Where the numbers come from:
 * the court, the net and the lines: ITF Rule 1 (all measurements to the outside of the lines);
-* the ball: scene.OFFICIAL["tennis"] (Rule 3 / Appendix I); its Magnus coefficient is RoboOlympics tennis'
+* the ball: scene.OFFICIAL["tennis"] (Rule 3 / Appendix I); its Magnus coefficient is Embodied Olympics tennis'
   (sports/tennis/sim/tn.py: C_L = 1 / (2 + 1/S); in MuJoCo's form F = c rho V (w x v) that is c = 0.375 / (1 + 2 S),
   0.29 at S = 0.15) instead of the generic 1.0;
 * the racket (shared, identically, with tennis-return): Appendix II's limits (at most 73.7 cm long, 31.7
@@ -44,7 +44,7 @@ from rfo.task import TaskBase
 # A rigid racket (graphite frame and throat, strung bed; the ball's own contact with the strings is the explicit
 # pair)'s contact with the robot, the venue's fixtures and the other props (the ground keeps its own: rfo/world.py
 # GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99
-# 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins
+# 0.999 0.0005, from Embodied Olympics' weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins
 # over a default-contact geom; a ball (priority 1) keeps its own bounce. With MuJoCo's default soft contact (solref
 # 0.02 1, solimp 0.9 0.95) it sank 75 mm into the robot and 66 mm into the court (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402

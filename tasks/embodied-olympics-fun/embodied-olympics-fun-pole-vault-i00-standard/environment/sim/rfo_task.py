@@ -8,26 +8,11 @@ Spirit, 2.35 m (7 ft 8 in), rated 90 lb (40.8 kg), the makers' rule being a pole
 weight (athleticsdirect.co.uk, UCS Junior Spirit poles: 2.35 m rated 55/65/75/90 lb; a top-hand grip 6 to 18 in
 below the top); its mass (1.1 kg) and thickness (32 mm) are estimates. The bar is at 1.00 m, set for this robot.
 
-FEASIBILITY (measured and computed in the simulator image): this robot with these hands cannot vault, at any bar
-height or pole length.
-- The hang (the vault's take-off, TR 28: the athlete hangs on the planted pole; the referee also asks the pole to carry
-  at least half the robot's weight then, or a jump with a pole in the hands would pass; and, so that a standing jump
-  that pushes down on the top of a near-vertical pole does not pass either, a run-up of at least 2.5 m/s over the
-  last 0.5 s before the take-off, the pole at least 20 degrees from vertical at the take-off, and a hand above the
-  pelvis while the pole carries the robot): two hands would hold about 310 N along a pole (one lets it slide at about
-  157 N, measured), less than the robot's 341 N. And a hand holds a pole only across its palm, square to the forearm
-  (as the parallel gripper of the earlier analysis did across its jaws), so on a pole tilted up from the horizontal the hanging robot's
-  weight comes on the arms' joints with a lever: over all arm poses of both arms (a search, the trunk upright, both
-  grip points on the pole's line, half the weight on each hand), the smallest largest arm torque against its limit is
-  0.65 for a level pole, 1.47 at 20 degrees, 2.45 at 40, 4.46 at 60 and 5.83 at 80 (the 5 N m wrists and the 25 N m
-  shoulders). A vault plants the pole at 45 degrees or more and swings it up to vertical: two to six times the
-  motors. The bar's height and the pole's length do not change this.
-- The plant: with the run-up injected (3 and 4 m/s, the pole planted 30 and 45 degrees from vertical with its tip at the
-  stop board, the right hand 2.0 m from the tip, the joints held), the rigid pole stops the run along it at once and
-  the hand loses the pole within the plant; the robot runs on into the mats (measured with the earlier grippers).
-- The energy: the running policy's 4 m/s carries 0.82 m of height; what the plant leaves (the speed square to the pole,
-  2.8 m/s at 45 degrees) carries 0.41 m: the centre of mass, about 0.65 m up when running, reaches about 1.06 m at best.
-The module is kept physical and honest; its test's positive is a declared referee-only injection.
+The take-off (TR 28: the athlete hangs on the planted pole): the referee asks the pole to carry at least half the
+robot's weight then, a run-up of at least 2.5 m/s over the last 0.5 s before the take-off, the pole at least 20
+degrees from vertical at the take-off, and a hand above the pelvis while the pole carries the robot. A Dex3-1 hand
+closed on the pole holds it across its palm, square to the forearm; it lets the pole slide along its axis at about
+157 N (measured).
 
 The landing area (TR 28.12): urethane foam, the soft contact set from a pit's foam: the top pads of UCS pole-vault
 pits (World Athletics / NFHS pits) are "23 lb ILD urethane foam" (ucsspirit.com, pole vault pit 1750-2200 series):
@@ -53,7 +38,7 @@ from rfo.referee import Flights
 from rfo.task import TaskBase
 # A rigid crossbar (fibreglass; the landing mats keep their foam)'s contact with the robot, the venue's fixtures and
 # the other props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells
-# (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid
+# (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from Embodied Olympics' weightlifting fix, a rigid
 # prop on the robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its
 # own bounce. With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 27 mm into the mats' sides
 # and 16 mm into a foot (stress test).

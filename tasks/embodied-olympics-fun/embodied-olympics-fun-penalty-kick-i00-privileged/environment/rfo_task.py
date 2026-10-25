@@ -38,8 +38,7 @@ class Keeper:
     Limits and their sources:
     - MASS 80 kg, 1.9 m x 0.6 m x 0.3 m: the dummy's mass and size (an adult goalkeeper's mass and standing height,
       shoulder width).
-    - V_MAX 3.0 m/s: an elite goalkeeper's lateral shuffle and the start of a dive move at about 3 m/s (the family's
-      previous dummy speed, kept).
+    - V_MAX 3.0 m/s: an elite goalkeeper's lateral shuffle and the start of a dive move at about 3 m/s.
     - F_MAX 800 N (about one body weight of the 80 kg dummy, 10 m/s^2): of the order of the peak lateral push-off a
       goalkeeper applies in a dive (about one body weight); an off-the-shelf industrial linear motor of this peak force
       is a common size. A_MAX 9 m/s^2 is the profile's acceleration, inside F_MAX / MASS = 10 m/s^2 so the servo can

@@ -207,7 +207,7 @@ class Task(BarGrip, TaskBase):
         "per finger joint; the thumb's rotation 0.86 / 3.1 N m), because with the device's torques the two hands hold "
         "about one body weight on the bar (measured: torn off by the catch itself; 1.5 times: 1.55, 2 times: 2.05 body "
         "weights) while the bottom of a giant swing pulls about four or more (up to 8.6 in 10 ms here; gymnasts 3.5 "
-        "to 3.7, Kopp & Reid 1980); in this venue's magic-action giant swing 4.5 times the device's lets go and "
+        "to 3.7, Kopp & Reid 1980); in a giant swing in this venue 4.5 times the device's lets go and "
         "{grip_scale} times holds, forwards and backwards (measured). No Unitree hand is this strong",
         "the grip (the hands stay on the bar): defined by contact: the catch is both hands grasping the bar (the bar "
         "touching each hand's index or middle finger and its thumb or palm); after it a hand is on the bar while the "

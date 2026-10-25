@@ -33,7 +33,7 @@ HANDS = {"left_hand", "right_hand"}
 # arms lowering, turning) until the ball falls free. Measured: the squeeze presses
 # about 6.6 N on each palm and holds the ball still for a whole episode (it creeps 3 to 4 mm in 60 s); with the
 # command at HOLD (the palms only touching) the ball slips out at once.
-# Re-derived for the fists (each hand 21 mm further out along its palm normal, the same squeeze): the ball creeps 6 mm in 20 s.
+# With the fists (each hand 21 mm further out along its palm normal, the same squeeze) the ball creeps 6 mm in 20 s.
 HOLD = dict(right_shoulder_pitch=-0.0299, right_shoulder_roll=-0.0282, right_shoulder_yaw=0.005, right_elbow=0.2272,
             right_wrist_roll=1.6012, right_wrist_pitch=-0.0067, right_wrist_yaw=0.1985, left_shoulder_pitch=-0.0299,
             left_shoulder_roll=0.0282, left_shoulder_yaw=-0.005, left_elbow=0.2272, left_wrist_roll=-1.6012,

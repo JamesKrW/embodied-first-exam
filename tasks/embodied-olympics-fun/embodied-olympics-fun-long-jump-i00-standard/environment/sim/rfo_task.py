@@ -31,7 +31,7 @@ def span(w, ids, axis):
 # 0.18 m x 0.07 m: the feet's sole spheres) that law sinks the standing robot (33.3 kg) 6.4 mm and stops it 71 mm deep
 # when it lands feet first at 2.5 m/s; sand is plastic and does not push back. MuJoCo's contact is a spring-damper
 # normalised by the bodies' masses, not a pressure law, so its numbers are fitted to those two depths on the G1 itself
-# (the group's probe_sand.py): time constant 0.15 s, damping ratio 2 (overdamped: no bounce), an impedance that falls
+# (measured): time constant 0.15 s, damping ratio 2 (overdamped: no bounce), an impedance that falls
 # from 0.95 at the surface to 0.40 at 5 cm (stiff at first, then yielding, as sand ahead of a sinking foot does);
 # measured: 7.4 mm standing, 75 mm for the 2.5 m/s landing, 0.10 m/s of rebound. Sand keeps no imprint here.
 SAND_CONTACT = dict(sand_timeconst_s=0.15, sand_dampratio=2.0, sand_imp0=0.95, sand_imp1=0.40, sand_give_m=0.05,
@@ -126,7 +126,7 @@ class Task(TaskBase):
              "board white, the sand yellow, the ground around it grass. Everything is level.")
     difficulty = ("The sand begins a metre beyond the line: with the foot kept behind the line the robot has to fly "
                   "about 1.2 m. Its running strides are in the air for less than 0.1 s and 0.4 m, its best "
-                  "published standing jump is 0.9 m, and no controller is known that jumps out of a run.")
+                  "published standing jump is 0.9 m.")
 
     def build(self, sc):
         p = self.p

@@ -157,7 +157,7 @@ def _quat(*rots) -> str:
 
 class _Batch:
     """Decoration merged into one mesh per colour (a software renderer pays per geom, not per triangle; after
-    RoboOlympics' beach-volleyball venue): add() boxes, then emit() the meshes and their geoms, drawn only."""
+    Embodied Olympics' beach-volleyball venue): add() boxes, then emit() the meshes and their geoms, drawn only."""
 
     def __init__(self, sc, prefix: str):
         self.sc, self.prefix, self.parts = sc, prefix, {}
@@ -198,7 +198,7 @@ SEAT_M, CROWD_FILL = 0.62, 0.5                     # a seat's width, the share o
 def _arena(sc, ground) -> None:
     """Perimeter boards and a stepped grandstand with spectators on each side, a roof over the far one, floodlight
     towers at the corners, a scoreboard and a line of trees, round everything the venue has: they give the place an
-    edge instead of a plain to the horizon (after RoboOlympics' venues of the throws and of beach volleyball). Drawn
+    edge instead of a plain to the horizon (after Embodied Olympics' venues of the throws and of beach volleyball). Drawn
     only (no collision class): a ball flies through them. Seeded: the same crowd in every process. Not built where
     the family has lowered the ground plane (a sand pit, a water jump)."""
     if abs(float((ground.get("pos") or "0 0 0").split()[2])) > 1e-9:

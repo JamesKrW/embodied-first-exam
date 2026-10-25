@@ -375,7 +375,7 @@ class Task(Dive, TaskBase):
              "board's stand is {concrete_below_m} m below the board's top and ends {fulcrum_to_concrete_edge_m} m "
              "beyond the front of the fulcrum's housing, at the pool's edge; handrails {rail_height_m} m high run "
              "along its sides. The water lies ahead and below. Nothing in the venue moves but the board.")
-    difficulty = ("No controller does dives: the robot must time its push with a board that bends and recoils under "
+    difficulty = ("The robot must time its push with a board that bends and recoils under "
                   "its 33 kg, take off high with exactly the right forward rotation, and then hold a straight body "
                   "with the legs drawn together, the toes pointed and the short arms stretched overhead through a "
                   "1 s fall. Nothing can be corrected once it is in the air.")

@@ -12,10 +12,10 @@ from rfo.task import TaskBase
 # ==================================================================================== BEGIN ski-snow block v3
 # The equipment and the snow (the same block in alpine_slalom, giant_slalom, snowboard and the freeski
 # families). Ported, with its authors'
-# permission, from the ski-snow model of the RoboOlympics freeski sport (github.com/CHIGUI0/roboolympics PR #259,
+# permission, from the ski-snow model of the Embodied Olympics freeski sport (github.com/CHIGUI0/roboolympics PR #259,
 # branch sport-freeski, commit d566cffb4, sports/freeski/skisnow.py, MIT): frictionless condim-1 contacts of the planks'
 # edge spheres with the snow, and, every 1 ms physics step, the tangential forces of the snow on every contact in the
-# plank's own frame, plus the air's forces on every link (v3: lift). v2 follows that file's final version: 9 spheres
+# plank's own frame, plus the air's forces on every link (lift included). It follows that file's final version: 9 spheres
 # per edge, a ski of three bodies (its forebody and afterbody on hinges with the ski's bending stiffness), hard well-
 # damped snow (timeconst 5 ms, damping ratio 1.5), the forces' slope against the slip capped at K_V (the explicit
 # step's stability), and solid planks (boxes over the running surface, shovel and tail, in stiff contact with every
@@ -40,7 +40,7 @@ from rfo.task import TaskBase
 #           Lieu & Mote 1985): an edged plank carves a turn of that radius, a flat one runs straight
 # sat(v) = v / sqrt(v^2 + V0^2), V0 = max(0.03 m/s, force / K_V): each force opposes its own segment's sliding and never
 # does positive work (an edged plank cannot climb, a sliding one cannot push itself). The snow's normal reaction is
-# MuJoCo's soft contact. Air (v3: lift): every link of the robot and of the planks feels the quasi-steady
+# MuJoCo's soft contact. Air (lift included): every link of the robot and of the planks feels the quasi-steady
 # normal-force aerodynamics of its hull's faces: along each of its own axes k, -0.5 rho C_N A_k |v| v_k (Hoerner's
 # cross-flow principle; A_k the convex hull of its visual shapes projected along its axis k; C_N 1.17, a flat plate's),
 # times the overlap factor (the robot's true silhouette over the links' summed areas, measured once standing). A flat
@@ -65,7 +65,7 @@ PLANK_SOLIMP = "0.95 0.99 0.002"
 SOLID_SOLREF = "0.004 1"                     # a plank against the robot's body and the other plank: stiff (freeski E11)
 SOLID_SOLIMP = "0.99 0.999 0.0005"
 BIND_SOLREF = "0.002 1"                      # the binding (a weld): as stiff as the 1 ms step allows
-BIND_SOLIMP = "0.99 0.999 0.001"            # (v2: 0.95 0.99 let a thrashing leg stretch it 2 cm: the stress test)
+BIND_SOLIMP = "0.99 0.999 0.001"            # (0.95 0.99 let a thrashing leg stretch it 2 cm in a stress test)
 AIR_RHO = 1.052
 C_N = 1.17                                   # a flat plate's normal-force coefficient across the flow (Hoerner 1965,
 #                                              Fluid-Dynamic Drag, ch. 3: 1.17 for a square plate normal to the flow)
@@ -115,7 +115,7 @@ class Plank:
                 out.append((e, f"{e}{i}", s, 0.0, self.half_width(s)))
             out.append((e, f"{e}tipc", H + 0.55 * self.shovel, 0.55 * self.tip_rise, 0.42 * self.tip_w))
             out.append((e, f"{e}tailc", -H - 0.55 * self.tail, 0.55 * self.tail_rise, 0.42 * self.tail_w))
-            # the shovel's and the tail's ends (v2: without them a ski pitched into the snow sank its tip, a solid
+            # the shovel's and the tail's ends (without them a ski pitched into the snow sank its tip, a solid
             # that does not touch the snow, up to 8 cm: the stress test)
             out.append((e, f"{e}tipe", H + self.shovel - SPHERE_R, self.tip_rise - SPHERE_R, 0.42 * self.tip_w))
             out.append((e, f"{e}taile", -H - self.tail + SPHERE_R, self.tail_rise - SPHERE_R, 0.42 * self.tail_w))
@@ -380,7 +380,7 @@ class SnowModel:
         vel = cv[:, 3:] + np.cross(cv[:, :3], cpos - d.subtree_com[self.drag_root])
         sp = np.linalg.norm(vel, axis=1)
         loc = np.einsum("bji,bj->bi", R, vel / np.maximum(sp, 1e-9)[:, None])
-        # the quasi-steady normal-force model (v3): each face of a link's hull pushes back along its own normal with
+        # the quasi-steady normal-force model: each face of a link's hull pushes back along its own normal with
         # 0.5 rho C_N A_k |v| v_k (Hoerner's cross-flow principle): an inclined flat link (a ski, a flat trunk) gets lift
         # across the flow as well as drag along it; a compact link, drag nearly along -v. F . v <= 0 always.
         Fl = -0.5 * AIR_RHO * self.cd * self.overlap * sp[:, None] * (self.drag_A * (loc * sp[:, None]))
@@ -534,7 +534,7 @@ class Profile:
                     quat=(math.cos(-a / 2), 0.0, math.sin(-a / 2), 0.0), **look, contype=SNOW_BIT,
                     conaffinity=SNOW_CONAFF, friction=(0.35, 0.005, 0.0001), condim=3, solref=PLANK_SOLREF,
                     solimp=PLANK_SOLIMP, priority=1)    # one snow for the skis and the body: its parameters win
-                    #                                     (v2: the body's soft default contact sank it 5-10 cm)
+                    #                                     (the body's soft default contact sank it 5-10 cm)
             names.append(nm)
         return names
 
@@ -645,7 +645,7 @@ def arch(batch, x, y, z, half_w, height=3.0, rgb=(0.12, 0.3, 0.75)) -> None:
 
 # ==================================================================================== BEGIN alpine-race block v2
 # A race through gates on a groomed slope (the same block in alpine_slalom, giant_slalom and snowboard): the slope, the flex poles and the gates, the start, the referee of gate
-# passing (FIS ICR 661.4), the finish and the falls. v2: the start as the RoboOlympics freeski sport's
+# passing (FIS ICR 661.4), the finish and the falls. The start as the Embodied Olympics freeski sport's
 # (github.com/CHIGUI0/roboolympics PR #259, sport.toml D6 / D8, MIT): no start gate and nothing that holds or
 # releases the robot: it stands on a level start platform (6 m) behind the start line, the platform's edge rounded
 # (the brink) onto the slope, and leaves it by its own action; the clock starts when its boots cross the start line.

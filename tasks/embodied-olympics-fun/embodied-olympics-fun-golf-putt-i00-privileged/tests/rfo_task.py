@@ -15,11 +15,9 @@ The putter, the hold and the start:
   vertical, the face towards the hole, the head a few cm over the green and to the right of the ball (a level club
   is a lever of about 0.6 N m on three small finger motors; hanging, its weight pulls along the shaft into the
   closed fingers). Whoever moves the club must keep its shaft near the vertical;
-* why one hand, not two: the Rules of Golf allow a stroke with one hand, and measured on the model, the G1 cannot put
-  two hands on this putter at the address: with the club soled behind the ball, inverse kinematics from 40 starts
-  finds no collision-free posture with both hands on the grip (measured with the earlier gripper hands: the misses
-  are 5 cm and more, or the arms pass through the trunk), the 1.32 m robot's hands being 0.4 m below its shoulders
-  there. The left hand (the G1's rubber fist) may still hold the grip (not required); the club may touch nothing
+* why one hand, not two: the Rules of Golf allow a stroke with one hand, and on this model the G1 cannot put two
+  hands on this putter at the address with the club soled behind the ball (no collision-free posture with both hands
+  on the grip: the 1.32 m robot's hands are 0.4 m below its shoulders there). The left hand (the G1's rubber fist) may still hold the grip (not required); the club may touch nothing
   else of the robot (Rule 10.1b, anchoring);
 * "in the hand" = the grip touches the right hand's fingers (index or middle) and its thumb or palm; a break of at
   most out_of_hand_s (0.05 s) is not a release.
@@ -56,7 +54,7 @@ from rfo.scene import HITTABLE, OFFICIAL, fmt, quat_z
 from rfo.task import TaskBase
 # A rigid putter (steel head and shaft, rubber grip)'s contact with the robot, the venue's fixtures and the other
 # props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
-# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
+# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from Embodied Olympics' weightlifting fix, a rigid prop on the
 # robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
 # With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 62 mm into the green and 26 mm into the
 # robot (stress test).
@@ -131,7 +129,7 @@ SIDE = "right"
 BUTT_FROM_GRASP_M = 0.05            # the grip across the palm, its butt 0.05 m beyond the hand's grasp centre
 # The start: the right arm's joints (shoulder pitch, roll, yaw, elbow, wrist roll, pitch, yaw) that hold the club out
 # to the right, the forearm level and pointing ahead, the shaft hanging vertically (found by inverse kinematics on the
-# model; the test checks the pose); these are also the arm's targets at t = 0
+# model); these are also the arm's targets at t = 0
 START_RIGHT_ARM = (-0.4282, -0.7409, -1.3816, 1.4714, -0.3449, -0.6175, 1.0732)
 EARLY_GRIP = "the putter left your hand"
 ANCHOR = "the putter touched a part of you other than your hands"

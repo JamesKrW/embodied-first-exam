@@ -22,7 +22,7 @@ Where the numbers come from:
   velocity in still air is 6.80 m/s, the value measured by Peastrel, Lynch and Armenti, "Terminal velocity of a
   shuttlecock in vertical fall", Am. J. Phys. 48, 511 (1980); a fast shuttle's speed then falls by a factor e every
   V_t^2 / g = 4.7 m of flight (the quadratic-drag picture of shuttle flight of Cohen, Darbois Texier, Quere and
-  Clanet, "The physics of badminton", New J. Phys. 17, 063001 (2015)). The test measures both: the fall from rest
+  Clanet, "The physics of badminton", New J. Phys. 17, 063001 (2015)). Measured in this model: the fall from rest
   (6.795 m/s) and a level shuttle launched at 30 m/s (22.8 m/s after 1.30 m, 13.3 m/s after 3.87 m: the point-mass
   quadratic-drag values within 0.3 %). Law 3's speed test (a full underhand stroke from one back line lands 530-990 mm
   short of the other back line) is met by this shuttle when it leaves 1 m above the back line at 30 degrees at
@@ -59,7 +59,7 @@ from rfo.scene import AIR, HITTABLE, VISUAL, bounce_solref, fmt
 from rfo.task import TaskBase
 # A rigid racket (graphite frame and shaft, strung bed)'s contact with the robot, the venue's fixtures and the other
 # props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py
-# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the
+# SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from Embodied Olympics' weightlifting fix, a rigid prop on the
 # robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its own bounce.
 # With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 48 mm into the hand, 80 mm into the
 # floor (stress test).

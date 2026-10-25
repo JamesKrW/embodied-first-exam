@@ -1,7 +1,7 @@
 """Ten-pin bowling (USBC): from the approach, deliver the ball down the official lane without fouling and knock down
 all ten pins with it: a strike. No grip and no finger holes: the 6 lb ball is held only by pressing it between the two
 bare palms (contact and friction), a two-handed delivery. Lane, gutters, pin deck, pins and oil pattern from
-RoboOlympics' bowling simulator; the Unitree H1-2."""
+Embodied Olympics' bowling simulator; the Unitree H1-2."""
 import math
 import xml.etree.ElementTree as ET
 
@@ -12,7 +12,7 @@ from rfo.scene import OFFICIAL, STANDABLE, VISUAL
 from rfo.task import TaskBase
 
 BALL = OFFICIAL["bowling"]                    # 8.5 in across, 6 lb: a legal house ball (USBC sets only a 16 lb maximum)
-# ---- copied from RoboOlympics sports/bowling/sim/bowling.py (MIT): USBC dimensions, metres / kilograms
+# ---- copied from Embodied Olympics sports/bowling/sim/bowling.py (MIT): USBC dimensions, metres / kilograms
 IN = 0.0254
 N_BOARDS = 39
 ROW_DX_FACTOR = math.sqrt(3) / 2
@@ -23,7 +23,7 @@ PIN_COM_Z = 0.147                             # 5 13/16 in (USBC: 5 11/16 to 5 1
 PIN_PROFILE = [(0.0, 2.03), (0.375, 2.5), (0.75, 2.828), (1.5, 3.4), (2.25, 3.906), (3.375, 4.51), (4.5, 4.766),
                (5.875, 4.563), (7.25, 3.927), (8.625, 2.828), (9.375, 2.237), (10.0, 1.797), (10.875, 1.87),
                (11.75, 2.2), (12.5, 2.38), (13.5, 2.2), (14.25, 1.75), (14.75, 1.1), (15.0, 0.0)]
-CONTACT = "0.004 0.35"                        # solref of lane, deck and pins: RoboOlympics' damping ratio (the pins' rebound) and
+CONTACT = "0.004 0.35"                        # solref of lane, deck and pins: Embodied Olympics' damping ratio (the pins' rebound) and
 #                                               its time constant of four physics steps (0.002 s at its 0.5 ms; 1 ms here)
 DECK_MU, PIN_MU, GUTTER_MU = 0.2, 0.3, 0.2    # pin on the deck; pin on pin and on the ball; gutters and walls
 TAPER_D0, TAPER_D1, N_RAMP = 6, 16, 6         # boards from the centre where the oil shortens / reaches its outside length
@@ -36,7 +36,7 @@ WOOD = (0.84, 0.67, 0.46, 1)
 
 def pin_inertia(mass: float, height: float):
     """Principal moments about the centre of mass of the solid of revolution with the pin's profile, scaled to the
-    pin's mass (RoboOlympics' pin_inertia)."""
+    pin's mass (Embodied Olympics' pin_inertia)."""
     zs = np.linspace(0, height, 2001)
     r = np.interp(zs, [h * IN for h, _ in PIN_PROFILE], [d * IN / 2 for _, d in PIN_PROFILE])
     dm = math.pi * r ** 2 * (zs[1] - zs[0])
@@ -308,7 +308,7 @@ class Task(TaskBase):
         return False                                          # nothing is grippable: no grip exists in this task
 
     def pins_down(self, w) -> list[bool]:
-        """RoboOlympics' pin-down rule: tilted more than the limit, or off the lane's surface."""
+        """Embodied Olympics' pin-down rule: tilted more than the limit, or off the lane's surface."""
         p = self.p
         out = []
         for b in self.pin_ids:

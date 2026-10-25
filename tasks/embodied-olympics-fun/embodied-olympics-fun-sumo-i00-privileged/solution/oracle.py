@@ -3,8 +3,8 @@ command on FALCON's walking policy (trained with forces on the hands), forearms 
 fists at the opponent's chest), steering not at the opponent but at a point beyond it on the line from the ring's
 centre through it, so that the push carries the opponent towards the nearest edge of the ring; the opponent's own
 walking policy, turning to face the robot, is pushed back and sideways until a foot lands outside the bales or it
-goes down. The options lat / tilt_stop / back / edge_rate (off by default) were tried and did not help. Measured
-(tests/sumo_robust.py): the default instance wins at 11.6 s (the opponent goes down); 8 of 10 perturbed starts (the
+goes down. The options lat / tilt_stop / back / edge_rate (off by default) were tried and did not help. Measured:
+the default instance wins at 11.6 s (the opponent goes down); 8 of 10 perturbed starts (the
 opponent's start time, speed, turn rate, the start distance) and 29 of 40 runs with its own numbers varied by 3 %
 win: two balance policies shoving each other make the bout chaotic."""
 import math

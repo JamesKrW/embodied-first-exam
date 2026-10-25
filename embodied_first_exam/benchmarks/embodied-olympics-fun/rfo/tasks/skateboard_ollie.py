@@ -22,7 +22,7 @@ from rfo.scene import STANDABLE, VISUAL, bounce_solref
 from rfo.task import TaskBase
 # A rigid truck hanger (aluminium)'s contact with the robot, the venue's fixtures and the other props (the ground
 # keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells (rfo/world.py SHELL_CONTACT:
-# solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid prop on the robot's
+# solref 0.004 s, solimp 0.99 0.999 0.0005, from Embodied Olympics' weightlifting fix, a rigid prop on the robot's
 # aluminium) with a solmix that wins over a default-contact geom; a ball (priority 1) keeps its own bounce. With
 # MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 50 mm (a wheel through the palm pad: the
 # trucks did not accept the robot's hulls and pads, conaffinity 1; now 1 | 4, the strike boxes still pass as on a

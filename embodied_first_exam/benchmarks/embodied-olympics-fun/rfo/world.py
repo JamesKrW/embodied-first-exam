@@ -1,4 +1,4 @@
-"""The Embodied Olympics - Fun world: one Unitree G1 of the RoboOlympics robot library (its g1-4: Menagerie's 29-joint G1, its real
+"""The Embodied Olympics - Fun world: one Unitree G1 of the Embodied Olympics robot library (its g1-4: Menagerie's 29-joint G1, its real
 joint, speed and torque limits, its motor torque-speed curves, its self-collision) in a sports venue, the action
 layer every task shares, the hands' grip, and the stepping that the referee (referee.py) watches.
 
@@ -9,9 +9,9 @@ sim rows replays an episode bit-exactly in a fresh process. The agent's action t
 Who drives the joints (row[0], the mode):
   stand     the platform holds the legs in the stance (the walking policy's default leg angles on the stand gains with
             gravity support); the row's 17 waist and arm targets drive the upper body
-  walk      Unitree's own walking policy drives the legs from the row's velocity command (vx, vy, wz; RoboOlympics'
+  walk      Unitree's own walking policy drives the legs from the row's velocity command (vx, vy, wz; Embodied Olympics'
             joint-group arbiter, the handover to the policy included); the row's waist and arm targets drive the rest
-  run       RoboOlympics' athletics running policy drives all 29 joints from the velocity command
+  run       Embodied Olympics' athletics running policy drives all 29 joints from the velocity command
   run_arms  the running policy drives the legs and the waist; the row's 14 arm targets drive the arms
   joints    the row drives all 29 joints: position targets, velocity targets, feed-forward torques and PD gains
             (Unitree's LowCmd: tau = kp (q - q_meas) + kd (dq - dq_meas) + tau_ff), at 1 kHz
@@ -122,7 +122,7 @@ MAX_SPEED = 150.0                              # m/s: the robot or a prop faster
 # timesteps stable), solimp 0.99 0.999 0.0005 (MuJoCo's default soft contact let a heavy bar sink 12-44 mm), and a
 # solmix that makes them win against a prop of default priority; a prop with a priority of its own (a ball: its bounce,
 # scene.py) keeps its own parameters.
-# Source: the RoboOlympics weightlifting fix (CHIGUI0/roboolympics PR #179 at f54e26a8, sports/weightlifting/
+# Source: the Embodied Olympics weightlifting fix (CHIGUI0/roboolympics PR #179 at f54e26a8, sports/weightlifting/
 # venue.py `_shells` and BAR_CONTACT, MIT; library issue CHIGUI0/roboolympics #268): <= 3.2 mm at 190 kg.
 # The robot's own collision geoms (the body hulls, the palm pads, the feet's strike boxes, a real hand's housing and
 # fingers) get the same stiff contact (ROBOT_CONTACT) against props, mechanisms and fixtures (not the ground:
@@ -243,7 +243,7 @@ def _shells(root: ET.Element, ground: set, skip: set = frozenset()) -> None:
 # rods. The visible body around them is the shells (above: the G1's waist and shoulder housings and its rubber fists,
 # the H1-2's thighs, knees, hips, wrist housings and its Inspire fingers), and the hands are the palm pads, a task's
 # tool or a real hand, added here after the library: none of them touched the robot itself. A limb went through the
-# body: a shot-put stance with the thumb 2.3 cm inside the shoulder, a search's put 4.7 cm into it and the other hand
+# body: a shot-put stance with the thumb 2.3 cm inside the shoulder, a put 4.7 cm into it and the other hand
 # 6.8 cm into the hip, a volleyball set with the hands 5.7-6.4 cm into each other, the H1-2's arms through each other,
 # a flailing G1's knee 9 cm into its pelvis.
 # Now every collision geom and every shell of the robot takes part (the shells are the visual meshes' convex hulls:

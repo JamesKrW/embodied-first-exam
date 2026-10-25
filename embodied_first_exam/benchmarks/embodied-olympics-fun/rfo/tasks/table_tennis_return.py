@@ -4,7 +4,7 @@ right hand, the G1's own Dex3-1 three-finger hand: it can slip, turn in the hand
 dropped.
 
 The parts:
-* the service: entry 221 of RoboOlympics' serve library (below), thrown by a table-tennis ball machine (the shared
+* the service: entry 221 of Embodied Olympics' serve library (below), thrown by a table-tennis ball machine (the shared
   ball machine block below, preset "tabletennis": two 50 mm wheels on speed-controlled, torque-limited motors, the
   ball fed by a gate and a force-limited ram; nothing pinned, no velocity written) whose exit is the library
   service's strike point, behind the server's end line, as a table-tennis robot stands. Its aim and speed
@@ -26,12 +26,12 @@ The parts:
 * the simulator's options: DeepMind's pair was identified with impratio 10; a world with a real hand needs impratio 100
   (realhand.IMPRATIO: with 10 a clamped handle creeps under a steady torque), and this module leaves it at 100.
 
-The ball, the table and the net's contact are Google DeepMind's system-identified model as RoboOlympics uses it
+The ball, the table and the net's contact are Google DeepMind's system-identified model as Embodied Olympics uses it
 (roboolympics/sports/tabletennis/sim/scene/tt_scene.xml, from competitive_robot_table_tennis, Apache-2.0): the ball's
 fluid coefficients and thin-shell inertia, the identified ball-table contact pair, the ball-net pair, and the simulator
 options the pair was identified and the serve library was made with (1 ms, implicitfast, elliptic friction cones with
 impratio 10: with MuJoCo's default pyramidal cones the same service bounces 13 cm further on the receiver's court).
-The ball-paddle pair is RoboOlympics' (hand-picked, not identified). The service is one entry of RoboOlympics' serve
+The ball-paddle pair is Embodied Olympics' (hand-picked, not identified). The service is one entry of Embodied Olympics' serve
 library (sim/serve_library.json: 279 services a Franka on a rail made under the real robot's limits, each judged legal
 by Laws 2.6.1-2.6.4), stored as the ball's state at the server's strike."""
 import xml.etree.ElementTree as ET
@@ -45,7 +45,7 @@ from rfo.task import TaskBase
 # A rigid paddle (wooden blade and handle; the ball's own contact with the blade is the explicit pair)'s contact with
 # the robot, the venue's fixtures and the other props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the
 # stiff contact of the core's shells (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from
-# roboolympics' weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins over a default-
+# Embodied Olympics' weightlifting fix, a rigid prop on the robot's aluminium) with a solmix that wins over a default-
 # contact geom; a ball (priority 1) keeps its own bounce. With MuJoCo's default soft contact (solref 0.02 1, solimp
 # 0.9 0.95) it sank 48 mm into the floor and the robot (stress test).
 from rfo.world import SHELL_CONTACT as RIGID  # noqa: E402
@@ -822,7 +822,7 @@ HAND = "right"                     # the racket hand
 GRIP = dict(butt_out_m=0.05, palm_off_m=0.005, finger_off_m=0.0)
 
 # DeepMind's identified ball-table pair, the net as their scene has it (the ball's undamped 1e5 N/m spring on a rigid
-# box), RoboOlympics' ball-paddle pair
+# box), Embodied Olympics' ball-paddle pair
 PAIRS = (("table", dict(solref="-1000000 -17", friction="0.1 0.1 0.005 0.0001 0.0001", solimp="0.98 0.99 0.001 0.5 2",
                         solreffriction="-0.0 -200.0")),
          ("net", dict(solref="-100000 0", friction="1 1 0.005 0.0001 0.0001")),

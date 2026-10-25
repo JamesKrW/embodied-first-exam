@@ -117,7 +117,7 @@ class Planner:
 
     def arms(self, q, pitch, target, iters=60, lam=0.02, rest=None, rest_w=0.05, fingers=None, bend=None):
         """bend: instead of `rest`, draw the elbow towards 0.9 rad and the wrists towards 0 (gain `bend`), the elbow
-        kept at or below pi/2 (bending forwards only), as the lift's injection plan of tests/test_clean_and_jerk.py."""
+        kept at or below pi/2 (bending forwards only), the bend measured in the injected lift that checks the referee."""
         """Arm angles (the right mirrors the left) that bring the left grip point to `target` with the jaws' across
         axis along y: damped least squares, drawn in the null space towards `rest` (default: q's arms). Returns
         (q, position error)."""

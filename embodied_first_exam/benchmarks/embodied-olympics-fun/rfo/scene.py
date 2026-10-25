@@ -1,7 +1,7 @@
 """Scene building for the Embodied Olympics - Fun worlds: the venue's XML (floor, lines, balls, goals, hoops, nets, bars,
-boxes) around one Unitree G1 of the RoboOlympics robot library. Plain MJCF through ElementTree; no simulator state here.
+boxes) around one Unitree G1 of the Embodied Olympics robot library. Plain MJCF through ElementTree; no simulator state here.
 
-Collision classes (MuJoCo contype / conaffinity bits), the RoboOlympics G1's own scheme extended to props:
+Collision classes (MuJoCo contype / conaffinity bits), the Embodied Olympics G1's own scheme extended to props:
   1   the floor, the feet's four sole spheres, every prop
   4   the robot's body hulls (contype 4, conaffinity 0: they hit what accepts 4, never each other; the robot's
       self-collision is explicit pairs)
@@ -38,7 +38,7 @@ BALLS = {
 }
 CONTACT_W = 250.0        # rad/s: the natural frequency of a ball's contact spring (a 25 ms bounce at 1 ms physics)
 
-# Official balls and implements (v2: rule-book sizes and masses, flight in air). radius m, mass kg; bounce = the
+# Official balls and implements (rule-book sizes and masses, flight in air). radius m, mass kg; bounce = the
 # restitution on a hard floor that the rule book's drop test gives (rebound height / drop height, square root); drag =
 # the sphere's drag coefficient C_d at playing speeds (MuJoCo's ellipsoid fluid model takes C_d / 2 as its blunt-drag
 # coefficient; its Kutta and Magnus lift terms are on at 1.0, as in Google DeepMind's system-identified table-tennis
@@ -47,16 +47,16 @@ AIR = dict(density=1.225, viscosity=1.8e-5)     # kg/m^3, Pa s (sea level, 15 C)
 OFFICIAL = {
     # IFAB Law 2: size 5, 68-70 cm round, 410-450 g; FIFA Quality rebound 135-155 cm from 2 m (e 0.85); C_d ~0.25
     "football":   dict(radius=0.110, mass=0.430, bounce=0.85, drag=0.25, roll=0.006, rgba=(0.95, 0.95, 0.95, 1)),
-    # FIBA size 7: 749-780 mm round, 567-650 g; rebound 1.2-1.4 m from 1.8 m (e 0.85); C_d 0.54 (RoboOlympics basketball)
+    # FIBA size 7: 749-780 mm round, 567-650 g; rebound 1.2-1.4 m from 1.8 m (e 0.85); C_d 0.54 (Embodied Olympics basketball)
     "basketball": dict(radius=0.1195, mass=0.620, bounce=0.85, drag=0.54, roll=0.004, rgba=(0.90, 0.45, 0.12, 1)),
     # FIVB: 65-67 cm round, 260-280 g; rebound ~0.75; C_d ~0.3
     "volleyball": dict(radius=0.105, mass=0.270, bounce=0.75, drag=0.30, roll=0.004, rgba=(0.98, 0.90, 0.25, 1)),
-    # ITF: 6.54-6.86 cm, 56.0-59.4 g; rebound 135-147 cm from 254 cm (e 0.745); C_d 0.55 (RoboOlympics tennis)
+    # ITF: 6.54-6.86 cm, 56.0-59.4 g; rebound 135-147 cm from 254 cm (e 0.745); C_d 0.55 (Embodied Olympics tennis)
     "tennis":     dict(radius=0.0335, mass=0.0577, bounce=0.745, drag=0.55, roll=0.002, rgba=(0.80, 0.95, 0.20, 1)),
     # ITTF: 40 mm, 2.7 g; rebound 24-26 cm from 30.5 cm on the table (e 0.9); DeepMind's identified fluid coefficients
     "tabletennis": dict(radius=0.020, mass=0.0027, bounce=0.90, drag=0.47, roll=0.001, rgba=(1.0, 0.55, 0.1, 1),
                         fluidcoef=(0.235, 0.25, 0.0, 1.0, 1.0)),
-    # MLB / WBSC: 9-9.25 in round, 5-5.25 oz; e ~0.55; C_d 0.35 (RoboOlympics baseball, after Nathan)
+    # MLB / WBSC: 9-9.25 in round, 5-5.25 oz; e ~0.55; C_d 0.35 (Embodied Olympics baseball, after Nathan)
     "baseball":   dict(radius=0.0365, mass=0.145, bounce=0.55, drag=0.35, roll=0.002, rgba=(0.97, 0.97, 0.94, 1)),
     # R&A: at least 42.67 mm, at most 45.93 g; C_d ~0.25 (dimpled)
     "golf":       dict(radius=0.02135, mass=0.0459, bounce=0.60, drag=0.25, roll=0.0016, rgba=(1, 1, 1, 1)),
@@ -258,7 +258,7 @@ class Scene:
         return dict(x=x, y=y, height=height, rest_z=h, length=length)
 
     def hurdle(self, name, x, y=0.0, height=0.10, width=1.0, mass_bar=0.30) -> dict:
-        """RoboOlympics' athletics hurdle (sports/athletics/track.py), scaled: a body hinged at the feet's front ends
+        """Embodied Olympics' athletics hurdle (sports/athletics/track.py), scaled: a body hinged at the feet's front ends
         that tips over forwards when the bar is pushed; counterweights in its feet."""
         bw, bh, bd = width, min(0.06, height / 2), 0.02
         b = self.body(name, (x + bd, y, 0.0))

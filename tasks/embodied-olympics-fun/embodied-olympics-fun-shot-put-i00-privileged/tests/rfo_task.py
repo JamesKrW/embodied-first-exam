@@ -21,14 +21,10 @@ N_WEDGE = 48
 # weight, the neck the rest, friction both. The H1-2's arm servos are soft (40 N m/rad at the shoulder, 18 at the
 # elbow) and have no gravity feed-forward, so the start command (HOLD) differs from where the arm stands: under the
 # shot's weight the arm settles at SETTLED, where the robot starts, at rest, the shot where it then rests (SHOT_AT: from
-# the centre of the pad's face plus the shot's radius along its normal, mount frame). Found by a CMA-ES search in
-# physics over the arm's angles, its targets and where the shot touches the neck, every angle and target inside the
-# joints' ranges (a target outside them would make every plan be refused), then settled for 8 s: under the start
-# command the shot moves 4 mm relative to the hand and then rests, and the robot stands.
-# Re-settled with the robot's self-collision (world.py): that stance had the hand's thumb (a look-only
-# finger then) 23 mm inside the shoulder's hull. Under the same start command, with the self-collision on, the arm
-# settles within 1 s with the thumb resting against the shoulder and the shot on the palm, and stays there for 8 s:
-# SETTLED and SHOT_AT are that rest (the shot's centre 0.159 m from the neck line).
+# the centre of the pad's face plus the shot's radius along its normal, mount frame). Every angle and target is inside
+# the joints' ranges. Under the start command, with the robot's self-collision (world.py), the arm settles within
+# 1 s with the thumb resting against the shoulder and the shot on the palm, and stays there for 8 s, the robot
+# standing: SETTLED and SHOT_AT are that rest (the shot's centre 0.159 m from the neck line).
 SETTLED = dict(shoulder_pitch=-0.6882, shoulder_roll=0.1622, shoulder_yaw=0.2701, elbow_pitch=-0.8693,
                elbow_roll=-0.9159, wrist_pitch=-0.4214, wrist_yaw=-1.1029)
 HOLD = dict(shoulder_pitch=-0.7315, shoulder_roll=0.1587, shoulder_yaw=0.3103, elbow_pitch=-0.8292,

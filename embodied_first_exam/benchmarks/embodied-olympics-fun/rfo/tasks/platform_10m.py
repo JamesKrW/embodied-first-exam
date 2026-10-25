@@ -331,7 +331,7 @@ class Task(Dive, TaskBase):
              "It projects {projection_m} m beyond the pool's edge; the water lies ahead and below. Handrails "
              "{rail_height_m} m high run along both sides of the platform and across its back, the side rails "
              "ending {rail_free_m} m before the front edge. The platform is rigid; nothing in the venue moves.")
-    difficulty = ("No controller does dives: the robot needs a take-off that is high enough and gives exactly the "
+    difficulty = ("A dive needs a take-off that is high enough and gives exactly the "
                   "right forward rotation, then a straight body with the legs drawn together, the toes pointed and "
                   "the short arms stretched overhead through a 1.4 s fall. A small error at the take-off becomes a "
                   "short or over-rotated entry, and nothing can be corrected once it is in the air.")

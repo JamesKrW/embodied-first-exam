@@ -15,7 +15,7 @@
 Do a long jump: run up, take off behind the take-off line, fly over the metre of runway beyond it and land in the sand pit. (Embodied Olympics `long-jump`: one Unitree G1 on the Embodied Olympics simulator, judged by a referee of events, geometry and contact rules.)
 
 ## Difficulty
-The sand begins a metre beyond the line: with the foot kept behind the line the robot has to fly about 1.2 m. Its running strides are in the air for less than 0.1 s and 0.4 m, its best published standing jump is 0.9 m, and no controller is known that jumps out of a run.
+The sand begins a metre beyond the line: with the foot kept behind the line the robot has to fly about 1.2 m. Its running strides are in the air for less than 0.1 s and 0.4 m, its best published standing jump is 0.9 m.
 
 ## Reference solution
 None. No reference controller exists for this family yet: positive by injection (at the board, 3.6 m/s forward and 2.5 m/s up: a mark of 1.50 m in the sand); negatives: running through, walking over the line, a foot over the line, short, beside the pit, beside the board, feet pulled up (no rise), into the sand without a flight, back out behind the mark. The sand follows a published resistive-force law of dry silica sand (2.02 N/cm^3, phi 34 deg): the G1 sinks 7.4 mm standing and 75 mm landing at 2.5 m/s, with a 0.10 m/s rebound. Nothing known jumps out of a run.

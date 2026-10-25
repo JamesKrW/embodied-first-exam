@@ -15,7 +15,7 @@
 On the trampoline, bounce as you like, then do one tuck jump, land on both feet, stop the bounce (one more straight out-bounce at most) and stand still. (Embodied Olympics `trampoline`: one Unitree G1 on the Embodied Olympics simulator, judged by a referee of events, geometry and contact rules.)
 
 ## Difficulty
-No controller bounces on a trampoline: the robot must time its leg push with a bed that drops and recoils under it to gain height, tuck and open again in the air, land on both feet, and then kill the bounce of a springy bed with its legs until it stands still.
+The robot must time its leg push with a bed that drops and recoils under it to gain height, tuck and open again in the air, land on both feet, and then kill the bounce of a springy bed with its legs until it stands still.
 
 ## Reference solution
 `solution/oracle.py` drives the robot through the task's own tooling, closed loop on the privileged state, and writes the trajectory (`solution/solve.sh`). Reference: a scripted G1 tuck jump (a balanced crouch, a lowcmd push on the sprung bed, the tuck held mid-flight, a squat landing that sinks as the bed recoils, one straight out-bounce, an ankle-strategy stand-up, 3 s still), chosen from 12 settings: 0.457 s of flight, a centre-of-mass rise of 0.32 m. The bed passes the FIG IV TRA 1 impact test in simulation (60 kg sphere from 4.00 m: deflection 0.988 m, in 940-1010 mm; rebound 3.486 m, in 3410-3660 mm). Negatives: nop, a tuck without a jump, pike first, a bent out-bounce, a second flight, a fall, an injected roll spin, an injected push onto the padding. Measured: success after 7.55 s of the 30 s limit, live and in a fresh replay, ending in the same state.

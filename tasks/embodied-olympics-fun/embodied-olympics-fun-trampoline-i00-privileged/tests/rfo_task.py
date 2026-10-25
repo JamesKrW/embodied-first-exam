@@ -109,7 +109,7 @@ class Task(TaskBase):
              "platforms with mats stand at both ends and mats lie on the floor around. Red lines mark area A "
              "(2.15 x 1.08 m) and area B (1.08 x 1.08 m) round the centre, and a 0.70 m red cross the centre. "
              "Nothing moves but the bed.")
-    difficulty = ("No controller bounces on a trampoline: the robot must time its leg push with a bed that drops "
+    difficulty = ("The robot must time its leg push with a bed that drops "
                   "and recoils under it to gain height, tuck and open again in the air, land on both feet, and then "
                   "kill the bounce of a springy bed with its legs until it stands still.")
 

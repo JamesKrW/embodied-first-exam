@@ -83,7 +83,7 @@ class Task(TaskBase):
         sc.geom(sc.wb, "stand_post", type="cylinder", pos=(x + 0.03, y_post, (H + 0.12) / 2), size=(0.02, (H + 0.12) / 2),
                 rgba=(0.3, 0.3, 0.33, 1), contype="1", conaffinity="13")
         # the vane: a plate hinged about a vertical axis at the post; only the robot touches it (its body hulls and its
-        # feet's strike boxes), like RoboOlympics' hinged hurdle
+        # feet's strike boxes), like Embodied Olympics' hinged hurdle
         b = sc.body("vane", (x, y_post - 0.03, H + t))
         ET.SubElement(b, "joint", name="vane", type="hinge", axis="0 0 1", range="-2.4 2.4", damping="0.002",
                       frictionloss="0.01", armature="0.0005")

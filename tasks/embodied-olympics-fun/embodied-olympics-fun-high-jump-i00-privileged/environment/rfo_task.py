@@ -7,7 +7,7 @@ from rfo.referee import Flights
 from rfo.task import TaskBase
 # A rigid crossbar (fibreglass; the landing mat keeps its foam)'s contact with the robot, the venue's fixtures and the
 # other props (the ground keeps its own: rfo/world.py GROUND_SOLMIX): the stiff contact of the core's shells
-# (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from roboolympics' weightlifting fix, a rigid
+# (rfo/world.py SHELL_CONTACT: solref 0.004 s, solimp 0.99 0.999 0.0005, from Embodied Olympics' weightlifting fix, a rigid
 # prop on the robot's aluminium) with a solmix that wins over a default- contact geom; a ball (priority 1) keeps its
 # own bounce. With MuJoCo's default soft contact (solref 0.02 1, solimp 0.9 0.95) it sank 40 mm into the floor and 39
 # mm into the robot (stress test).
@@ -48,9 +48,9 @@ def official_bar(sc, name, x, height, p):
 # at 4 m/s that is a sink of about 0.4 m, and lying still, below the plateau, about 1 cm. World Athletics (TR 27.10)
 # sets only the area's size (at least 6 m x 4 m x 0.7 m); the shock-absorption classes of EN 12503-2 were not
 # available. MuJoCo's contact is a spring-damper normalised by the bodies' masses, not a pressure law: fitted to those
-# numbers (the group's probe_soft.py on a rigid block, probe_mat.py on the robot), a time constant of 0.8 s, critically
+# numbers (measured with a rigid block and with the robot), a time constant of 0.8 s, critically
 # damped, an impedance that falls from 0.4 at the surface to 0.05 at 8 cm (a firm skin, then the yielding plateau).
-# Measured on the test's injected jump (the H1-2 into the mat at 3.7 m/s): 0.46 m deep, no rebound (the box contact
+# Measured with the H1-2 dropped into the mat at 3.7 m/s: 0.46 m deep, no rebound (the box contact
 # it replaces: 0.20 m and 0.96 m/s back up); the body then rests about 0.28 m deep (no elastic recovery of the foam is
 # modelled). Friction 1.0 on the cover (not measured).
 MAT_CONTACT = dict(mat_timeconst_s=0.8, mat_dampratio=1.0, mat_imp0=0.4, mat_imp1=0.05, mat_give_m=0.08, mat_friction=1.0)

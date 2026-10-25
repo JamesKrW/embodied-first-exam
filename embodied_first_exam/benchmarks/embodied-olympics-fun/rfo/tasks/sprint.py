@@ -2,7 +2,7 @@
 (the short indoor distance: the benchmark shows what a robot can do, it does not stage the Olympic
 programme, and 100 m was half a minute of the same thing).
 
-The start procedure, the false-start rule, the lane rule, the "down" rule and the timing are RoboOlympics' athletics
+The start procedure, the false-start rule, the lane rule, the "down" rule and the timing are Embodied Olympics' athletics
 referee (sports/athletics/track.py, branch athletics-v3, MIT), ported: "on your marks" at t = 0, "set" 2.0 s later, the
 gun 1.2-2.2 s after "set" (this instance's fixed draw); a start movement earlier than 0.100 s after the gun is a false
 start; the finish is the torso's leading point on the line, interpolated between two physics steps."""

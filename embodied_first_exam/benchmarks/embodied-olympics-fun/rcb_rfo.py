@@ -2,7 +2,7 @@
 
 One module, copied unchanged into every Embodied Olympics - Fun task: the privileged environment (`Session`), the privileged
 verifier (`replay`) and the standard sim service (`Episode`, driven by sim/server.py). The world is the `rfo` package
-next to it (the Unitree G1 or H1-2 of the RoboOlympics robot library in a sports venue, rfo/world.py) with the family's own rules,
+next to it (the Unitree G1 or H1-2 of the Embodied Olympics robot library in a sports venue, rfo/world.py) with the family's own rules,
 `rfo_task.py`.
 
 A control step is 10 ms (10 physics steps of 1 ms). An action is a row of one of the action types
@@ -35,7 +35,7 @@ Python (privileged mode):
     s.reset()                                  # back to the frozen start (unlimited); clears s.rows
     s.replay()                                 # what the verifier will do with s.rows, in a fresh world
     s.save_trajectory()                        # /app/output/trajectory.npz (the deliverable): s.rows as sim rows
-CLI (the verifiers, make_instances.py):
+CLI (the verifiers, and writing a frozen instance):
     python rcb_rfo.py replay --instance instance.json --traj trajectory.npz --out r.json [--video replay.mp4]
     python rcb_rfo.py instance --family <family> --seed <seed> --out instance.json
 """

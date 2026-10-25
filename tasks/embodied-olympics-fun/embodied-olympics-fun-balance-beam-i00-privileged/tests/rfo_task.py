@@ -68,7 +68,7 @@ class Task(TaskBase):
              "supports (0.9 m from each end) are fixed; the far end is marked yellow.")
     difficulty = ("The beam is {width_m} m wide and the robot's built-in stance and gait keep the feet 0.24 m "
                   "apart, so neither can be used: every step is a single-leg balance on a sole 0.07 m wide, "
-                  "{height_m} m above the floor, for {length_m} m. No controller of this robot is known to do it.")
+                  "{height_m} m above the floor, for {length_m} m.")
 
     def build(self, sc):
         p = self.p
