@@ -27,7 +27,7 @@ expert_time_estimate_hours = 4.0
 mode = "standard"
 protocol = "eai-standard/2.1"
 oracle = "partial"
-oracle_evidence = "SimToolReal's pretrained policy, replayed in this scene, reaches 7/45 goals (solution/; README of dextoolbench_spatula_flat_spatula_flip_over-privileged)"
+oracle_evidence = "SimToolReal's pretrained policy, replayed in this scene, reaches 22/45 goals (solution/; README of dextoolbench_spatula_flat_spatula_flip_over-privileged)"
 
 [metadata.resources]
 # minimum compute to run this task (docs/protocol/README.md §2.9)
