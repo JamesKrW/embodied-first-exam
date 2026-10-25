@@ -141,8 +141,8 @@ on which the frozen instance does not rebuild to its stored initial state report
 the agent's processes; from then on the service refuses every request, and it judges the episode it ran (the task's success rule, with any settle or hold window run on the live simulator)
 and writes the verdict into `final.json` (`success`, the verdict; `live_success`, how the episode itself ended, before
 any settle or hold check; `graded_by` = `live`, `replays` = 0); nothing is
-replayed to grade it (PROTOCOL H.4). The video is a live recording, or, only where the simulator is verified bit-wise
-replayable, a post-hoc replay of `trajectory.npz` after the verdict (`video_source`, PROTOCOL §4); it never decides
+replayed to grade it (PROTOCOL H.4). The video is a post-hoc replay of `trajectory.npz` after the verdict by default, and a live
+recording where the simulator is not verified bit-wise replayable (`video_source`, PROTOCOL §4); it never decides
 anything. With resets, the first episode is kept as evidence too:
 `trajectory.first.npz` (its rows from the journal) and `replay.first.mp4`, rendered after the graded video; `final.json`
 says how it ended (`first_success`, `first_reason`; a success ends the trial, so after a reset `first_success` is 0) and
@@ -451,8 +451,8 @@ negative `Content-Length` (CI job `unit-tests`).
 `episode.jsonl` (calls, checkpoints, resumes), `journal.f64`, `startups.jsonl`, `calls/NNNNNN/` (meta + last frames per call),
 `server.log`, and at the end `trajectory.npz`, `final.json`, `replay.mp4`. The collect hook signals the service by PID
 after a collect hook has stopped the agent's processes; the service judges the live episode in-process (or dumps it with its live verdict
-and exits), and the hook writes `final.json`, then the video (a live recording, or a post-hoc replay where PROTOCOL §4
-allows one). A separate, network-less verifier transcribes `final.json` (PROTOCOL H.4). A GPU lost to a host
+and exits), and the hook writes `final.json`, then the video (a post-hoc replay, or a live recording where PROTOCOL §4
+requires one). A separate, network-less verifier transcribes `final.json` (PROTOCOL H.4). A GPU lost to a host
 systemd reload before the episode was judged is reported as `gpu_lost` (`infra_error`).
 
 ### 15. Privileged-mode parity

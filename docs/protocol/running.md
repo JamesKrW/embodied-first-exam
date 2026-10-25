@@ -140,8 +140,8 @@ Codex session (`agent/sessions/`). Run Codex with `--ak reasoning_summary=detail
   task's own image, only where a post-hoc replay is allowed (PROTOCOL §4), on the same host class when the replay is
   only reproducible there, and kept only when the replay reaches the recorded final state; `replay.regenerated.json` next to it says how. The grade is never touched, and
   the agent is never rerun for a video.
-- **Standard modes:** no replay grades the episode (PROTOCOL H.4). The video is a live recording, or a post-hoc replay
-  where the benchmark declares its simulator verified bit-wise replayable (PROTOCOL §4). Either way the verdict is on
+- **Standard modes:** no replay grades the episode (PROTOCOL H.4). The video is a post-hoc replay by default, and a live
+  recording where the benchmark's simulator is not verified bit-wise replayable (PROTOCOL §4). Either way the verdict is on
   disk first (`final.json` `finalized`; `video_pending` while the video is made) and `final.json` says `video_source`
   (`live` / `render`). Published videos follow the same rule and keep the label.
 - **Standard mode (RoboTwin):** the sim service records `live.mp4` (six views, frames only while physics runs and something moves,
