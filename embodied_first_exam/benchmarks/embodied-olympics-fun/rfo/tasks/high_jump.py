@@ -97,9 +97,9 @@ class Task(TaskBase):
         "(FAMILIES.md: a school competition's opening height; the men's world record is 2.45 m)",
         "TR 27 does not define a jump; here its flight lasts at least {min_air_s} s and raises the pelvis at least "
         "{rise_min_m} m above its height at lift-off (a fall from a stand raises it by nothing); the number is kept "
-        "within this robot's reach: its two-foot squat jump leaves the ground at about 1.8 m/s (0.17 m of rise), "
-        "and one leg gives at most half that push's work (an estimate of about 0.1 m of rise off one foot); a "
-        "human's jump raises it far more",
+        "within this robot's reach: an open-loop two-foot squat jump leaves the ground at about 1.8 m/s (0.17 m of "
+        "rise); a one-foot take-off of an agent's own on the declared H2-class legs (2.5 kW, 295 N m per joint) "
+        "left the ground at 2.78 m/s (0.39 m of rise of the centre of mass)",
         "the bar is rigid and its supports are fixed, so unlike a real bar it would carry a body: touching it is "
         "allowed, as in the rules, but contact with it for more than {bar_touch_max_s} s in all is a failure, and so "
         "is a push from it: the normal impulse of the bar on the robot, summed over the attempt, may be at most "
