@@ -54,6 +54,7 @@ UNITS: dict[str, list[str]] = {
     "RoboWits": _own("robowits"),
     "RoboPaint": _own("robopaint", "images/robopaint-pictures-files/"),
     "RoboLab": _own("robolab", "images/robolab-files/"),
+    "TactileLab": _own("tactilelab", "images/tactilelab-files/", "images/tactilelab-assets-files/"),
     "BEHAVIOR-1K": _own("behavior", "images/behavior-files/"),
     "ManiGuard": _own("maniguard"),
     "MolmoSpaces": _own("molmospaces"),

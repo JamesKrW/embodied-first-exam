@@ -812,3 +812,12 @@ sim = { cpus = 4, memory_gb = 10, pids = 8192, gpu_memory_gb = 5 }
 recommended_gpu = "any NVIDIA GPU with EGL (RTX 4090 / L4)"
 measured = "oracle trials of all 60 directories on an RTX 4090 workstation (docker stats every 3 s, the trial's resource monitor): the sim sidecar 2.1 GB and 0.83 GiB of GPU memory (standard, chess; realtime 0.8 GB and 0.72 GiB), the agent's container (the client) 0.03 GB; the collect hook renders the video inside the sidecar (EGL)"
 caps_measured = "GPU memory (the sim service): at most 0.83 GiB in the oracle trials -> max(1.5 x peak, peak + 4), rounded up: 5 GiB; processes and disk: defaults, not measured"
+
+# 20 task(s)
+[[cap]]
+match = "^tactilelab-.*-privileged$"
+main = { cpus = 8, memory_gb = 29, pids = 16384, gpu_memory_gb = 24, disk_gb = 20 }
+gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
+recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
+measured = "author estimate: one Isaac Sim 5.1 process (PhysX on the GPU, RTX rendering) took 8-10 GB of host memory and 4-6 GB of GPU memory in the author's runs; to be re-measured"
+caps_measured = "an author estimate, not measured"
