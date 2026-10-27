@@ -1,8 +1,8 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.1.0@sha256:07b70f9162c93e22541b236ef0903603567d947e3784e664c03d1f768315c388",
+ "image": "ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.1.0@sha256:00e8f53a6925f2c5a5afb3dfd139ebc70df2d6f7d087f8f07ddf06f73e4bf01b",
  "source": "embodied_first_exam/benchmarks/embodiedswe",
  "files": {
   "esw_proxy.py": "4481f808beaf323aaf6aa02de9c859434e8d614a53e132ab9fc28318d68d271e",
-  "rcb_embodiedswe.py": "e2454c92d6a09abf2d8115e13828bae68f200c24f51c871291211dbc3358cebd"
+  "rcb_embodiedswe.py": "634193a5a5f2945c4818363aa9fba917bd2d38d33de0000ebe2ab0c96531a397"
  }
 }

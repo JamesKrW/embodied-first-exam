@@ -7,7 +7,7 @@
 | Twin | — (privileged only) |
 | Simulator / robot | `embodiedswe` / `unitree-g1-dex3` |
 | Family / instance | `locomanip.fruit_delivery.g1.loco_pink_ik` / seed 0 |
-| Oracle | `none` — No reference solution in the repository, and none written for this scene yet; the build, the start-state hash, replay determinism and a do-nothing run scoring 0 are checked. |
+| Oracle | `none` — No reference solution in the repository. A scripted reference solve() exists outside the repository (internal only, used to check the task is solvable through the grading path); it is not shipped. |
 | Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.2.0` |
 
@@ -19,7 +19,7 @@ deliverable: `solution/solve.py` exposing `solve(env)`.
 Loco-manipulation: the G1 walks under a frozen locomotion policy (base velocity commands) while its arms and hands pick fruit and carry it to a plate elsewhere in the room.
 
 ## Reference solution
-None in the repository (`oracle = "none"`). No scripted reference has been written for this scene yet.
+None in the repository (`oracle = "none"`). A scripted reference `solve()` is kept outside the repository (internal only).
 
 ## Verification
 `tests/grade.py`: a trusted simulator process in the verifier container builds the env from the frozen instance
@@ -38,8 +38,19 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 |---|---|---|
 | CPU cores | 4 | 4 |
 | Memory | 13 GB | 13 GB |
-| GPU memory | 6.5 GB | 6.5 GB |
+| GPU memory | 5 GB | 5 GB |
 
 - GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: not yet measured: RoboLab's privileged figures (the same Isaac Sim 5.1 stack and recipe, CPU PhysX) as the estimate
+- Measured: measured on an L40S with a scripted reference, one graded run alone on the GPU (docker stats + nvidia-smi every 2 s): rollout and replay through the proxy 3.0 GiB RAM / 0.56 GiB GPU, video render 11.9 / 4.4; minimums = the video peak plus headroom
 - Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 24 GiB GPU memory, 24 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 24 GiB GPU memory, 24 GiB memory. Limits measured: not yet measured: RoboLab's privileged limits (the same Isaac Sim stack) as the estimate.
+
+## Details
+
+### Review notes
+- Contact artifact (reported, not changed): at a high grip closure (1.3 on the hand's closure scale) the middle
+  fingertip of the G1's right hand stays attached to the lemon after the fingers open, and the lemon rises with the
+  hand (3 of 3 trials; 0 of 4 at closure 0.9). It looks like a penetration artifact of the contact model. It makes
+  the release harder than it is physically, and a solution could use it as glue while carrying.
+- Device: PhysX and the frozen locomotion policy run on the CPU only (the tooling refuses another device). On a GPU
+  the policy is deterministic but its bits differ from the CPU's, the start state differs from the frozen instance,
+  and a trajectory recorded on the CPU fails there.

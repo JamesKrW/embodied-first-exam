@@ -40,6 +40,14 @@ state (the cutting scenes have no `success()`: their graders' predicate, enough 
 also the tooling's `cut_success` for the development `check`); `progress` = its rubric score. A fresh process re-executes the recorded actions and must reach the same final
 state. No submissions, checkpoints or best-of-N: the final `solution/` is graded once.
 
+## Device
+
+PhysX and the G1's frozen locomotion policy run on the CPU, in the verifier and in the agent's development env alike
+(`make_env()` builds exactly as grading does; the tooling refuses an instance or a build on another device). A fresh
+CPU process repeats a run bit for bit, which the replay check needs. On a GPU the locomotion policy is deterministic
+too but its bits differ from the CPU's, start states differ from the frozen instances, and a trajectory recorded on
+the CPU fails there.
+
 ## Image
 
 `ghcr.io/mll-lab-nu/efe-private:embodiedswe-<VERSION>` (`images/embodiedswe/`, BUILD_ONLY): RoboLab's recipe plus

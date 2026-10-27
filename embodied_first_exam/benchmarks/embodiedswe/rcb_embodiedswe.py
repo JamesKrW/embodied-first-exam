@@ -138,7 +138,12 @@ def build(instance: dict):
     robobench.discover()
     from robobench.core.registries import ENVS
     seed = int(instance["seed"])
+    if instance.get("device", DEVICE) != DEVICE:
+        raise ValueError(f"instance built on {instance.get('device')!r}; these tasks run PhysX (and the G1 locomotion "
+                         f"policy) on {DEVICE!r} only: another device gives another start state and other bits")
     env = ENVS.get(instance["preset"])().build(num_envs=1, seed=seed, device=DEVICE)
+    if str(env.device) != DEVICE:
+        raise RuntimeError(f"the env was built on {env.device}, not {DEVICE}")
     env.reset(seed=seed)
     return env
 
