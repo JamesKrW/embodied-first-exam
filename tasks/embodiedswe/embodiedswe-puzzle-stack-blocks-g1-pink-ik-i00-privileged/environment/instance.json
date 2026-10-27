@@ -1,0 +1,10 @@
+{
+ "action_dim": 0,
+ "control_dt": 0.0,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.0,
+ "preset": "puzzle.stack_blocks.g1.pink_ik",
+ "seed": 0,
+ "state_sha": "PENDING"
+}

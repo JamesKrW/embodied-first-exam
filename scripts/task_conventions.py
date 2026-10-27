@@ -96,6 +96,7 @@ BENCHMARKS = [  # (directory prefix, label)
     ("labutopia-", "LabUtopia"),
     ("autobio-", "AutoBio"),
     ("abc-sim-", "ABC Sim"),
+    ("embodiedswe-", "EmbodiedSWE"),
 ]
 # Modes (PROTOCOL §3, owner 2026-10-14): a benchmark ships any subset of the modes. A standard or standard-realtime
 # task without a privileged twin says why in its README's Twin row ("— (none: ...)"), the task's own declaration:
@@ -279,6 +280,7 @@ BENCHMARK_DIRS = {
     "Embodied Olympics - Fun": "embodied-olympics-fun", "Embodied Olympics - Match": "embodied-olympics-match", "Embodied Safety Exam": "embodied-safety-exam",
     "Panda Dynamic Scenes": "pandadyn", "AM-Bench": "ambench", "iSpatialGym": "ispatialgym",
     "roboEngineer": "roboengineer", "LabUtopia": "labutopia", "AutoBio": "autobio", "ABC Sim": "abc-sim",
+    "EmbodiedSWE": "embodiedswe",
 }
 
 
