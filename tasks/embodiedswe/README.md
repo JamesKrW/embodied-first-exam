@@ -52,7 +52,10 @@ the CPU fails there.
 
 `ghcr.io/mll-lab-nu/efe-private:embodiedswe-<VERSION>` (`images/embodiedswe/`, BUILD_ONLY): RoboLab's recipe plus
 robobench at the pinned commit, scrubbed of graders, smoke probes and solve-calibrated comments, and its asset bundle
-by sha256.
+by sha256. Isaac Lab's default ground plane and its 3 textures are mirrored into the image by sha256
+(`isaac_assets.json`), and the Isaac Lab kit files point their asset root there, so no scene reads the network. Some
+upstream binary USD assets carry "Generated from Composed Stage" doc strings with their authors' build paths; these
+hold no task content and are left as shipped.
 
 ## Provenance
 

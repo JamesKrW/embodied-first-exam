@@ -88,6 +88,21 @@ roots = sorted(r for r in f.load_manifest()['bundles'] if '/deformable/' not in 
 sys.exit(1 if f.fetch(prefixes=roots) else 0)" && \
     rm -rf /opt/embodiedswe/.cache /root/.cache/huggingface && \
     ! grep -rlaE "https?://[A-Za-z0-9.-]*(amazonaws|nvidia|huggingface)" /opt/embodiedswe/robobench --include=*.usda --include=*.mdl
+# Isaac Lab's default ground plane, which puzzle.spatula, puzzle.syringe, cutting.slice and cutting.dice spawn
+# (`GroundPlaneCfg()`: {ISAAC_NUCLEUS_DIR}/Environments/Grid/default_environment.usd), and its whole USD dependency closure
+# (the three textures it references; OmniPBR.mdl is Kit's own), from NVIDIA's public Omniverse content bucket, each checked by
+# its sha256, at the bucket's key layout under /opt/isaac_assets. Isaac Lab's experience files then point the asset root
+# (/persistent/isaac/asset_root/{default,cloud,nvidia}, read by isaaclab.utils.assets) at that mirror, so the scenes load
+# unchanged and offline. Closure + checksums: images/embodiedswe/isaac_assets.json (fetch_isaac_assets.py).
+ADD --chmod=644 --checksum=sha256:deab39088eaf39ed7be951966c5e6bd5e58b90ab64743b0cdc8e5579fd5a99d9 https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Environments/Grid/Materials/Textures/WireframeBlur_basecolor.png /opt/isaac_assets/Assets/Isaac/5.1/Isaac/Environments/Grid/Materials/Textures/WireframeBlur_basecolor.png
+ADD --chmod=644 --checksum=sha256:44fc0e82007bb0bd94631cd7ec45986a71ed74b9413899fbffac13efe151be4b https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Environments/Grid/Materials/Textures/WireframeBlur_blue.png /opt/isaac_assets/Assets/Isaac/5.1/Isaac/Environments/Grid/Materials/Textures/WireframeBlur_blue.png
+ADD --chmod=644 --checksum=sha256:940b96ee8c8e53bd1acbc770d4ca0ac98bed9c96439ab386d1b27dbc9790cc4e https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Environments/Grid/Materials/Textures/Wireframe_blue.png /opt/isaac_assets/Assets/Isaac/5.1/Isaac/Environments/Grid/Materials/Textures/Wireframe_blue.png
+ADD --chmod=644 --checksum=sha256:8a21c317d638d33a4e6c20c958a7ed8f4d8c5195efd7e20f1b85178b4a15638a https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Environments/Grid/default_environment.usd /opt/isaac_assets/Assets/Isaac/5.1/Isaac/Environments/Grid/default_environment.usd
+RUN A=/opt/robolab/.venv/lib/python3.11/site-packages/isaaclab/apps && \
+    sed -i '/^persistent\.isaac\.asset_root\.\(default\|cloud\|nvidia\) = /s#"https://omniverse-content-production\.s3-us-west-2\.amazonaws\.com/Assets/Isaac/5\.1"$#"/opt/isaac_assets/Assets/Isaac/5.1"#' $A/*.kit && \
+    test "$(grep -h '^persistent\.isaac\.asset_root\.\(default\|cloud\|nvidia\) = "/opt/isaac_assets/Assets/Isaac/5\.1"$' $A/*.kit | wc -l)" = 18 && \
+    ! grep -n 'asset_root.*https://' $A/*.kit && chmod -R a+rX /opt/isaac_assets && \
+    test -f /opt/isaac_assets/Assets/Isaac/5.1/Isaac/Environments/Grid/default_environment.usd
 ENV HF_HUB_OFFLINE=1 OMNI_KIT_ALLOW_ROOT=1
 # the graded solution process runs as `nobody`: it must reach the interpreter (under /root, traverse only) and read the
 # package trees, never write them. The tooling (rcb_embodiedswe.py, esw_proxy.py) is not in this image: each task copies
