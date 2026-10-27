@@ -7,7 +7,7 @@
 | Twin | `humanclaw-sit-bed-i07-standard` |
 | Simulator / robot | `humanclaw` / `smplx-human` |
 | Family / instance | `sit-bed` / seed 0 |
-| Oracle | `none` — pending: the navmesh oracle has not been run on this version yet |
+| Oracle | `full` — navmesh oracle (privileged tools, closed loop, on RTX 4090): 36 actions; two fresh-process replays on RTX 4090 succeed with equal final hashes (9732baf2aa4e1667) from the start hash dff7d019996e1406; on L40S these actions fail (the motion model's arithmetic differs; the privileged solution then reruns the oracle there); image humanclaw-0.1.0, 2026-10-27 |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:humanclaw-0.1.0` |
 

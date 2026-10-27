@@ -30,8 +30,8 @@ dynamics = "static"
 protocol = "eai-standard/2.1"
 instance_seed = 0
 expert_time_estimate_hours = 0.5
-oracle = "none"
-oracle_evidence = "pending: the navmesh oracle has not been run on this version yet"
+oracle = "full"
+oracle_evidence = "the privileged oracle's 33 actions streamed as skill rows through the client (open loop: they succeed on L40S)"
 
 [metadata.resources]
 min_cpus = 4.0
@@ -68,7 +68,7 @@ sim = { cpus = 8.0, memory_gb = 24.0, pids = 8192 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = []
+oracle = [0]
 
 [verifier]
 timeout_sec = 900.0

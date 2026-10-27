@@ -31,7 +31,7 @@ protocol = "eai-standard/2.1"
 instance_seed = 0
 expert_time_estimate_hours = 0.5
 oracle = "full"
-oracle_evidence = "the privileged oracle's 55 actions streamed as skill rows through the client; harbor oracle run pending"
+oracle_evidence = "the privileged oracle's 55 actions streamed as skill rows through the client (open loop: they succeed on L40S and RTX 4090)"
 
 [metadata.resources]
 min_cpus = 4.0

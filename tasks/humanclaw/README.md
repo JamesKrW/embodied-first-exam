@@ -32,8 +32,9 @@ allows 100 actions, the stop included, and has no reset; success needs an explic
 
 What differs from HumanCLAW's own evaluator (declared in every task):
 - The motion model's noise is seeded at every reset (torch / numpy / random, seed 0). HumanCLAW never seeds it, so its
-  rollouts of the same actions differ run to run; seeded, an episode is a function of the actions, which a submitted
-  trajectory and a crash-resume both need.
+  rollouts of the same actions differ run to run; seeded, an episode is a function of the actions on a given GPU
+  model, which a submitted trajectory and a crash-resume both need. Across GPU models the motion model's arithmetic
+  differs in the last bits and the physics amplifies it, so the verifier replays on the machine the agent ran on.
 - A reset rebuilds the simulator (HumanCLAW builds a fresh one per rollout too), so moved furniture comes back.
 - The agent is not HumanCLAW's VLM pipeline (planner + verifier, history of 10): it is whatever the harness runs, and
   it calls the skills directly.
@@ -63,6 +64,16 @@ privileged mode. An EFE Codex + Astra pass over the 200 tasks checks the rates. 
 per-episode outcomes are kept as trusted provenance outside the repository; no agent-readable file names them.
 
 ## Reference solution
-A navmesh oracle (privileged tools: shortest path to the nearest target, turn-and-walk along it, then sit for an
-interaction episode, then stop), run closed-loop and stored as `solution/actions.json` once it succeeds on this
-version (`oracle` / `oracle_evidence` in each task.toml).
+A navmesh oracle with the privileged tools (`solution/oracle.py`): Habitat's shortest path (on a navmesh for a wider
+body) to the nearest goal viewpoint or to a reachable point beside a target box, turn-and-walk along it, close in with
+short strides, then, for an interaction episode, HumanCLAW's own sitting recipe (turn the back to the target, step
+back, sit at the category's height until the pelvis touches it), then stop; it tries a few variants with free resets.
+It solves 84 of the 100 episodes (core 39 / 50, all-only 45 / 50); the other 16 have no reference solution
+(`oracle = "none"`): targets behind furniture or up a step, and seats the body does not land on.
+- privileged: `solution/actions.json` is the oracle's trajectory, replayed twice in fresh processes to success with
+  equal final hashes on the GPU model named in `oracle_evidence`. The physics amplifies the last-bit differences of the
+  motion model between GPU models (an RTX 4090 and an L40S agree on the start hash, never on the final one, and on
+  about 1 trajectory in 10 not even on the verdict), so `solve.sh` replays it first and, where it fails on the
+  machine at hand, runs the oracle again closed loop there.
+- standard: the same actions streamed as `skill` rows through the client (open loop, so they hold on the GPU model
+  named in the evidence).

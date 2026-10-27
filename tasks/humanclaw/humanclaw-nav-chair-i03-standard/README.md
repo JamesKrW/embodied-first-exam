@@ -7,7 +7,7 @@
 | Twin | `humanclaw-nav-chair-i03-privileged` |
 | Simulator / robot | `humanclaw` / `smplx-human` |
 | Family / instance | `nav-chair` / seed 0 |
-| Oracle | `full` — the privileged oracle's 17 actions streamed as skill rows through the client; harbor oracle run pending |
+| Oracle | `full` — the privileged oracle's 17 actions streamed as skill rows through the client (open loop: they succeed on L40S and RTX 4090) |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:humanclaw-0.1.0` |
 

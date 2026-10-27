@@ -14,9 +14,10 @@
     python /opt/tools/hc_tools.py replay /app/output/trajectory.npz [--video out.mp4] [--json out.json]
 
 Coordinates are Habitat's world frame: y up, metres; heading_deg is the body's facing about +y (0 = facing -z, + =
-turning left). A replay of the same actions from the frozen start reproduces the same episode (the motion model's
-noise is seeded at every reset), which is what the verifier checks: it replays the trajectory twice, each time in a
-fresh process from its own copy of the instance, and both must succeed and end in the same state.
+turning left). A replay of the same actions from the frozen start reproduces the same episode on the same GPU model
+(the motion model's noise is seeded at every reset; another GPU model computes it slightly differently, and the
+physics amplifies that), which is what the verifier checks on this machine: it replays the trajectory twice, each
+time in a fresh process from its own copy of the instance, and both must succeed and end in the same state.
 """
 from __future__ import annotations
 
@@ -114,8 +115,14 @@ class Env:
                 settings.agent_radius, settings.agent_height = float(agent_radius), 1.6
                 if hasattr(settings, "include_static_objects"):
                     settings.include_static_objects = True
-                cache[key] = habitat_sim.PathFinder()
-                sim.recompute_navmesh(cache[key], settings)
+                pf_new = habitat_sim.PathFinder()
+                for cell in (settings.cell_size, 0.1, 0.15):   # a large scene can exceed Detour's limits: coarser cells
+                    settings.cell_size = cell
+                    if sim.recompute_navmesh(pf_new, settings) and pf_new.is_loaded:
+                        break
+                else:
+                    raise RuntimeError(f"could not build a navmesh for agent_radius={agent_radius}")
+                cache[key] = pf_new
             pf = cache[key]
         a = self.session.env.agent.translation
         # from the body: its pelvis is ~0.9 m above the floor, too high for the navmesh snap on some floors

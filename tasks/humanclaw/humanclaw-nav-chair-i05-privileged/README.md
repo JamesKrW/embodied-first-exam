@@ -7,7 +7,7 @@
 | Twin | `humanclaw-nav-chair-i05-standard` |
 | Simulator / robot | `humanclaw` / `smplx-human` |
 | Family / instance | `nav-chair` / seed 0 |
-| Oracle | `full` — navmesh oracle (privileged tools, closed loop): 37 actions; two fresh-process replays succeed with equal final hashes (fef1fbba2bd8f88c) from the start hash 474bf0fceea53fc2; image humanclaw-0.1.0, RTX 4090, 2026-10-27 |
+| Oracle | `full` — navmesh oracle (privileged tools, closed loop, on RTX 4090): 37 actions; two fresh-process replays on L40S succeed with equal final hashes (307817fb95cf58e5) from the start hash 474bf0fceea53fc2; the same actions succeed on RTX 4090 (the oracle run itself); image humanclaw-0.1.0, 2026-10-27 |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:humanclaw-0.1.0` |
 

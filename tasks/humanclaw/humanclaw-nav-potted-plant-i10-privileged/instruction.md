@@ -54,7 +54,7 @@ env.save("/app/output/trajectory.npz")
 ```
 `python /opt/tools/hc_tools.py replay /app/output/trajectory.npz` runs what the verifier runs (add `--video
 out.mp4` to watch it). The motion model's noise is seeded at every reset, so the same actions from the start give
-the same episode; check it with two replays. The source of every module is in `/opt/humanclaw/src/humanclaw_bench`
+the same episode on this machine's GPU (the verifier replays here); check it with two replays. The source of every module is in `/opt/humanclaw/src/humanclaw_bench`
 and `/opt/tools`.
 
 ## External material

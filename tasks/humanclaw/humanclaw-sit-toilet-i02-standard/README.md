@@ -7,7 +7,7 @@
 | Twin | `humanclaw-sit-toilet-i02-privileged` |
 | Simulator / robot | `humanclaw` / `smplx-human` |
 | Family / instance | `sit-toilet` / seed 0 |
-| Oracle | `none` — pending: the navmesh oracle has not been run on this version yet |
+| Oracle | `full` — the privileged oracle's 44 actions streamed as skill rows through the client (open loop: they succeed on L40S) |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:humanclaw-0.1.0` |
 

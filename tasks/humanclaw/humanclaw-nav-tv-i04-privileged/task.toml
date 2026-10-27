@@ -15,8 +15,8 @@ robot = "smplx-human"
 family = "nav-tv"
 mode = "privileged"
 dynamics = "static"
-oracle = "none"
-oracle_evidence = "pending: the navmesh oracle has not been run on this version yet"
+oracle = "full"
+oracle_evidence = "navmesh oracle (privileged tools, closed loop, on RTX 4090): 12 actions; two fresh-process replays on L40S succeed with equal final hashes (2e5270c763813a8f) from the start hash f8c00b051359a97a; the same actions succeed on RTX 4090 (the oracle run itself); image humanclaw-0.1.0, 2026-10-27"
 instance_seed = 0
 expert_time_estimate_hours = 0.5
 
@@ -54,7 +54,7 @@ main = { cpus = 8.0, memory_gb = 29.0, pids = 16384 }
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
 default = 0
 allowed = [0]
-oracle = []
+oracle = [0]
 
 [verifier]
 timeout_sec = 4200.0              # two fresh-process replays at tests/grade.py's limit (1800 s each) + 600 s

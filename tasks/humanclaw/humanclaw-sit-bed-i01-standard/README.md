@@ -7,7 +7,7 @@
 | Twin | `humanclaw-sit-bed-i01-privileged` |
 | Simulator / robot | `humanclaw` / `smplx-human` |
 | Family / instance | `sit-bed` / seed 0 |
-| Oracle | `full` — the privileged oracle's 34 actions streamed as skill rows through the client; harbor oracle run on 2026-10-27: reward 1, graded live, the live final state hash equal to the replays' |
+| Oracle | `full` — the privileged oracle's 34 actions streamed as skill rows through the client (open loop: they succeed on L40S and RTX 4090); harbor oracle run on RTX 4090: reward 1, graded live |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:humanclaw-0.1.0` |
 

@@ -31,7 +31,7 @@ protocol = "eai-standard/2.1"
 instance_seed = 0
 expert_time_estimate_hours = 0.5
 oracle = "full"
-oracle_evidence = "the privileged oracle's 34 actions streamed as skill rows through the client; harbor oracle run on 2026-10-27: reward 1, graded live, the live final state hash equal to the replays'"
+oracle_evidence = "the privileged oracle's 34 actions streamed as skill rows through the client (open loop: they succeed on L40S and RTX 4090); harbor oracle run on RTX 4090: reward 1, graded live"
 
 [metadata.resources]
 min_cpus = 4.0
