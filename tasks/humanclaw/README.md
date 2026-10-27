@@ -52,15 +52,13 @@ action chains), so the agent reaches the model APIs and the package registries o
 The 100 episodes were chosen from HumanCLAW's own full-validation runs of Codex + GPT-6 Astra, condition `codex_r3`
 (Codex CLI 0.145 with HumanCLAW's own Codex wrapper, reasoning effort max, an image window of 50; 64.2 % of the 1,218
 episodes), using that run's per-episode outcome only:
-- two groups of 50, each 25 navigation (chair 9, potted plant 8, TV 8) + 25 interaction (bed 9, couch 8, toilet 8):
-  - the **core** group, r3 success 15 / 50 = **30 %** (chair 3, potted plant 2, TV 3, bed 3, couch 2, toilet 2): its 50
-    episodes are this benchmark's core-set entries;
-  - the **all-only** group, r3 success 30 / 50 = **60 %** (5 per category);
-  so the whole set (all 100) is at 45 % under r3;
+- two halves of 50, each 25 navigation (chair 9, potted plant 8, TV 8) + 25 interaction (bed 9, couch 8, toilet 8):
+  one at r3 success 15 / 50 = **30 %** (chair 3, potted plant 2, TV 3, bed 3, couch 2, toilet 2), the other at
+  30 / 50 = **60 %** (5 per category); so the whole set (all 100) is at 45 % under r3;
 - within a (category, r3 outcome) cell: fewest picks from the same scene first (at most 3 episodes per scene; 41 scenes),
   then outcomes that HumanCLAW's other runs on the same model agree with (no flukes), then a fixed random order.
 The calibration run is not an EFE run: HumanCLAW's wrapper and VLM loop, an older Codex CLI, effort max, and no
-privileged mode. An EFE Codex + Astra pass over the 200 tasks checks the rates. Upstream episode ids and the
+privileged mode. None of the 100 is in the core set yet: an EFE run over the 200 tasks comes first. Upstream episode ids and the
 per-episode outcomes are kept as trusted provenance outside the repository; no agent-readable file names them.
 
 ## Reference solution
@@ -68,7 +66,7 @@ A navmesh oracle with the privileged tools (`solution/oracle.py`): Habitat's sho
 body) to the nearest goal viewpoint or to a reachable point beside a target box, turn-and-walk along it, close in with
 short strides, then, for an interaction episode, HumanCLAW's own sitting recipe (turn the back to the target, step
 back, sit at the category's height until the pelvis touches it), then stop; it tries a few variants with free resets.
-It solves 84 of the 100 episodes (core 39 / 50, all-only 45 / 50); the other 16 have no reference solution
+It solves 84 of the 100 episodes (39 / 50 in the 30 % half, 45 / 50 in the 60 % half); the other 16 have no reference solution
 (`oracle = "none"`): targets behind furniture or up a step, and seats the body does not land on.
 - privileged: `solution/actions.json` is the oracle's trajectory, replayed twice in fresh processes to success with
   equal final hashes on the GPU model named in `oracle_evidence`. The physics amplifies the last-bit differences of the
