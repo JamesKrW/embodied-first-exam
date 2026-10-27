@@ -7,7 +7,7 @@
 | Twin | — (privileged only) |
 | Simulator / robot | `embodiedswe` / `franka-panda` |
 | Family / instance | `assembly.bulb.franka.osc` / seed 0 |
-| Oracle | `none` — No reference solution in the repository. Pilot (board 0265): a scripted reference solve() written for this pilot is kept outside the task (internal only); its result on this version is recorded in the pilot report. |
+| Oracle | `none` — No reference solution in the repository. A scripted reference solve() exists outside the repository (internal only, used to check the task is solvable through the grading path); it is not shipped. |
 | Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.1.0` |
 

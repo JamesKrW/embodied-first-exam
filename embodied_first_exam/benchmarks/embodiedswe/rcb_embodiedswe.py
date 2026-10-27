@@ -175,6 +175,20 @@ READ_RE = re.compile(r"^_*(get|is|has|find|describe|seated|success|score|tower_h
 # refused (they rebind or hand out the write path).
 ENV_CALLS = {"describe", "describe_stage", "get_states"}
 
+# Strict, audited read-method allowlist for the privileged objects that hold ground truth (scene, robot).
+# Default deny: a method on a scene/robot that is not listed here is refused even if its name looks like a
+# read (the regex above is kept only as a secondary gate for leaf objects such as configs and articulations).
+# Maintainers EXTEND these per task after auditing the new scene/robot class (not a code change for each run).
+READ_METHODS_SCENE = {
+    "get_state", "describe", "seated", "success", "score", "tower_height",
+    "_bulb_offsets_in_socket", "_bulb_axis_cos", "_block_tensors", "_upright", "_slots", "_level_counts",
+}
+READ_METHODS_ROBOT = {
+    "get_state", "describe", "name", "prim_name", "action_dim", "control_period", "control_dt",
+    "actuator_limits", "joint_names", "body_names",
+}
+MAX_HANDLES = 500_000              # cap the trusted-side handle table (a solution cannot grow it without bound)
+
 
 class Refused(Exception):
     pass
@@ -189,6 +203,7 @@ class Server:
         self.on_step = on_step           # callable(action tensor) -> None; raises StopRollout to end
         self.objs: dict[int, tuple] = {0: ("obj", env)}
         self.ids: dict[int, int] = {id(env): 0}
+        self.method_ids: dict[tuple, int] = {}
         self.n_requests = 0
         self.n_refused = 0
         self.refusals: list[str] = []
@@ -205,14 +220,22 @@ class Server:
         key = id(obj)
         h = self.ids.get(key)
         if h is None or self.objs[h][1] is not obj:
+            if len(self.objs) >= MAX_HANDLES:
+                raise StopRollout(f"handle_cap ({MAX_HANDLES} handles)")
             h = len(self.objs)
             self.objs[h] = ("obj", obj)
             self.ids[key] = h
         return {"__h__": h, "type": type(obj).__name__, "callable": callable(obj)}
 
     def method_handle(self, owner, name: str) -> dict:
-        h = len(self.objs)
-        self.objs[h] = ("method", owner, name)
+        key = (id(owner), name)                       # dedup: reading the same method twice reuses its handle
+        h = self.method_ids.get(key)
+        if h is None or self.objs.get(h) != ("method", owner, name):
+            if len(self.objs) >= MAX_HANDLES:
+                raise StopRollout(f"handle_cap ({MAX_HANDLES} handles)")
+            h = len(self.objs)
+            self.objs[h] = ("method", owner, name)
+            self.method_ids[key] = h
         return {"__h__": h, "type": f"{type(owner).__name__}.{name}", "callable": True}
 
     def resolve(self, d: dict):
@@ -234,7 +257,11 @@ class Server:
             return name in ENV_CALLS
         if WRITE_RE.match(name) or name in ("on_bind", "actuator_sink", "build_controller"):
             return False
-        return bool(READ_RE.match(name))
+        if isinstance(owner, self._scene_types):      # privileged ground-truth objects: strict allowlist
+            return name in READ_METHODS_SCENE
+        if isinstance(owner, self._robot_types):
+            return name in READ_METHODS_ROBOT
+        return bool(READ_RE.match(name))               # leaf objects (configs, articulations): name heuristic
 
     def getattr(self, obj, name: str):
         if not isinstance(name, str) or (name.startswith("__") and name.endswith("__")) or name in ("_grader", "_env"):
@@ -283,7 +310,8 @@ class Server:
         if op == "len":
             return len(obj)
         if op == "iter":
-            return self.value(list(obj)[:100_000])
+            import itertools
+            return self.value(list(itertools.islice(obj, 100_000)))  # never materialize the whole iterable
         if op == "contains":
             return decode(req.get("item"), self.resolve) in obj
         if op == "bool":
@@ -299,8 +327,28 @@ class StopRollout(Exception):
     pass
 
 
+def _hide_other_procs() -> None:
+    """Belt to Landlock's suspenders: give the solution a private mount namespace with /proc remounted
+    hidepid=2, so other processes' /proc entries (cmdline, environ, fd, mem of the trusted sim) are hidden
+    even on a kernel where Landlock is weaker or absent. Best effort: a verifier container without
+    CAP_SYS_ADMIN gets EPERM and this is a no-op (Landlock stays the guarantee, re-checked by
+    esw_proxy._verify_sandbox). Runs while still root, before the setuid below."""
+    import ctypes
+    libc = ctypes.CDLL(None, use_errno=True)
+    CLONE_NEWNS = 0x00020000
+    MS_REC, MS_PRIVATE = 0x4000, 1 << 18
+    if libc.unshare(CLONE_NEWNS) != 0:
+        return
+    libc.mount(None, b"/", None, MS_REC | MS_PRIVATE, None)
+    libc.mount(b"proc", b"/proc", b"proc", 0, b"hidepid=2")
+
+
 def _preexec_nobody():
     os.setsid()
+    try:
+        _hide_other_procs()
+    except Exception:  # noqa: BLE001 — best effort; Landlock + _verify_sandbox are the guarantee
+        pass
     os.setgroups([])
     os.setgid(NOBODY)
     os.setuid(NOBODY)
@@ -356,7 +404,9 @@ def prepare_solution(src: Path, dst: Path) -> None:
 
 def run_solution(env, solution: Path, work: Path, on_step, timeout_s: float, log_path: Path) -> dict:
     """Start the solution process as `nobody` and serve it until solve ends, it dies, or `timeout_s` passes."""
-    from esw_proxy import Wire
+    from esw_proxy import LANDLOCK_ABI_MIN, Wire, landlock_abi
+    if landlock_abi() < LANDLOCK_ABI_MIN:
+        raise RuntimeError(f"this kernel offers no Landlock ABI >= {LANDLOCK_ABI_MIN}: the solution cannot be sandboxed")
     sol = work / "solution"
     prepare_solution(solution, sol)
     scratch = work / "scratch"
@@ -399,7 +449,7 @@ def run_solution(env, solution: Path, work: Path, on_step, timeout_s: float, log
     threading.Thread(target=watchdog, daemon=True).start()
     t0 = None
     try:
-        wire.send({"op": "hello", "root": srv.handle_of(env), "protocol": "esw-proxy/1"})
+        wire.send({"op": "hello", "root": srv.handle_of(env), "protocol": "esw-proxy/1", "scratch": str(scratch)})
         while True:
             try:
                 req = wire.recv()
@@ -418,8 +468,13 @@ def run_solution(env, solution: Path, work: Path, on_step, timeout_s: float, log
                 wire.send({"value": None})
                 continue
             if op == "done":
+                if req.get("sandbox_failed"):
+                    out["solve_status"] = "sandbox_failed"
+                    out["sandbox_error"] = str(req["sandbox_failed"])[:500]
+                    break
                 out["solve_status"] = "error" if req.get("error") else "returned"
                 out["solve_error"] = req.get("error")
+                out["sandbox"] = req.get("sandbox")
                 break
             try:
                 v = srv.handle(req)
@@ -466,6 +521,8 @@ def cmd_make_instance(a) -> int:
     inst["control_dt"] = round(float(env.dt * env.robot.control_period), 6)
     inst["physics_dt"] = float(env.dt)
     Path(a.out).write_text(json.dumps(inst, indent=1, sort_keys=True) + "\n")
+    if a.describe:
+        Path(a.describe).write_text(env.describe().strip() + "\n")
     print(json.dumps(inst), flush=True)
     stop_app()
     return 0
@@ -528,6 +585,9 @@ def cmd_rollout(a) -> int:
         res["phase"] = "solve"
         run = run_solution(env, Path(a.solution), out / "work", on_step, float(a.timeout), Path(a.solve_log))
         res.update(run)
+        if run.get("solve_status") == "sandbox_failed":
+            res.update(phase="sandbox_failed", infra_error=1)
+            raise StopRollout("sandbox_failed")
         res.update(_final(env, grader, inst))
         A = np.stack(actions).astype(np.float32) if actions else np.zeros((0, env.robot.action_dim), np.float32)
         np.savez(out / "actions.npz", task=np.array(inst["preset"]), seed=np.array(inst["seed"]), actions=A)
@@ -606,6 +666,8 @@ def cmd_video(a) -> int:
         env.reset(seed=seed)
         res["instance_ok"] = state_sha(env) == inst["state_sha"]
         eye, target = (env.room or {}).get("camera") or ((1.6, -1.6, 1.4), (0.3, 0.0, 0.5))
+        if a.eye and a.target:
+            eye, target = [float(v) for v in a.eye.split(",")], [float(v) for v in a.target.split(",")]
         cam.set_world_poses_from_view(torch.tensor([list(eye)]), torch.tensor([list(target)]))
         A = _load_actions(a.traj, inst["preset"], env.robot.action_dim)
         control_dt = float(env.dt * env.robot.control_period)
@@ -662,6 +724,7 @@ def main(argv=None) -> int:
     p.add_argument("--preset", required=True, choices=sorted(TASKS))
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out", required=True)
+    p.add_argument("--describe", default=None, help="also write env.describe() here (the task's instruction text)")
     for name in ("rollout", "check"):
         p = sub.add_parser(name)
         p.add_argument("--instance", default="/app/instance.json")
@@ -683,6 +746,8 @@ def main(argv=None) -> int:
     p.add_argument("--width", type=int, default=960)
     p.add_argument("--height", type=int, default=540)
     p.add_argument("--max-frames", type=int, default=9000)
+    p.add_argument("--eye", default=None, help="camera eye x,y,z (env frame); default: the room's camera")
+    p.add_argument("--target", default=None, help="camera target x,y,z")
     a = ap.parse_args(argv)
     if a.cmd == "rollout" and not a.solve_log:
         a.solve_log = str(Path(a.out) / "solve.log")

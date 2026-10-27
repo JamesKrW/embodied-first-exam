@@ -1,0 +1,8 @@
+{
+ "image": "ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.1.0@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+ "source": "embodied_first_exam/benchmarks/embodiedswe",
+ "files": {
+  "esw_proxy.py": "0749136349c6cc70a19e239c4719d4dcc6b42e3e5e216cfd144786f31c1f233f",
+  "rcb_embodiedswe.py": "a555442e534902608158c8066a81db3baaec14f0526ffd35b09ccf583279d28b"
+ }
+}

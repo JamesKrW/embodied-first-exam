@@ -293,6 +293,110 @@ def _limits() -> None:
             pass
 
 
+# Landlock (Linux >= 5.13, unprivileged, allowed by Docker's default seccomp profile): the solution process may read
+# the system's software trees, its own solution copy and /proc entries of its own; it may write only its scratch
+# directory, and it can open no TCP connection. Everything else (other processes' /proc entries, /tests, /logs, the
+# trusted work files, /tmp, /cache, /app) is out of reach whatever the file modes say. A PID namespace would need
+# CAP_SYS_ADMIN, which a verifier container does not get (PROTOCOL H.1: no service widens its container).
+LANDLOCK_ABI_MIN = 4
+_FS_EXECUTE, _FS_WRITE_FILE, _FS_READ_FILE, _FS_READ_DIR = 1, 2, 4, 8
+_FS_ALL_V1 = (1 << 13) - 1                   # execute .. make_sym
+_FS_REFER, _FS_TRUNCATE = 1 << 13, 1 << 14
+_NET_BIND_TCP, _NET_CONNECT_TCP = 1, 2
+READ_TREES = ("/usr", "/bin", "/sbin", "/lib", "/lib32", "/lib64", "/libx32", "/etc", "/opt", "/root", "/sys")
+PROC_FILES = ("/proc/cpuinfo", "/proc/meminfo", "/proc/stat", "/proc/loadavg", "/proc/version", "/proc/filesystems",
+              "/proc/sys")
+DEV_FILES = ("/dev/null", "/dev/zero", "/dev/urandom", "/dev/random", "/dev/full")
+
+
+def landlock_abi() -> int:
+    import ctypes
+    libc = ctypes.CDLL(None, use_errno=True)
+    return int(libc.syscall(444, None, 0, 1))          # landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION)
+
+
+def sandbox(solution: str, scratch: str) -> int:
+    """Restrict this process (and everything it starts) with Landlock. Returns the ABI; raises when unavailable."""
+    import ctypes
+    libc = ctypes.CDLL(None, use_errno=True)
+    abi = landlock_abi()
+    if abi < LANDLOCK_ABI_MIN:
+        raise OSError(f"Landlock ABI {abi} < {LANDLOCK_ABI_MIN}")
+    fs_all = _FS_ALL_V1 | _FS_REFER | _FS_TRUNCATE
+
+    class Ruleset(ctypes.Structure):
+        _fields_ = [("fs", ctypes.c_uint64), ("net", ctypes.c_uint64)]
+
+    class PathBeneath(ctypes.Structure):
+        _pack_ = 1
+        _fields_ = [("allowed", ctypes.c_uint64), ("fd", ctypes.c_int32)]
+
+    rs = Ruleset(fs_all, _NET_BIND_TCP | _NET_CONNECT_TCP)
+    fd = libc.syscall(444, ctypes.byref(rs), ctypes.sizeof(rs), 0)
+    if fd < 0:
+        raise OSError(ctypes.get_errno(), "landlock_create_ruleset")
+    read = _FS_EXECUTE | _FS_READ_FILE | _FS_READ_DIR
+    rules = [(p, read) for p in READ_TREES] + [(p, _FS_READ_FILE | _FS_READ_DIR) for p in PROC_FILES]
+    rules += [(f"/proc/{os.getpid()}", _FS_READ_FILE | _FS_READ_DIR), (solution, _FS_READ_FILE | _FS_READ_DIR)]
+    rules += [(p, _FS_READ_FILE | _FS_WRITE_FILE) for p in DEV_FILES]
+    rules += [(scratch, fs_all & ~_FS_REFER if abi < 2 else fs_all)]
+    for path, acc in rules:
+        try:
+            pfd = os.open(path, os.O_PATH | os.O_CLOEXEC)
+        except OSError:
+            continue
+        try:
+            if os.path.isfile(path) or not os.path.isdir(path):
+                acc &= _FS_EXECUTE | _FS_READ_FILE | _FS_WRITE_FILE | _FS_TRUNCATE
+            attr = PathBeneath(acc, pfd)
+            if libc.syscall(445, fd, 1, ctypes.byref(attr), 0) != 0:
+                raise OSError(ctypes.get_errno(), f"landlock_add_rule {path}")
+        finally:
+            os.close(pfd)
+    if libc.prctl(38, 1, 0, 0, 0) != 0:                # PR_SET_NO_NEW_PRIVS
+        raise OSError(ctypes.get_errno(), "prctl(PR_SET_NO_NEW_PRIVS)")
+    if libc.syscall(446, fd, 0) != 0:                  # landlock_restrict_self
+        raise OSError(ctypes.get_errno(), "landlock_restrict_self")
+    os.close(fd)
+    return abi
+
+
+def _verify_sandbox(scratch: str) -> None:
+    """Fail closed: after sandbox() returns, confirm the restrictions are actually in force. A silently
+    mis-applied Landlock ruleset (a rule fd that failed to open, an ABI quirk) would otherwise leave a hole
+    that only shows up as a leak. Each check must be DENIED; if any is allowed we raise, and main() reports
+    an infrastructure failure instead of running the solution. Cheap (a few syscalls)."""
+    import socket
+    holes = []
+    try:                                              # another process's /proc must be unreadable
+        with open("/proc/1/cmdline", "rb") as f:
+            f.read(1)
+        holes.append("/proc/1/cmdline readable")
+    except (PermissionError, FileNotFoundError, OSError):
+        pass
+    probe = os.path.join("/", "esw_sandbox_probe")     # a write outside scratch must be refused
+    try:
+        with open(probe, "w") as f:
+            f.write("x")
+        os.unlink(probe)
+        holes.append("write outside scratch allowed")
+    except (PermissionError, FileNotFoundError, OSError):
+        pass
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # an outbound TCP connect must be refused
+    s.settimeout(0.2)
+    try:
+        s.connect(("10.255.255.1", 9))
+        holes.append("outbound TCP connect allowed")
+    except PermissionError:
+        pass
+    except OSError:
+        pass                                           # unreachable / refused / timeout: no egress, acceptable
+    finally:
+        s.close()
+    if holes:
+        raise OSError("sandbox verification failed: " + "; ".join(holes))
+
+
 def main(argv: list[str]) -> int:
     """`python -I -B esw_proxy.py FD_IN FD_OUT SOLUTION_DIR [EXTRA_PATH ...]` (started by the trusted side)."""
     fd_in, fd_out, sol = int(argv[1]), int(argv[2]), argv[3]
@@ -305,9 +409,16 @@ def main(argv: list[str]) -> int:
     import importlib.util
     import traceback
 
-    hello = wire.recv()                          # {"op": "hello", "root": {...handle...}}
+    hello = wire.recv()                          # {"op": "hello", "root": {...handle...}, "scratch": dir}
     env = RemoteEnv(conn, int(hello["root"]["__h__"]), "BaseEnv")
     status = {"op": "done"}
+    try:
+        scratch = hello.get("scratch") or os.getcwd()
+        status["sandbox"] = f"landlock/{sandbox(sol, scratch)}"
+        _verify_sandbox(scratch)                     # fail closed: a sandbox that did not take effect = no run
+    except Exception as exc:  # noqa: BLE001 — no sandbox, no run: the trusted side reports an infrastructure failure
+        wire.send({"op": "done", "sandbox_failed": f"{type(exc).__name__}: {exc}"})
+        os._exit(0)
     try:
         sys.path.insert(0, sol)                  # the native grader's rule: solve.py's directory is importable
         spec = importlib.util.spec_from_file_location("solve", os.path.join(sol, "solve.py"))

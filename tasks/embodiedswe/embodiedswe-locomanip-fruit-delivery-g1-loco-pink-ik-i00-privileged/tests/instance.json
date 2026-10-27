@@ -1,10 +1,10 @@
 {
- "action_dim": 0,
- "control_dt": 0.0,
+ "action_dim": 32,
+ "control_dt": 0.016667,
  "device": "cpu",
  "format": "esw-instance/1",
- "physics_dt": 0.0,
+ "physics_dt": 0.008333333333333333,
  "preset": "locomanip.fruit_delivery.g1.loco_pink_ik",
  "seed": 0,
- "state_sha": "PENDING"
+ "state_sha": "dc2b1198d3669a75b472aa58617200d9057fba1255790cc748230ed8ddf49f41"
 }

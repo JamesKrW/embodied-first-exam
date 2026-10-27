@@ -89,12 +89,12 @@ sys.exit(1 if f.fetch(prefixes=roots) else 0)" && \
     rm -rf /opt/embodiedswe/.cache /root/.cache/huggingface && \
     ! grep -rlaE "https?://[A-Za-z0-9.-]*(amazonaws|nvidia|huggingface)" /opt/embodiedswe/robobench --include=*.usda --include=*.mdl
 ENV HF_HUB_OFFLINE=1 OMNI_KIT_ALLOW_ROOT=1
-# this benchmark's tooling; the graded solution process runs as `nobody`: it must reach the interpreter (under /root,
-# traverse only) and read the package trees, never write them
-COPY tools/rcb_embodiedswe.py tools/esw_proxy.py /opt/efe/
-RUN chmod 711 /root && chmod -R a+rX /opt/efe /opt/embodiedswe /root/.local/share/uv && \
-    python -I -B -c "import sys; sys.path[:0] = ['/opt/embodiedswe', '/opt/efe']; import robobench, esw_proxy, rcb_embodiedswe; robobench.discover(); \
-from robobench.core.registries import ENVS; [ENVS.get(p) for p in rcb_embodiedswe.TASKS]; print('tasks ok')" && \
-    find /opt/embodiedswe /opt/efe -name __pycache__ -prune -exec rm -rf {} + && \
+# the graded solution process runs as `nobody`: it must reach the interpreter (under /root, traverse only) and read the
+# package trees, never write them. The tooling (rcb_embodiedswe.py, esw_proxy.py) is not in this image: each task copies
+# it to /opt/efe from the files image ghcr.io/mll-lab-nu/efe:embodiedswe-files (source embodied_first_exam/benchmarks/embodiedswe).
+RUN chmod 711 /root && chmod -R a+rX /opt/embodiedswe /root/.local/share/uv && mkdir -p /opt/efe && \
+    python -I -B -c "import sys; sys.path[:0] = ['/opt/embodiedswe']; import robobench; robobench.discover(); \
+from robobench.core.registries import ENVS; [ENVS.get(p) for p in ('assembly.bulb.franka.osc', 'puzzle.stack_blocks.g1.pink_ik', 'locomanip.fruit_delivery.g1.loco_pink_ik')]; print('tasks ok')" && \
+    find /opt/embodiedswe -name __pycache__ -prune -exec rm -rf {} + && \
     python -I -B /opt/efe/build/scrub_embodiedswe.py /opt/embodiedswe --check && mkdir -p /app/output
 WORKDIR /app

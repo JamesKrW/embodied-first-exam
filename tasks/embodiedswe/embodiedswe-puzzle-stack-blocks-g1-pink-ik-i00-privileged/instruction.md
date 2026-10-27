@@ -7,7 +7,9 @@ An NVIDIA GPU is available. Your job: write a program that completes the task be
 
 ## The task
 
-(the scene and robot description, rendered from the env's own describe())
+4 coloured wooden blocks (45 mm cubes) lie scattered flat on a work table, beside a marked square pad. Goal: stack all 4 blocks into a single upright tower centred on the pad — one block squarely on top of the next, faces level, so the finished tower stands 4 blocks high and stays standing. A block placed off-centre enough to overhang, set down crooked, or left off the pad does not count toward the tower.
+
+A Unitree G1 humanoid with three-finger hands, fixed at the pelvis (legs locked), a stationary upper-body manipulator. Control mode 'pink_ik': 17 arm+waist joints driven by the Pink IK solver (absolute wrist poses), plus 14 hand joints by direct position target. Action dim 28.
 
 The task is complete when `env.scene.success()` is true for the env (a `(num_envs,)` bool tensor) at the end of the
 graded run. That is the verdict. Partial progress toward it is also recorded (EmbodiedSWE's rubric for this task,
@@ -26,7 +28,7 @@ env = make_env()        # launches Isaac Sim headless first, then builds and res
 
 `make_env()` checks that the start state is the frozen instance of this task (`/app/instance.json`). In development
 anything goes: reset it, restore states, read anything, make cameras, run many processes. `env.step(action)` takes a
-`(1, N)` tensor; one step is control_dt s of simulated time. `env.describe()`, `env.describe_stage()`, the
+`(1, 28)` tensor; one step is 0.016667 s of simulated time. `env.describe()`, `env.describe_stage()`, the
 scene's and the robot's own methods and the source under `/opt/embodiedswe` tell you the rest.
 
 ## Deliverable
@@ -56,11 +58,22 @@ with no network and no GPU, and receives a proxy `env` that forwards to the simu
   `write_*` / `set_*` / `reset*` method of an asset, the scene or the robot, assigning attributes, and private or
   `__dunder__` attributes. Modifying a tensor you read changes only your copy.
 
-The solution process has no simulator of its own: it can import `numpy`, `torch` (CPU), `scipy`, `pinocchio`, `pink`
-and pure-Python helpers (`isaaclab.utils.math`, your own modules), but nothing that needs a running Isaac Sim app. Keep
-module level light: no simulator launch or env build at import time (a `if __name__ == "__main__":` block that builds
-an env with `make_env()` and calls `solve(env)` is a good pattern for development). Importing `solve.py` may take at
-most 5 minutes.
+What `solve.py` can use in the graded run. Its process has **no simulator and no Isaac Sim app**; it is
+sandboxed (Landlock) and sees only its own files:
+
+- it can import the Python standard library, `numpy`, `torch` (CPU only; 4 threads), `scipy`, `pinocchio` and
+  `pink`, the pure-Python parts of `robobench` that import no Isaac module, and your own modules in
+  `solution/`; it can read the files in `solution/` (relative to `__file__`) and the installed packages;
+- it cannot import `isaaclab`, `isaacsim`, `omni` or `pxr` (they need the running app; `isaaclab.utils.math`
+  included: copy the few quaternion helpers you need into your folder), and calling the robot's controller
+  objects through the proxy is refused like any other non-read;
+- it can write only to its own scratch directory (`$TMPDIR`, also its working directory and `$HOME`), not to
+  `solution/`; it sees no other process, no `/tmp`, no `/app`, and has no network;
+- it can start subprocesses (at most 512 processes in all); every one of them is ended with it.
+
+Keep module level light: no simulator launch or env build at import time (a `if __name__ == "__main__":` block that
+builds an env with `make_env()` and calls `solve(env)` is a good pattern for development). Importing `solve.py` may
+take at most 5 minutes.
 
 The graded run ends when `solve` returns or raises, its process ends, or after **30 minutes** of wall-clock time; every
 process it started is then ended, and the verdict is read on the state at that moment (a crash or a hang is not
@@ -89,7 +102,7 @@ refusals (it takes a few minutes: one Isaac Sim launch plus your rollout).
   written its results is fine.
 - Every Python process starts from a fresh simulator; nothing carries over between scripts.
 - Physics runs on the CPU, so a fresh process repeats a run bit for bit; the proxy adds a little time per call
-  (measured below 1 ms), so a closed-loop solve that reads state every step is fine.
+  (about 0.05 ms per read or step request, measured), so a closed-loop solve that reads state every step is fine.
 - You can look at the scene: add a camera (`make_env(cameras=True)`, then Isaac Lab's `Camera`), save frames to PNG
   and look at the images themselves.
 

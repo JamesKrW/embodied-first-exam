@@ -1,10 +1,10 @@
 {
- "action_dim": 0,
- "control_dt": 0.0,
+ "action_dim": 8,
+ "control_dt": 0.066667,
  "device": "cpu",
  "format": "esw-instance/1",
- "physics_dt": 0.0,
+ "physics_dt": 0.004166666666666667,
  "preset": "assembly.bulb.franka.osc",
  "seed": 0,
- "state_sha": "PENDING"
+ "state_sha": "4bd0f14229c2b00604114fabde9dac523c58add83b965d9f8629324f76d973ef"
 }

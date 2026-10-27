@@ -116,10 +116,12 @@ def main() -> int:
                               "rollout_success": int(bool(ro.get("success")))})
                 return 0
         else:
-            rp = {"success": ro.get("success"), "final_sha": ro.get("final_sha"), "progress": ro.get("progress")}
+            # No action reached the sim: nothing to replay, and nothing was done (nop = 0 is an acceptance check), so
+            # this scores success 0 outright, whatever the rollout's predicate says.
+            rp = {"success": False, "final_sha": ro.get("final_sha"), "progress": 0.0}
         deterministic = rp.get("final_sha") == ro.get("final_sha")
-        ok = bool(ro.get("success")) and bool(rp.get("success")) and deterministic
-        progress = float(ro.get("progress") or 0.0)
+        ok = n > 0 and bool(ro.get("success")) and bool(rp.get("success")) and deterministic
+        progress = float(ro.get("progress") or 0.0) if n > 0 else 0.0
         out = {**ZERO, "success": int(ok), "deterministic": int(deterministic),
                "rollout_success": int(bool(ro.get("success"))), "replay_success": int(bool(rp.get("success"))),
                "progress": round(progress, 6), "replay_progress": round(float(rp.get("progress") or 0.0), 6),

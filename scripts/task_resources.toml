@@ -3228,6 +3228,14 @@ verifier_min_memory_gb = 13.0
 verifier_min_gpu_memory_gb = 6.5
 measured = "not yet measured: RoboLab's privileged figures (the same Isaac Sim 5.1 stack and recipe, CPU PhysX) as the estimate"
 
+[[rule]]
+match = "^embodiedswe-puzzle-stack-blocks-g1-pink-ik-i00-privileged$"
+min_memory_gb = 12.0
+min_gpu_memory_gb = 4.5
+verifier_min_memory_gb = 12.0
+verifier_min_gpu_memory_gb = 4.5
+measured = "measured on an L40S with a scripted reference, one graded run alone on the GPU (docker stats + nvidia-smi every 2 s): rollout through the proxy 1.6 GiB RAM / 0.6 GiB GPU, replay 0.9 / 0.6, video render 10.7 / 3.8; minimums = the video peak plus headroom"
+
 [[limit]]
 match = "^embodiedswe-.*-privileged$"
 scope = "trial"
