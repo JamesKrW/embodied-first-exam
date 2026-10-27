@@ -1,0 +1,11 @@
+# The verifier replays on HumanCLAW, which needs the GPU (EGL + CUDA).
+services:
+  main:
+    shm_size: "4gb"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

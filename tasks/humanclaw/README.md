@@ -1,0 +1,68 @@
+# HumanCLAW
+
+Find, navigate and interact with a simulated human body: in a furnished HSSD house, find an object of a category,
+walk until the body touches it and, for a bed, couch or toilet, sit on it, using nothing but whole-body motion
+skills. No arm, no gripper: the robot is an SMPL-X human body, moved by HumanCLAW's MotionDiT skill models under
+Half-Physics.
+
+| | |
+|---|---|
+| upstream | HumanCLAW (HumanClawBench), the source snapshot of PR #490 (commit `fe3d376`, tree `f60d71a0` of `harnesses/humanclaw`); profile `paper_fullval_v1` (1,218 val episodes in 41 HSSD scenes) |
+| simulator | Habitat-Sim `acbe6f4` with HumanCLAW's Half-Physics patch (Bullet `2c204c4`), MotionDiT flow-matching skills (30 NFE midpoint), GPU (EGL rendering, CUDA) |
+| robot | `smplx-human`: HumanCLAW's SMPL-X neutral body, 8 motion skills (walk, turn, side step, step back, climb up / down a step, sit, stop) |
+| score | HumanCLAW's own metric code, unchanged (`evaluation/metrics/episode.py`): NavSR@20cm (chair, potted plant, TV) or InteractSR (bed, couch, toilet) |
+| tasks | 100 frozen episodes x 2 modes: `tasks/humanclaw/humanclaw-{nav,sit}-<category>-i<NN>-privileged` and `-standard` (`eai-standard/2.1`) |
+| image | `ghcr.io/mll-lab-nu/efe-private:humanclaw-<VERSION>` (`images/humanclaw/`, BUILD_ONLY: built from the recipe when it cannot be pulled; needs a Hugging Face token with access to the gated HSSD supplement) |
+
+## The task
+One task = one frozen episode of HumanCLAW's full validation set: the scene, the body's start pose (HumanCLAW's own
+spawn values), the target category and its goal objects, HumanCLAW's instruction word for word ("Find the chair and
+move until your body is touching the target, with zero distance to the target object.", plus "Finally, sit on the
+bed." for an interaction category). An action is a row `[action_id, value]`, one motion skill of 0.5 s (15 frames at
+30 Hz), mapped to HumanCLAW's skill calls by its own planner code (`_chooser_action`, so its clamps apply). An episode
+allows 100 actions, the stop included, and has no reset; success needs an explicit stop (HumanCLAW's active stop).
+
+| | privileged | standard |
+|---|---|---|
+| the agent has | the simulator (`hc_tools.Env`): the body's pose, the targets' boxes, the navmesh, free resets | a client: the head camera (448 x 448 RGB, 90° fov), actions used / left, the pelvis' height change |
+| deliverable | `trajectory.npz` (`actions`, T <= 100 rows) | none: the sidecar records and grades the live episode |
+| graded by | two fresh-process replays from the verifier's copy of the instance: both succeed, equal final state hashes | the live episode (HumanCLAW's `finalize` at the stop, in the sidecar); nothing replayed |
+| video | the first replay's recorded poses, rendered after the verdict | the live episode's recorded poses, rendered after the verdict |
+| time cutoff | 3600 s | 3600 s |
+
+What differs from HumanCLAW's own evaluator (declared in every task):
+- The motion model's noise is seeded at every reset (torch / numpy / random, seed 0). HumanCLAW never seeds it, so its
+  rollouts of the same actions differ run to run; seeded, an episode is a function of the actions, which a submitted
+  trajectory and a crash-resume both need.
+- A reset rebuilds the simulator (HumanCLAW builds a fresh one per rollout too), so moved furniture comes back.
+- The agent is not HumanCLAW's VLM pipeline (planner + verifier, history of 10): it is whatever the harness runs, and
+  it calls the skills directly.
+- Videos are rendered after the verdict from the poses the episode recorded frame by frame (HumanCLAW's own delayed
+  renderer: it restores each recorded post-physics pose and renders; simulation never advances), so the frames are the
+  graded episode's, not a re-run. The live video writer stays off as in HumanCLAW's paper runs (its third-person sensor
+  can change Bullet's contact cache).
+- `view_points` in the frozen goals are cut to the 5 best per goal (HumanCLAW's loader needs one; nothing it scores
+  reads them).
+
+Network: HumanCLAW's public repository holds recorded rollouts of these very episodes (its docs/analysis has
+action chains), so the agent reaches the model APIs and the package registries only (`allowlist`), in both modes.
+
+## Selection (model-calibrated with Codex + GPT-6 Astra r3)
+The 100 episodes were chosen from HumanCLAW's own full-validation runs of Codex + GPT-6 Astra, condition `codex_r3`
+(Codex CLI 0.145 with HumanCLAW's own Codex wrapper, reasoning effort max, an image window of 50; 64.2 % of the 1,218
+episodes), using that run's per-episode outcome only:
+- two groups of 50, each 25 navigation (chair 9, potted plant 8, TV 8) + 25 interaction (bed 9, couch 8, toilet 8):
+  - the **core** group, r3 success 15 / 50 = **30 %** (chair 3, potted plant 2, TV 3, bed 3, couch 2, toilet 2): its 50
+    episodes are this benchmark's core-set entries;
+  - the **all-only** group, r3 success 30 / 50 = **60 %** (5 per category);
+  so the whole set (all 100) is at 45 % under r3;
+- within a (category, r3 outcome) cell: fewest picks from the same scene first (at most 3 episodes per scene; 41 scenes),
+  then outcomes that HumanCLAW's other runs on the same model agree with (no flukes), then a fixed random order.
+The calibration run is not an EFE run: HumanCLAW's wrapper and VLM loop, an older Codex CLI, effort max, and no
+privileged mode. An EFE Codex + Astra pass over the 200 tasks checks the rates. Upstream episode ids and the
+per-episode outcomes are kept as trusted provenance outside the repository; no agent-readable file names them.
+
+## Reference solution
+A navmesh oracle (privileged tools: shortest path to the nearest target, turn-and-walk along it, then sit for an
+interaction episode, then stop), run closed-loop and stored as `solution/actions.json` once it succeeds on this
+version (`oracle` / `oracle_evidence` in each task.toml).

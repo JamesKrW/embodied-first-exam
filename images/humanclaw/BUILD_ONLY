@@ -1,0 +1,53 @@
+BUILD_ONLY: ghcr.io/mll-lab-nu/efe-private:humanclaw-<images/humanclaw/VERSION> is never public (docs/protocol/README.md §2.4,
+D5). It is kept in the organization's private package as the build cache of the HumanCLAW tasks: every task's Dockerfile
+starts with this recipe (images/humanclaw/Dockerfile, copied in by scripts/task_conventions.py normalize) and its compose
+names the private image in `build.cache_from`. A runner that can pull the image takes its layers. Unlike other recipes,
+this one cannot be built by `harbor run` on a runner without the image: its HSSD layer needs a Hugging Face token (below),
+and a task's compose may not pass build secrets (verifier isolation). Such a runner builds the image once by hand (Build,
+below) under the private tag; every task then finds its layers in the local cache.
+
+Why
+  The image holds data that may be used but not redistributed: the HSSD scenes (hssd/hssd-hab, CC BY-NC 4.0, on terms
+  each user accepts on Hugging Face), HumanCLAW's HSSD val41 supplement (HumanCLAW/HumanCLAW-HSSD, a gated dataset whose
+  access request affirms the HSSD terms), the SMPL-X-derived body model in HumanCLAW's resources (SMPL-X licence: research
+  use, no redistribution) and the paper_fullval_v1 motion weights (HumanCLAW/HumanCLAW, trained on AMASS). HumanCLAW's
+  code is Apache-2.0 (LICENSE, NOTICE in /opt/humanclaw); Habitat-Sim is MIT.
+
+What the builder accepts
+  - the HSSD terms (CC BY-NC 4.0: non-commercial use) and the terms of the gated HumanCLAW-HSSD dataset;
+  - the SMPL-X / AMASS licences that the body model and the motion weights carry (research use).
+  A Hugging Face token whose account has access to HumanCLAW/HumanCLAW-HSSD (request it on the dataset's page; it is
+  approved automatically) is needed: the build takes it as the BuildKit secret `hf_token` (from the HF_TOKEN environment
+  variable of the shell that runs the build), never stored in a layer. A runner that pulls the private image needs no
+  token.
+
+Inputs (all pinned)
+  docker.io/nvidia/cuda:12.4.1-devel-ubuntu22.04 by digest; Ubuntu packages from the Ubuntu archive (TODO: the
+  snapshot.ubuntu.com pin, which answered 502 on 2026-10-27); PyTorch 2.6.0 + CUDA 12.4 and every other Python
+  package by version; HumanCLAW's source snapshot from this repository's PR #490 at commit fe3d376 (its
+  harnesses/humanclaw tree hash checked), without its docs/, tools/, harnesses/, experiment configs and episode shards;
+  Habitat-Sim at acbe6f4 (Bullet submodule 2c204c4 checked) with HumanCLAW's Half-Physics patch (sha256 checked), built
+  headless with CUDA and Bullet; the paper_fullval_v1 weights archive at revision 77ac3df (sha256 checked, and the
+  manifest compared); the 10,545 official hssd-hab files the 41 scenes use at revision 4369cb9 (each by size and
+  sha256 from HumanCLAW's asset_requirements.json) and the supplement archive at revision efced86 (HumanCLAW's
+  prepare-hssd verifies its hashes), combined by HumanCLAW's own prepare-hssd and materialized (no symlinks).
+
+Data
+  None beyond the image: nothing is mounted or downloaded at run time. The frozen episodes live in the task
+  directories (instance.json).
+
+Host
+  Linux x86_64, Docker with BuildKit and the NVIDIA Container Toolkit, an NVIDIA GPU (EGL rendering, MotionDiT on CUDA;
+  compute capability 8.0-9.0 is compiled in). Build: ~80 GB of free disk, network access to github.com, huggingface.co
+  (+ its LFS CDN), download.pytorch.org, pypi.org and the Ubuntu archive; a cold build takes about 25 min on a 32-core
+  host (Habitat-Sim ~6 min, HSSD ~10 min).
+
+Build and publish (maintainers; from the repository root)
+    HF_TOKEN=... docker buildx build --load --build-arg BUILDKIT_INLINE_CACHE=1 --secret id=hf_token,env=HF_TOKEN \
+      -t ghcr.io/mll-lab-nu/efe-private:humanclaw-$(cat images/humanclaw/VERSION) images/humanclaw
+    docker push ghcr.io/mll-lab-nu/efe-private:humanclaw-$(cat images/humanclaw/VERSION)
+  A new VERSION: change the tag in the tasks' `cache_from` and normalize them.
+
+Check a build
+  The frozen episodes must rebuild to their recorded start hashes and the oracle's trajectory must replay to success in
+  two fresh processes with equal final hashes: `harbor run -p tasks/humanclaw/<task>-privileged -a oracle` (reward 1).
