@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 # humanclaw: HumanCLAW (HumanClawBench) environment -- Habitat-Sim acbe6f4 with the HumanCLAW Half-Physics patch (headless,
 # CUDA, Bullet), the HumanCLAW runtime (episode loader, Half-Physics env, MotionDiT skill runner, paper metrics) from the
 # source snapshot imported in mll-lab-nu/embodied-first-exam PR #490 (commit fe3d376, tree f60d71a0 of
@@ -21,10 +20,24 @@ RUN rm -f /etc/apt/sources.list.d/cuda*.list && \
       libglvnd-dev libgl-dev libegl-dev libglx-dev libopengl-dev libgles-dev libglu1-mesa-dev libegl1 libgl1 libgomp1 && \
     rm -rf /var/lib/apt/lists/* && mkdir -p /usr/share/glvnd/egl_vendor.d && \
     printf '{"file_format_version":"1.0.0","ICD":{"library_path":"libEGL_nvidia.so.0"}}\n' > /usr/share/glvnd/egl_vendor.d/10_nvidia.json
-# Python 3.10 venv: PyTorch 2.6.0 + CUDA 12.4 (HumanCLAW constraints/eval-cu124.txt), every other package pinned
-RUN python3 -m venv /opt/venv && /opt/venv/bin/pip install pip==24.2 setuptools==75.1.0 wheel==0.44.0 && \
-    /opt/venv/bin/pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124 && \
-    /opt/venv/bin/pip install numpy==1.26.4 scipy==1.15.3 Pillow==10.4.0 imageio-ffmpeg==0.6.0 python-dotenv==1.0.1 \
+# Python 3.10 venv: PyTorch 2.6.0 + CUDA 12.4 (HumanCLAW constraints/eval-cu124.txt), every other package pinned,
+# their dependencies too (the constraints: every package the venv ends up with, by version)
+RUN printf '%s\n' \
+      attrs==24.2.0 certifi==2026.10.23 charset-normalizer==3.5.2 contourpy==1.3.2 cycler==0.12.1 \
+      filelock==3.32.3 fonttools==4.65.0 fsspec==2026.7.0 gitdb==4.0.12 GitPython==3.1.43 \
+      huggingface-hub==0.26.2 idna==3.20 imageio==2.36.0 imageio-ffmpeg==0.6.0 Jinja2==3.1.6 \
+      kiwisolver==1.5.1 llvmlite==0.43.0 MarkupSafe==3.0.3 matplotlib==3.9.2 mpmath==1.3.0 \
+      networkx==3.4.2 numba==0.60.0 numpy==1.26.4 numpy-quaternion==2023.0.4 nvidia-cublas-cu12==12.4.5.8 \
+      nvidia-cuda-cupti-cu12==12.4.127 nvidia-cuda-nvrtc-cu12==12.4.127 nvidia-cuda-runtime-cu12==12.4.127 nvidia-cudnn-cu12==9.1.0.70 nvidia-cufft-cu12==11.2.1.3 \
+      nvidia-curand-cu12==10.3.5.147 nvidia-cusolver-cu12==11.6.1.9 nvidia-cusparse-cu12==12.3.1.170 nvidia-cusparselt-cu12==0.6.2 nvidia-nccl-cu12==2.21.5 \
+      nvidia-nvjitlink-cu12==12.4.127 nvidia-nvtx-cu12==12.4.127 packaging==26.3 pillow==10.4.0 pyparsing==3.3.3 \
+      python-dateutil==3.0.0 python-dotenv==1.0.1 PyYAML==6.0.3 requests==2.34.2 scipy==1.15.3 \
+      six==1.17.0 smmap==5.0.3 sympy==1.13.1 tqdm==4.66.5 triton==3.2.0 \
+      typing_extensions==4.16.0 tzdata==2026.5 urllib3==2.8.0 \
+      > /tmp/pins.txt && \
+    python3 -m venv /opt/venv && /opt/venv/bin/pip install pip==24.2 setuptools==75.1.0 wheel==0.44.0 && \
+    /opt/venv/bin/pip install -c /tmp/pins.txt torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124 && \
+    /opt/venv/bin/pip install -c /tmp/pins.txt numpy==1.26.4 scipy==1.15.3 Pillow==10.4.0 imageio-ffmpeg==0.6.0 python-dotenv==1.0.1 \
       huggingface-hub==0.26.2 attrs==24.2.0 GitPython==3.1.43 imageio==2.36.0 matplotlib==3.9.2 numba==0.60.0 \
       numpy-quaternion==2023.0.4 tqdm==4.66.5
 ENV PATH="/opt/venv/bin:${PATH}" VIRTUAL_ENV=/opt/venv
@@ -62,10 +75,12 @@ RUN curl -fsSL --retry 5 -o /tmp/w.tgz https://huggingface.co/HumanCLAW/HumanCLA
     rm -rf /tmp/w /tmp/w.tgz
 # HSSD: the official hssd-hab files the 41 scenes use (by name and sha256 from the snapshot's asset_requirements.json) and
 # the gated HumanCLAW val41 supplement, combined by HumanCLAW's own prepare-hssd, then materialized (no symlinks)
-RUN --mount=type=secret,id=hf_token,required=true --mount=type=cache,id=humanclaw-hssd,target=/cache python - <<'PY'
+RUN --mount=type=secret,id=hf_token --mount=type=cache,id=humanclaw-hssd,target=/cache python - <<'PY'
 import hashlib, json, os, shutil, subprocess, time
 import concurrent.futures as cf   # (no `from` imports: a Dockerfile linter reads a line starting with FROM as a stage)
 import huggingface_hub as hh
+if not os.path.exists("/run/secrets/hf_token"):   # optional, so a build that finds this layer cached needs none
+    raise SystemExit("this layer needs the build secret hf_token (images/humanclaw/BUILD_ONLY)")
 tok = open("/run/secrets/hf_token").read().strip()
 H = "/opt/humanclaw/resources/hssd/humanclaw-hssd-val41"
 req = json.load(open(f"{H}/asset_requirements.json"))["assets"]

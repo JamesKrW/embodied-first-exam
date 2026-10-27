@@ -5,7 +5,7 @@
     out = env.step(0, 0.4)              # one action [action_id, value] (see ACTIONS); returns the new state
     env.state()                         # body position / heading, actions used, done, success, distance to target
     env.targets()                       # the target category, every target object's centre and bounding box
-    env.shortest_path([x, y, z])        # navmesh path from the body to a point (Habitat's pathfinder)
+    env.shortest_path([x, y, z], agent_radius=0.35)   # navmesh path from the body to a point (radius: a wider body)
     env.rgb()                           # the head camera's image (H x W x 3 uint8)
     env.reset()                         # back to the frozen start (a fresh simulator), any number of times
     env.save("/app/output/trajectory.npz")   # this episode's actions so far: the deliverable
@@ -73,7 +73,7 @@ class Env:
         s = self.session
         a = s.env.agent
         p, q = a.translation, a.rotation
-        fwd = q.transform_vector(hc_core_vec3(s, 0.0, 0.0, -1.0))
+        fwd = q.transform_vector(hc_core_vec3(s, 0.0, 0.0, 1.0))   # the SMPL-X body faces its local +z
         geo = s.env.metric_target_geometry()
         r = s.result or {}
         return {"position": [float(p.x), float(p.y), float(p.z)],
@@ -96,18 +96,30 @@ class Env:
                 "geometry_now": {k: v for k, v in geo.items() if isinstance(v, (int, float, str, bool, list))},
                 "goal_viewpoints": s.episode.viewpoint_positions}
 
-    def shortest_path(self, goal, start=None) -> dict:
-        """Habitat's navmesh path (geodesic distance, waypoints) from the body (or `start`) to `goal`."""
+    def shortest_path(self, goal, start=None, agent_radius: float | None = None) -> dict:
+        """Habitat's navmesh path (geodesic distance, waypoints) from the body (or `start`) to `goal`. The scene's own
+        navmesh by default; `agent_radius` (m) builds (once, cached) a navmesh for a wider body, whose paths keep that
+        far from walls and furniture (the human body is wider than the default)."""
         import habitat_sim
         sim = self.session.env.sim
         pf = sim.pathfinder
-        if not pf.is_loaded:
-            settings = habitat_sim.NavMeshSettings()
-            settings.set_defaults()
-            settings.agent_radius, settings.agent_height = 0.25, 1.6
-            sim.recompute_navmesh(pf, settings)
+        if agent_radius is None and not pf.is_loaded:
+            agent_radius = 0.25
+        if agent_radius is not None:
+            cache = self.__dict__.setdefault("_pathfinders", {})
+            key = (id(sim), round(float(agent_radius), 3))
+            if key not in cache:
+                settings = habitat_sim.NavMeshSettings()
+                settings.set_defaults()
+                settings.agent_radius, settings.agent_height = float(agent_radius), 1.6
+                if hasattr(settings, "include_static_objects"):
+                    settings.include_static_objects = True
+                cache[key] = habitat_sim.PathFinder()
+                sim.recompute_navmesh(cache[key], settings)
+            pf = cache[key]
         a = self.session.env.agent.translation
-        st = np.asarray(start if start is not None else [a.x, a.y, a.z], dtype=np.float32)
+        # from the body: its pelvis is ~0.9 m above the floor, too high for the navmesh snap on some floors
+        st = np.asarray(start if start is not None else [a.x, a.y - 0.9, a.z], dtype=np.float32)
         st = pf.snap_point(st)
         path = habitat_sim.ShortestPath()
         path.requested_start, path.requested_end = st, pf.snap_point(np.asarray(goal, dtype=np.float32))

@@ -7,7 +7,7 @@
 | Twin | `humanclaw-nav-chair-i01-privileged` |
 | Simulator / robot | `humanclaw` / `smplx-human` |
 | Family / instance | `nav-chair` / seed 0 |
-| Oracle | `none` — pending: the navmesh oracle has not been run on this version yet |
+| Oracle | `full` — the privileged oracle's 9 actions streamed as skill rows through the client; harbor oracle run on 2026-10-27: reward 1, graded live, the live final state hash equal to the replays' |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:humanclaw-0.1.0` |
 

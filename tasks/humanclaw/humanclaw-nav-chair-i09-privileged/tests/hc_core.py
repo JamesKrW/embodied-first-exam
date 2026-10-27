@@ -47,6 +47,8 @@ from typing import Any
 
 import numpy as np
 
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")   # deterministic cuBLAS (set before CUDA starts)
+
 SCHEMA = "efe-humanclaw-instance/1"
 NAV_CATEGORIES = ("chair", "potted_plant", "tv")
 INTERACT_CATEGORIES = ("bed", "couch", "toilet")
@@ -128,6 +130,8 @@ def instance_digest(inst: dict) -> str:
 def _f64(*vals) -> bytes:
     out = []
     for v in vals:
+        if hasattr(v, "detach"):                     # a torch tensor (on the GPU in the motion state)
+            v = v.detach().cpu().double().numpy()
         a = np.asarray(v, dtype=np.float64).reshape(-1)
         out.append(struct.pack(f"<{a.size}d", *a.tolist()))
     return b"".join(out)
@@ -193,7 +197,7 @@ class Session:
             lighting=str(rd.get("lighting", "ambient")), ambient_strength=float(rd.get("ambient_strength", 1.2)),
             ego_resolution=tuple(rd.get("ego_resolution", [448, 448])),
             third_person_resolution=tuple(rd.get("third_person_resolution", [512, 512])),
-            compute_metrics=True, video_enabled=False, **kwargs)
+            compute_metrics=True, video_enabled=bool(self.inst.get("video_enabled", False)), **kwargs)
 
     # -- an episode --
     def reset(self) -> None:
@@ -209,6 +213,8 @@ class Session:
         random.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)          # also every CUDA device's generator
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True, warn_only=True)
         self.env = self._new_env()
         init_xb = self.motion.reset(self.seed_mode, self.seed_pkl, self.seed_pt, self.episode.init_offset,
                                     self.episode.init_yaw)
@@ -223,6 +229,12 @@ class Session:
                                            profile_name=self.profile.profile, rollout_index=0)
         self.metrics.record_reset()
         self.n_actions, self.done, self.result, self.rows = 0, False, None, []
+        self._pelvis_y0 = float(self.env.agent.translation.y)
+        # seed again once everything is built: a first build (lazy module set-up) draws from the CPU generator, a
+        # rebuild does not, and the episode must start from the same state either way
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
 
     def act(self, row: Any) -> dict:
         """One action (a row clip_row accepts, or the idle row). Returns {done, success, ...}."""
@@ -274,8 +286,7 @@ class Session:
     def pelvis_rise(self) -> float:
         """How far the pelvis is above where it was at the start (m; negative: lower, e.g. seated): what the body
         feels, not where it is."""
-        t, _o, _b = self.env._read_agent_state()
-        return float(t[1]) - float(self.traj.initial_state["human"]["transl"][1])
+        return round(float(self.env.agent.translation.y) - self._pelvis_y0, 4)   # Habitat is y-up
 
     # -- the state, for a hash --
     def state_sha(self) -> str:
@@ -298,7 +309,7 @@ class Session:
         mo = self.motion
         for t in (mo.motion_state, mo.T_ref_accum):
             h.update(b"-" if t is None else t.detach().cpu().contiguous().numpy().astype(np.float64).tobytes())
-        h.update(_f64([mo.floor_y_accum, mo.current_pelvis_y, mo.step_index]))
+        h.update(_f64(mo.floor_y_accum, mo.current_pelvis_y, mo.step_index))   # floats or GPU scalar tensors
         h.update(torch.get_rng_state().numpy().tobytes())
         if torch.cuda.is_available():
             for s in torch.cuda.get_rng_state_all():
@@ -331,10 +342,11 @@ def render_rollout(rollout_dir: str | os.PathLike, out_dir: str | os.PathLike) -
 
 
 def episode_video(session: Session, path: str | os.PathLike) -> None:
-    """path: the episode's video (first person | third person, side by side, 30 fps), and path.last.png its last
-    frame, from the live episode's recorded poses (render_rollout)."""
+    """path (<name>.mp4): the episode's video (first person | third person, side by side, 30 fps), and <name>.last.png
+    its last frame, from the live episode's recorded poses (render_rollout)."""
     import subprocess
     path = str(path)
+    last = os.path.splitext(path)[0] + ".last.png"
     with tempfile.TemporaryDirectory(prefix="hc-video-", dir=os.path.dirname(path) or None) as tmp:
         session.write_rollout(Path(tmp) / "rollout")
         render_rollout(Path(tmp) / "rollout", Path(tmp) / "rendered")
@@ -343,7 +355,7 @@ def episode_video(session: Session, path: str | os.PathLike) -> None:
                         "[0:v]scale=-2:448[a];[1:v]scale=-2:448[b];[a][b]hstack", "-c:v", "libx264", "-preset",
                         "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-movflags", "+faststart", path], check=True)
         subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-sseof", "-0.5", "-i", path, "-update", "1",
-                        "-frames:v", "1", path + ".last.png"], check=False)
-        if not os.path.isfile(path + ".last.png"):
+                        "-frames:v", "1", last], check=False)
+        if not os.path.isfile(last):
             subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", path, "-vf", "reverse", "-frames:v", "1",
-                            path + ".last.png"], check=True)
+                            last], check=True)

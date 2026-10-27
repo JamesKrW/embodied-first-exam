@@ -46,7 +46,8 @@ env.step(0, 0.4)                     # one action; returns env.state()
 env.state()                          # position, heading_deg, pelvis_rise_m, actions_used/left, done, success,
                                      # body_target_distance_m, sits_so_far, pelvis_touches_target
 env.targets()                        # the target objects' centres and bounding boxes, the rule
-env.shortest_path([x, y, z])         # Habitat navmesh path from the body to a point
+env.shortest_path([x, y, z], agent_radius=0.35)  # Habitat navmesh path from the body to a point
+                                     # (agent_radius: a navmesh for a wider body; the default is narrow)
 env.rgb()                            # the head camera's image
 env.reset()                          # back to the frozen start (a fresh simulator), any number of times
 env.save("/app/output/trajectory.npz")
