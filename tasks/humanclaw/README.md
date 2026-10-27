@@ -12,7 +12,7 @@ Half-Physics.
 | robot | `smplx-human`: HumanCLAW's SMPL-X neutral body, 8 motion skills (walk, turn, side step, step back, climb up / down a step, sit, stop) |
 | score | HumanCLAW's own metric code, unchanged (`evaluation/metrics/episode.py`): NavSR@20cm (chair, potted plant, TV) or InteractSR (bed, couch, toilet) |
 | tasks | 100 frozen episodes x 2 modes: `tasks/humanclaw/humanclaw-{nav,sit}-<category>-i<NN>-privileged` and `-standard` (`eai-standard/2.1`) |
-| image | `ghcr.io/mll-lab-nu/efe-private:humanclaw-<VERSION>` (`images/humanclaw/`, BUILD_ONLY: built from the recipe when it cannot be pulled; needs a Hugging Face token with access to the gated HSSD supplement) |
+| image | `ghcr.io/mll-lab-nu/efe-private:humanclaw-<VERSION>` (`images/humanclaw/`, BUILD_ONLY: without access to the organization's packages, build it once yourself, Image and host below) |
 
 ## The task
 One task = one frozen episode of HumanCLAW's full validation set: the scene, the body's start pose (HumanCLAW's own
@@ -60,6 +60,25 @@ episodes), using that run's per-episode outcome only:
 The calibration run is not an EFE run: HumanCLAW's wrapper and VLM loop, an older Codex CLI, effort max, and no
 privileged mode. None of the 100 is in the core set yet: an EFE run over the 200 tasks comes first. Upstream episode ids and the
 per-episode outcomes are kept as trusted provenance outside the repository; no agent-readable file names them.
+
+## Image and host
+`images/humanclaw/` builds `ghcr.io/mll-lab-nu/efe-private:humanclaw-<VERSION>` (21.8 GB): HumanCLAW's code, Habitat-Sim,
+the motion weights and the 41 HSSD scenes. It holds data that may not be redistributed, so it is **BUILD_ONLY**
+(`images/humanclaw/BUILD_ONLY` has the licences and the full recipe notes). A runner with access to the organization's
+packages pulls it. Anyone else builds it once, from the repository root:
+1. On Hugging Face, request access to the gated dataset `HumanCLAW/HumanCLAW-HSSD` (approved automatically) and accept
+   the terms of `hssd/hssd-hab`.
+2. Make a read token and export it: `export HF_TOKEN=hf_...`
+3. Build under the tag the tasks' `cache_from` names (the token goes in as a BuildKit secret, never into a layer):
+   `docker buildx build --builder default --secret id=hf_token,env=HF_TOKEN -t ghcr.io/mll-lab-nu/efe-private:humanclaw-$(cat images/humanclaw/VERSION) images/humanclaw`
+   It takes about 30 minutes on a 32-core host (Habitat-Sim's compile and the HSSD download), no GPU, and about
+   40 GB of free disk under Docker's data root.
+4. `harbor run -p tasks/humanclaw/<task> ...` then builds each task from the local build cache: no token, no download,
+   seconds (the failed cache import from the private package is only logged). Keep that cache (`docker builder
+   prune` drops it).
+
+Running needs an NVIDIA GPU (EGL rendering and the motion model on CUDA; compute capability 8.0 to 9.0). A
+privileged trajectory replays bit for bit only on the GPU model it was made on (The task, above).
 
 ## Reference solution
 A navmesh oracle with the privileged tools (`solution/oracle.py`): Habitat's shortest path (on a navmesh for a wider

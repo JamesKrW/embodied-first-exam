@@ -41,21 +41,60 @@ RUN printf '%s\n' \
       huggingface-hub==0.26.2 attrs==24.2.0 GitPython==3.1.43 imageio==2.36.0 matplotlib==3.9.2 numba==0.60.0 \
       numpy-quaternion==2023.0.4 tqdm==4.66.5
 ENV PATH="/opt/venv/bin:${PATH}" VIRTUAL_ENV=/opt/venv
+# Network helpers: every git source is fetched at its exact commit (depth 1), retried with backoff, and from a mirror
+# where one exists (Eigen: GitLab, which sheds load at times, then its GitHub mirror; a commit hash pins the content)
+RUN cat > /usr/local/bin/hc-retry <<'SH' && cat > /usr/local/bin/hc-git-at <<'SH2' && \
+    cat > /usr/local/bin/hc-git-submodules <<'SH3' && chmod +x /usr/local/bin/hc-retry /usr/local/bin/hc-git-at /usr/local/bin/hc-git-submodules
+#!/bin/bash
+# hc-retry CMD...: run CMD up to 6 times, waiting 10, 20, ... s between tries
+for i in 1 2 3 4 5 6; do "$@" && exit 0; echo "hc-retry: attempt $i failed: $*" >&2; sleep $((i * 10)); done
+exit 1
+SH
+#!/bin/bash
+# hc-git-at DIR SHA URL [URL...]: DIR becomes a checkout of commit SHA (depth 1), fetched from the first URL that has it
+set -u
+d=$1 sha=$2; shift 2
+mkdir -p "$d" && git -C "$d" init -q
+for i in 1 2 3 4 5 6; do
+  for u in "$@"; do
+    if git -C "$d" fetch -q --depth 1 "$u" "$sha"; then git -C "$d" checkout -q FETCH_HEAD && exit 0; fi
+  done
+  echo "hc-git-at: attempt $i failed: $sha from $*" >&2; sleep $((i * 10))
+done
+exit 1
+SH2
+#!/bin/bash
+# hc-git-submodules REPO: every submodule of REPO, recursively, at the commit REPO records for it (then a
+# `git submodule update --init --recursive` finds them all in place and fetches nothing)
+set -eu
+r=$1
+[ -f "$r/.gitmodules" ] || exit 0
+git -C "$r" config -f .gitmodules --get-regexp '^submodule\..*\.path$' | while read -r key path; do
+  name=${key#submodule.}; name=${name%.path}
+  url=$(git -C "$r" config -f .gitmodules --get "submodule.$name.url")
+  sha=$(git -C "$r" ls-tree HEAD "$path" | awk '{print $3}')
+  [ -n "$sha" ] || continue
+  alt=""
+  case "$url" in *gitlab.com/libeigen/eigen*) alt=https://github.com/eigen-mirror/eigen.git ;; esac
+  hc-git-at "$r/$path" "$sha" "$url" $alt
+  hc-git-submodules "$r/$path"
+done
+SH3
 # the HumanCLAW source snapshot (by commit; its tree hash checked), without what the runtime does not need
 RUN git init -q /tmp/hc && cd /tmp/hc && git remote add origin https://github.com/mll-lab-nu/embodied-first-exam && \
-    git fetch -q --depth 1 --filter=blob:none origin fe3d37676264cba2f71569aa8822428e9c73e1ca && \
+    hc-retry git fetch -q --depth 1 --filter=blob:none origin fe3d37676264cba2f71569aa8822428e9c73e1ca && \
     test "$(git rev-parse FETCH_HEAD:harnesses/humanclaw)" = f60d71a04c79411089fc5e606322b96f61cad8dd && \
     git sparse-checkout set --no-cone /harnesses/humanclaw/pyproject.toml /harnesses/humanclaw/LICENSE \
       /harnesses/humanclaw/NOTICE /harnesses/humanclaw/src/ /harnesses/humanclaw/resources/agent/ \
       /harnesses/humanclaw/resources/hssd/ /harnesses/humanclaw/resources/metrics/ /harnesses/humanclaw/resources/seeds/ \
       /harnesses/humanclaw/resources/weights/ /harnesses/humanclaw/resources/assets.json \
       /harnesses/humanclaw/configs/paper_fullval_v1.json /harnesses/humanclaw/patches/habitat-sim/ && \
-    git checkout -q FETCH_HEAD && mv harnesses/humanclaw /opt/humanclaw && cd / && rm -rf /tmp/hc && \
+    hc-retry git checkout -q FETCH_HEAD && mv harnesses/humanclaw /opt/humanclaw && cd / && rm -rf /tmp/hc && \
     rm -rf /opt/humanclaw/src/humanclaw_bench/harnesses /opt/humanclaw/src/humanclaw_bench/libero && \
     echo "6f57ec8130b4ccca7d208a0754ba691d52e44b469cd6dcee220fa193fcad6766  /opt/humanclaw/patches/habitat-sim/humanclaw_halfphysics.patch" | sha256sum -c -
 # Habitat-Sim acbe6f4 + the Half-Physics patch: headless, CUDA, Bullet (HumanCLAW patches/habitat-sim/README.md)
-RUN git clone -q https://github.com/facebookresearch/habitat-sim.git /opt/habitat-sim && cd /opt/habitat-sim && \
-    git checkout -q acbe6f4922e68145e401e55c30f9dfea460a3f24 && git submodule update -q --init --recursive && \
+RUN hc-git-at /opt/habitat-sim acbe6f4922e68145e401e55c30f9dfea460a3f24 https://github.com/facebookresearch/habitat-sim.git && \
+    cd /opt/habitat-sim && hc-git-submodules . && git submodule update -q --init --recursive && \
     test "$(git -C src/deps/bullet3 rev-parse HEAD)" = 2c204c49e56ed15ec5fcfa71d199ab6d6570b3f5 && \
     git apply --check /opt/humanclaw/patches/habitat-sim/humanclaw_halfphysics.patch && \
     git apply /opt/humanclaw/patches/habitat-sim/humanclaw_halfphysics.patch && \
@@ -63,7 +102,7 @@ RUN git clone -q https://github.com/facebookresearch/habitat-sim.git /opt/habita
       --cmake-args="-DCMAKE_CUDA_ARCHITECTURES=80;86;89;90 -DCCACHE_FOUND:FILEPATH=" && \
     HEADLESS=True WITH_CUDA=True WITH_BULLET=True pip install --no-deps --no-build-isolation -e . && \
     pip install --no-deps build/deps/magnum-bindings/src/python && \
-    find build -name '*.o' -delete && rm -rf .git src/deps/*/.git && \
+    find build -name '*.o' -delete && find . -name .git -prune -exec rm -rf {} + && \
     python -c "import habitat_sim; assert habitat_sim.built_with_bullet; print(habitat_sim.__file__)"
 RUN pip install --no-deps -e /opt/humanclaw
 # the paper_fullval_v1 motion weights (HumanCLAW/HumanCLAW, public), checked by archive sha256 and by the manifest
