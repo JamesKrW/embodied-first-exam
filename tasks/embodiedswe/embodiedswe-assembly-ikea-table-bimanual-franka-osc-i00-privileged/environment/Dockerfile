@@ -2,7 +2,7 @@
 # commit, scrubbed, + its assets by sha256); built locally, not published (images/embodiedswe/BUILD_ONLY). The tooling
 # comes from the files image (images/embodiedswe-files/, source embodied_first_exam/benchmarks/embodiedswe/).
 FROM ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.2.0
-COPY --from=ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.1.0@sha256:00e8f53a6925f2c5a5afb3dfd139ebc70df2d6f7d087f8f07ddf06f73e4bf01b /rcb_embodiedswe.py /esw_proxy.py /opt/efe/
+COPY --from=ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.1.0@sha256:8130ccc0db1c0a413018e445954cacbfaa06f0204cd865d5acf7227ceb5ecd30 /rcb_embodiedswe.py /esw_proxy.py /opt/efe/
 COPY instance.json /app/instance.json
 RUN mkdir -p /app/output
 WORKDIR /app

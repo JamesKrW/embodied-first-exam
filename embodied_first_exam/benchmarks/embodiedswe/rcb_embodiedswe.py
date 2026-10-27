@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import signal
@@ -401,6 +402,42 @@ class StopRollout(Exception):
     pass
 
 
+# Action ranges the tooling enforces (robobench clips none of these itself): the 6 end-effector pose deltas of a
+# task-space arm (OSC / impedance / differential IK) are in action units, each in [-1, 1] (x pos_scale m, x rot_scale
+# rad). Other dims are left to robobench: joint and finger targets are bounded by the joint limits, and the G1
+# locomotion command is clipped to its policy's command range by robobench itself.
+DELTA_MODES = ("osc", "impedance", "diff_ik")
+
+
+def action_box(env):
+    """Per-dim (lo, hi) lists for env's action vector; +/-inf where the tooling enforces no range."""
+    r = env.robot
+    dim = int(r.action_dim)
+    lo, hi = [-math.inf] * dim, [math.inf] * dim
+    slices = getattr(r, "action_slices", None)
+    kids = getattr(r, "robots", None)
+    parts = ([(s, kids[n]) for n, s in slices.items()] if isinstance(slices, dict) and kids is not None
+             else [(slice(0, dim), r)])
+    for s, rb in parts:
+        if getattr(rb, "control_mode", None) in DELTA_MODES:
+            for k in range(s.start, min(s.start + 6, s.stop)):
+                lo[k], hi[k] = -1.0, 1.0
+    return lo, hi
+
+
+def box_violation(act, box) -> str | None:
+    """None, or a message naming the first out-of-range value of a (num_envs, dim) action."""
+    import torch
+    lo = torch.tensor(box[0], dtype=act.dtype)
+    hi = torch.tensor(box[1], dtype=act.dtype)
+    bad = (act < lo - 1e-6) | (act > hi + 1e-6)
+    if not bool(bad.any()):
+        return None
+    e, k = [int(v) for v in bad.nonzero()[0]]
+    return (f"action[{k}] = {float(act[e, k]):.6g} is outside its range [{box[0][k]:g}, {box[1][k]:g}] "
+            f"(task-space pose deltas are in action units, each in [-1, 1]); the action was not applied")
+
+
 def _hide_other_procs() -> None:
     """Belt to Landlock's suspenders: give the solution a private mount namespace with /proc remounted
     hidepid=2, so other processes' /proc entries (cmdline, environ, fd, mem of the trusted sim) are hidden
@@ -641,6 +678,7 @@ def cmd_rollout(a) -> int:
         step_s = [0.0]
         bad = [0]
         step_err = [None]
+        box = action_box(env)
 
         def on_step(act):
             if act.numel() != env.num_envs * env.robot.action_dim:
@@ -653,6 +691,10 @@ def cmd_rollout(a) -> int:
             if len(actions) >= MAX_STEPS:
                 raise StopRollout(f"step_cap ({MAX_STEPS} control steps)")
             act = act.reshape(env.num_envs, env.robot.action_dim).contiguous()
+            msg = box_violation(act, box)
+            if msg is not None:                       # refused, not clipped: never stepped, never recorded
+                bad[0] += 1
+                raise ValueError(msg)
             actions.append(act[0].numpy().copy())     # recorded BEFORE the step: a step that raises is in the record
             t = time.perf_counter()
             try:
@@ -694,7 +736,7 @@ def cmd_rollout(a) -> int:
     return 0
 
 
-def _load_actions(path: str, preset: str, action_dim: int):
+def _load_actions(path: str, preset: str, action_dim: int, box=None):
     import numpy as np
     d = np.load(path, allow_pickle=False)
     if str(d["task"]) != preset:
@@ -702,6 +744,10 @@ def _load_actions(path: str, preset: str, action_dim: int):
     A = np.asarray(d["actions"], dtype=np.float32)
     if A.ndim != 2 or A.shape[1] != action_dim or len(A) > MAX_STEPS or not np.isfinite(A).all():
         raise ValueError("malformed trajectory")
+    if box is not None and len(A):
+        lo, hi = np.asarray(box[0], np.float64), np.asarray(box[1], np.float64)
+        if ((A < lo - 1e-6) | (A > hi + 1e-6)).any():
+            raise ValueError("malformed trajectory: an action outside its range")
     return A
 
 
@@ -715,7 +761,7 @@ def cmd_replay(a) -> int:
         inst = load_instance(a.instance)
         env, grader, sha = _graded_env(inst, a.grader)
         res.update(instance_sha=sha, instance_ok=sha == inst["state_sha"])
-        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim)
+        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim, action_box(env))
         t1 = time.perf_counter()
         for i, row in enumerate(A):
             try:
@@ -763,7 +809,7 @@ def cmd_video(a) -> int:
         if a.eye and a.target:
             eye, target = [float(v) for v in a.eye.split(",")], [float(v) for v in a.target.split(",")]
         cam.set_world_poses_from_view(torch.tensor([list(eye)]), torch.tensor([list(target)]))
-        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim)
+        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim, action_box(env))
         control_dt = float(env.dt * env.robot.control_period)
         every = max(1, int(round(1.0 / (a.fps * control_dt))))
         if len(A) / every > a.max_frames:                   # a long rollout becomes a time lapse
@@ -816,6 +862,19 @@ def make_env(instance: str = "/app/instance.json", cameras: bool = False):
     sha = state_sha(env)
     if sha != inst["state_sha"]:
         log(f"warning: the start state differs from the frozen instance ({sha[:12]} != {inst['state_sha'][:12]})")
+    box = action_box(env)
+    raw_step = env.step
+
+    def step(action, *args, **kwargs):              # the grading step path's range check, here too
+        import torch
+        t = torch.as_tensor(action)
+        if t.numel() == env.num_envs * env.robot.action_dim:
+            msg = box_violation(t.reshape(env.num_envs, -1).to("cpu", torch.float32), box)
+            if msg is not None:
+                raise ValueError(msg)
+        return raw_step(action, *args, **kwargs)
+
+    env.step = step
     return env
 
 

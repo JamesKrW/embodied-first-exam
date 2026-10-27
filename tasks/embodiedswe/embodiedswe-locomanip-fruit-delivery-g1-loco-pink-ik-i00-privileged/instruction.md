@@ -33,6 +33,11 @@ anything goes: reset it, restore states, read anything, make cameras, run many p
 `(1, 32)` tensor; one step is 0.016667 s of simulated time. `env.describe()`, `env.describe_stage()`, the
 scene's and the robot's own methods and the source under `/opt/embodiedswe` tell you the rest.
 
+Action range. The tooling enforces no range on this robot's action: the wrist poses are absolute targets for
+the IK, the hand joint targets are bounded by the joint limits, and robobench clips the 4 base-command values
+to its locomotion policy's command range (vx [-0.6, 0.6] m/s, vy [-0.4, 0.4] m/s, wz [-0.6, 0.6] rad/s,
+hip height [0.50, 0.80] m).
+
 ## Deliverable
 
 The whole folder `/app/output/solution/`. Its entry point is `/app/output/solution/solve.py`, exposing

@@ -34,6 +34,12 @@ anything goes: reset it, restore states, read anything, make cameras, run many p
 `(1, 8)` tensor; one step is 0.066667 s of simulated time. `env.describe()`, `env.describe_stage()`, the
 scene's and the robot's own methods and the source under `/opt/embodiedswe` tell you the rest.
 
+Action range. In the 8-value action, the first 6 values are end-effector pose deltas in action units
+(x 0.02 m for position, x 0.097 rad for rotation); each must lie in [-1, 1]. An action with a value outside
+that range is refused with `ValueError`: it is not clipped, not applied and not recorded, in development
+(`make_env()`) and in grading alike. The 2 finger values are finger position targets in metres
+(0 closed, 0.04 open); the joint limits bound them.
+
 ## Deliverable
 
 The whole folder `/app/output/solution/`. Its entry point is `/app/output/solution/solve.py`, exposing

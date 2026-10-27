@@ -40,6 +40,13 @@ state (the cutting scenes have no `success()`: their graders' predicate, enough 
 also the tooling's `cut_success` for the development `check`); `progress` = its rubric score. A fresh process re-executes the recorded actions and must reach the same final
 state. No submissions, checkpoints or best-of-N: the final `solution/` is graded once.
 
+Action ranges: robobench clips none of a task-space arm's pose deltas, so the tooling enforces them. Each of the 6
+end-effector pose deltas of a Franka arm (operational-space control) must lie in [-1, 1] action units; an action
+outside that range is refused with `ValueError` (not clipped, not applied, not recorded, counted in `bad_actions`),
+in the graded run and in the development `make_env()` alike. A recorded trajectory with such an action does not
+replay. The G1's wrist poses and hand targets are bounded by its IK and joint limits, and robobench clips its
+locomotion command itself. Each task's instruction states the range for its robot.
+
 ## Device
 
 PhysX and the G1's frozen locomotion policy run on the CPU, in the verifier and in the agent's development env alike

@@ -39,6 +39,12 @@ This robot is bimanual: `env.robot.articulation` is `None`. Each arm is reached 
 `env.robot.robots['left']` and `env.robot.robots['right']` (their articulations, bodies and joints), and
 `env.robot.action_slices` says which part of the action vector drives which arm.
 
+Action range. In each arm's 8-value slice, the first 6 values are end-effector pose deltas in action units
+(x 0.02 m for position, x 0.097 rad for rotation); each must lie in [-1, 1]. An action with a value outside
+that range is refused with `ValueError`: it is not clipped, not applied and not recorded, in development
+(`make_env()`) and in grading alike. The 2 finger values of each slice are finger position targets in metres
+(0 closed, 0.04 open); the joint limits bound them.
+
 ## Deliverable
 
 The whole folder `/app/output/solution/`. Its entry point is `/app/output/solution/solve.py`, exposing

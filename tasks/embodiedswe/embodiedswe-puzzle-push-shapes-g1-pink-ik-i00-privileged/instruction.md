@@ -34,6 +34,9 @@ anything goes: reset it, restore states, read anything, make cameras, run many p
 `(1, 28)` tensor; one step is 0.016667 s of simulated time. `env.describe()`, `env.describe_stage()`, the
 scene's and the robot's own methods and the source under `/opt/embodiedswe` tell you the rest.
 
+Action range. The tooling enforces no range on this robot's action: the wrist poses are absolute targets for
+the IK and the hand joint targets are bounded by the joint limits.
+
 ## Deliverable
 
 The whole folder `/app/output/solution/`. Its entry point is `/app/output/solution/solve.py`, exposing

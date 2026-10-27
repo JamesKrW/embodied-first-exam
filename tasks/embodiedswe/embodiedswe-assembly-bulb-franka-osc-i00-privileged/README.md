@@ -43,3 +43,13 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 - GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: not yet measured: RoboLab's privileged figures (the same Isaac Sim 5.1 stack and recipe, CPU PhysX) as the estimate
 - Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 24 GiB GPU memory, 24 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 24 GiB GPU memory, 24 GiB memory. Limits measured: not yet measured: RoboLab's privileged limits (the same Isaac Sim stack) as the estimate.
+
+## Details
+
+### Review notes
+- Solvability (no reference solution ships for this scene): the bulb is physically seatable. A development-only
+  probe that presses and twists the bulb directly seats it, so the thread works.
+- A scripted robot attempt stalls during the turn. Three properties of the controller and the gripper make
+  the turn hard: the rotational stiffness of the operational-space controller; its nullspace posture spring,
+  which pulls the last wrist joint back toward its rest angle; and the parallel jaw, which pivots on the round
+  glass instead of holding it rigidly.
