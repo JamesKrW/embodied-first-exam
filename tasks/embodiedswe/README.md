@@ -35,23 +35,31 @@ and loco-manipulation scenes, one frozen instance each), privileged mode, `task_
 The verifier builds the env from the frozen instance (EmbodiedSWE's own build and seeded reset), attaches the task's
 grader (EmbodiedSWE's, unchanged) and runs the delivered `solve(env)` in a separate process as an unprivileged user,
 without network or GPU, behind a proxy env (`embodied_first_exam/benchmarks/embodiedswe/esw_proxy.py`): reads return copies,
-`env.step(action)` steps the simulator, everything else is refused. Success = the grader's end predicate on the final
-state (the cutting scenes have no `success()`: their graders' predicate, enough pieces and all of them on the board, is
-also the tooling's `cut_success` for the development `check`); `progress` = its rubric score. A fresh process re-executes the recorded actions and must reach the same final
-state. No submissions, checkpoints or best-of-N: the final `solution/` is graded once.
+`env.step(action)` steps the simulator, everything else is refused. The verdict is EmbodiedSWE's, read once on the
+state when the rollout ends (`solve` returns or raises, its process ends, or the 30-minute limit passes): success = the
+grader's end predicate (the cutting scenes have no `success()`: their graders' predicate, enough pieces and all of them
+on the board, is also the tooling's `cut_success` for the development `check`); `progress` = its rubric score, the
+peak recorded progress, so progress made before an exception or the time limit counts. An exception from
+`env.step` is raised in `solve`, as EmbodiedSWE's `GradedEnv` lets it propagate. Actions are applied as given: as in
+EmbodiedSWE, a Franka's operational-space controller scales the 6 pose deltas by `pos_scale` / `rot_scale` without
+clipping them and clamps the joint torques (100 N·m); only an action's shape and finite values are checked. A run in
+which no action reached the simulator scores 0. A fresh process then re-executes the recorded actions: a diagnostic
+(`deterministic`, `replay_success`, `replay_progress` in `reward.json`) and the source of the video, which is marked
+`video_mismatch` in `video.json` when it does not reach the run's final state; neither changes the verdict.
 
-Action ranges: robobench clips none of a task-space arm's pose deltas, so the tooling enforces them. Each of the 6
-end-effector pose deltas of a Franka arm (operational-space control) must lie in [-1, 1] action units; an action
-outside that range is refused with `ValueError` (not clipped, not applied, not recorded, counted in `bad_actions`),
-in the graded run and in the development `make_env()` alike. A recorded trajectory with such an action does not
-replay. The G1's wrist poses and hand targets are bounded by its IK and joint limits, and robobench clips its
-locomotion command itself. Each task's instruction states the range for its robot.
+Differences from EmbodiedSWE's own grading, on purpose:
+- PhysX runs on the CPU (see Device), so a fresh process repeats a run bit for bit and the video rendered after the
+  verdict shows the graded run.
+- Only the final `solution/` is graded, once: no submitted checkpoints, no best-of-N.
+- `solve` runs in a sandbox (a separate process as an unprivileged user, no network, no GPU) behind a proxy env, with
+  the 30-minute limit on its wall clock.
+- One frozen instance per task, seed 0.
 
 ## Device
 
 PhysX and the G1's frozen locomotion policy run on the CPU, in the verifier and in the agent's development env alike
 (`make_env()` builds exactly as grading does; the tooling refuses an instance or a build on another device). A fresh
-CPU process repeats a run bit for bit, which the replay check needs. On a GPU the locomotion policy is deterministic
+CPU process repeats a run bit for bit, which the replayed video needs. On a GPU the locomotion policy is deterministic
 too but its bits differ from the CPU's, start states differ from the frozen instances, and a trajectory recorded on
 the CPU fails there.
 

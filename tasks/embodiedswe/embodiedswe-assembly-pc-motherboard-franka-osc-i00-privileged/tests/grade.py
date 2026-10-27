@@ -1,5 +1,6 @@
 """Verifier entry point of an EmbodiedSWE task: run the delivered program /app/output/solution/ (`solve(env)`) against a
-fresh simulator built from the frozen instance, then re-execute its recorded actions in another fresh process.
+fresh simulator built from the frozen instance and grade it once, as EmbodiedSWE does; then re-execute its recorded
+actions in another fresh process (a diagnostic and the video's source, never part of the verdict).
 
     python /tests/grade.py --instance /tests/instance.json --grader /tests/grader/<scene>.py
 
@@ -7,19 +8,24 @@ Every step runs in its own process (`rcb_embodiedswe.py`, the image's tooling; t
 1. rollout  - the trusted simulator process builds the env from the frozen instance (seeded reset, PhysX on the CPU),
               checks its state hash, attaches the task's grader (EmbodiedSWE's rubric, recorded after every step) and
               serves the solution, which runs in ANOTHER process as `nobody` without network or GPU, through a proxy that
-              answers reads with copies, executes `env.step(action)` and refuses everything else. It ends when `solve`
+              answers reads with copies, executes `env.step(action)` and refuses everything else (an exception from
+              `env.step` is raised in `solve`, as EmbodiedSWE's GradedEnv lets it propagate). It ends when `solve`
               returns or raises, its process dies, or the rollout limit (30 min of solve time) passes; every process of
               `nobody` is killed, then the verdict is read on the state at that moment: success = the grader's end
-              predicate (`check_success`), progress = its rubric score. The actions are recorded.
-2. replay   - a fresh process rebuilds the frozen instance and re-executes the recorded actions (no solution code).
-              success = rollout success AND replay success AND the same final-state hash (`deterministic`).
-3. video    - only after reward.txt / reward.json are written: a third process renders the recorded actions.
+              predicate (`check_success`), progress = its rubric score (peak recorded progress). The actions are
+              recorded. This is the verdict (a run in which no action reached the simulator scores 0).
+2. replay   - a fresh process rebuilds the frozen instance and re-executes the recorded actions (no solution code):
+              a diagnostic only (`deterministic` = the same final-state hash, `replay_success`, `replay_progress`).
+              A replay that differs, fails or overruns leaves the verdict as it is and is noted in grade.log.
+3. video    - only after reward.txt / reward.json are written: a third process renders the recorded actions;
+              video.json says whether its final state matches the rollout's (`video_mismatch`; `video_ok` 0 then).
 
 Whose failure a 0 is (every path writes a reward; `deterministic`, `grader_error` and `infra_error` are always present):
-- the agent's: no solution/solve.py (`missing_solution`), a solve that fails to load or raises (`solve_error`), times out
-  (`solve_timeout`), sends a bad action (`bad_action`), does not reach the goal, or does not replay to the same state;
+- the agent's: no solution/solve.py (`missing_solution`), no action at all, or a final state that does not meet the
+  goal (whether solve returned, raised (`solve_error`), timed out (`solve_timeout`) or sent a malformed action
+  (`bad_action`: wrong shape, NaN or inf));
 - the verifier's (`infra_error` = 1, no verdict on the agent): the rebuilt instance not matching the frozen one
-  (`instance_mismatch`), a rollout or replay process that ends without a result or overruns its limit, any error here.
+  (`instance_mismatch`), a rollout process that ends without a result or overruns its limit, any error here.
 """
 from __future__ import annotations
 
@@ -73,32 +79,37 @@ def run(cmd: list[str], timeout: float, log_name: str) -> tuple[dict | None, boo
 
 
 def _verify(a, ro: dict, out_dir: str, status: str, n: int, t0: float) -> dict:
-    """Replay the recorded actions in a fresh process and score; writes reward.txt / reward.json, returns the fields."""
+    """Score the rollout (the verdict), then replay the recorded actions in a fresh process as a diagnostic; writes
+    reward.txt / reward.json, returns the fields."""
     t1 = time.time()
-    rp, rp_timeout = (None, False)
+    # The verdict: the rollout's own reading of the grader on its final state (EmbodiedSWE's verdict). No action
+    # reached the sim: nothing was done (nop = 0 is an acceptance check), so that scores 0 whatever the predicate says.
+    ok = n > 0 and bool(ro.get("success"))
+    progress = float(ro.get("progress") or 0.0) if n > 0 else 0.0
+    diag = {"replay_failed": 0, "replay_timed_out": 0}
     if n > 0:
         rp, rp_timeout = run([sys.executable, TOOL, "replay", "--instance", a.instance, "--grader", a.grader,
                               "--traj", os.path.join(out_dir, "actions.npz")],
                              BOOT_S + 2.0 * float(ro.get("solve_wall_s", ROLLOUT_S)) + 600.0, "replay.log")
         if rp_timeout or rp is None or "error" in rp or not rp.get("instance_ok"):
-            print(f"[grade] replay gave no result: {json.dumps(rp)[:2000] if rp else 'no result'}", file=sys.stderr)
-            out = {**ERR, "replay_failed": 1, "replay_timed_out": int(rp_timeout), "n_actions": n,
-                   "rollout_success": int(bool(ro.get("success")))}
-            write(False, out)
-            return out
+            print(f"[grade] replay gave no result (diagnostic only, the verdict stands): "
+                  f"{json.dumps(rp)[:2000] if rp else ('timed out' if rp_timeout else 'no result')}", file=sys.stderr)
+            diag = {"replay_failed": 1, "replay_timed_out": int(rp_timeout)}
+            rp = {}
     else:
-        # No action reached the sim: nothing to replay, and nothing was done (nop = 0 is an acceptance check), so
-        # this scores success 0 outright, whatever the rollout's predicate says.
         rp = {"success": False, "final_sha": ro.get("final_sha"), "progress": 0.0}
-    deterministic = rp.get("final_sha") == ro.get("final_sha")
-    ok = n > 0 and bool(ro.get("success")) and bool(rp.get("success")) and deterministic
-    progress = float(ro.get("progress") or 0.0) if n > 0 else 0.0
+    deterministic = bool(rp) and rp.get("final_sha") == ro.get("final_sha")
+    if n > 0 and rp and not deterministic:
+        print(f"[grade] the replay did not reach the rollout's final state (rollout {ro.get('final_sha')}, replay "
+              f"{rp.get('final_sha')}; replay success {int(bool(rp.get('success')))}): the verdict stands, the "
+              f"video (a replay) does not show this run", file=sys.stderr)
     out = {**ZERO, "success": int(ok), "deterministic": int(deterministic),
            "rollout_success": int(bool(ro.get("success"))), "replay_success": int(bool(rp.get("success"))),
-           "progress": round(progress, 6), "replay_progress": round(float(rp.get("progress") or 0.0), 6),
+           "progress": round(progress, 6), "replay_progress": round(float(rp.get("progress") or 0.0), 6), **diag,
            "instance_ok": 1, "n_actions": n, "sim_steps": n,
            "solve_returned": int(status == "returned"), "solve_error": int(status in ("error", "process_ended")),
            "solve_timeout": int(status == "timeout"), "bad_action": int(int(ro.get("bad_actions", 0)) > 0),
+           "step_errors": int(ro.get("step_errors", 0)),
            "proxy_requests": int(ro.get("requests", 0)), "proxy_refused": int(ro.get("refused", 0)),
            "solve_wall_s": float(ro.get("solve_wall_s", 0.0)), "rollout_ms_per_step": float(ro.get("ms_per_step", 0.0)),
            "rollout_wall_s": round(t1 - t0, 1), "replay_wall_s": round(time.time() - t1, 1)}
@@ -140,18 +151,11 @@ def main() -> int:
                 shutil.copyfile(os.path.join(out_dir, f), os.path.join(LOG_DIR, f))
         status = ro.get("solve_status", "")
         n = int(ro.get("n_actions", 0))
-        if status == "step_error":
-            # The env could not take one of the solution's actions (e.g. a controller singularity): the rollout ended
-            # there. The solution's failure, not infrastructure: success 0, nothing to replay, no progress credited.
-            print(f"[grade] step error: {str(ro.get('step_error'))[:1000]}", file=sys.stderr)
-            out = {**ZERO, "step_error": 1, "progress": 0.0,
-                   "rollout_progress": round(float(ro.get("progress") or 0.0), 6), "instance_ok": 1,
-                   "n_actions": n, "sim_steps": n, "solve_error": 1,
-                   "proxy_requests": int(ro.get("requests", 0)), "proxy_refused": int(ro.get("refused", 0)),
-                   "solve_wall_s": float(ro.get("solve_wall_s", 0.0)), "rollout_wall_s": round(time.time() - t0, 1)}
-            write(False, out)
-        else:
-            out = _verify(a, ro, out_dir, status, n, t0)
+        if ro.get("step_errors"):
+            print(f"[grade] env.step raised {ro.get('step_errors')} time(s), first at action "
+                  f"{ro.get('step_error_at')}: "
+                  f"{str(ro.get('step_error'))[:1000]}", file=sys.stderr)
+        out = _verify(a, ro, out_dir, status, n, t0)
     except Exception:  # noqa: BLE001
         traceback.print_exc(file=sys.stderr)
         write(False, {**ERR})
@@ -160,8 +164,16 @@ def main() -> int:
         v, _ = run([sys.executable, TOOL, "video", "--instance", a.instance, "--traj",
                     os.path.join(LOG_DIR, "trajectory.npz"), "--video", os.path.join(LOG_DIR, "replay.mp4")],
                    BOOT_S + 3.0 * float(out.get("solve_wall_s") or ROLLOUT_S) + 600.0, "video.log")
-        json.dump({"video_source": "replay", "video_ok": int(bool(v and v.get("video_ok"))),
-                   "frames": int((v or {}).get("frames", 0))}, open(os.path.join(LOG_DIR, "video.json"), "w"))
+        rendered = bool(v and v.get("video_ok"))
+        # The video is a replay: it shows this run only if it reaches the rollout's final state.
+        mismatch = not (rendered and v.get("final_sha") and v.get("final_sha") == ro.get("final_sha"))
+        if rendered and mismatch:
+            print(f"[grade] the video's replay did not reach the rollout's final state (rollout {ro.get('final_sha')}, "
+                  f"video {v.get('final_sha')}): video_mismatch, the video does not show this run", file=sys.stderr)
+        json.dump({"video_source": "replay", "video_ok": int(rendered and not mismatch),
+                   "video_rendered": int(rendered), "video_mismatch": int(mismatch),
+                   "frames": int((v or {}).get("frames", 0))},
+                  open(os.path.join(LOG_DIR, "video.json"), "w"))
     return 0
 
 

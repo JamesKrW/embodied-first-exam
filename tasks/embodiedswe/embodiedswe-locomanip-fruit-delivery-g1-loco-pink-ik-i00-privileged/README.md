@@ -27,9 +27,11 @@ None in the repository (`oracle = "none"`). A scripted reference `solve()` is ke
 agent's `solve()` runs in a separate process as `nobody` (no network, no GPU, process limit) behind a proxy that
 answers reads with copies, executes `env.step(action)` and refuses everything else. The rollout ends when `solve`
 returns, raises or dies, or after 30 min; the verdict is read on the state then: success = the grader's end
-predicate, `progress` = its rubric score. A fresh process then re-executes the recorded actions; `reward.txt` = 1 iff
-the rollout and the replay both succeed and reach the same final-state hash (`deterministic`). The video is rendered
-afterwards from the recorded actions.
+predicate, `progress` = its rubric score (its peak recorded progress), and `reward.txt` = that success, as
+EmbodiedSWE grades. A fresh process then re-executes the recorded actions as a diagnostic (`deterministic` = the same
+final-state hash, `replay_success`, `replay_progress` in `reward.json`); it does not change the verdict. The video is
+rendered afterwards from the recorded actions (`video.json`: `video_mismatch` when that replay misses the run's
+final state).
 
 ## Compute resources
 Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.

@@ -64,8 +64,9 @@ with no network and no GPU, and receives a proxy `env` that forwards to the simu
   `write_*` / `set_*` / `reset*` method of an asset, any method of the scene or the robot that is not one of their
   queries (state, progress and geometry reads such as `success()`, `seated()`, `get_state()`), assigning attributes,
   and private or `__dunder__` attributes. Modifying a tensor you read changes only your copy.
-- if `env.step(action)` raises (the env cannot take that action, e.g. the controller hits a singular pose), the graded
-  run ends at that step and scores 0.
+- if `env.step(action)` raises (the env cannot take that action, e.g. the controller hits a singular pose), the
+  error is raised in `solve`, as in EmbodiedSWE: the run goes on if `solve` handles it, and otherwise ends
+  there, with the verdict read on the state at that moment.
 
 What `solve.py` can use in the graded run. Its process has **no simulator and no Isaac Sim app**; it is
 sandboxed (Landlock) and sees only its own files:
@@ -86,9 +87,10 @@ take at most 5 minutes.
 
 The graded run ends when `solve` returns or raises, its process ends, or after **30 minutes** of wall-clock time; every
 process it started is then ended, and the verdict is read on the state at that moment (a crash or a hang is not
-retried). Every action is recorded; a second fresh simulator process then re-executes the recorded actions from the
-frozen instance and must reach the same final state, bit for bit, for the run to count. Only the final
-`/app/output/solution/` is graded, once.
+retried). That verdict is the result: success = the task's success predicate on that state. Every action is
+recorded; a second fresh simulator process then re-executes the recorded actions from the frozen instance to
+check that the run repeats bit for bit and to render the video; this check does not change the verdict. Only
+the final `/app/output/solution/` is graded, once.
 
 Rules of the graded run (they hold whatever the proxy lets through): change the world only by stepping forward with
 `env.step`; never reset, restore states, move objects, modify physics, the task, the scene or the robot's controller,

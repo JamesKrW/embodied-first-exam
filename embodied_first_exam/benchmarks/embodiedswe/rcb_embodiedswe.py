@@ -27,14 +27,16 @@ reads answered with copies, `env.step(action)` executed and recorded, everything
 `solve` returns or raises, its process dies, or the rollout time limit passes (the verdict is then read from the state
 at that moment, as EmbodiedSWE's grader does at its budget kill). Every process of `nobody` is killed before the
 verdict is read. Verdict: success = the grader's `check_success` on the final state (their end predicate); progress =
-the grader's rubric score (its peak recorded progress).
+the grader's rubric score (its peak recorded progress). An exception from `env.step` is raised in `solve`, as
+EmbodiedSWE's GradedEnv lets it propagate: the rollout goes on if `solve` handles it. Actions are applied as given
+(robobench's controllers scale task-space deltas by pos_scale / rot_scale without clipping); only the shape and
+finiteness of an action are checked. The replay and the video are diagnostics: they never change the verdict.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import math
 import os
 import re
 import signal
@@ -402,42 +404,6 @@ class StopRollout(Exception):
     pass
 
 
-# Action ranges the tooling enforces (robobench clips none of these itself): the 6 end-effector pose deltas of a
-# task-space arm (OSC / impedance / differential IK) are in action units, each in [-1, 1] (x pos_scale m, x rot_scale
-# rad). Other dims are left to robobench: joint and finger targets are bounded by the joint limits, and the G1
-# locomotion command is clipped to its policy's command range by robobench itself.
-DELTA_MODES = ("osc", "impedance", "diff_ik")
-
-
-def action_box(env):
-    """Per-dim (lo, hi) lists for env's action vector; +/-inf where the tooling enforces no range."""
-    r = env.robot
-    dim = int(r.action_dim)
-    lo, hi = [-math.inf] * dim, [math.inf] * dim
-    slices = getattr(r, "action_slices", None)
-    kids = getattr(r, "robots", None)
-    parts = ([(s, kids[n]) for n, s in slices.items()] if isinstance(slices, dict) and kids is not None
-             else [(slice(0, dim), r)])
-    for s, rb in parts:
-        if getattr(rb, "control_mode", None) in DELTA_MODES:
-            for k in range(s.start, min(s.start + 6, s.stop)):
-                lo[k], hi[k] = -1.0, 1.0
-    return lo, hi
-
-
-def box_violation(act, box) -> str | None:
-    """None, or a message naming the first out-of-range value of a (num_envs, dim) action."""
-    import torch
-    lo = torch.tensor(box[0], dtype=act.dtype)
-    hi = torch.tensor(box[1], dtype=act.dtype)
-    bad = (act < lo - 1e-6) | (act > hi + 1e-6)
-    if not bool(bad.any()):
-        return None
-    e, k = [int(v) for v in bad.nonzero()[0]]
-    return (f"action[{k}] = {float(act[e, k]):.6g} is outside its range [{box[0][k]:g}, {box[1][k]:g}] "
-            f"(task-space pose deltas are in action units, each in [-1, 1]); the action was not applied")
-
-
 def _hide_other_procs() -> None:
     """Belt to Landlock's suspenders: give the solution a private mount namespace with /proc remounted
     hidepid=2, so other processes' /proc entries (cmdline, environ, fd, mem of the trusted sim) are hidden
@@ -659,6 +625,13 @@ def _final(env, grader, inst: dict) -> dict:
     return {"success": success, "progress": score, "final_sha": state_sha(env)}
 
 
+def _peak(grader) -> float:
+    try:
+        return max((float(step[0]["progress"]) for step in grader.history), default=0.0)
+    except Exception:  # noqa: BLE001
+        return 0.0
+
+
 def cmd_rollout(a) -> int:
     """The graded run. Prints one JSON line (also written to OUT/rollout.json); the actions go to OUT/actions.npz."""
     import numpy as np
@@ -677,8 +650,7 @@ def cmd_rollout(a) -> int:
         actions: list = []
         step_s = [0.0]
         bad = [0]
-        step_err = [None]
-        box = action_box(env)
+        step_err: list = []                           # (index, message) of every env.step that raised
 
         def on_step(act):
             if act.numel() != env.num_envs * env.robot.action_dim:
@@ -691,10 +663,6 @@ def cmd_rollout(a) -> int:
             if len(actions) >= MAX_STEPS:
                 raise StopRollout(f"step_cap ({MAX_STEPS} control steps)")
             act = act.reshape(env.num_envs, env.robot.action_dim).contiguous()
-            msg = box_violation(act, box)
-            if msg is not None:                       # refused, not clipped: never stepped, never recorded
-                bad[0] += 1
-                raise ValueError(msg)
             actions.append(act[0].numpy().copy())     # recorded BEFORE the step: a step that raises is in the record
             t = time.perf_counter()
             try:
@@ -702,9 +670,12 @@ def cmd_rollout(a) -> int:
                 if grader is not None:
                     grader.record()
             except Exception as exc:  # noqa: BLE001 — the env could not take this action (e.g. a controller
-                step_err[0] = f"{type(exc).__name__}: {exc}"[:1000]   # singularity): the rollout ends here
-                raise StopRollout("step_error") from exc
-            step_s[0] += time.perf_counter() - t
+                # singularity). As in EmbodiedSWE's GradedEnv, the error reaches solve: the rollout goes on if solve
+                # handles it, and ends (verdict on the state then) if it does not. The replay repeats it.
+                step_err.append((len(actions) - 1, f"{type(exc).__name__}: {exc}"[:1000]))
+                raise
+            finally:
+                step_s[0] += time.perf_counter() - t
             return None
 
         res["phase"] = "solve"
@@ -713,12 +684,14 @@ def cmd_rollout(a) -> int:
         if run.get("solve_status") == "sandbox_failed":
             res.update(phase="sandbox_failed", infra_error=1)
             raise StopRollout("sandbox_failed")
-        if step_err[0] is not None:
-            res["step_error"] = step_err[0]
+        if step_err:
+            res.update(step_errors=len(step_err), step_error_at=step_err[0][0], step_error=step_err[0][1])
             try:
                 res.update(_final(env, grader, inst))
-            except Exception as exc:  # noqa: BLE001 — the env may be unusable after the failed step; no verdict
-                res.update(success=False, progress=0.0, final_sha=None, final_error=f"{type(exc).__name__}: {exc}"[:500])
+            except Exception as exc:  # noqa: BLE001 — the env may be unusable after the failed step: success 0,
+                # progress = the rubric's peak recorded before it (the grader's own record of the run)
+                res.update(success=False, progress=_peak(grader), final_sha=None,
+                           final_error=f"{type(exc).__name__}: {exc}"[:500])
         else:
             res.update(_final(env, grader, inst))
         A = np.stack(actions).astype(np.float32) if actions else np.zeros((0, env.robot.action_dim), np.float32)
@@ -736,7 +709,7 @@ def cmd_rollout(a) -> int:
     return 0
 
 
-def _load_actions(path: str, preset: str, action_dim: int, box=None):
+def _load_actions(path: str, preset: str, action_dim: int):
     import numpy as np
     d = np.load(path, allow_pickle=False)
     if str(d["task"]) != preset:
@@ -744,10 +717,6 @@ def _load_actions(path: str, preset: str, action_dim: int, box=None):
     A = np.asarray(d["actions"], dtype=np.float32)
     if A.ndim != 2 or A.shape[1] != action_dim or len(A) > MAX_STEPS or not np.isfinite(A).all():
         raise ValueError("malformed trajectory")
-    if box is not None and len(A):
-        lo, hi = np.asarray(box[0], np.float64), np.asarray(box[1], np.float64)
-        if ((A < lo - 1e-6) | (A > hi + 1e-6)).any():
-            raise ValueError("malformed trajectory: an action outside its range")
     return A
 
 
@@ -761,17 +730,26 @@ def cmd_replay(a) -> int:
         inst = load_instance(a.instance)
         env, grader, sha = _graded_env(inst, a.grader)
         res.update(instance_sha=sha, instance_ok=sha == inst["state_sha"])
-        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim, action_box(env))
+        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim)
         t1 = time.perf_counter()
+        n_err = 0
         for i, row in enumerate(A):
             try:
                 env.step(torch.from_numpy(row).reshape(1, -1).to(env.device))
                 if grader is not None:
                     grader.record()
-            except Exception as exc:  # noqa: BLE001 — the recorded action the rollout's env also failed on
-                res.update(step_error=f"{type(exc).__name__}: {exc}"[:1000], step_error_at=i)
-                break
-        res.update(_final(env, grader, inst), n_actions=int(len(A)), replay_step_s=round(time.perf_counter() - t1, 3))
+            except Exception as exc:  # noqa: BLE001 — a recorded action the rollout's env also raised on; the
+                if not n_err:         # rollout went on after it (its solve handled the error), so the replay does too
+                    res.update(step_error=f"{type(exc).__name__}: {exc}"[:1000], step_error_at=i)
+                n_err += 1
+        if n_err:
+            res["step_errors"] = n_err
+        try:
+            res.update(_final(env, grader, inst))
+        except Exception as exc:  # noqa: BLE001
+            res.update(success=False, progress=_peak(grader), final_sha=None,
+                       final_error=f"{type(exc).__name__}: {exc}"[:500])
+        res.update(n_actions=int(len(A)), replay_step_s=round(time.perf_counter() - t1, 3))
     except Exception:  # noqa: BLE001
         res.update(error=traceback.format_exc()[-4000:])
     res["wall_s"] = round(time.monotonic() - t0, 1)
@@ -809,7 +787,7 @@ def cmd_video(a) -> int:
         if a.eye and a.target:
             eye, target = [float(v) for v in a.eye.split(",")], [float(v) for v in a.target.split(",")]
         cam.set_world_poses_from_view(torch.tensor([list(eye)]), torch.tensor([list(target)]))
-        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim, action_box(env))
+        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim)
         control_dt = float(env.dt * env.robot.control_period)
         every = max(1, int(round(1.0 / (a.fps * control_dt))))
         if len(A) / every > a.max_frames:                   # a long rollout becomes a time lapse
@@ -820,9 +798,10 @@ def cmd_video(a) -> int:
             grab = (i % every == 0) or i == len(A) - 1
             try:
                 env.step(torch.from_numpy(row).reshape(1, -1), render=grab)
-            except Exception as exc:  # noqa: BLE001 — the rollout ended on this step error too; the video stops here
-                res.update(step_error=f"{type(exc).__name__}: {exc}"[:500], step_error_at=i)
-                break
+            except Exception as exc:  # noqa: BLE001 — the rollout raised on this step too and went on after it
+                res.setdefault("step_error", f"{type(exc).__name__}: {exc}"[:500])
+                res.setdefault("step_error_at", i)
+                continue
             if grab:
                 cam.update(env.dt)
                 f = cam.data.output["rgb"][0].detach().cpu().numpy()[..., :3]
@@ -862,19 +841,6 @@ def make_env(instance: str = "/app/instance.json", cameras: bool = False):
     sha = state_sha(env)
     if sha != inst["state_sha"]:
         log(f"warning: the start state differs from the frozen instance ({sha[:12]} != {inst['state_sha'][:12]})")
-    box = action_box(env)
-    raw_step = env.step
-
-    def step(action, *args, **kwargs):              # the grading step path's range check, here too
-        import torch
-        t = torch.as_tensor(action)
-        if t.numel() == env.num_envs * env.robot.action_dim:
-            msg = box_violation(t.reshape(env.num_envs, -1).to("cpu", torch.float32), box)
-            if msg is not None:
-                raise ValueError(msg)
-        return raw_step(action, *args, **kwargs)
-
-    env.step = step
     return env
 
 
