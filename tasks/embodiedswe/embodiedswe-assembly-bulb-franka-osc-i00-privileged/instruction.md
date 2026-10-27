@@ -13,8 +13,9 @@ Goal: pick up the bulb, set it on the socket, and screw it down (turn it clockwi
 A Franka Emika Panda arm with a parallel-jaw gripper, fixed to the table. Control mode 'osc': 7 arm joints by operational-space control (joint torque); the action is 6 end-effector pose deltas, plus 2 gripper fingers by direct position target. Action dim 8.
 
 The task is complete when `env.scene.success()` is true for the env (a `(num_envs,)` bool tensor) at the end of the
-graded run. That is the verdict. Partial progress toward it is also recorded (EmbodiedSWE's rubric for this task,
-reported as `progress`), but only success counts as solved.
+graded run.
+That is the verdict. Partial progress toward it is also recorded (EmbodiedSWE's rubric for this task, reported
+as `progress`), but only success counts as solved.
 
 ## The environment
 
@@ -56,8 +57,11 @@ with no network and no GPU, and receives a proxy `env` that forwards to the simu
   `env.get_states()`, the scene's and robot's query methods) returns its result;
 - `env.step(action)` steps the simulator; this is the only way your program changes anything;
 - everything else is refused with `PermissionError`: `env.reset()`, `env.set_states(...)`, `env.sim.step()`, any
-  `write_*` / `set_*` / `reset*` method of an asset, the scene or the robot, assigning attributes, and private or
-  `__dunder__` attributes. Modifying a tensor you read changes only your copy.
+  `write_*` / `set_*` / `reset*` method of an asset, any method of the scene or the robot that is not one of their
+  queries (state, progress and geometry reads such as `success()`, `seated()`, `get_state()`), assigning attributes,
+  and private or `__dunder__` attributes. Modifying a tensor you read changes only your copy.
+- if `env.step(action)` raises (the env cannot take that action, e.g. the controller hits a singular pose), the graded
+  run ends at that step and scores 0.
 
 What `solve.py` can use in the graded run. Its process has **no simulator and no Isaac Sim app**; it is
 sandboxed (Landlock) and sees only its own files:

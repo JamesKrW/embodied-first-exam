@@ -1,0 +1,10 @@
+{
+ "action_dim": 8,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.008333333333333333,
+ "preset": "puzzle.coffee.franka.osc",
+ "seed": 0,
+ "state_sha": "68054e6c5b29193d81650dc6d3ba78fc5f0fcd9bd2e247ccc29d78d94dc376fc"
+}

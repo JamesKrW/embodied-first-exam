@@ -40,6 +40,10 @@ BOOT_S = 900.0                      # Isaac Sim start + scene build, generous (m
 LOAD_S = 300.0                      # importing solve.py (the tooling's own limit)
 
 
+ZERO = {"success": 0, "deterministic": 0, "grader_error": 0, "infra_error": 0}
+ERR = {"success": 0, "deterministic": 0, "grader_error": 1, "infra_error": 1}
+
+
 def write(ok: bool, out: dict) -> None:
     os.makedirs(LOG_DIR, exist_ok=True)
     open(os.path.join(LOG_DIR, "reward.txt"), "w").write("1\n" if ok else "0\n")
@@ -68,6 +72,40 @@ def run(cmd: list[str], timeout: float, log_name: str) -> tuple[dict | None, boo
     return res, False
 
 
+def _verify(a, ro: dict, out_dir: str, status: str, n: int, t0: float) -> dict:
+    """Replay the recorded actions in a fresh process and score; writes reward.txt / reward.json, returns the fields."""
+    t1 = time.time()
+    rp, rp_timeout = (None, False)
+    if n > 0:
+        rp, rp_timeout = run([sys.executable, TOOL, "replay", "--instance", a.instance, "--grader", a.grader,
+                              "--traj", os.path.join(out_dir, "actions.npz")],
+                             BOOT_S + 2.0 * float(ro.get("solve_wall_s", ROLLOUT_S)) + 600.0, "replay.log")
+        if rp_timeout or rp is None or "error" in rp or not rp.get("instance_ok"):
+            print(f"[grade] replay gave no result: {json.dumps(rp)[:2000] if rp else 'no result'}", file=sys.stderr)
+            out = {**ERR, "replay_failed": 1, "replay_timed_out": int(rp_timeout), "n_actions": n,
+                   "rollout_success": int(bool(ro.get("success")))}
+            write(False, out)
+            return out
+    else:
+        # No action reached the sim: nothing to replay, and nothing was done (nop = 0 is an acceptance check), so
+        # this scores success 0 outright, whatever the rollout's predicate says.
+        rp = {"success": False, "final_sha": ro.get("final_sha"), "progress": 0.0}
+    deterministic = rp.get("final_sha") == ro.get("final_sha")
+    ok = n > 0 and bool(ro.get("success")) and bool(rp.get("success")) and deterministic
+    progress = float(ro.get("progress") or 0.0) if n > 0 else 0.0
+    out = {**ZERO, "success": int(ok), "deterministic": int(deterministic),
+           "rollout_success": int(bool(ro.get("success"))), "replay_success": int(bool(rp.get("success"))),
+           "progress": round(progress, 6), "replay_progress": round(float(rp.get("progress") or 0.0), 6),
+           "instance_ok": 1, "n_actions": n, "sim_steps": n,
+           "solve_returned": int(status == "returned"), "solve_error": int(status in ("error", "process_ended")),
+           "solve_timeout": int(status == "timeout"), "bad_action": int(int(ro.get("bad_actions", 0)) > 0),
+           "proxy_requests": int(ro.get("requests", 0)), "proxy_refused": int(ro.get("refused", 0)),
+           "solve_wall_s": float(ro.get("solve_wall_s", 0.0)), "rollout_ms_per_step": float(ro.get("ms_per_step", 0.0)),
+           "rollout_wall_s": round(t1 - t0, 1), "replay_wall_s": round(time.time() - t1, 1)}
+    write(ok, out)
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--instance", required=True)
@@ -75,8 +113,6 @@ def main() -> int:
     ap.add_argument("--solution", default="/app/output/solution")
     ap.add_argument("--no-video", action="store_true")
     a = ap.parse_args()
-    ZERO = {"success": 0, "deterministic": 0, "grader_error": 0, "infra_error": 0}
-    ERR = {"success": 0, "deterministic": 0, "grader_error": 1, "infra_error": 1}
     entry = os.path.join(a.solution, "solve.py")
     if not (os.path.isdir(a.solution) and not os.path.islink(a.solution)
             and os.path.isfile(entry) and not os.path.islink(entry)):
@@ -104,34 +140,18 @@ def main() -> int:
                 shutil.copyfile(os.path.join(out_dir, f), os.path.join(LOG_DIR, f))
         status = ro.get("solve_status", "")
         n = int(ro.get("n_actions", 0))
-        t1 = time.time()
-        rp, rp_timeout = (None, False)
-        if n > 0:
-            rp, rp_timeout = run([sys.executable, TOOL, "replay", "--instance", a.instance, "--grader", a.grader,
-                                  "--traj", os.path.join(out_dir, "actions.npz")],
-                                 BOOT_S + 2.0 * float(ro.get("solve_wall_s", ROLLOUT_S)) + 600.0, "replay.log")
-            if rp_timeout or rp is None or "error" in rp or not rp.get("instance_ok"):
-                print(f"[grade] replay gave no result: {json.dumps(rp)[:2000] if rp else 'no result'}", file=sys.stderr)
-                write(False, {**ERR, "replay_failed": 1, "replay_timed_out": int(rp_timeout), "n_actions": n,
-                              "rollout_success": int(bool(ro.get("success")))})
-                return 0
+        if status == "step_error":
+            # The env could not take one of the solution's actions (e.g. a controller singularity): the rollout ended
+            # there. The solution's failure, not infrastructure: success 0, nothing to replay, no progress credited.
+            print(f"[grade] step error: {str(ro.get('step_error'))[:1000]}", file=sys.stderr)
+            out = {**ZERO, "step_error": 1, "progress": 0.0,
+                   "rollout_progress": round(float(ro.get("progress") or 0.0), 6), "instance_ok": 1,
+                   "n_actions": n, "sim_steps": n, "solve_error": 1,
+                   "proxy_requests": int(ro.get("requests", 0)), "proxy_refused": int(ro.get("refused", 0)),
+                   "solve_wall_s": float(ro.get("solve_wall_s", 0.0)), "rollout_wall_s": round(time.time() - t0, 1)}
+            write(False, out)
         else:
-            # No action reached the sim: nothing to replay, and nothing was done (nop = 0 is an acceptance check), so
-            # this scores success 0 outright, whatever the rollout's predicate says.
-            rp = {"success": False, "final_sha": ro.get("final_sha"), "progress": 0.0}
-        deterministic = rp.get("final_sha") == ro.get("final_sha")
-        ok = n > 0 and bool(ro.get("success")) and bool(rp.get("success")) and deterministic
-        progress = float(ro.get("progress") or 0.0) if n > 0 else 0.0
-        out = {**ZERO, "success": int(ok), "deterministic": int(deterministic),
-               "rollout_success": int(bool(ro.get("success"))), "replay_success": int(bool(rp.get("success"))),
-               "progress": round(progress, 6), "replay_progress": round(float(rp.get("progress") or 0.0), 6),
-               "instance_ok": 1, "n_actions": n, "sim_steps": n,
-               "solve_returned": int(status == "returned"), "solve_error": int(status in ("error", "process_ended")),
-               "solve_timeout": int(status == "timeout"), "bad_action": int(int(ro.get("bad_actions", 0)) > 0),
-               "proxy_requests": int(ro.get("requests", 0)), "proxy_refused": int(ro.get("refused", 0)),
-               "solve_wall_s": float(ro.get("solve_wall_s", 0.0)), "rollout_ms_per_step": float(ro.get("ms_per_step", 0.0)),
-               "rollout_wall_s": round(t1 - t0, 1), "replay_wall_s": round(time.time() - t1, 1)}
-        write(ok, out)
+            out = _verify(a, ro, out_dir, status, n, t0)
     except Exception:  # noqa: BLE001
         traceback.print_exc(file=sys.stderr)
         write(False, {**ERR})

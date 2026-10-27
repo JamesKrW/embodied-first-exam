@@ -1,0 +1,10 @@
+{
+ "action_dim": 8,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.004166666666666667,
+ "preset": "assembly.pc_gpu_ram.franka.osc",
+ "seed": 0,
+ "state_sha": "a8390afd1722bc53a2dda155dff52099589c17a899bb16660ab110e2a8c528e9"
+}

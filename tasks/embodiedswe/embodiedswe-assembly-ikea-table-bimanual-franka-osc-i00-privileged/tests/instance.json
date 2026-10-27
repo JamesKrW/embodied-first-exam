@@ -1,0 +1,10 @@
+{
+ "action_dim": 16,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.008333333333333333,
+ "preset": "assembly.ikea_table.bimanual_franka.osc",
+ "seed": 0,
+ "state_sha": "9954e41df2fbc48d6634cfdced9ca59470055ad3cf589e595152eaa1bdc10385"
+}

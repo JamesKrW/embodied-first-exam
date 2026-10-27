@@ -1,0 +1,10 @@
+{
+ "action_dim": 28,
+ "control_dt": 0.016667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.008333333333333333,
+ "preset": "packing.egg_carton.g1.pink_ik",
+ "seed": 0,
+ "state_sha": "8efe9248385af71eda9fb50ca0f7fc0c7390bc6c32c8e3731f39358383cf1226"
+}

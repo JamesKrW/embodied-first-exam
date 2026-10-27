@@ -1,0 +1,10 @@
+{
+ "action_dim": 16,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.008333333333333333,
+ "preset": "puzzle.syringe.bimanual_franka.osc",
+ "seed": 0,
+ "state_sha": "49ee01d88b66548839b5277ac1dfd86879fb9e0a2ebcff80f2232cf794f7d50c"
+}

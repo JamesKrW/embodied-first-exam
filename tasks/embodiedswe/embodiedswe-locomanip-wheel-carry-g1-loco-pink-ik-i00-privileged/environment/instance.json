@@ -1,0 +1,10 @@
+{
+ "action_dim": 32,
+ "control_dt": 0.02,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.005,
+ "preset": "locomanip.wheel_carry.g1.loco_pink_ik",
+ "seed": 0,
+ "state_sha": "0d45f57179e09fee4fda231b164ce2750766876d37512bb963662db1dfa3e062"
+}

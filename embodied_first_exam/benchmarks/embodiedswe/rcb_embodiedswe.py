@@ -59,7 +59,50 @@ TASKS = {
     "assembly.bulb.franka.osc": {"grader": "BulbAssemblyGrader", "check": "success"},
     "puzzle.stack_blocks.g1.pink_ik": {"grader": "StackBlocksGrader", "check": "success"},
     "locomanip.fruit_delivery.g1.loco_pink_ik": {"grader": "FruitDeliveryGrader", "check": "success"},
+    "assembly.allen_bolt.franka.osc": {"grader": "AllenBoltAssemblyGrader", "check": "success"},
+    "assembly.ikea_table.bimanual_franka.osc": {"grader": "IkeaTableAssemblyGrader", "check": "success"},
+    "assembly.nut_thread.franka.osc": {"grader": "NutThreadAssemblyGrader", "check": "success"},
+    "assembly.pc_gpu.franka.osc": {"grader": "PcGpuAssemblyGrader", "check": "success"},
+    "assembly.pc_gpu_ram.franka.osc": {"grader": "PcGpuRamAssemblyGrader", "check": "success"},
+    "assembly.pc_motherboard.franka.osc": {"grader": "PcMotherboardAssemblyGrader", "check": "success"},
+    "assembly.pc_ram.franka.osc": {"grader": "PcRamAssemblyGrader", "check": "success"},
+    "packing.pen_holder.franka.osc": {"grader": "PenHolderGrader", "check": "success"},
+    "packing.tool_packing.franka.osc": {"grader": "ToolPackingGrader", "check": "success"},
+    "packing.egg_carton.g1.pink_ik": {"grader": "EggCartonGrader", "check": "success"},
+    "packing.clear_organic_objects.g1.pink_ik": {"grader": "ClearOrganicObjectsGrader", "check": "success"},
+    "puzzle.coffee.franka.osc": {"grader": "CoffeeServiceGrader", "check": "success"},
+    "puzzle.syringe.bimanual_franka.osc": {"grader": "SyringeDosingGrader", "check": "success"},
+    "puzzle.push_shapes.g1.pink_ik": {"grader": "PushShapesGrader", "check": "success"},
+    "puzzle.classify_objects.g1.pink_ik": {"grader": "ClassifyObjectsGrader", "check": "success"},
+    "cutting.slice.franka.osc": {"grader": "SliceFoodGrader", "check": "cut_success"},   # the scene has no success()
+    "cutting.dice.franka.osc": {"grader": "DiceFoodGrader", "check": "cut_success"},
+    "locomanip.box_to_bin.g1.loco_pink_ik": {"grader": "BoxToBinGrader", "check": "success"},
+    "locomanip.wheel_carry.g1.loco_pink_ik": {"grader": "WheelCarryGrader", "check": "success"},
 }
+
+
+def cut_success(scene):
+    """The cutting scenes' public end predicate (they have no success()): the food is in at least its target number
+    of pieces (`cfg.target_pieces`, 0 = every piece) and every piece's root is still on the chopping board, inside its
+    footprint (`cfg.board_size`, centred on the env origin) and above its top. `(num_envs,)` bool."""
+    import torch
+    target = scene.cfg.target_pieces or len(scene.pieces)
+    hx, hy = scene.cfg.board_size[0] / 2, scene.cfg.board_size[1] / 2
+    ok = torch.ones(scene.env.num_envs, dtype=torch.bool, device=scene.env.device)
+    for pc in scene.pieces:
+        rel = pc.data.root_pos_w - scene.env_origins
+        ok &= (rel[:, 0].abs() < hx) & (rel[:, 1].abs() < hy) & (rel[:, 2] > scene._board_top)
+    return (scene.pieces_count() >= target) & ok
+
+
+CHECKS = {"cut_success": cut_success}
+
+
+def task_success(env, preset: str):
+    """The task's public end predicate, `(num_envs,)` bool: the scene's own method, or the tooling's for scenes
+    without one (CHECKS)."""
+    name = TASKS[preset]["check"]
+    return CHECKS[name](env.scene) if name in CHECKS else getattr(env.scene, name)()
 
 
 def log(*a) -> None:
@@ -151,10 +194,10 @@ def load_grader(path: str, preset: str):
     return getattr(mod, TASKS[preset]["grader"])
 
 
-def stop_app():
+def stop_app(rc: int = 0):
     sys.stdout.flush()
     sys.stderr.flush()
-    os._exit(0)                     # Kit can hang on close; everything is written by now
+    os._exit(rc)                    # Kit can hang on close; everything is written by now
 
 
 # ------------------------------------------------------------------------------------------------ the proxy server
@@ -182,6 +225,28 @@ ENV_CALLS = {"describe", "describe_stage", "get_states"}
 READ_METHODS_SCENE = {
     "get_state", "describe", "seated", "success", "score", "tower_height",
     "_bulb_offsets_in_socket", "_bulb_axis_cos", "_block_tensors", "_upright", "_slots", "_level_counts",
+    # assembly scenes (allen_bolt, ikea_table, nut_thread, pc_gpu, pc_gpu_ram, pc_motherboard, pc_ram)
+    "grasp_sites", "engaged", "gpu_engaged", "gpu_seated", "ram_engaged", "ram_seated",
+    "_bolt_offsets_in_platform", "_bolt_axis_cos", "_bolt_offsets_in_case", "_leg_offsets_in_table", "_leg_axis_cos",
+    "_weld_targets", "_nut_offsets_in_bolt", "_nut_axis_cos", "_card_offset_in_case", "_ram_offsets_in_case",
+    "_axis_cos", "_part_axis_cos",
+    # packing scenes (pen_holder, tool_packing, egg_carton, clear_organic_objects)
+    "holder_up", "inserted", "settled", "counted", "all_inserted", "holder_placed", "_pen_tensors", "_pen_ends_local",
+    "drawer_pos", "door_pos", "stowed", "drawers_closed", "doors_closed", "_slot_xy", "_item_in_tray",
+    "lid_pos", "lid_closed", "occupied", "_seat_candidates", "_stages_complete",
+    "cleared", "placed_on_tray", "stage_flags", "organics_cleared", "distractors_in_bin", "organics_present",
+    "_in_bin", "_on_tray", "_speed",
+    # puzzle scenes (coffee, syringe, push_shapes, classify_objects); syringe's fixture() writes and stays refused
+    "cover_pos", "cover_closed", "cover_open", "button_depth", "pod_seated", "cup_under_spout", "cup_on_tray",
+    "cup_settled", "running", "filled", "stage_flags",
+    "barrel_axis", "travel", "tip_pos", "plunger_top_w", "seated_reservoir", "well_mouths", "seated_well", "liquid",
+    "doses", "spilled", "drawn", "doses_ok", "parked",
+    "position_error", "orientation_error", "block_bottom_z", "not_lifted", "dropped", "yaw_matched", "stage_live",
+    "sorted_mask", "n_sorted",
+    # cutting scenes (slice, dice); knife_edge only fills a lazy cache of edge samples
+    "pieces_count", "knife_edge", "food_height", "plane_aim_w", "plane_axis_w",
+    # locomanip scenes (box_to_bin, wheel_carry)
+    "placed", "carried_fraction", "box_pose", "wheel_pose",
 }
 READ_METHODS_ROBOT = {
     "get_state", "describe", "name", "prim_name", "action_dim", "control_period", "control_dt",
@@ -255,13 +320,17 @@ class Server:
     def allowed_call(self, owner, name: str) -> bool:
         if owner is self.env:
             return name in ENV_CALLS
-        if WRITE_RE.match(name) or name in ("on_bind", "actuator_sink", "build_controller"):
+        if name in ("on_bind", "actuator_sink", "build_controller"):
             return False
-        if isinstance(owner, self._scene_types):      # privileged ground-truth objects: strict allowlist
+        # privileged ground-truth objects: the audited exact-name allowlist alone decides (a listed read such as
+        # `settled` or `inserted` must not fall to the write-verb regex)
+        if isinstance(owner, self._scene_types):
             return name in READ_METHODS_SCENE
         if isinstance(owner, self._robot_types):
             return name in READ_METHODS_ROBOT
-        return bool(READ_RE.match(name))               # leaf objects (configs, articulations): name heuristic
+        if WRITE_RE.match(name):                       # leaf objects (configs, articulations): name heuristic
+            return False
+        return bool(READ_RE.match(name))
 
     def getattr(self, obj, name: str):
         if not isinstance(name, str) or (name.startswith("__") and name.endswith("__")) or name in ("_grader", "_env"):
@@ -319,7 +388,7 @@ class Server:
         if op == "repr":
             return repr(obj)[:20000]
         if op == "dir":
-            return [n for n in dir(obj) if not (n.startswith("__") and n.endswith("__"))]
+            return self.value([n for n in dir(obj) if not (n.startswith("__") and n.endswith("__"))])
         raise Refused(f"unknown operation {op!r}")
 
 
@@ -515,7 +584,11 @@ def run_solution(env, solution: Path, work: Path, on_step, timeout_s: float, log
 def cmd_make_instance(a) -> int:
     launch()
     inst = {"format": INSTANCE_FORMAT, "preset": a.preset, "seed": int(a.seed), "device": DEVICE}
-    env = build(inst)
+    try:
+        env = build(inst)
+    except Exception:  # noqa: BLE001 — a failed build writes no instance and exits non-zero
+        traceback.print_exc()
+        stop_app(1)
     inst["state_sha"] = state_sha(env)
     inst["action_dim"] = int(env.robot.action_dim)
     inst["control_dt"] = round(float(env.dt * env.robot.control_period), 6)
@@ -540,7 +613,7 @@ def _final(env, grader, inst: dict) -> dict:
         v = grader.verdict()[0]
         success, score = bool(v["success"]), float(v["score"])
     else:
-        success, score = bool(getattr(env.scene, TASKS[inst["preset"]]["check"])()[0]), None
+        success, score = bool(task_success(env, inst["preset"])[0]), None
     return {"success": success, "progress": score, "final_sha": state_sha(env)}
 
 
@@ -562,6 +635,7 @@ def cmd_rollout(a) -> int:
         actions: list = []
         step_s = [0.0]
         bad = [0]
+        step_err = [None]
 
         def on_step(act):
             if act.numel() != env.num_envs * env.robot.action_dim:
@@ -574,12 +648,16 @@ def cmd_rollout(a) -> int:
             if len(actions) >= MAX_STEPS:
                 raise StopRollout(f"step_cap ({MAX_STEPS} control steps)")
             act = act.reshape(env.num_envs, env.robot.action_dim).contiguous()
+            actions.append(act[0].numpy().copy())     # recorded BEFORE the step: a step that raises is in the record
             t = time.perf_counter()
-            env.step(act.to(env.device))
-            if grader is not None:
-                grader.record()
+            try:
+                env.step(act.to(env.device))
+                if grader is not None:
+                    grader.record()
+            except Exception as exc:  # noqa: BLE001 — the env could not take this action (e.g. a controller
+                step_err[0] = f"{type(exc).__name__}: {exc}"[:1000]   # singularity): the rollout ends here
+                raise StopRollout("step_error") from exc
             step_s[0] += time.perf_counter() - t
-            actions.append(act[0].numpy().copy())
             return None
 
         res["phase"] = "solve"
@@ -588,7 +666,14 @@ def cmd_rollout(a) -> int:
         if run.get("solve_status") == "sandbox_failed":
             res.update(phase="sandbox_failed", infra_error=1)
             raise StopRollout("sandbox_failed")
-        res.update(_final(env, grader, inst))
+        if step_err[0] is not None:
+            res["step_error"] = step_err[0]
+            try:
+                res.update(_final(env, grader, inst))
+            except Exception as exc:  # noqa: BLE001 — the env may be unusable after the failed step; no verdict
+                res.update(success=False, progress=0.0, final_sha=None, final_error=f"{type(exc).__name__}: {exc}"[:500])
+        else:
+            res.update(_final(env, grader, inst))
         A = np.stack(actions).astype(np.float32) if actions else np.zeros((0, env.robot.action_dim), np.float32)
         np.savez(out / "actions.npz", task=np.array(inst["preset"]), seed=np.array(inst["seed"]), actions=A)
         res.update(phase="done", n_actions=int(len(A)), bad_actions=bad[0], sim_step_s=round(step_s[0], 3),
@@ -627,10 +712,14 @@ def cmd_replay(a) -> int:
         res.update(instance_sha=sha, instance_ok=sha == inst["state_sha"])
         A = _load_actions(a.traj, inst["preset"], env.robot.action_dim)
         t1 = time.perf_counter()
-        for row in A:
-            env.step(torch.from_numpy(row).reshape(1, -1).to(env.device))
-            if grader is not None:
-                grader.record()
+        for i, row in enumerate(A):
+            try:
+                env.step(torch.from_numpy(row).reshape(1, -1).to(env.device))
+                if grader is not None:
+                    grader.record()
+            except Exception as exc:  # noqa: BLE001 — the recorded action the rollout's env also failed on
+                res.update(step_error=f"{type(exc).__name__}: {exc}"[:1000], step_error_at=i)
+                break
         res.update(_final(env, grader, inst), n_actions=int(len(A)), replay_step_s=round(time.perf_counter() - t1, 3))
     except Exception:  # noqa: BLE001
         res.update(error=traceback.format_exc()[-4000:])
@@ -678,7 +767,11 @@ def cmd_video(a) -> int:
         n = 0
         for i, row in enumerate(A):
             grab = (i % every == 0) or i == len(A) - 1
-            env.step(torch.from_numpy(row).reshape(1, -1), render=grab)
+            try:
+                env.step(torch.from_numpy(row).reshape(1, -1), render=grab)
+            except Exception as exc:  # noqa: BLE001 — the rollout ended on this step error too; the video stops here
+                res.update(step_error=f"{type(exc).__name__}: {exc}"[:500], step_error_at=i)
+                break
             if grab:
                 cam.update(env.dt)
                 f = cam.data.output["rgb"][0].detach().cpu().numpy()[..., :3]
@@ -686,7 +779,11 @@ def cmd_video(a) -> int:
                     w.append_data(f)
                     n += 1
         w.close()
-        res.update(video=a.video, frames=n, every=every, final_sha=state_sha(env), video_ok=n > 0)
+        try:
+            fsha = state_sha(env)
+        except Exception:  # noqa: BLE001
+            fsha = None
+        res.update(video=a.video, frames=n, every=every, final_sha=fsha, video_ok=n > 0)
     except Exception:  # noqa: BLE001
         res.update(video_ok=False, error=traceback.format_exc()[-4000:])
     res["wall_s"] = round(time.monotonic() - t0, 1)

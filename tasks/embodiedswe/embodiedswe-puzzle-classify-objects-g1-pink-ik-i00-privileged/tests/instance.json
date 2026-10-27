@@ -1,0 +1,10 @@
+{
+ "action_dim": 28,
+ "control_dt": 0.016667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.008333333333333333,
+ "preset": "puzzle.classify_objects.g1.pink_ik",
+ "seed": 0,
+ "state_sha": "8fdf8d723e421499122d4fdd540628b5d4e9973741ba8f0cb255fc31bce6ac53"
+}

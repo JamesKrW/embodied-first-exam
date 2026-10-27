@@ -7,9 +7,9 @@
 | Twin | — (privileged only) |
 | Simulator / robot | `embodiedswe` / `franka-panda` |
 | Family / instance | `assembly.bulb.franka.osc` / seed 0 |
-| Oracle | `none` — No reference solution in the repository. A scripted reference solve() exists outside the repository (internal only, used to check the task is solvable through the grading path); it is not shipped. |
+| Oracle | `none` — No reference solution in the repository, and none written for this scene yet; the build, the start-state hash, replay determinism and a do-nothing run scoring 0 are checked. |
 | Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
-| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.1.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.2.0` |
 
 ## Task
 Screw a light bulb into its socket (Franka, operational-space control). EmbodiedSWE's `assembly.bulb.franka.osc` task (robobench at commit `67f44e8a2ca5`), privileged mode, with a program as the
@@ -19,7 +19,7 @@ deliverable: `solution/solve.py` exposing `solve(env)`.
 Contact-rich assembly: a grasp of a small round bulb, alignment on a threaded socket and a turn-while-pressing motion under torque control (OSC); EmbodiedSWE's GPT-6-class agents solve it within a few hours in their own runs.
 
 ## Reference solution
-None in the repository (`oracle = "none"`). The pilot's scripted reference `solve()` is kept outside the task.
+None in the repository (`oracle = "none"`). No scripted reference has been written for this scene yet.
 
 ## Verification
 `tests/grade.py`: a trusted simulator process in the verifier container builds the env from the frozen instance

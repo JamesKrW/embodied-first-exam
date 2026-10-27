@@ -13,8 +13,9 @@ Goal: pick up every FRUIT and place it on the plate, leaving everything else whe
 A Unitree G1 humanoid with three-finger hands, standing on its own two legs and free to walk. Control mode 'loco_pink_ik': 17 arm+waist joints driven by the Pink IK solver (absolute wrist poses), plus 14 hand joints by direct position target. The last 4 action dims are a BASE COMMAND for the 12 leg joints — [vx, vy, wz, hip_height]: forward and sideways speed in m/s and turn rate in rad/s, all in the robot's own frame, plus the standing height of the pelvis in m. A frozen locomotion policy turns that command into leg motion and keeps the robot balanced, so you steer the robot rather than stepping it; all-zero velocity with a sensible hip height (about 0.72) is a stationary balanced stand, which is what you want while the arms work. Wrist poses are absolute and in the env frame, so while the robot walks you must re-issue them every step to keep the hands where you want them. Action dim 32.
 
 The task is complete when `env.scene.success()` is true for the env (a `(num_envs,)` bool tensor) at the end of the
-graded run. That is the verdict. Partial progress toward it is also recorded (EmbodiedSWE's rubric for this task,
-reported as `progress`), but only success counts as solved.
+graded run.
+That is the verdict. Partial progress toward it is also recorded (EmbodiedSWE's rubric for this task, reported
+as `progress`), but only success counts as solved.
 
 ## The environment
 
@@ -56,8 +57,11 @@ with no network and no GPU, and receives a proxy `env` that forwards to the simu
   `env.get_states()`, the scene's and robot's query methods) returns its result;
 - `env.step(action)` steps the simulator; this is the only way your program changes anything;
 - everything else is refused with `PermissionError`: `env.reset()`, `env.set_states(...)`, `env.sim.step()`, any
-  `write_*` / `set_*` / `reset*` method of an asset, the scene or the robot, assigning attributes, and private or
-  `__dunder__` attributes. Modifying a tensor you read changes only your copy.
+  `write_*` / `set_*` / `reset*` method of an asset, any method of the scene or the robot that is not one of their
+  queries (state, progress and geometry reads such as `success()`, `seated()`, `get_state()`), assigning attributes,
+  and private or `__dunder__` attributes. Modifying a tensor you read changes only your copy.
+- if `env.step(action)` raises (the env cannot take that action, e.g. the controller hits a singular pose), the graded
+  run ends at that step and scores 0.
 
 What `solve.py` can use in the graded run. Its process has **no simulator and no Isaac Sim app**; it is
 sandboxed (Landlock) and sees only its own files:

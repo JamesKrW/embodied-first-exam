@@ -7,9 +7,9 @@
 | Twin | — (privileged only) |
 | Simulator / robot | `embodiedswe` / `unitree-g1-dex3` |
 | Family / instance | `locomanip.fruit_delivery.g1.loco_pink_ik` / seed 0 |
-| Oracle | `none` — No reference solution in the repository. A scripted reference solve() exists outside the repository (internal only, used to check the task is solvable through the grading path); it is not shipped. |
+| Oracle | `none` — No reference solution in the repository, and none written for this scene yet; the build, the start-state hash, replay determinism and a do-nothing run scoring 0 are checked. |
 | Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
-| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.1.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.2.0` |
 
 ## Task
 Deliver the fruit to the plate (Unitree G1, walking, Pink IK). EmbodiedSWE's `locomanip.fruit_delivery.g1.loco_pink_ik` task (robobench at commit `67f44e8a2ca5`), privileged mode, with a program as the
@@ -19,7 +19,7 @@ deliverable: `solution/solve.py` exposing `solve(env)`.
 Loco-manipulation: the G1 walks under a frozen locomotion policy (base velocity commands) while its arms and hands pick fruit and carry it to a plate elsewhere in the room.
 
 ## Reference solution
-None in the repository (`oracle = "none"`). The pilot's scripted reference `solve()` is kept outside the task.
+None in the repository (`oracle = "none"`). No scripted reference has been written for this scene yet.
 
 ## Verification
 `tests/grade.py`: a trusted simulator process in the verifier container builds the env from the frozen instance

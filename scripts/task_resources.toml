@@ -3214,7 +3214,7 @@ match = "^abc-sim-.*-standard(-realtime)?$"
 main = { cpus = 4.0, memory_gb = 10.0, pids = 8192 }
 sim = { cpus = 4.0, memory_gb = 10.0, pids = 8192 }
 
-# embodiedswe, privileged: 3 task(s) (pilot, board 0265)
+# embodiedswe, privileged: 22 task(s)
 [[rule]]
 match = "^embodiedswe-.*-privileged$"
 min_cpus = 4.0

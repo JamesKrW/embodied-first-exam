@@ -1,0 +1,10 @@
+{
+ "action_dim": 8,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.004166666666666667,
+ "preset": "assembly.allen_bolt.franka.osc",
+ "seed": 0,
+ "state_sha": "ead190de941f16a71c3118edd1ff72f1ed4820d1c204114e7978930c076ed7ce"
+}

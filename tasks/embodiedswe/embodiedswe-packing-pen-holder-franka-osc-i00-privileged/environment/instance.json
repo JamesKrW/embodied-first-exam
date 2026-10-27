@@ -1,0 +1,10 @@
+{
+ "action_dim": 8,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.008333333333333333,
+ "preset": "packing.pen_holder.franka.osc",
+ "seed": 0,
+ "state_sha": "1d85be4f832cbc11fa36ce631f6f8d15e1de9b8d5920745a83f597238dad1871"
+}

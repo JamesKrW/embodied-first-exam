@@ -9,7 +9,7 @@
 | Family / instance | `puzzle.stack_blocks.g1.pink_ik` / seed 0 |
 | Oracle | `none` — No reference solution in the repository. A scripted reference solve() exists outside the repository (internal only, used to check the task is solvable through the grading path); it is not shipped. |
 | Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
-| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.1.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.2.0` |
 
 ## Task
 Stack the blocks (Unitree G1, fixed pelvis, Pink IK). EmbodiedSWE's `puzzle.stack_blocks.g1.pink_ik` task (robobench at commit `67f44e8a2ca5`), privileged mode, with a program as the
@@ -19,7 +19,7 @@ deliverable: `solution/solve.py` exposing `solve(env)`.
 Bimanual-capable humanoid upper body with three-finger hands driven by absolute wrist poses (Pink IK): grasping and placing blocks precisely enough to build a stable tower.
 
 ## Reference solution
-None in the repository (`oracle = "none"`). The pilot's scripted reference `solve()` is kept outside the task.
+None in the repository (`oracle = "none"`). A scripted reference `solve()` is kept outside the repository (internal only).
 
 ## Verification
 `tests/grade.py`: a trusted simulator process in the verifier container builds the env from the frozen instance

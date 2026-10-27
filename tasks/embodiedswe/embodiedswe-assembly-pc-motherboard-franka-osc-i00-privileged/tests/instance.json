@@ -1,0 +1,10 @@
+{
+ "action_dim": 8,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.004166666666666667,
+ "preset": "assembly.pc_motherboard.franka.osc",
+ "seed": 0,
+ "state_sha": "79688b548fb961f196bc235a495b8e7d2f0883d18c2ba3f21265803880534c9c"
+}

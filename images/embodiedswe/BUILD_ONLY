@@ -1,5 +1,5 @@
 BUILD_ONLY: ghcr.io/mll-lab-nu/efe-private:embodiedswe-<images/embodiedswe/VERSION> is never public (docs/protocol/README.md
-§2.4, D5). Pilot (board 0265): built locally only, not pushed anywhere yet; the EmbodiedSWE tasks name it in their FROM.
+§2.4, D5). Built locally only, not pushed anywhere yet; the EmbodiedSWE tasks name it in their FROM.
 
 Why
   It contains NVIDIA Isaac Sim 5.1 / Omniverse Kit and the Isaac Lab 2.3.2 wheels (RoboLab's recipe, images/robolab/):
@@ -24,9 +24,12 @@ Inputs (all pinned)
 What the build changes in EmbodiedSWE (scrub_embodiedswe.py, in this folder; upstream is not edited)
   Keeps robobench/, LICENSE and pyproject.toml only; removes every suite's grader/ and smokes/ (the verifier ships the
   task's grader from its own tests/), the deformable suite and caches; strips all comments and non-module docstrings
-  from the suites' binding files (configs/envs.py: calibration notes of solved bindings) and nine solve-calibrated
-  scene comments of locomanip fruit_delivery (stance, grasp cell, release annulus, measured windows). It checks that
-  the code is unchanged otherwise (AST equality without docstrings) and that no banned phrase survives (`--check`).
+  from the suites' binding files (configs/envs.py: calibration notes of solved bindings); rewrites the solve-calibrated
+  comments and pointers in the shipped tasks' scene modules and text assets (stances, grasp cells and windows, release
+  recipes, pointers to removed smokes and solutions; a `.usda` edit may touch only `#` lines); removes the working
+  poses from two describe() texts (box_to_bin, wheel_carry: code confined to describe()) and
+  robobench/scripts/robot_binding_smoke.py (a working reach driver). It checks that the code is unchanged otherwise
+  (AST equality without docstrings) and that no banned phrase survives (`--check`).
 
 Data
   None beyond the image: HF_HUB_OFFLINE=1; nothing is downloaded at run time. Frozen instances live in the task dirs.

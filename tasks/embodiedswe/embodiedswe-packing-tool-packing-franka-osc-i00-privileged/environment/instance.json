@@ -1,0 +1,10 @@
+{
+ "action_dim": 8,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.008333333333333333,
+ "preset": "packing.tool_packing.franka.osc",
+ "seed": 0,
+ "state_sha": "89bc1f7254632f12f3c7efb2bcebe7d314fb87b57121bd5619a95016cfc84dcc"
+}
