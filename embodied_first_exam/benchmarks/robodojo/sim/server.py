@@ -430,7 +430,7 @@ def check_frames(cams, fps: int, depth: str, control_steps: int) -> None:
     more than MAX_FRAMES images (the layer's check: a 400, nothing executed): the Recorder films every `every`-th action
     plus the first and the last frame, whatever `video` asks to be returned."""
     every = max(1, int(round(CTRL_HZ / max(1, fps))))
-    L.check_frames(len(cams), int(math.ceil(control_steps / every)) + 2, depth in ("frames", "legacy"), MAX_FRAMES)
+    L.check_frames(len(cams), L.frames_per_call(control_steps, every), depth in ("frames", "legacy"), MAX_FRAMES)
 
 
 def parse_submit(meta: dict, A: np.ndarray) -> tuple:

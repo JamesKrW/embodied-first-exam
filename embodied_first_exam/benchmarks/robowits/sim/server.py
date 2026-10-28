@@ -216,13 +216,11 @@ E["instance_exact"] = bool(S.instance_exact)
 E["ready"] = True                       # S exists: ctrl_steps() counts its control steps (a resume replay included)
 ROBOT = S.robot
 CAMS = ["ego", "wrist_right", "wrist_left"]
-# The images one call may hold. Every frame a call records stays in memory until its response is sent, and building the
-# response takes about three times the frames' size (a per-frame depth map costs about three RGB frames more): a call
-# without a bound could exhaust the sidecar's memory, and a service killed for memory is never the agent's failure
-# (PROTOCOL §2.6), so one large request could void a failed trial. MAX_FRAMES images of 848x480 peak at about 5.4 GB of
-# the sidecar's 11 GiB (measured on the layer's Recorder and encode_response).
-MAX_FRAMES = 1500                  # /spec max_frames_per_call: cameras x frames; a frame with per-frame depth counts DEPTH_FRAME
-DEPTH_FRAME = 4
+# The images one call may hold (PROTOCOL §3 "Images per call"): every frame a call records stays in memory until its
+# response is sent, so a call without a bound could exhaust the sidecar's memory, and a service killed for memory is never
+# the agent's failure, so one large request could void a failed trial. Cameras x frames at the recorder's real stride,
+# its first and last frames included; a frame with per-frame depth counts once more (L.check_frames).
+MAX_FRAMES = 1500                  # /spec max_frames_per_call
 MOUNT = {"ego": "static, above and behind the robot", "wrist_right": "right wrist", "wrist_left": "left wrist"}
 ARM = {"right": (slice(0, 7), 7), "left": (slice(8, 15), 15)}
 LAYOUT = [f"Joint{i}_R" for i in range(1, 8)] + ["right_gripper"] + [f"Joint{i}_L" for i in range(1, 8)] + ["left_gripper"]
@@ -339,29 +337,16 @@ def calib(cameras: list[str]) -> dict:
 def frames_ok(cams: list, steps: int, fps: int, meta: dict) -> None:
     """400 (ValueError), before anything is executed, for a call that would hold more than MAX_FRAMES images: `steps`
     control steps recorded at `fps`, the recorder's first and last frames included."""
-    deep = L.depth_mode(meta) in ("frames", "legacy")
-    try:
-        L.check_frames(len(cams) * (DEPTH_FRAME if deep else 1), steps // int(round(CTRL_HZ / max(1, fps))) + 2, limit=MAX_FRAMES)
-    except ValueError as exc:
-        raise ValueError(f"{exc}" + (f" (here a frame with per-frame depth counts {DEPTH_FRAME} images)" if deep else "")) from None
-
-
-class Rec(L.Recorder):
-    """The call's recorder, keeping the image budget while the call runs: how many control steps an ee_pose row takes
-    (4 to 400) is known only then. At the budget it takes no more frames -- the motion goes on, the last frame is always
-    taken -- and meta["frames_skipped"] counts the frames left out."""
-    skipped = 0
-
-    def _capture(self, last: bool) -> None:
-        per = len(self.cams) * (DEPTH_FRAME if self.mode in ("frames", "legacy") else 1)
-        if not last and per * (len(self.steps) + 2) > MAX_FRAMES:
-            self.skipped += 1
-            return
-        super()._capture(last)
+    L.check_frames(len(cams), L.frames_per_call(steps, int(round(CTRL_HZ / max(1, fps)))),
+                   L.depth_mode(meta) in ("frames", "legacy"), MAX_FRAMES)
 
 
 def recorder(cams: list[str], fps: int, meta: dict) -> L.Recorder:
-    return Rec(cams, int(round(CTRL_HZ / max(1, fps))), grab, proprio_row, extrinsics, ctrl_steps, depth=L.depth_mode(meta), clock_hz=CTRL_HZ)
+    """The call's recorder, keeping the image budget while the call runs: how many control steps an ee_pose row takes
+    (4 to 400) is known only then. At the budget it takes no more frames -- the motion goes on, the last frame is always
+    taken -- and meta["frames_skipped"] counts the frames left out (rec.skipped)."""
+    return L.Recorder(cams, int(round(CTRL_HZ / max(1, fps))), grab, proprio_row, extrinsics, ctrl_steps, depth=L.depth_mode(meta),
+                      clock_hz=CTRL_HZ, max_images=MAX_FRAMES)
 
 
 def meta_common(cams) -> dict:
@@ -508,7 +493,7 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
                          f"{periods:.4f} periods; the nearest is {k}/{CTRL_HZ} = {k / CTRL_HZ!r}")
     if typ == "joint_position" and A.shape[0] * dt > MAX_CHUNK_S + 1e-9: raise ValueError(f"chunk longer than max_chunk_s={MAX_CHUNK_S}: {A.shape[0]} rows x {dt} s")
     if typ == "ee_pose" and A.shape[0] > 50: raise ValueError("ee_pose: at most 50 rows per submit")
-    # the least the rows take (a joint row: dt; an ee_pose row: 4 control steps); what ee_pose rows take beyond it, Rec bounds
+    # the least the rows take (a joint row: dt; an ee_pose row: 4 control steps); what ee_pose rows take beyond it, the recorder bounds
     frames_ok(cams, A.shape[0] * (int(round(periods)) if typ == "joint_position" else 4), fps, meta)   # (the depth mode is checked here)
     rec = recorder(cams, fps, meta); clipped: list = []; plan: list = []
     # ---- the request is valid: from here on the chunk is executed

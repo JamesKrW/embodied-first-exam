@@ -39,14 +39,12 @@ CTRL_HZ = 20; SUBSTEPS = 5
 MAX_CHUNK_S = float(os.environ.get("RCB_MAX_CHUNK_S", "10")); MAX_WATCH_S = float(os.environ.get("RCB_MAX_WATCH_S", "30"))
 VIDEOS = ("mp4", "frames", "both", "none")
 MAX_VIDEO_FPS = 1000                   # the mp4 encoder's frame rate; the recorder keeps at most one frame per control step
-# The images one call may hold. Every frame a call records stays in memory until its response is sent, and building the
-# response takes about three times the frames' size (a per-frame depth map costs about three RGB frames more): a call
-# without a bound could exhaust the sidecar's memory, and a service killed for memory is never the agent's failure
-# (PROTOCOL §2.6), so one large request could void a failed trial. MAX_FRAMES images of the largest camera (canvas_cam,
-# 1024x1024) peak at about 5.9 GB of the sidecar's 10 GiB (measured on the layer's Recorder and encode_response); the
-# longest default watch (30 s at 5 fps) is 152 frames of each camera, 608 images of all four.
-MAX_FRAMES = 640                       # /spec max_frames_per_call: cameras x frames; a frame with per-frame depth counts DEPTH_FRAME
-DEPTH_FRAME = 4
+# The images one call may hold (PROTOCOL §3 "Images per call"): every frame a call records stays in memory until its
+# response is sent, so a call without a bound could exhaust the sidecar's memory, and a service killed for memory is never
+# the agent's failure, so one large request could void a failed trial. Cameras x frames at the recorder's real stride,
+# its first and last frames included; a frame with per-frame depth counts once more (L.check_frames). The longest default
+# watch (30 s at 5 fps) is 152 frames of each camera, 608 images of all four.
+MAX_FRAMES = 640                       # /spec max_frames_per_call
 LOCK = threading.Lock()
 E = {"ready": False, "step": 0, "calls": 0, "done": False, "reason": None, "t0": time.time(), "error": None}
 EP = L.Episode(DATA, dim=7, resume="exact", persist=("tip_target",))   # the journal rows are Session.step's 7 joint targets
@@ -467,10 +465,9 @@ def frames_ok(cams, steps: int, fps: int, meta: dict) -> None:
     control steps recorded at `fps`, the recorder's first and last frames included."""
     deep = L.depth_mode(meta) in ("frames", "legacy")
     try:
-        L.check_frames(len(cams) * (DEPTH_FRAME if deep else 1), steps // max(1, int(round(CTRL_HZ / max(1, fps)))) + 2, limit=MAX_FRAMES)
+        L.check_frames(len(cams), L.frames_per_call(steps, int(round(CTRL_HZ / max(1, fps)))), deep, MAX_FRAMES)
     except ValueError as exc:
-        raise ValueError(f"{exc}; this call takes {steps} control steps ({steps / CTRL_HZ:g} s)"
-                         + (f", and a frame with per-frame depth counts {DEPTH_FRAME} images" if deep else "")) from None
+        raise ValueError(f"{exc}; this call takes {steps} control steps ({steps / CTRL_HZ:g} s)") from None
 
 
 @checked

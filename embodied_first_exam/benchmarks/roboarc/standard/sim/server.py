@@ -157,13 +157,12 @@ E["ready"] = True                       # S exists: ctrl_steps() counts its cont
 CTRL_HZ = float(S.control_hz); SUBSTEPS = int(S.physics_substeps)
 CAMS = list(S.VIDEO_CAMERAS)
 CAM_INFO = S.camera_info(CAMS)
-# The images one call may hold. Every frame a call records stays in memory until its response is sent, and building the
-# response takes about three times the frames' size (a per-frame depth map costs about three RGB frames more): a call
-# without a bound could exhaust the sidecar's memory, and a service killed for memory is never the agent's failure
-# (PROTOCOL §2.6), so one large request could void a failed trial. MAX_FRAMES images of 848x480 peak at about 7.2 GB of
-# the sidecar's 16 GiB (measured on the layer's Recorder and encode_response).
-MAX_FRAMES = 2000                  # /spec max_frames_per_call: cameras x frames; a frame with per-frame depth counts DEPTH_FRAME
-DEPTH_FRAME = 4
+# The images one call may hold (PROTOCOL §3 "Images per call"): every frame a call records stays in memory until its
+# response is sent, so a call without a bound could exhaust the sidecar's memory, and a service killed for memory is never
+# the agent's failure, so one large request could void a failed trial. Cameras x frames as the recorder takes them (one
+# every 1/fps of sim time, its first and last frames included); a frame with per-frame depth counts once more
+# (L.check_frames).
+MAX_FRAMES = 2000                  # /spec max_frames_per_call
 MOUNT = {c: ("static" if CAM_INFO[c]["mount"]["type"] == "static" else f"on the robot link {CAM_INFO[c]['mount']['parent_link']}") for c in CAMS}
 ARMS = list(S.robot.arms)
 LAYOUT = list(S.action_layout)
@@ -358,11 +357,15 @@ def calib(cameras: list[str]) -> dict:
 def frames_ok(cams: list, steps: int, fps: int, meta: dict) -> None:
     """400 (ValueError), before anything is executed, for a call that would hold more than MAX_FRAMES images: `steps`
     control steps recorded at `fps`, the recorder's first and last frames included."""
-    deep = L.depth_mode(meta) in ("frames", "legacy")
-    try:
-        L.check_frames(len(cams) * (DEPTH_FRAME if deep else 1), int(steps * fps / CTRL_HZ) + 2, limit=MAX_FRAMES)
-    except ValueError as exc:
-        raise ValueError(f"{exc}" + (f" (here a frame with per-frame depth counts {DEPTH_FRAME} images)" if deep else "")) from None
+    L.check_frames(len(cams), recorded_frames(steps, fps), L.depth_mode(meta) in ("frames", "legacy"), MAX_FRAMES)
+
+
+def recorded_frames(steps: int, fps: int) -> int:
+    """The frames per camera the 2.4 recorder takes over a call of `steps` control steps (the count of real captures):
+    one at the start, one at the first control step at or after each k/fps of sim time (k = 1 .. floor(steps x fps /
+    control_hz)), and the last unless the last of those is taken at the call's last step."""
+    m = int(steps * fps / CTRL_HZ + 1e-9)
+    return m + 1 + (math.ceil(m * CTRL_HZ / fps - 1e-9) < steps)
 
 
 class Rec(L.Recorder):
@@ -372,7 +375,7 @@ class Rec(L.Recorder):
     skipped = 0
 
     def _capture(self, last: bool) -> None:
-        per = len(self.cams) * (DEPTH_FRAME if self.mode in ("frames", "legacy") else 1)
+        per = len(self.cams) * (2 if self.mode in ("frames", "legacy") else 1)   # as L.check_frames counts
         if not last and per * (len(self.steps) + 2) > MAX_FRAMES:
             self.skipped += 1
             return
