@@ -38,7 +38,7 @@ RUN VIRTUAL_ENV=/opt/tactilelab/.venv uv pip install "pin==4.0.0" "pin-pink==4.2
     VIRTUAL_ENV=/opt/tactilelab/.venv uv pip install --no-deps --reinstall "numpy==1.26.0" && \
     rm -rf /root/.cache/uv
 # Pin: the steps above follow the install sequence the tasks were developed with; this one sets every package of the Isaac
-# environment to the version of the reference build (the list below, 226 packages, without resolving), removes any package an
+# environment to the version of the reference build (the list below, 229 packages, without resolving), removes any package an
 # unpinned step above pulls in today that the list does not hold, and fails unless the environment is exactly the list
 RUN printf '%s\n' \
       'absl-py==2.5.1' \
@@ -147,6 +147,7 @@ RUN printf '%s\n' \
       'jmespath==1.0.1' \
       'junitparser==5.0.3' \
       'kiwisolver==1.4.4' \
+      'lazy-loader==0.4' \
       'libcoal==3.0.3' \
       'libpinocchio==4.0.0' \
       'llvmlite==0.42.0' \
@@ -230,6 +231,7 @@ RUN printf '%s\n' \
       'rtree==1.3.0' \
       's3transfer==0.13.1' \
       'safetensors==0.8.0' \
+      'scikit-image==0.24.0' \
       'scipy==1.15.3' \
       'sentry-sdk==2.29.1' \
       'setuptools==78.1.0' \
@@ -243,6 +245,7 @@ RUN printf '%s\n' \
       'tensorboard==2.21.0' \
       'tensorboard-data-server==0.7.2' \
       'tensordict==0.14.3' \
+      'tifffile==2024.8.30' \
       'tokenizers==0.23.3' \
       'toml==0.10.2' \
       'torch==2.7.0+cu128' \
