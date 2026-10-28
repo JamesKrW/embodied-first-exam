@@ -8,7 +8,7 @@
 | Simulator / robot | `molmospaces` / `franka-robotiq-2f85` |
 | Family / instance | `pick-and-place-next-to` / seed 0 |
 | Oracle | `none` — no reference solution (MolmoSpaces' planners and grasp files are not shipped); positive example graded 1: molmospaces-pick-and-place-next__HMjmn5X (run codex-gpt6_1_sol-high, batch molmo-v2-sol, 2026-10-16; its verifier's replays ran out of time on a loaded host (the earlier 500 s limit), so it was graded 1 offline with the verifier's replay tool: two fresh replays in the task's image, no time limit, both successes with equal final hashes); human review in PR #276 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:molmospaces-0.2.5` |
 
 ## Task
@@ -22,14 +22,14 @@ Pick a named object and put it down beside a named reference object, on the same
 ## Reference solution
 None is shipped. Upstream's scripted experts (`molmo_spaces/policy/solvers`) are reference solutions and are not in the
 image; neither are grasp files nor the public MolmoBot trajectories (agent egress: the model APIs and the package
-registries; the PyPI distribution `molmo-spaces` has those experts, PROTOCOL §2.11).
+registries; the PyPI distribution `molmo-spaces` has those experts, PROTOCOL §5).
 
 ## Verification
 Open-loop replay of `/app/output/trajectory.npz` from `tests/instance.json` in two fresh processes (`tests/grade.py`).
 Each replay is upstream's evaluation loop: one upstream `Task.step` per row until upstream's `is_done()` (the
 benchmark's 30 s horizon = 455 control steps) or the last row, then upstream's `judge_success()`
 on the final state: the horizontal gap between the two objects' axis-aligned bounding boxes is between 0 and 6 cm; both rest on the same supporting body; and the reference object has moved at most 15 cm and rotated at most 60 degrees from its start pose. Pass iff both replays succeed and end in the same state; `replay.mp4` is rendered after
-the verdict. No oracle; human review in PR #276 (PROTOCOL §2.7: per family, this task and its twin, a
+the verdict. No oracle; human review in PR #276 (PROTOCOL §4: per family, this task and its twin, a
 positive example and the `nop` result).
 
 ## Resources

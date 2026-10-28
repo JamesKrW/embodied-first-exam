@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-go1` |
 | Family / instance | `mujoco_playground/Go1Handstand` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:mujoco-0.1.3` |
 
 ## Task

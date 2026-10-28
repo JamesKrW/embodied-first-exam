@@ -8,7 +8,7 @@
 | Simulator / robot | `behavior` / `r1pro` |
 | Family / instance | `putting_shoes_on_rack` / seed 301 |
 | Oracle | `partial` — solution/ streams the privileged oracle's joint targets (oracle_qpos.npy, 6283 rows) through the client. Recorded Harbor oracle run (laptop, a pre-v1.0 version): 2026-09-25 behavior-putting-shoes-on-rack-i__XB2NUoX (job behavior-putting-shoes-on-rack-i00-limited-oracle-0925-015349) scored 1 with live_matches_replay 1 (6283 control steps), 1 of 1. The sim service, collect hook, grader and oracle client changed since (crash recovery); not re-run on this version (static validation only). |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:behavior-0.1.2` |
 
 ## Task
@@ -31,7 +31,7 @@ when it is missing) and never decides anything. `infra_error` = 1 (no verdict on
 missing, unreadable or not finalized, the service never ended the episode, it gave up after crashes not all inside the
 agent's calls, or the frozen start did not rebuild (`instance_mismatch`).
 
-Oracle `partial`: the reference solution scored 1 on earlier versions of this task (`task.toml` `oracle_evidence`) and was not re-run on this one; the family is reviewed by a maintainer (PROTOCOL §2.7) in the pull request that adds it.
+Oracle `partial`: the reference solution scored 1 on earlier versions of this task (`task.toml` `oracle_evidence`) and was not re-run on this one; the family is reviewed by a maintainer (PROTOCOL §4) in the pull request that adds it.
 
 ## Resources
 Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.

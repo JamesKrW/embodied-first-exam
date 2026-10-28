@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `i2rt-yam-bimanual` |
 | Family / instance | `conveyor_pick` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.1.0` |
 
 ## Task

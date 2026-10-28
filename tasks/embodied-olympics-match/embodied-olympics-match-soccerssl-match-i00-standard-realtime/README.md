@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `ssl-robot` |
 | Family / instance | `soccer_ssl_match` / seed 7 |
 | Oracle | `partial` — screening (soccer_ssl-1): the camera reference's result at level 2 is not established for this development seed; a model won level 2 (Opus 4:3, camera only). The oracle run checks the pipeline |
-| Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 14400 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Real time | slowdown S = 10 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RO_SLOWDOWN`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0` |
 

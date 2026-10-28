@@ -171,7 +171,7 @@ Outside Harbor, the standard service run on each reference (`std_local` check): 
   give-up after crashes between calls or a failed resume, a frozen start that did not build, a service that did not end
   its episode for the collect hook, a service-side failure writing the verdict (`finalize_error`). Crashes all inside
   the agent's calls (`sim_crashed_on_call`), a simulator error from a call (2.2 / 2.1: `sim_error`, the agent's 0; 2.3:
-  the layer's own rule, PROTOCOL §4b), a fall, a timeout are the agent's result. A video that fails is only a missing
+  the layer's own rule, PROTOCOL §3), a fall, a timeout are the agent's result. A video that fails is only a missing
   video.
 
 ## Standard-realtime (`eai-standard/2.3`)

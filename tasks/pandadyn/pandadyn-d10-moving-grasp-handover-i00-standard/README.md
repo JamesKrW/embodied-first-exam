@@ -8,7 +8,7 @@
 | Simulator / robot | `maniskill` / `franka-panda-bimanual` |
 | Family / instance | `d10_moving_grasp_handover` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0` |
 
 ## Task

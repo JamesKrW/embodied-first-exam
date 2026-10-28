@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `franka-panda-bimanual` |
 | Family / instance | `ikea_eket` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 10800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0` |
 
 ## Task

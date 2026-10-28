@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `tennis_serve` / seed 0 |
 | Oracle | `full` — Reference: an underarm key-pose technique with the H1-2's own Inspire hands at their default forces (20 N per fingertip, 30 N the thumb; the racket's handle across the right palm, the ball in the left hand; no weld), the right arm's swing keys, three key times and the release searched by CMA-ES (any arm more than 3 mm into the body rejected), then a narrow search around the first success. The left hand opens at 1.27 s while the robot stands at rest, the racket meets the ball and sends it off at 12.3 m/s over the net into the box at (14.40, 2.22); success at 3.20 s; deepest self-overlap 0.1 mm; live, replay and the state hash agree. It is fragile in time: it also succeeds with all servo gains x0.97 and x1.03, but the key times 10 ms earlier or later miss (0 of 2). Measured: success after 3.2 s of the 20 s limit, live and in a fresh replay, ending in the same state. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

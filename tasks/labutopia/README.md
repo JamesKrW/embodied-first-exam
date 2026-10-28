@@ -79,7 +79,7 @@ through the robot's joint targets alone, (b) whose success check can be stated w
 - **Left out: `level4_CleanBeaker`.** Its success check looks only at where the two beakers stand at the end, and one
   of them starts there; the pouring and shaking on the way are not checked.
 - **Left out: `level4_DeviceOperation`.** Its seven checks are tied to the controller's own phase counter; it needs a
-  rule written here, and then human review (PROTOCOL §2.7).
+  rule written here, and then human review (PROTOCOL §4).
 - **Left out: level 5** (`level5_Navigation`, `level5_Mobile_manipulation`): a Franka on a Ridgeback base, a different
   robot and action.
 
@@ -212,7 +212,7 @@ PhysX runs on the CPU (LabUtopia's default backend, `numpy`). Measured in the im
   at about 200 control steps/s (180 s); it may take 2400 s and is killed at that limit. `[verifier] timeout_sec` 5400 =
   2 x 2400 + the video replay, whose renderer starts cold (what is left; skipped under 120 s) + 300 s, so
   `tests/grade.py` always writes a reward before Harbor's timeout.
-- **What is not the agent's 0** (`infra_error = 1` in `reward.json`, PROTOCOL §2.6). Standard: `final.json` missing
+- **What is not the agent's 0** (`infra_error = 1` in `reward.json`, PROTOCOL §4). Standard: `final.json` missing
   (the service writes it as soon as its scene is up), unreadable, or not finalized (the collect hook was killed before
   it wrote the verdict); the service never ending its episode for the hook; a give-up after crashes between calls or a
   failed resume; a live episode that did not rebuild the instance's placements (`instance_mismatch`); no

@@ -7,25 +7,25 @@
 | Twin | `robodojo-plug-in-charger-i00-standard` |
 | Simulator / robot | `robodojo` / `arx-x5-bimanual` |
 | Family / instance | `plug_in_charger` / seed 0 |
-| Oracle | `none` — no positive example yet; no reference solution (RoboDojo releases no expert, and its training demonstrations carry no initial state); reported separately until one exists; human review in PR #142 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no positive example yet; no reference solution (RoboDojo releases no expert, and its training demonstrations carry no initial state); marked unvalidated (PROTOCOL §2 `validated`); human review in PR #142 |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:robodojo-0.2.1` |
 
 ## Task
 Pick up the charger and plug it into the socket of the power strip so that it sits upright and fully inserted, then return the arms to their start pose. (RoboDojo's `plug_in_charger`). RoboDojo capability dimension: Precision. Instance i00 is RoboDojo's own evaluation layout
 `arx_x5/0/plug_in_charger_0.json` (sha256 `0fb33f8293090054`), frozen in `instance.json`. The deliverable is one replayable trajectory of
 RoboDojo's 14-D joint action at 25 Hz (`/app/output/trajectory.npz`), graded by RoboDojo's own reward check for the task,
-with no step cap (RoboDojo's own evaluation gives a policy 400 actions; PROTOCOL D1).
+with no step cap (RoboDojo's own evaluation gives a policy 400 actions; PROTOCOL §3).
 
 ## Difficulty
-A RoboDojo Precision task (rigid objects), graded by RoboDojo's own success thresholds (its evaluation gives a policy 400 actions; no step cap here, PROTOCOL D1). Privileged mode gives every object's pose and bounding box, the check's code, unlimited resets and
+A RoboDojo Precision task (rigid objects), graded by RoboDojo's own success thresholds (its evaluation gives a policy 400 actions; no step cap here, PROTOCOL §3). Privileged mode gives every object's pose and bounding box, the check's code, unlimited resets and
 self-replay; the helpers are only joint moves, gripper commands and RoboDojo's IK. This mode is the control for the
 standard twin.
 
 ## Reference solution
 None. RoboDojo releases no expert or planner script, and its training demonstrations (Hugging Face
 `RoboDojo-Benchmark/RoboDojo`, `data/`) record no initial state or layout, so none replays on a frozen layout. The task is
-reported separately until it has a positive example (PROTOCOL §7, Open 4).
+marked unvalidated (PROTOCOL §2 `validated`).
 
 ## Verification
 `tests/grade.py` replays `/app/output/trajectory.npz` from the frozen layout once, in a fresh process

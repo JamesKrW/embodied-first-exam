@@ -4,11 +4,11 @@
 |---|---|
 | Benchmark | AM-Bench |
 | Mode | standard (`eai-standard/2.2`) |
-| Twin | — (none: standard only, graded by the live episode; its physics does not replay bit for bit, PROTOCOL §4.8) |
+| Twin | — (none: standard only, graded by the live episode; its physics does not replay bit for bit, PROTOCOL §4) |
 | Simulator / robot | `ambench` / `ambench-fahexa` |
 | Family / instance | `pull_lever_fahexa` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:ambench-0.3.1` |
 
 ## Task

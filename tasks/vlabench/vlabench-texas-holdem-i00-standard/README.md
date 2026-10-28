@@ -8,7 +8,7 @@
 | Simulator / robot | `vlabench` / `franka-panda` |
 | Family / instance | `vlabench/texas_holdem` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:vlabench-0.2.0` |
 
 ## Task
@@ -52,6 +52,6 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | | |
 |---|---|
 | Actions | `joint_position` (9, float64): absolute targets for the 7 arm joints (rad) and the 2 fingers (m), 0.1 s per control step |
-| Episode cap | 9000 control steps (900 s of robot time; `spec.max_control_steps`, PROTOCOL §4.5 MAY) |
+| Episode cap | 9000 control steps (900 s of robot time; `spec.max_control_steps`, docs/protocol/standard_mode.md) |
 | Resources | 4 CPUs, no GPU (CPU physics, OSMesa rendering) |
 | Instruction | restated; VLABench's own: "We're playing Texas hodl'em game! What's your largest cards? Show me on the placemat" (graded: the cards VLABench's get_largest_combination picks (the first five-card combination of the highest rank in its enumeration order: the 6-to-10 straight with the 9 of hearts; the higher 7-to-jack straight on the table does not count) all inside the placemat (contain)) |

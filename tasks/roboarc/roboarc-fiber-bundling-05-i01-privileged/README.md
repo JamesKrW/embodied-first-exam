@@ -7,8 +7,8 @@
 | Twin | `roboarc-fiber-bundling-05-i01-standard` |
 | Simulator / robot | `roboarc` / `franka-robotiq-2f85` |
 | Family / instance | `fiber_bundling` / seed 0 |
-| Oracle | `none` — No oracle; human review in PR #N (PROTOCOL §4). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. |
-| Agent time budget | 10800 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — No oracle; human review in the pull request that adds the task (PROTOCOL §4). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. |
+| Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` |
 
 ## Task
@@ -18,7 +18,7 @@ RoboARC fiber_bundling (Franka Panda + Robotiq 2F-85, MuJoCo): produce one repla
 A 7-dof franka panda arm with a robotiq 2f-85 parallel gripper on a fixed base with a 8-D joint-target action space at 40 Hz; success needs the task's predicate (above) held for 0.5 s. Grasping: assisted grasping (contact_weld_v1).
 
 ## Reference solution
-No oracle; human review in PR #N (PROTOCOL §2.7). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. `oracle = "none"`: there is no `solution/`, and Harbor checks the nop agent only.
+No oracle; human review in the pull request that adds the task (PROTOCOL §4). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. `oracle = "none"`: there is no `solution/`, and Harbor checks the nop agent only.
 
 ## Verification
 Open-loop replay of `/app/output/trajectory.npz` from the frozen instance (`/tests/instance.json`, staged from the image and checked against `tests/runtime_binding.json`) in a fresh process, twice; pass iff the

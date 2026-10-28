@@ -8,11 +8,11 @@
 | Simulator / robot | `robosuite` / `fourier-gr1` |
 | Family / instance | `robocasa-gr1/PosttrainPnPNovelFromCuttingboardToBasketSplitA` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa-gr1-0.1.0` |
 
 ## Task
-Standard mode (robot as a service, `eai-standard/2.1`) of `robocasa-gr1-cuttingboard-to-basket-i00-privileged`: the same frozen instance and success check, served by the `sim` sidecar (`images/robocasa/standard/server_casa.py`, tool module `casa_tool`), which records the episode and judges it live (nothing is replayed); the verifier grades the sidecar's record in a container of its own. The agent sees the robot's cameras (RGB-D, calibrated), its own joints and end effector, and the instruction.
+Standard mode (robot as a service, `eai-standard/2.1`) of `robocasa-gr1-cuttingboard-to-basket-i00-privileged`: the same frozen instance and success check, served by the `sim` sidecar (`embodied_first_exam/benchmarks/robocasa/sim/server_casa.py`, tool module `casa_tool`), which records the episode and judges it live (nothing is replayed); the verifier grades the sidecar's record in a container of its own. The agent sees the robot's cameras (RGB-D, calibrated), its own joints and end effector, and the instruction.
 
 ## Difficulty
 The agent has to find the objects in the humanoid's camera images, coordinate two arms and two dexterous hands through the IK controller, and finish in one episode without a reset.

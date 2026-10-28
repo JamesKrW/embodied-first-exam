@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
 | Family / instance | `picture_hang` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz: 869 Sharpa Wave rows on the Marvin dual-arm robot (success after 669 controls, 200 rows of slack), recorded from the authoring controller through its arm layer (IK to arm joint targets; motor targets only). Two fresh-process replays end with identical state hashes; float32-rounded rows also succeed. Wave-3 port of the 2026-10-14 floating-stage oracle. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task

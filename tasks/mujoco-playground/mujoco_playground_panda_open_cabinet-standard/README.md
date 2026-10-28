@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `franka-panda` |
 | Family / instance | `mujoco_playground/PandaOpenCabinet` / seed 60417 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:mujoco-0.1.2` |
 
 ## Task

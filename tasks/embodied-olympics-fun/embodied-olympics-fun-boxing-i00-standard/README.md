@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `boxing` / seed 0 |
 | Oracle | `full` — Reference: a straight punch from a guard with the upper arm raised 0.04 rad, the trunk's turn behind it and the wrist pitched +0.31 rad so that the knuckle part leads, then the walking policy at zero command; its parameters come from a random search over the guard, the trunk's wind and turn, the wrist, the punch's end pose and its duration (96 tries, 10 scoring). The bag receives 15.9 N s (12 required) at 1.25 m in a 0.030 s touch; the fist is back at the guard at 4.0 s; no arm into the robot's own body; live, replay and the state hash agree. 3 of 4 neighbours succeed (servo gains x0.97 / x1.03 and the bag 1.5 cm farther pass; with the bag 1.5 cm nearer the blow lands early in the stroke: 10.7 N s, too weak). The privileged twin's reference rows (401 control steps, success after 4.01 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

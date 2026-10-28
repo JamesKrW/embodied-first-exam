@@ -7,8 +7,8 @@
 | Twin | `robodojo-align-blocks-i00-privileged` |
 | Simulator / robot | `robodojo` / `arx-x5-bimanual` |
 | Family / instance | `align_blocks` / seed 0 |
-| Oracle | `none` — no positive example yet; no reference solution (RoboDojo releases no expert, and its training demonstrations carry no initial state); reported separately until one exists; human review in PR #142 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no positive example yet; no reference solution (RoboDojo releases no expert, and its training demonstrations carry no initial state); marked unvalidated (PROTOCOL §2 `validated`); human review in PR #142 |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:robodojo-0.2.1` |
 
 ## Task
@@ -17,13 +17,12 @@ robot only through the eai-standard/2.2 client (the simulator runs in the `sim` 
 the episode as a (T, 14) trajectory of RoboDojo's own joint action at 25 Hz.
 
 ## Difficulty
-A RoboDojo Open task (rigid (rigid cubes and a rigid triangular prism pushed on a table) objects), graded by RoboDojo's own success thresholds (its evaluation gives a policy 200 actions; no step cap here, PROTOCOL D1). Here the agent sees only the three cameras (RGB, optional depth) and the arms' proprioception: no object
+A RoboDojo Open task (rigid (rigid cubes and a rigid triangular prism pushed on a table) objects), graded by RoboDojo's own success thresholds (its evaluation gives a policy 200 actions; no step cap here, PROTOCOL §3). Here the agent sees only the three cameras (RGB, optional depth) and the arms' proprioception: no object
 poses, no success signal, no reset, one episode (no step cap; RoboDojo's own evaluation gives a policy 200 actions).
 
 ## Reference solution
 None (see the privileged twin): RoboDojo releases no expert or planner script, and its training demonstrations record no
-initial state, so none replays on a frozen layout. The task is reported separately until it has a positive example
-(PROTOCOL §7, Open 4).
+initial state, so none replays on a frozen layout. The task is marked unvalidated (PROTOCOL §2 `validated`).
 
 ## Verification
 The sim service ends the episode on RoboDojo's own check (success), a failed check, the runaway guard or the time limit, and

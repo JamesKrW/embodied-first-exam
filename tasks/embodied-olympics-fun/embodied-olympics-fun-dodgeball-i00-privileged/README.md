@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `dodgeball` / seed 0 |
 | Oracle | `full` — Reference: the G1 turns side-on and walks back and forth on the walking policy so that it is moving at each feed; five 14.2 m/s throws from turret-aimed machines all miss; 9 of 10 perturbations (feed times, speed, gap, aim height, machine distance) succeed, the machine at 2.8 m fails. Measured: success after 13.06 s of the 15.5 s limit, live and in a fresh replay, ending in the same state. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

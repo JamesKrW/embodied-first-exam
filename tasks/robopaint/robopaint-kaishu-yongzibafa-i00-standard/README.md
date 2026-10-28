@@ -7,8 +7,8 @@
 | Twin | `robopaint-kaishu-yongzibafa-i00-privileged` |
 | Simulator / robot | `maniskill` / `franka-panda` |
 | Family / instance | `robopaint_kaishu_yongzibafa` / seed 0 |
-| Oracle | `partial` — Reference solution in solution/ (streams the privileged reference's joint targets), re-made on 2026-10-09 (README, Change Log; tasks/robopaint/README.md, Targets). The same trajectory scores 1 under the process rules in the verifier (the graders' rcb_brush_strict.py, with which the sim service also scores the live sheet): path_mm 1270 and mark_width_mm 3.71, against the colouring-in limits 3230 mm and 1.34 mm. Harbor oracle 1 and nop 0 on both modes of this pair on its current files (2026-10-09): tasks/robopaint/README.md (Validation). |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `partial` — Reference solution in solution/ (streams the privileged reference's joint targets; tasks/robopaint/README.md, Targets). The same trajectory scores 1 under the process rules in the verifier (the graders' rcb_brush_strict.py, with which the sim service also scores the live sheet): path_mm 1270 and mark_width_mm 3.71, against the colouring-in limits 3230 mm and 1.34 mm. Harbor oracle 1 and nop 0 on both modes of this pair on its current files (2026-10-09): tasks/robopaint/README.md (Validation). |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:robopaint-0.2.0` |
 
 ## Task

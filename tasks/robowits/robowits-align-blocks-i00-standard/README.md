@@ -8,7 +8,7 @@
 | Simulator / robot | `robowits` / `marvin-bimanual` |
 | Family / instance | `align_blocks` / seed 0 |
 | Oracle | `none` — No reference solution: RoboWits ships no expert or planner for its seed tasks. Solvable: model trial robowits-align-blocks-i00-limite__bbbgbmS (robowits-lunaxh-limited-0929, standard) graded success=1, deterministic=1 by the separate verifier; nop scored 0. These records are from earlier versions of the task (before protocol v1.0, on the same frozen instance and predicate); not re-run on this version (static validation only, 2026-10-01). Human review per family (protocol §4). Re-graded with the 2026-10-14 grader (two AMD workstations; the earlier positives were graded on the Intel laptop, so a trajectory that fails the earlier grader on AMD too says nothing either way): the cited __bbbgbmS fails the earlier grader on AMD as well (inconclusive); __r8twyX6 passes the earlier grader but fails the 2026-10-14 one (a gripper still touches a cube at the end). No standard positive confirmed under the 2026-10-14 grader yet. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:robowits-0.1.1` |
 
 ## Task
@@ -38,7 +38,7 @@ served (`instance_mismatch`, an infrastructure failure). After the verdict the s
 once into `/logs/verifier/replay.mp4`; a failed video never changes the verdict. What is checked, in words:
 `instruction.md`, "Success criterion (as graded)".
 
-No oracle; human review in PR #3 (PROTOCOL §2.7), with its privileged twin: the positive example, the `nop` result and the predicate
+No oracle; human review in PR #3 (PROTOCOL §4), with its privileged twin: the positive example, the `nop` result and the predicate
 summary are in the PR's review table.
 
 ## Resources

@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `sharpa-wave-floating` |
 | Family / instance | `binder_page_load` / seed 0 |
 | Oracle | `full` — solution/ replays the validated Sharpa Wave authoring trajectory (2,192 controls, success after 2,042; standard mode submits the same float64 rows through the public client). Two fresh-process replays succeed with identical state hashes; float32-rounded rows also succeed. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task

@@ -8,7 +8,7 @@
 | Simulator / robot | `bigym2` / `unitree-g1-dex1` |
 | Family / instance | `dishwasher-close` / seed 0 |
 | Oracle | `none` — no reference solution (BiGym 2.0 ships no expert or planner; its demonstrations and its agents' programs stay off the agent's network); positive example graded 1 by the separate verifier: bigym2-dishwasher-close-i00-priv__BtaZZZZ (run codex-gpt6_luna-medium, 2026-10-08, on an earlier text of the privileged task; regraded by its current verifier); human review in PR #123 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 0 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:bigym2-0.1.1` |
 
@@ -31,7 +31,7 @@ timing was; the video is rendered from it in one pass after the verdict. `tests/
 the agent's first command, a simulator error raised by a control step and a simulator crash inside a control step (a
 fatal signal) are the agent's 0; before it, a kill, a failed resume and a reset that does not rebuild the scene are infrastructure
 (`infra_error = 1`; owner, 2026-10-17, docs/protocol/standard_mode.md). Success condition: the door and both racks are closed to within 5% of their travel: the door within about 4.5 degrees of shut, the lower rack within 0.025 m and the upper rack within 0.0225 m of fully in.
-No oracle; human review in PR #123 (PROTOCOL §2.7).
+No oracle; human review in PR #123 (PROTOCOL §4).
 
 ## Resources
 Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.

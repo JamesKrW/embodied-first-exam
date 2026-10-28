@@ -8,7 +8,7 @@
 | Simulator / robot | `vlabench` / `franka-panda` |
 | Family / instance | `vlabench/select_poker_spatial` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:vlabench-0.2.0` |
 
 ## Task
@@ -52,6 +52,6 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | | |
 |---|---|
 | Actions | `joint_position` (9, float64): absolute targets for the 7 arm joints (rad) and the 2 fingers (m), 0.1 s per control step |
-| Episode cap | 9000 control steps (900 s of robot time; `spec.max_control_steps`, PROTOCOL §4.5 MAY) |
+| Episode cap | 9000 control steps (900 s of robot time; `spec.max_control_steps`, docs/protocol/standard_mode.md) |
 | Resources | 4 CPUs, no GPU (CPU physics, OSMesa rendering) |
 | Instruction | restated; VLABench's own: "Please pick the 4th poker from left to right" (graded: the card is grasped by the hand and its root is at z >= 0.9 m (is_grasped and lift); upstream says only "pick"; the cards are counted along +x) |

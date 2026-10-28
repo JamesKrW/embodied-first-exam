@@ -12,7 +12,6 @@ simulator = "mujoco"                # ABC Sim (abc_sim, amazon-far/abc @ d0832d1
 robot = "i2rt-yam-bimanual"
 family = "ball_tray"
 dynamics = "dynamic"                # the tray's runtime pushes the ball
-slowdown = 1                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RCB_SLOWDOWN's default
 protocol = "eai-standard/2.3"
 oracle = "full"
 instance_seed = 0

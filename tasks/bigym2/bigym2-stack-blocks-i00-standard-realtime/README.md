@@ -8,7 +8,7 @@
 | Simulator / robot | `bigym2` / `unitree-g1-dex1` |
 | Family / instance | `stack-blocks` / seed 0 |
 | Oracle | `none` — no reference solution (BiGym 2.0 ships no expert or planner; its demonstrations and its agents' programs stay off the agent's network); positive example graded 1 by the separate verifier: bigym2-stack-blocks-i00-privileg__Rz4Pgdi (run codex-gpt6_luna-medium, 2026-10-08, on an earlier text of the privileged task; regraded by its current verifier); human review in PR #123 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 0 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:bigym2-0.1.1` |
 
@@ -31,7 +31,7 @@ timing was; the video is rendered from it in one pass after the verdict. `tests/
 the agent's first command, a simulator error raised by a control step and a simulator crash inside a control step (a
 fatal signal) are the agent's 0; before it, a kill, a failed resume and a reset that does not rebuild the scene are infrastructure
 (`infra_error = 1`; owner, 2026-10-17, docs/protocol/standard_mode.md). Success condition: the three blocks form one stack on the green pad: the lowest touching the pad, each of the others touching the block below it, at least 0.03 m higher and within 0.05 m of it horizontally; no block held by a gripper.
-A block touching the floor ends the episode as a failure. No oracle; human review in PR #123 (PROTOCOL §2.7).
+A block touching the floor ends the episode as a failure. No oracle; human review in PR #123 (PROTOCOL §4).
 
 ## Resources
 Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.

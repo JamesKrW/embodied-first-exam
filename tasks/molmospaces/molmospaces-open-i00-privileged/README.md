@@ -8,7 +8,7 @@
 | Simulator / robot | `molmospaces` / `franka-robotiq-2f85` |
 | Family / instance | `open` / seed 0 |
 | Oracle | `none` — no reference solution (MolmoSpaces' planners and grasp files are not shipped); positive example graded 1 by the separate verifier: molmospaces-open-i00-privileged__bVqNR4u (run codex-gpt6_1_sol-high, batch molmo-harder-sol, 2026-10-16, image 0.2.4, the same instance); human review in PR #276 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:molmospaces-0.2.5` |
 
 ## Task
@@ -22,14 +22,14 @@ Open an articulated fixture in a hand-built AI2-THOR kitchen: find a handle, gra
 ## Reference solution
 None is shipped. Upstream's scripted experts (`molmo_spaces/policy/solvers`) are reference solutions and are not in the
 image; neither are grasp files nor the public MolmoBot trajectories (agent egress: the model APIs and the package
-registries; the PyPI distribution `molmo-spaces` has those experts, PROTOCOL §2.11).
+registries; the PyPI distribution `molmo-spaces` has those experts, PROTOCOL §5).
 
 ## Verification
 Open-loop replay of `/app/output/trajectory.npz` from `tests/instance.json` in two fresh processes (`tests/grade.py`).
 Each replay is upstream's evaluation loop: one upstream `Task.step` per row until upstream's `is_done()` (the
 benchmark's 30 s horizon = 455 control steps) or the last row, then upstream's `judge_success()`
 on the final state: some joint of any dishwasher in the room is open at least 15% of its range (all start closed). Pass iff both replays succeed and end in the same state; `replay.mp4` is rendered after
-the verdict. No oracle; human review in PR #276 (PROTOCOL §2.7: per family, this task and its twin, a
+the verdict. No oracle; human review in PR #276 (PROTOCOL §4: per family, this task and its twin, a
 positive example and the `nop` result).
 
 ## Resources

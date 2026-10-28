@@ -8,7 +8,7 @@
 | Simulator / robot | `maniguard` / `franka-panda-longfinger` |
 | Family / instance | `cabinet_pickup` / seed 22 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:maniguard-0.2.1` |
 
 ## Task
@@ -66,12 +66,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: one trial: sim anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s); GPU memory and CPU otherwise from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack)
-- Measured (caps): GPU memory (the sim service): cap 18 GiB (owner); measured peaks 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling), so a run may exceed it; recorded, enforced only when RCB_LIMITS_ENFORCE=1; processes and disk: defaults, not measured
+- Measured (caps): GPU memory (the sim service): cap 18 GiB, the benchmark's choice, below the measured peaks of 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling): a trial over it is recorded and fails only when a run sets RCB_LIMITS_ENFORCE=1 (tasks/maniguard/README.md "GPU memory"); processes and disk: defaults, not measured
 
 ## Details
 | | |
 |---|---|
-| Episode | one episode, no reset, no step budget: it ends when the goal has held for 10 consecutive control steps, when the agent's time is up, on a simulator error, or at the technical cap of 50,000 control steps (41.7 min of simulated time; `spec["max_control_steps"]`, reason `runaway_guard`, PROTOCOL §4.5); the wall clock is the only budget |
+| Episode | one episode, no reset, no step budget: it ends when the goal has held for 10 consecutive control steps, when the agent's time is up, on a simulator error, or at the technical cap of 50,000 control steps (41.7 min of simulated time; `spec["max_control_steps"]`, reason `runaway_guard`, docs/protocol/standard_mode.md); the wall clock is the only budget |
 | Action space | `submit` chunks of `joint_position` (8, streamed at the 20 Hz control rate with the agent's `dt`, a multiple of 1/20 s) or `ee_pose` (8, IK per row); `observe` frames or a watch window; `/kinematics` (FK / IK, stateless); binary RCB1 responses |
 | Images | the `sim` sidecar runs efe-private:maniguard (BUILD_ONLY, `images/maniguard/BUILD_ONLY`) with `$RCB_MANIGUARD_DATA` mounted read-only; the agent container and the verifier run the shared client image with its pip pins (`embodied_first_exam/standard/client.env`) |
 | Crash recovery | resume class `approx` (OmniGibson declares rollouts nondeterministic; docs/protocol/standard_mode.md §13.1): every control step journaled, a checkpoint with the state hash after every call; `restart: on-failure:6` |

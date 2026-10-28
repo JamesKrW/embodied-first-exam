@@ -4,11 +4,11 @@
 |---|---|
 | Benchmark | roboEngineer |
 | Mode | standard (`eai-policy/1.0`) |
-| Twin | — (none: roboEngineer has no privileged mode, PROTOCOL §2.15) |
+| Twin | — (none: roboEngineer has no privileged mode, PROTOCOL §2) |
 | Simulator / robot | `mujoco` / `intel-aero-partial` |
 | Family / instance | `roboengineer/landing-random-pad` / seed 1 |
 | Oracle | `full` — Harbor 0.23.0 oracle agent on a cloud CPU host, 2026-10-18, image efe-private:quadrotor-landing-0.1.0: six safe held-out landings of six, mean score 82.89; nop 0. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:quadrotor-landing-0.1.0` |
 
 ## Task

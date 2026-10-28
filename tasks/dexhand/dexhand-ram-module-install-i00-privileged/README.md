@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `sharpa-wave-floating` |
 | Family / instance | `ram_module_install` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz replays the validated Sharpa Wave authoring trajectory in both modes (1,529 rows; the episode ends at success after 1,379 controls, with the source's 1.66 mm socket throat). Two fresh-process replays give identical state hashes; Harbor 0.23 oracle trials score 1 in privileged and standard mode, nop trials 0. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task

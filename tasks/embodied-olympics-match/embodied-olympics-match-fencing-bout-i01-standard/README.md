@@ -4,11 +4,11 @@
 |---|---|
 | Benchmark | Embodied Olympics - Match |
 | Mode | standard (`eai-standard-turn/1.0`) |
-| Twin | — (none: a task Embodied Olympics exports with its own service, PROTOCOL §4c; a turn-based match has no trajectory deliverable) |
+| Twin | — (none: a task Embodied Olympics exports with its own service, PROTOCOL §3; a turn-based match has no trajectory deliverable) |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `fencing_bout` / seed 39 |
 | Oracle | `full` — in process (fencing-7): the oracle beats level 1 on this seed 15:11; over 40 player seeds the reference wins this instance 62.5 %, the equilibrium mix 47.5 % (fresh-seed means 61.5 %, 53.5 %); none of the nine constant intentions nor a random player wins it; live on vanilla Harbor 0.23.0 (2026-10-15, the exported task) the oracle won 15:11 in 25 phrases, replay identical (the world is deterministic) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0` |
 
 ## Task

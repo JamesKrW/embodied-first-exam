@@ -8,7 +8,7 @@
 | Simulator / robot | `robolab` / `franka-robotiq-2f85` |
 | Family / instance | `put_two_mugs_on_shelf` / seed 0 |
 | Oracle | `none` — No reference solution: RoboLab ships no expert or planner. Positive examples graded 1 by the separate verifier: robolab-put-two-mugs-on-shelf-i0__AMuARWT (robolab-put-two-mugs-on-shelf-i00-privileged before 2026-10-14, run codex-gpt6_luna-xhigh, robolab-lunacx-0925-2038). The positives were graded before 2026-10-14 (one-finger gripper contact, no settle hold); not re-graded under the 2026-10-14 term unless stated here. Human review per family (PROTOCOL §4). |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:robolab-0.2.1` |
 
 ## Task
@@ -40,7 +40,7 @@ Isaac Lab makes with every step), and the collect hook encodes it after the verd
 only). Compute: the collect hook needs no GPU after the service exits (it replayed the episode in two fresh Isaac
 processes before 2026-10-17).
 
-No oracle; human review in PR #3 (PROTOCOL §2.7: per family, this task and its twin, a positive example and the `nop` result).
+No oracle; human review in PR #3 (PROTOCOL §4: per family, this task and its twin, a positive example and the `nop` result).
 
 ## Resources
 Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.

@@ -4,11 +4,11 @@
 |---|---|
 | Benchmark | roboEngineer |
 | Mode | standard (`eai-policy/1.1`) |
-| Twin | — (none: roboEngineer has no privileged mode, PROTOCOL §2.15) |
+| Twin | — (none: roboEngineer has no privileged mode, PROTOCOL §2) |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `roboengineer/g1-terrain-walk` / seed 1 |
 | Oracle | `partial` — Harbor 0.23.0 oracle agent on a cloud L40S host, 2026-10-18, images efe-private:control-transfer-0.2.0-train / 0.2.0 (200 + 2466 + 1479 + 986 PPO iterations x 4096 environments from scratch; 12009 s of the 14400 s; round 0 passed all four development cases, the later, sealed rounds drifted sideways): the reference (trains the public curriculum from scratch on the agent's GPU, three deployments, the last sealed) succeeded on 4/12 held-out cases, mean engineering score 82.68; nop 0. No full oracle: human review (PROTOCOL §4). |
-| Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 14400 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:control-transfer-0.2.0` |
 
 ## Task

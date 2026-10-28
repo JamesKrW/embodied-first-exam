@@ -7,8 +7,8 @@
 | Twin | `myosuite-dex-airplane-fly-i00-privileged` |
 | Simulator / robot | `myosuite` / `myohand` |
 | Family / instance | `dex_airplane_fly` / seed 0 |
-| Oracle | `none` — no positive example yet (two model attempts failed: Claude Code + Claude Opus 5.5 (run `claude_code-claude_opus_5_5-default`, 2026-10-06) and Codex + GPT-6 Luna, effort high, run `codex-gpt6_luna-high`); the task is reported separately until one exists (PROTOCOL §4); human review in PR #65 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no positive example yet (two model attempts failed: Claude Code + Claude Opus 5.5 (run `claude_code-claude_opus_5_5-default`, 2026-10-06) and Codex + GPT-6 Luna, effort high, run `codex-gpt6_luna-high`); the task is marked unvalidated (PROTOCOL §2 `validated`); human review in PR #65 |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:myosuite-0.1.1` |
 
 ## Task
@@ -19,7 +19,7 @@ A toy airplane lies on the table; the MyoHand is at its pre-grasp pose. Standard
 Same instance and success rule as `myosuite-dex-airplane-fly-i00-privileged` (first-pass rating: hard). In standard mode the agent loses free resets, the simulator and the object state: it sees camera images and the limb's proprioception, acts in actuator-command chunks, and gets 10 resets, so it has to close the loop on what it sees and learn the body from a few real attempts.
 
 ## Reference solution
-None. Solvability evidence: no positive example yet (two model attempts failed: Claude Code + Claude Opus 5.5 (run `claude_code-claude_opus_5_5-default`, 2026-10-06) and Codex + GPT-6 Luna, effort high, run `codex-gpt6_luna-high`); the task is reported separately until one exists (PROTOCOL §7, Open 4); human review in PR #65.
+None. Solvability evidence: no positive example yet (two model attempts failed: Claude Code + Claude Opus 5.5 (run `claude_code-claude_opus_5_5-default`, 2026-10-06) and Codex + GPT-6 Luna, effort high, run `codex-gpt6_luna-high`); the task is marked unvalidated (PROTOCOL §2 `validated`); human review in PR #65.
 
 ## Verification
 The sim service judges the episode live (the task's rule on the steps it ran: on track over the 99-step reference) and records every executed control step; it checks at the episode's start that the scene is the frozen instance (its recorded state hash; else `instance_mismatch`, an infrastructure failure). The collect hook (`environment/sim/finalize.sh`) ends the service and writes that live verdict to `final.json` (`graded_by` = `live`; nothing is replayed to grade it), then renders `replay.mp4` in one pass over the recorded trajectory, which decides nothing; `tests/grade.py` (separate sandbox, no network) passes iff the live episode succeeded. A missing or unreadable `final.json`, one without a verdict, or a give-up after crashes not all inside the agent's calls is an infrastructure failure (`infra_error = 1`), not the agent's 0. No oracle; human review in PR #65. `nop`: the episode times out, reward 0.
@@ -43,7 +43,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Upstream | MyoSuite 2.12.2 (Apache-2.0) on MuJoCo 3.6.0, the models that ship in its wheel |
 | Service | `environment/sim/server.py` (the adapter) on the shared 2.2 layer `rcb_limited.py` (`embodied_first_exam/standard/`); cameras `left_cam`, `right_cam`, `center_cam`, `hand_top`, `hand_bottom`, `hand_side_inter`, `hand_side_exter`, `plam_lookat` (640 x 480); forward kinematics of the body's links |
 | Resources | 4 CPUs, no GPU (CPU physics, OSMesa rendering); after the agent's phase the collect hook only renders the video (one pass over the graded episode), it replays nothing to grade |
-| Reset budget | 10 (`RCB_RESET_BUDGET`, compose default; PROTOCOL §4.5): `POST /reset` starts a new episode from the frozen instance; only the last episode is graded, a success ends the trial; results under another budget are reported separately |
+| Reset budget | 10 (`RCB_RESET_BUDGET`, compose default; PROTOCOL §2): `POST /reset` starts a new episode from the frozen instance; only the last episode is graded, a success ends the trial; results under another budget are reported separately |
 
 ### Provenance
 The frozen instance (`environment/sim/instance.npz`) and its scene facts were made at generation time; see `tasks/myosuite/README.md`.

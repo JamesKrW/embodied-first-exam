@@ -8,7 +8,7 @@
 | Simulator / robot | `behavior` / `r1pro` |
 | Family / instance | `tidying_bedroom` / seed 301 |
 | Oracle | `none` — No reference solution: BEHAVIOR-1K ships no expert or planner that replays on this frozen instance. Solvable: model trial behavior-tidying-bedroom-i00__VcXRVyJ (behavior-lunaxh-t8-0927, the privileged twin behavior-tidying-bedroom-i00-privileged on the same frozen instance and BDDL goal) graded success=1, deterministic=1 by the separate verifier on a pre-v1.0 version of this task (dev branch 2d486a91; grader verdict and frozen instance unchanged since); not re-run on this version (static validation only). Human review per family (protocol §4). |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:behavior-0.1.2` |
 
 ## Task
@@ -31,7 +31,7 @@ when it is missing) and never decides anything. `infra_error` = 1 (no verdict on
 missing, unreadable or not finalized, the service never ended the episode, it gave up after crashes not all inside the
 agent's calls, or the frozen start did not rebuild (`instance_mismatch`).
 
-No oracle: the family is reviewed by a maintainer (PROTOCOL §2.7) in the pull request that adds it, on a positive example and a `nop` run per mode.
+No oracle: the family is reviewed by a maintainer (PROTOCOL §4) in the pull request that adds it, on a positive example and a `nop` run per mode.
 
 ## Resources
 Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.

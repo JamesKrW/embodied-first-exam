@@ -4,11 +4,11 @@
 |---|---|
 | Benchmark | Embodied Olympics - Match |
 | Mode | standard-realtime (`eai-standard-realtime/1.0`) |
-| Twin | — (none: a task Embodied Olympics exports with its own service, PROTOCOL §4c) |
+| Twin | — (none: a task Embodied Olympics exports with its own service, PROTOCOL §3) |
 | Simulator / robot | `mujoco` / `franka-panda` |
 | Family / instance | `tabletennis_match` / seed 11 |
 | Oracle | `partial` — export-only top tier (sim/match.py TIERS top, 2026-10-16: level 4's serves, the strongest returns the real-limited arm makes, level 2's defence): our truth-state reference beat it in 12 of 40 seeds, our camera-only reference in 7 of 18 (D = 5), both on this seed (5:0 camera, 6:4 truth); every simple baseline lost all its matches; the live oracle run is in the export report |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Real time | slowdown S = 10 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RO_SLOWDOWN`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0` |
 

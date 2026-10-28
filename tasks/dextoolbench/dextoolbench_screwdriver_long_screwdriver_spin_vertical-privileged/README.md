@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `kuka-iiwa14-sharpa-ha4` |
 | Family / instance | `dextoolbench/screwdriver/long_screwdriver/spin_vertical` / seed 0 |
 | Oracle | `partial` — SimToolReal's pretrained policy, replayed in this scene, reaches 27/100 goals (solution/; README of dextoolbench_screwdriver_long_screwdriver_spin_vertical-privileged) |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:mujoco-0.1.2` |
 
 ## Task

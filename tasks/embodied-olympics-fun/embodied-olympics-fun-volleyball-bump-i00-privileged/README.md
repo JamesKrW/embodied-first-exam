@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `volleyball_bump` / seed 0 |
 | Oracle | `full` — Reference, on Unitree's actuator data (H2-class legs, rotor inertia, joint friction): a walk forward and to the left, then a forearm platform held through the contact; the walk, key times and the platform's joint offsets from CMA-ES, with penalties for the arms coming within 5 cm of each other and for any arm passing into the body. The serve comes from the ball machine behind the far end line; the ball meets the right forearm (it also brushes the wrist-pitch link by 2 mm), comes in at 11.3 m/s, leaves at 8.0 m/s, rises to 3.30 m and lands 0.13 m from the target centre; success after 5.85 s. The arms stay at least 2.9 cm apart and no arm passes into the body (at most 0.4 mm). It is open loop on the one serve: 4 of 6 perturbations succeed (servo gains x0.97 / x1.03 and the timing 10 ms earlier / later pass; a machine launch speed 0.5 % lower or higher fails, because the ball misses the platform). Measured: success after 5.84 s of the 10 s limit, live and in a fresh replay, ending in the same state. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

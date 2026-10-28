@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `aloha-2` |
 | Family / instance | `ikea_svallet` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 10800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:ikea-mujoco-sim-0.4.0` |
 
 ## Task

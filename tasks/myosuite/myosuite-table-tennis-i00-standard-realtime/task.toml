@@ -28,7 +28,6 @@ simulator = "myosuite"            # MyoSuite 2.12.2 on MuJoCo 3.6.0 (CPU physics
 robot = "myoarm-torso"
 family = "table_tennis"
 dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
-slowdown = 1                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RCB_SLOWDOWN's default
 protocol = "eai-standard/2.3"
 oracle = "none"
 oracle_evidence = "a successful episode of the privileged twin (GPT-6 Luna xhigh, trial `myosuite-table-tennis-i00-privil__SMNgbHk`, 82 rows) planned from step 0 in one `submit(..., at=0)` at S = 1 succeeds live and in the fresh replay, with no stall (2026-10-14); the standard twin's evidence holds for the same instance and rule; human review in PR #201"

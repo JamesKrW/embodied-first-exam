@@ -8,7 +8,7 @@
 | Simulator / robot | `yamlab` / `i2rt-yam-bimanual` |
 | Family / instance | `hang_mug_on_tree` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:yamlab-0.2.1` |
 
 ## Task

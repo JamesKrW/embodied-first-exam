@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
 | Family / instance | `boot_sole_brush` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz: the 1,688-row Sharpa Wave witness on the Marvin right arm (success at control 1,538, then 150 hold rows), authored by tracking the wave-2 floating-hand episode's hand-root poses with arm inverse kinematics (closed loop, joint integral; the brush-transfer segment re-timed 3x slower); two fresh-process replays succeed with identical state hashes, float32-rounded rows succeed, and no arm, stand or parked-hand contact occurs in any physics substep. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task

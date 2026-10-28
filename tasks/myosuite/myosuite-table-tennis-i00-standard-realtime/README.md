@@ -8,7 +8,7 @@
 | Simulator / robot | `myosuite` / `myoarm-torso` |
 | Family / instance | `table_tennis` / seed 0 |
 | Oracle | `none` — a successful episode of the privileged twin (GPT-6 Luna xhigh, trial `myosuite-table-tennis-i00-privil__SMNgbHk`, 82 rows) planned from step 0 in one `submit(..., at=0)` at S = 1 succeeds live and in the fresh replay, with no stall (2026-10-14); the standard twin's evidence holds for the same instance and rule; human review in PR #201 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:myosuite-0.1.1` |
 
@@ -46,7 +46,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Slowdown | S = 1 (`RCB_SLOWDOWN`'s default): measured RTF 2.1-2.7 (2026-10-14, an RTX 4090 workstation (32 cores, load 30-60), the service capped at 4 CPUs: 2.08 with the realtime service's clock flat out (RCB_SLOWDOWN = 0.01, 11 episodes, 13.3 s of robot time), 2.6-2.7 for the bare physics; S = ceil(1.5 / 2.08) = 1. At S = 1 a controller at the control rate with a camera image every 0.25 s ran 11 episodes with no stall (largest lag 0.23 s), and an EGL frame takes 5 ms (an OSMesa one 1.3 s)) |
 | Service | the realtime layer of HumanoidBench, BiGym 2.0 and RoboOlympics (`rcb_realtime.py`, `rcb_service.py`, unchanged) with `server.py`, which implements `rcb_service.Sim` on `rcb_myosuite.Session` (the standard twin's scene, action and success rule); cameras `topview`, `default`, `close_up`, `hand_top`, `hand_bottom`, `hand_side_inter`, `hand_side_exter`, `plam_lookat` (640 x 480, EGL on the GPU) |
 | Resources | 4 CPUs and a GPU for rendering (the physics is on the CPU) |
-| Reset budget | 10 (`RCB_RESET_BUDGET`, compose default; PROTOCOL §4b): `POST /reset` starts a new episode from the frozen instance, paused; only the last episode is graded, a success ends the trial; results under another budget or slowdown are reported separately |
+| Reset budget | 10 (`RCB_RESET_BUDGET`, compose default; PROTOCOL §2): `POST /reset` starts a new episode from the frozen instance, paused; only the last episode is graded, a success ends the trial; results under another budget or slowdown are reported separately |
 
 ### Provenance
 The frozen instance (`environment/sim/instance.npz`) and its scene facts were made at generation time; the realtime

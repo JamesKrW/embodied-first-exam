@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `golf_putt` / seed 0 |
 | Oracle | `full` — Reference for the G1's own Dex3-1 right hand at the device's torques (the putter's grip across the palm, held by the closed fingers and thumb; no weld): a one-armed pendulum putt by the wrist's roll joint with the wrist's yaw held at zero, the arm's kinematics reading where the club is in the hand; holed at 18.0 s of the 30 s limit (one hand: with the club soled behind the ball, inverse kinematics from 40 starts finds no collision-free posture with both hands on the grip, the misses 5 cm and more or the arms through the trunk), one 12 ms contact of the head; the same state hash twice; holed again with the swing 2 % faster and with the ball 2 mm towards the heel or the toe (3 of 5 perturbations; a face closed 0.5 degree more or a take-back 0.02 rad longer stops 6-10 cm short). At the start the hanging club turns 0.7 degree in the hand in 3 s. Negatives: nop (time), the hand opened (the putter left the hand), injected rolls too soft, too hard, over the edge, past the hole, at rest on the lip, off the green, a push, a double hit then a second stroke, a ball thrown at the shaft, a kick, astride the line, a fall; stimp 10 measured. Stress: random arm targets with the club in the hand end on the anchoring rule at 0.34 s, the club at most 7.4 mm into anything. The privileged twin's reference rows (1799 control steps, success after 17.99 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

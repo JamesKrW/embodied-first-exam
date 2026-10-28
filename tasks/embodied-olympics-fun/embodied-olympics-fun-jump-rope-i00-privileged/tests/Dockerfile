@@ -1,4 +1,4 @@
-# Separate verifier sandbox (PROTOCOL §2.6): the same simulator image with the verifier's own copies of the tooling, the
+# Separate verifier sandbox (PROTOCOL H.1): the same simulator image with the verifier's own copies of the tooling, the
 # world package, the family's rules and the frozen instance (the grader, the tooling and the world package's core from
 # the files-only image images/embodied-olympics-fun-files/). Nothing the agent did in its container reaches this one:
 # Harbor uploads only /app/output/.

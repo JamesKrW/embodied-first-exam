@@ -8,7 +8,7 @@
 | Simulator / robot | `behavior` / `r1pro` |
 | Family / instance | `picking_up_trash` / seed 301 |
 | Oracle | `partial` — solution/ streams the privileged oracle's joint targets (oracle_qpos.npy, 5115 rows) through the client. Recorded Harbor oracle runs: 3 of 3 scored 1 on an RTX 4090 workstation (job v22-oracle-picking-up-trash-1741, best behavior-picking-up-trash-i00-li__eg8GdNj) on the dev branch 9eb18edf version of this task (rcb-limited/2.2, no crash recovery); 2026-09-25 behavior-picking-up-trash-i00-li__fyYUXt4 (laptop, an older version) scored 1 with live_matches_replay 1. The sim service, collect hook, grader and oracle client changed since (crash recovery); not re-run on this version (static validation only). Measured 2026-10-10 on main 332bf8080 (a cloud L40S host): scored 1 (5114 control steps; live, both replays and deterministic 1) once the oracle waited long enough for the service (the simulator took 620-682 s to start on those hosts, longer than the client's 600 s default wait at the time, which gave two 0-step runs; the default is 3600 s since). |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:behavior-0.1.2` |
 
 ## Task
@@ -31,7 +31,7 @@ when it is missing) and never decides anything. `infra_error` = 1 (no verdict on
 missing, unreadable or not finalized, the service never ended the episode, it gave up after crashes not all inside the
 agent's calls, or the frozen start did not rebuild (`instance_mismatch`).
 
-Oracle `partial`: the reference solution scored 1 on earlier versions of this task (`task.toml` `oracle_evidence`) and was not re-run on this one; the family is reviewed by a maintainer (PROTOCOL §2.7) in the pull request that adds it.
+Oracle `partial`: the reference solution scored 1 on earlier versions of this task (`task.toml` `oracle_evidence`) and was not re-run on this one; the family is reviewed by a maintainer (PROTOCOL §4) in the pull request that adds it.
 
 ## Resources
 Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.

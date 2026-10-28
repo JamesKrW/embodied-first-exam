@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `volleyball_serve` / seed 0 |
 | Oracle | `full` — Reference: a tiny toss off the open left palm by the arm's own movement (no pin, no launch), then the same arm swings up with the trunk's turn and strikes the ball about 0.1 s after the toss with the upper arm and forearm (Rule 12.4.1 allows any part of the arm). Key times, arm keys and trunk lean come from CMA-ES, any arm more than 3 mm into the body rejected. The ball comes in at 0.66 m/s and leaves at 13.6 m/s; it lands 14.2 m ahead (4.7 m beyond the net), 3.8 m right of the middle; success after 1.61 s; live, replay and the state hash agree. The deepest self-overlap is 3.0 mm (the right wrist on the right hip at 0.11 s). 4 of 4 perturbations succeed (servo gains x0.97 / x1.03, the keys after the strike 10 ms earlier / later). The privileged twin's reference rows (161 control steps, success after 1.61 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

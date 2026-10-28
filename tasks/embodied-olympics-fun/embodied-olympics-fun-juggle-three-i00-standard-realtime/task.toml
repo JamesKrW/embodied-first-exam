@@ -30,7 +30,6 @@ robot = "unitree-g1"
 family = "juggle_three"
 category = "throwing-catching-striking"
 dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
-slowdown = 1                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RCB_SLOWDOWN's default
 protocol = "eai-standard/2.3"
 instance_seed = 0
 expert_time_estimate_hours = 20.0

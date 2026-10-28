@@ -7,8 +7,8 @@
 | Twin | `roboarc-buzz-wire-3d-05-i01-privileged` |
 | Simulator / robot | `roboarc` / `franka-robotiq-2f85` |
 | Family / instance | `buzz_wire_3d` / seed 0 |
-| Oracle | `none` — No oracle; human review in PR #N (PROTOCOL §4). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. |
-| Agent time budget | 10800 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — No oracle; human review in the pull request that adds the task (PROTOCOL §4). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. |
+| Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` |
 
 ## Task
@@ -23,7 +23,7 @@ the privileged task to measure the cost of losing resets, privileged state and t
 Same scene, instance and success rule as `roboarc-buzz-wire-3d-05-i01-privileged` (see its Difficulty). In standard mode the agent loses resets, privileged state and planning primitives: it sees camera images and proprioception only, acts through the client, and gets one episode, so it has to estimate the scene from images and recover from its own mistakes without starting over.
 
 ## Reference solution
-No oracle; human review in PR #N (PROTOCOL §2.7). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. `oracle = "none"`: there is no `solution/`, and Harbor checks the nop agent only.
+No oracle; human review in the pull request that adds the task (PROTOCOL §4). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. `oracle = "none"`: there is no `solution/`, and Harbor checks the nop agent only.
 
 ## Verification
 See `tests/grade.py`.

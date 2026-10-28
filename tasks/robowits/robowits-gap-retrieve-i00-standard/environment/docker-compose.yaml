@@ -24,7 +24,7 @@ services:
       - ${RCB_ROBOWITS_BLENDERKIT:?set RCB_ROBOWITS_BLENDERKIT to your BlenderKit model folder (images/robowits/NOTICE)}:/opt/robowits/assets/blender_kit:ro
     working_dir: /tmp
     command: sh /srv/run.sh
-    restart: on-failure:6          # N >= 3 (PROTOCOL §4.1); a resume continues the episode
+    restart: on-failure:6          # N >= 3 (docs/protocol/standard_mode.md); a resume continues the episode
     environment:
       RCB_TASK: gap_retrieve
       RCB_INSTANCE: /srv/instance.json

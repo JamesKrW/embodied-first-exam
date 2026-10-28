@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
 | Family / instance | `bicycle_pump_stroke` / seed 0 |
 | Oracle | `full` — solution/ replays the validated Sharpa Wave episode on the Marvin right arm (4,299 controls, success after 4,149: hose head pushed onto the valve and locked at control 306, 28 counted strokes to 210.64 kPa, lock opened and head pulled off at control 4,083, released hold); the standard oracle submits the same rows as float64 through the public client. Two fresh-process replays succeed with identical state hashes, and the rows rounded to float32 also succeed. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task

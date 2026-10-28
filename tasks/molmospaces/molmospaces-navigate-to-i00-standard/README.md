@@ -8,7 +8,7 @@
 | Simulator / robot | `molmospaces` / `rainbow-rby1` |
 | Family / instance | `navigate-to` / seed 0 |
 | Oracle | `none` — no reference solution (MolmoSpaces' planners and grasp files are not shipped); positive example graded 1 by the separate verifier: molmospaces-navigate-to-i00-priv__YWMd22o (run codex-gpt6_1_sol-high, batch molmo-v2-sol-rby1, 2026-10-16); human review in PR #276 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:molmospaces-0.2.5` |
 
 ## Task
@@ -34,7 +34,7 @@ follows upstream's evaluation: one upstream `Task.step` per executed row; it end
 when it builds the scene, before the agent is served. `replay.mp4` is rendered by one video-only pass from
 `trajectory.npz` after the verdict, which it never changes. `infra_error = 1` (no verdict on the agent): no, an
 unreadable or an unfinished `final.json`, a service that gave up after crashes between calls or never ended the
-episode, a frozen start the image no longer builds (`instance_mismatch`). No oracle; human review in PR #276 (PROTOCOL §2.7: per family, this task
+episode, a frozen start the image no longer builds (`instance_mismatch`). No oracle; human review in PR #276 (PROTOCOL §4: per family, this task
 and its twin, a positive example and the `nop` result).
 
 ## Resources

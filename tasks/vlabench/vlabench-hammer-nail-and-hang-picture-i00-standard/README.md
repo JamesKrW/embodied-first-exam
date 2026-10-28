@@ -8,7 +8,7 @@
 | Simulator / robot | `vlabench` / `franka-panda` |
 | Family / instance | `vlabench/hammer_nail_and_hang_picture` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:vlabench-0.2.0` |
 
 ## Task
@@ -52,6 +52,6 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | | |
 |---|---|
 | Actions | `joint_position` (9, float64): absolute targets for the 7 arm joints (rad) and the 2 fingers (m), 0.1 s per control step |
-| Episode cap | 9000 control steps (900 s of robot time; `spec.max_control_steps`, PROTOCOL §4.5 MAY) |
+| Episode cap | 9000 control steps (900 s of robot time; `spec.max_control_steps`, docs/protocol/standard_mode.md) |
 | Resources | 4 CPUs, no GPU (CPU physics, OSMesa rendering) |
 | Instruction | restated; VLABench's own: "Please hang the 本所立川 on the wall safely and steadily." (graded (HangPictureTask): the nail's joint in [0.05, 0.08] (joint_in_range) and, at some step, the painting's grasp keypoint within 0.05 m of the nail's; upstream does not mention the nail) |

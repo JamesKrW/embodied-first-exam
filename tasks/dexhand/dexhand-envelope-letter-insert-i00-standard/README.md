@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
 | Family / instance | `envelope_letter_insert` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz: Sharpa Wave rows on the Marvin right arm (2,446 rows; success after 2,346 controls, 100 hold rows of slack), float32-exact. Authored closed loop on the wave-2 wrist stage and followed with the arm by IK; two fresh-process replays give identical state hashes; no arm, stand or parked-hand contact with the task objects. No Wuji Hand 2.2 reference for the arm rig. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task

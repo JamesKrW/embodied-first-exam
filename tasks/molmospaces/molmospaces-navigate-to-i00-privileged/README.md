@@ -8,7 +8,7 @@
 | Simulator / robot | `molmospaces` / `rainbow-rby1` |
 | Family / instance | `navigate-to` / seed 0 |
 | Oracle | `none` — no reference solution (MolmoSpaces' planners and grasp files are not shipped); positive example graded 1 by the separate verifier: molmospaces-navigate-to-i00-priv__YWMd22o (run codex-gpt6_1_sol-high, batch molmo-v2-sol-rby1, 2026-10-16); human review in PR #276 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:molmospaces-0.2.5` |
 
 ## Task
@@ -22,14 +22,14 @@ Drive the mobile base through an unseen multi-room house to an object of a named
 ## Reference solution
 None is shipped. Upstream's scripted experts (`molmo_spaces/policy/solvers`) are reference solutions and are not in the
 image; neither are grasp files nor the public MolmoBot trajectories (agent egress: the model APIs and the package
-registries; the PyPI distribution `molmo-spaces` has those experts, PROTOCOL §2.11).
+registries; the PyPI distribution `molmo-spaces` has those experts, PROTOCOL §5).
 
 ## Verification
 Open-loop replay of `/app/output/trajectory.npz` from `tests/instance.json` in two fresh processes (`tests/grade.py`).
 Each replay is upstream's evaluation loop: one upstream `Task.step` per row until upstream's `is_done()` (the
 benchmark's 100 s horizon = 500 control steps) or the last row, then upstream's `judge_success()`
 on the final state: for the one of the 2 target objects nearest to the robot base (horizontal distance), the horizontal distance from the base to its position (the origin of its body, not its nearest surface) is less than 1.5 m and at least one of its pixels shows in head_camera. Pass iff both replays succeed and end in the same state; `replay.mp4` is rendered after
-the verdict. No oracle; human review in PR #276 (PROTOCOL §2.7: per family, this task and its twin, a
+the verdict. No oracle; human review in PR #276 (PROTOCOL §4: per family, this task and its twin, a
 positive example and the `nop` result).
 
 ## Resources

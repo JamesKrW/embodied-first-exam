@@ -8,7 +8,7 @@
 | Simulator / robot | `robosuite` / `franka-panda` |
 | Family / instance | `libero-max/libero_10/target_relocation` / seed 195 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:libero-max-0.1.1` |
 
 ## Task
@@ -57,5 +57,5 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | | |
 |---|---|
 | Actions | `ee_delta` (7, float64): OSC hand-target delta (1.0 = 0.05 m, 0.5 rad per control step) and gripper |
-| Episode cap | 9000 control steps (450 s of robot time; `spec.max_control_steps`, PROTOCOL §4.5 MAY) |
+| Episode cap | 9000 control steps (450 s of robot time; `spec.max_control_steps`, docs/protocol/standard_mode.md) |
 | Resources | 4 CPUs, no GPU (CPU physics, OSMesa rendering); the collect hook: the verdict at once, then one video pass (up to 5,400 s for the longest episode on a busy host) |

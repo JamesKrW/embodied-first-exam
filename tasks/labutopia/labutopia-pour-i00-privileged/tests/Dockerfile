@@ -1,4 +1,4 @@
-# Separate verifier sandbox (PROTOCOL §2.6): the same image with the verifier's own copies of the tooling and the frozen
+# Separate verifier sandbox (PROTOCOL H.1): the same image with the verifier's own copies of the tooling and the frozen
 # instance. Nothing the agent did in its container reaches this one: Harbor uploads only the declared artifacts.
 # >>> images/labutopia/Dockerfile
 # labutopia: LabUtopia (Rui-li023/LabUtopia @ 8df7278, NeurIPS 2025 Datasets and Benchmarks), a chemistry laboratory

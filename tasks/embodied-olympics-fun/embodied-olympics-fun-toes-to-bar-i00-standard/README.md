@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `toes_to_bar` / seed 0 |
 | Oracle | `full` — Real reference solution (lowcmd rows, limp wrists, a slow strict fold; privileged state): a grid over the fold's angles gives the hips at -2.3 rad with straight knees (with the hips at the joint's limit and the knees bent the thighs meet the trunk 0.07 m short of the bar). Five repetitions in 46.7 s of the 60 s with the G1's own Dex3-1 hands at 1.5 times the device's drive torques (declared; the strict toes-to-bar needs 1.4 times: at 1.3 times a hand lets go in the fifth repetition); no arm or leg into the robot's own body; live, replay and the state hash agree. 6 of 6 variations succeed (servo gains x0.97 / x1.03 at hips -2.3 and -2.2 rad, both hip angles as they are; 46.7 to 51.0 s). The privileged twin's reference rows (4668 control steps, success after 46.68 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

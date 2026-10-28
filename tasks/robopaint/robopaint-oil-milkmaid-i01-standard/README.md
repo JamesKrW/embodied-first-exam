@@ -7,8 +7,8 @@
 | Twin | `robopaint-oil-milkmaid-i01-privileged` |
 | Simulator / robot | `maniskill` / `franka-panda` |
 | Family / instance | `robopaint_oil_milkmaid` / seed 0 |
-| Oracle | `partial` — Reference solution in solution/ (streams the privileged reference's joint targets; the hi-res version of 2026-10-09, README Change Log). The same trajectory scores 1 under the process rules in the verifier (the graders' rcb_brush_strict.py, with which the sim service also scores the live sheet) (2026-10-09): path_mm 23964 of the 71900 mm budget; its strokes are sweeps. Harbor oracle and nop runs: tasks/robopaint/README.md (Oil: the pointed brush). |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `partial` — Reference solution in solution/ (streams the privileged reference's joint targets; tasks/robopaint/README.md, Targets). The same trajectory scores 1 under the process rules in the verifier (the graders' rcb_brush_strict.py, with which the sim service also scores the live sheet) (2026-10-09): path_mm 23964 of the 71900 mm budget; its strokes are sweeps. Harbor oracle and nop runs: tasks/robopaint/README.md (Oil: the pointed brush). |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:robopaint-0.2.0` |
 
 ## Task

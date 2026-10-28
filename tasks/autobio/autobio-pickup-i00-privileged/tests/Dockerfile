@@ -1,4 +1,4 @@
-# Separate verifier sandbox (PROTOCOL §2.6): the same image with the verifier's own copies of the tooling and the frozen
+# Separate verifier sandbox (PROTOCOL H.1): the same image with the verifier's own copies of the tooling and the frozen
 # instance. Nothing the agent did in its container reaches this one: Harbor uploads only the declared artifacts.
 # >>> images/autobio/Dockerfile
 # autobio: AutoBio (autobio-bench/AutoBio @ 0850421, the "preliminary version" of the ICLR 2026 benchmark): a biology

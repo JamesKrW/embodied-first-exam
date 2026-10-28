@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `platform_10m` / seed 0 |
 | Oracle | `full` — Reference: a scripted G1 dive (stand with the arms overhead, a balanced crouch, a 0.37 s lean with soft ankles, a lowcmd push with the hips opened, a straight entry shape), the lean time found by bisection: a half somersault of 167 deg at the first touch, the body line 8.5 deg off vertical when the hips reach the surface, entry 2.29 m out. Referee test: 12 negatives, incl. over- and under-rotation, a topple, a scrape, arms down, legs apart, toes, a twist and a side entry (injected kicks), too far, a step, a hop (double jump). Measured: success after 6.32 s of the 20 s limit, live and in a fresh replay, ending in the same state. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

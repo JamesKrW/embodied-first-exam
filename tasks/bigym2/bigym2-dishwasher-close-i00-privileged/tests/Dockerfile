@@ -1,4 +1,4 @@
-# Separate verifier sandbox (PROTOCOL §2.6): the same simulator image with the verifier's own copies of the tooling and
+# Separate verifier sandbox (PROTOCOL H.1): the same simulator image with the verifier's own copies of the tooling and
 # the frozen instance. Nothing the agent did in its container reaches this one: Harbor uploads only /app/output/.
 FROM ghcr.io/mll-lab-nu/efe:bigym2-0.1.1
 COPY instance.json test.sh /tests/

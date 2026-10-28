@@ -17,7 +17,7 @@ Every image is public: Harbor pulls it.
 
 ## Tasks
 
-The topological families: `roboarc-<family>-<NN>-i01-{privileged,standard}` (PROTOCOL §2.2); the IKEA suite:
+The topological families: `roboarc-<family>-<NN>-i01-{privileged,standard}` (PROTOCOL §1); the IKEA suite:
 `roboarc-ikea-<item>-i00-{privileged,standard}` (one frozen scene per item, `i00`; no tier number; [IKEA suite](#ikea-suite)):
 - `<family>` with dashes (`interlocked-claws`); `[metadata].family` keeps the underscores.
 - `<NN>`: two digits, the base's number in its family. A number is never reused: removing a task leaves a gap. The

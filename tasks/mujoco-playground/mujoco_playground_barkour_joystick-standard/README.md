@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `google-barkour-vb` |
 | Family / instance | `mujoco_playground/BarkourJoystick` / seed 2 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:mujoco-0.1.3` |
 
 ## Task
@@ -19,7 +19,7 @@ the last episode is graded), the robot's own sensors and the cameras that follow
 ## Difficulty
 Same instance and success check as `mujoco_playground_barkour_joystick-privileged`. In standard mode the agent loses free resets, the simulator and
 the world state: it sees camera images and proprioception (joints, IMU, foot contacts), acts in joint position chunks,
-and gets 10 resets (`RCB_RESET_BUDGET`, the compose file's default; PROTOCOL §4.5), so it has to close the loop
+and gets 10 resets (`RCB_RESET_BUDGET`, the compose file's default; PROTOCOL §2), so it has to close the loop
 on the robot's own sensors; only the last episode is graded.
 
 ## Reference solution

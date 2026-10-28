@@ -30,7 +30,7 @@ services:
     # runtime_binding.json and checks it (images/roboarc/stage_instance.py), then runs the command.
     entrypoint: ["sh", "-c", "python /opt/robotangle/stage_instance.py cast-keyhole-05-i01 /tmp/robotangle-instance --binding /srv/runtime_binding.json && exec \"$$@\"", "stage"]
     command: sh /srv/run.sh
-    restart: on-failure:6          # N >= 3 (PROTOCOL §4.1); a resume continues the episode
+    restart: on-failure:6          # N >= 3 (docs/protocol/standard_mode.md); a resume continues the episode
     environment:
       NPY_DISABLE_CPU_FEATURES: AVX512F,AVX512CD,AVX512_SKX,AVX512_CLX,AVX512_CNL,AVX512_ICL,AVX512_SPR
       OPENBLAS_CORETYPE: Haswell

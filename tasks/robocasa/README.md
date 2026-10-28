@@ -38,7 +38,7 @@ Not included (82):
 - **Actions.** The robot's native composite-controller command, one per control step (20 Hz), in both modes: 12
   channels, arm end-effector deltas (OSC, base frame), grip, base velocities, torso and the hybrid-mode switch
   (`casa_tool.action_spec`). This is the controller the demonstrations were recorded with. In standard mode the type is
-  `ee_delta`; a `joint_position` type is not offered (PROTOCOL §4.4 SHOULD): the arm's demonstrations, and so the
+  `ee_delta`; a `joint_position` type is not offered (docs/protocol/standard_mode.md): the arm's demonstrations, and so the
   references, are OSC commands. Scales (robosuite 1.5.1 `default_pandaomron.json`, `omron_mobile_base.xml`): arm 1.0 =
   5 cm / 0.5 rad per step; base 1.0 = a target velocity of 1 m/s (`base_x`, `base_y`) or 1.5 rad/s (`base_yaw`),
   force-limited velocity servos; torso a delta joint-position command, 1.0 = height target 5 cm above the current
@@ -66,7 +66,7 @@ Not included (82):
   target point to give. Camera images (RGB and depth, in both modes and in replay videos) draw the visual meshes only,
   as robosuite's own cameras do; the collision geoms (geom group 0) are hidden.
 
-## Standard-mode service (`images/robocasa/standard/server_casa.py`)
+## Standard-mode service (`embodied_first_exam/benchmarks/robocasa/sim/server_casa.py`)
 Derived from `images/mujoco/limited/server_mj.py` (via MetaWorld+'s `server_mw.py`) and identical in protocol and
 lifecycle: four endpoints, RCB1, no reset, journal + per-call checkpoints with at most two resumes, startup watchdog,
 SIGUSR1 collect hook, `/data` evidence, verdict before video. Differences (items 6, 7 and 11: the grading):
@@ -113,7 +113,7 @@ SIGUSR1 collect hook, `/data` evidence, verdict before video. Differences (items
 8. **Request validation.** A request is checked as a whole before any physics (`parse_submit` / `parse_observe`):
    a `dt`, `seconds` or `video_fps` that is not a finite number in range, `cameras` that is not a list of names,
    a `note` that is not a string, actions that are not a `(T, N)` array of finite numbers are a 400 and nothing ran
-   (PROTOCOL §4.6); `null` means "not given". Only an error while the simulator executes is a 500 and ends the
+   (PROTOCOL §4); `null` means "not given". Only an error while the simulator executes is a 500 and ends the
    episode. Kept as it was: camera names the robot does not have are ignored, and an unknown `video` value means
    "last frame only". `dt = 0` is a 400.
 9. `time_left_s` counts from the agent's first request to the service (any endpoint; logged as `first_request` in

@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `kuka-iiwa14-sharpa-ha4` |
 | Family / instance | `dextoolbench/brush/blue_brush/sweep_forward` / seed 0 |
 | Oracle | `partial` — SimToolReal's pretrained policy, replayed in this scene, reaches 8/34 goals (solution/; README of dextoolbench_brush_blue_brush_sweep_forward-privileged) |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:mujoco-0.1.2` |
 
 ## Task

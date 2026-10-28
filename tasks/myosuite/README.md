@@ -167,7 +167,7 @@ locomotion challenges and by hand_pose); elbow and finger pose / reach (near-dup
 - **none (the other nineteen):** no reference was validated. The wheel has NPG baselines for pen_twirl, hand_pose and
   hand_reach too, but the pilot found none that succeeds from the frozen instance under the 1 s hold (they predate
   MyoSuite's current models); the MyoChallenge and Reorient8 envs have no NPG baseline. Solvability rests on successful
-  model trials (human review, PROTOCOL §2.7, table below).
+  model trials (human review, PROTOCOL §4, table below).
 
 ## Integrity
 - The baselines are removed from the image in the same layer that installs MyoSuite (no layer of `ghcr.io/mll-lab-nu/efe:myosuite-0.1.1` holds

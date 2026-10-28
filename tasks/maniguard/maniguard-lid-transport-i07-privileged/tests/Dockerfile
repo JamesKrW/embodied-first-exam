@@ -138,7 +138,7 @@ RUN sed -i -e '/ jammy-security /s|http://snapshot.ubuntu.com/ubuntu/20261001T00
     echo "15a39563d491def84446c8a5304e873a6b6509d56e2b54edce8eea154e1290a0  /etc/apt/sources.list" | sha256sum -c -
 WORKDIR /app
 # <<< images/maniguard/Dockerfile
-# Separate verifier sandbox (PROTOCOL §2.6): the same simulator image with the verifier's own copies of the tooling and the
+# Separate verifier sandbox (PROTOCOL H.1): the same simulator image with the verifier's own copies of the tooling and the
 # frozen instance baked in. Nothing the agent did in its container reaches this one: Harbor uploads only the declared
 # artifacts (/app/output/), so a patched monitor, goal check or interpreter in the agent container cannot change the verdict.
 FROM maniguard-base

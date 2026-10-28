@@ -8,7 +8,7 @@
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
 | Family / instance | `robocasa365/TurnOnToasterOven` / seed 0 |
 | Oracle | `none` — the privileged reference planned from step 0 through this service at S = 2 succeeds live and in the fresh replay, deterministic, no stall (2026-10-14); human review in PR #205 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Real time | slowdown S = 2 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0` |
 
@@ -42,6 +42,6 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|
 | Slowdown | S = 2 (`RCB_SLOWDOWN`'s default): measured RTF 1.27-1.29 (2026-10-14, an RTX 4090 workstation (32 cores, load 35-45), the service capped at 4 CPUs: 1.29 with the realtime service's clock flat out (RCB_SLOWDOWN = 0.01, 3 episodes of 600 control steps), 1.27 for the bare physics holding still; S = ceil(1.5 / 1.29) = 2) |
 | Episode | at most 3000 control steps (150 s of robot time; the privileged deliverable's cap); ends at the first success |
-| Reset budget | 10 (`RCB_RESET_BUDGET`; PROTOCOL §4b); a reset rebuilds the scene (about 20 s) |
+| Reset budget | 10 (`RCB_RESET_BUDGET`; PROTOCOL §2); a reset rebuilds the scene (about 20 s) |
 | Action type | `joint_position` (13 channels, `control_dt` 0.05 s) |
 | Cameras | `robot0_agentview_center`, `robot0_agentview_left`, `robot0_agentview_right`, `robot0_eye_in_hand` (robot-mounted; poses in the proprioception) |

@@ -7,8 +7,8 @@
 | Twin | `robopaint-caoshu-nangong-i00-standard` |
 | Simulator / robot | `maniskill` / `franka-panda` |
 | Family / instance | `robopaint_caoshu_nangong` / seed 0 |
-| Oracle | `partial` — Reference solution in solution/ (a new family, generated on 2026-10-09 with the current tooling): the generator's self-test replayed it on the graders' copy and through the scoring service (equal metrics, success); under the process rules the verifier scores it 1 (tests/grade.py with rcb_brush_strict.py, two fresh replays): path_mm 890 and mark_width_mm 3.11, against the colouring-in limits 2680 mm and 0.93 mm. Harbor oracle and nop runs: tasks/robopaint/README.md (Caoshu). |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `partial` — Reference solution in solution/ (generated with the current tooling): the generator's self-test replayed it on the graders' copy and through the scoring service (equal metrics, success); under the process rules the verifier scores it 1 (tests/grade.py with rcb_brush_strict.py, two fresh replays): path_mm 890 and mark_width_mm 3.11, against the colouring-in limits 2680 mm and 0.93 mm. Harbor oracle and nop runs: tasks/robopaint/README.md (Caoshu). |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:robopaint-0.2.0` |
 
 ## Task

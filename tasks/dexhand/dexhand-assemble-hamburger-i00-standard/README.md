@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `sharpa-wave-floating` |
 | Family / instance | `assemble_hamburger` / seed 0 |
 | Oracle | `full` — solution/ replays the validated Sharpa Wave authoring trajectory (privileged: 6,090 controls, success after 5,794; standard: the recorded 5,793-control public-client episode). Both pass two fresh-process replays with identical state hashes. solution/wuji/trajectory.npz is a validated Wuji Hand 2.2 trajectory of this instance (5,847 controls, motor targets only, physical contact only); the oracle uses it when the run selects wuji (privileged: DEXHAND_HAND=wuji; standard: the sim service's hand), and it replays to success in two fresh processes with identical state hashes. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task

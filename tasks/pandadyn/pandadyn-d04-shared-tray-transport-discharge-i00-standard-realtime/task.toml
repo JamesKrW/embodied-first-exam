@@ -28,7 +28,6 @@ simulator = "maniskill"
 robot = "franka-panda-bimanual"
 family = "d04_shared_tray_transport_discharge"
 dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
-slowdown = 4                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RCB_SLOWDOWN's default
 protocol = "eai-standard/2.3"
 oracle = "full"
 instance_seed = 1

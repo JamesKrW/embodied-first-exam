@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `springboard_3m` / seed 0 |
 | Oracle | `full` — Reference: a scripted dive (ankle-strategy balance on the bent board while the arms rise, a balanced crouch, a 0.27 s lean, a push that depresses the board 0.18 m), the lean time found by bisection: 170 deg at the first touch, 5.3 deg at the hips, entry 1.44 m out. The board has a tip stiffness of 5449 N/m (built for a published 5446) and a first mode of 3.93 Hz (sqrt(k/m_eff) 3.94). Referee test negatives as in platform-10m plus a double bounce; nop topples off at 18.5 s (a fall). The privileged twin's reference rows (567 control steps, success after 5.67 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

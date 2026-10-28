@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
 | Family / instance | `jar_lid_open` / seed 0 |
 | Oracle | `full` — solution/ replays the validated Sharpa Wave episode on the Marvin right arm (1,159 controls, success after 1,009); it passes two fresh-process replays with identical state hashes, float32 rounding, and the Harbor oracle in both modes (standard: the same rows submitted through the public client). solution/wuji/trajectory.npz is a validated Wuji Hand 2.2 trajectory of this instance (1,242 controls, motor targets only, physical contact only); the oracle uses it when the run selects wuji (privileged: DEXHAND_HAND=wuji; standard: the sim service's hand), and it replays to success in two fresh processes with identical state hashes. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task

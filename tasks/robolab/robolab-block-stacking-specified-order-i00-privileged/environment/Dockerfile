@@ -59,7 +59,7 @@ WORKDIR /app
 # Everything task-specific is copied here.
 FROM robolab-base
 # RoboLab's repository ships one recorded episode (examples/recorded_data/RubiksCubeAndBananaTask: the actions of a successful
-# run, replayed by examples/run_recorded.py): a solution of one of these tasks within the agent's reach (PROTOCOL §2.7).
+# run, replayed by examples/run_recorded.py): a solution of one of these tasks within the agent's reach (PROTOCOL H.2).
 # Nothing at run time reads it (only that example script does); the agent's image does not keep it.
 RUN rm -rf /opt/robolab/examples/recorded_data
 COPY instance.json /app/instance.json

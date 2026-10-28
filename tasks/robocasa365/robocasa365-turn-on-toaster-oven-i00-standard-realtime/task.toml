@@ -28,7 +28,6 @@ simulator = "robosuite"
 robot = "franka-panda-omron"
 family = "robocasa365/TurnOnToasterOven"
 dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
-slowdown = 2                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RCB_SLOWDOWN's default
 protocol = "eai-standard/2.3"
 oracle = "none"
 oracle_evidence = "the privileged reference planned from step 0 through this service at S = 2 succeeds live and in the fresh replay, deterministic, no stall (2026-10-14); human review in PR #205"

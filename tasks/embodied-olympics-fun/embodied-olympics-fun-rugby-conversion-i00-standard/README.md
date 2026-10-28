@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `rugby_conversion` / seed 0 |
 | Oracle | `full` — Reference, on Unitree's actuator data (rotor inertia, joint friction): a standing power kick through lowcmd, the hip and knee bursts at the G1's 88 / 139 N m; the wind-up pose, hip roll, crouch, ankle, knee-burst start, waist torque and wind-up length from CMA-ES, with a penalty for any arm passing into the robot's own body. The foot meets the ball above the rigid tee at 3.18 s and sends it through the goal plane at 5.66 m (the bar is at 3.0 m), 0.44 m right of the middle; success after 4.05 s. All 8 perturbations score (servo gains x0.97 / x1.03, the kick 10 ms earlier / later, the tee 1 cm nearer, farther, left, right; the ball crosses at 5.3-5.7 m). The deepest self-overlap is 1.2 mm (trunk and shoulder). The robot falls after the kick, which is allowed (Law 8 judges the ball). The privileged twin's reference rows (405 control steps, success after 4.05 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

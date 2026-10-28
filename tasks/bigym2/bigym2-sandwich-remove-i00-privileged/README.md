@@ -8,7 +8,7 @@
 | Simulator / robot | `bigym2` / `unitree-g1-dex1` |
 | Family / instance | `sandwich-remove` / seed 0 |
 | Oracle | `none` — no reference solution (BiGym 2.0 ships no expert or planner; its demonstrations and its agents' programs stay off the agent's network); no positive example yet; human review in PR #123 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:bigym2-0.1.1` |
 
 ## Task
@@ -25,7 +25,7 @@ on the Hugging Face Hub and never reach the agent (no network but the model APIs
 `tests/grade.py` replays `/app/output/trajectory.npz` from the frozen instance in two fresh processes (`rcb_bigym2.py
 replay`: upstream's official env, one step per row until upstream ends the episode). Pass iff upstream's `is_success`
 holds in both (the task's success held for 1 s, no fall) and both end in the same state. Success condition: the sandwich lies flat (either face up, within 10 degrees of level) touching the chopping board.
-A finger of either gripper touching the sandwich ends the episode as a failure: move it with the spatula. No oracle; human review in PR #123 (PROTOCOL §2.7).
+A finger of either gripper touching the sandwich ends the episode as a failure: move it with the spatula. No oracle; human review in PR #123 (PROTOCOL §4).
 
 ## Resources
 Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.

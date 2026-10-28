@@ -8,7 +8,7 @@
 | Simulator / robot | `robowits` / `marvin-bimanual` |
 | Family / instance | `raise_platform` / seed 0 |
 | Oracle | `none` — No reference solution: RoboWits ships no expert or planner for its seed tasks. Solvable: model trial robowits-raise-platform-i00__uqturjE (robowits-lunaxh-0925-2042, privileged) graded success=1, deterministic=1 by the separate verifier; nop scored 0. These records are from earlier versions of the task (before protocol v1.0, on the same frozen instance and predicate); not re-run on this version (static validation only, 2026-10-01). Human review per family (protocol §4). Re-graded with the 2026-10-14 grader (two AMD workstations; the earlier positives were graded on the Intel laptop, so a trajectory that fails the earlier grader on AMD too says nothing either way): the cited robowits-raise-platform-i00__uqturjE passes the 2026-10-14 grader. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:robowits-0.1.1` |
 
 ## Task
@@ -35,7 +35,7 @@ agent's 0), plus `/logs/verifier/replay.mp4`. What the predicate checks, in word
 Genesis' CPU backend restores the frozen snapshot exactly, so in-process repeats and fresh processes agree bit for bit
 on one CPU vendor (tasks/robowits/README.md).
 
-No oracle; human review in PR #3 (PROTOCOL §2.7): the positive example, the `nop` result and the predicate
+No oracle; human review in PR #3 (PROTOCOL §4): the positive example, the `nop` result and the predicate
 summary are in the PR's review table.
 
 ## Resources

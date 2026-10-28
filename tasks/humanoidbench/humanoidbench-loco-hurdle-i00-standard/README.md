@@ -8,7 +8,7 @@
 | Simulator / robot | `humanoidbench` / `unitree-h1` |
 | Family / instance | `hurdle` / seed 0 |
 | Oracle | `none` — no rollout of this instance; published RL passes the bar (FastTD3 887 / 700); human review in PR #9 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:humanoidbench-0.2.0` |
 
 ## Task
@@ -28,7 +28,7 @@ simulator of its own, and 50 resets instead of unlimited ones: every try is a re
 
 ## Reference solution
 None. Requiring one would cap the benchmark at what we can already solve, which systematically removes the
-interesting tasks. What replaces it (docs/protocol/README.md §2.7): the floor above (doing nothing cannot
+interesting tasks. What replaces it (docs/protocol/README.md §4): the floor above (doing nothing cannot
 pass), the evidence that the task has a solution (`oracle_evidence` in task.toml), and a human reviewer.
 
 ## Verification

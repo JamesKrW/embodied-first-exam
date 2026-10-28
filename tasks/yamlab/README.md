@@ -80,7 +80,7 @@ The stage flags of YAMLab's task managers (`yamlab/envs/tasks/*_manager.py`) wit
   top (YAMLab's `<object>_below_table` termination). Stages require held conditions (8 or 30 control steps), so a
   momentary pose does not count. The instructions give every number (privileged: also the world heights).
 
-## Oracle (PROTOCOL §2.7)
+## Oracle (PROTOCOL §4)
 `oracle = "full"`, every instance in both modes. The reference solution is YAMLab's own human demonstration of that instance: a
 30-step (1 s) linear move from the home pose to the demonstration's first action, then its recorded 14-D actions, replayed
 open-loop. YAMLab's own replay tool restores the recorded *states* frame by frame; here only the actions are replayed, and

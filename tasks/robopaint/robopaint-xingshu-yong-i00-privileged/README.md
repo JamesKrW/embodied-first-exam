@@ -7,8 +7,8 @@
 | Twin | `robopaint-xingshu-yong-i00-standard` |
 | Simulator / robot | `maniskill` / `franka-panda` |
 | Family / instance | `robopaint_xingshu_yong` / seed 0 |
-| Oracle | `partial` — Reference solution in solution/, re-made on 2026-10-09 by the calligraphy planner (README, Reference solution and Change Log; tasks/robopaint/README.md, Targets). The verifier scores it 1 under the process rules (tests/grade.py with rcb_brush_strict.py, two fresh replays): path_mm 726 and mark_width_mm 5.14, against the colouring-in limits 1450 mm and 2.25 mm. Harbor oracle 1 and nop 0 on both modes of this pair on its current files (2026-10-09): tasks/robopaint/README.md (Validation). |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `partial` — Reference solution in solution/, made by the calligraphy planner (README, Reference solution; tasks/robopaint/README.md, Targets). The verifier scores it 1 under the process rules (tests/grade.py with rcb_brush_strict.py, two fresh replays): path_mm 726 and mark_width_mm 5.14, against the colouring-in limits 1450 mm and 2.25 mm. Harbor oracle 1 and nop 0 on both modes of this pair on its current files (2026-10-09): tasks/robopaint/README.md (Validation). |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:robopaint-0.2.0` |
 
 ## Task
@@ -39,7 +39,7 @@ position-controlled arm (PD lag ~0.1 s). The tooling gives only thin primitives;
 `s.brush_state()` are privileged feedback. The stroke cap rules out filling the exemplar with many thin strokes.
 
 ## Reference solution
-Generated on the graders' copy (the calligraphy planner of 2026-10-09): per
+Generated on the graders' copy (the calligraphy planner): per
 brush contact (connected strokes of the exemplar, several regions of its ink each), a robot-free trajectory optimisation against
 the brush model: handle control points (x, y, press) about every 6 mm along a path through the contact's ink (several paths
 tried, the best kept; one of them follows each region's ink branch by branch, rings round and side branches out and back),

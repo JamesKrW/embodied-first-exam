@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
 | Family / instance | `usb_plug_insert` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz replays the validated Sharpa Wave episode on the Marvin right arm (1,595 controls; success after 1,475, then 120 unexecuted hold rows of slack): pinch and lift as in the floating-stage episode, a planned joint-space change of the arm's IK branch while the plug is carried, closed-loop alignment in front of the desk edge, insertion into port 4, release and a 1 s released hold. Two fresh-process replays succeed with identical state hashes, and the rows rounded to float32 also succeed. The standard oracle submits the same rows through the public client. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task

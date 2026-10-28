@@ -8,7 +8,7 @@
 | Simulator / robot | `behavior` / `r1pro` |
 | Family / instance | `putting_shoes_on_rack` / seed 301 |
 | Oracle | `partial` — Reference solution solution/oracle_putting_shoes_on_rack.py on the frozen task-level primitives solution/rcb_behavior_ref.py. Recorded Harbor oracle run (laptop, a pre-v1.0 uncommitted tree): 2026-09-24 behavior-putting-shoes-on-rack-i__LkouR9y (job behavior-putting-shoes-on-rack-i00-oracle-0924-234514) scored 1 (6283 control steps, deterministic 1, instance_exact 1), 1 of 1. Model trial behavior-putting-shoes-on-rack-i__KozJnde (behavior-lunaxh-0925-2057) scored 1. The tooling and verifier files changed since; not re-run on this version (static validation only). Measured 2026-10-10 on main 332bf8080 (an 8-vCPU cloud L40S host, Harbor oracle agent, once): the reference solution's own run ended without success (q_score 0.8, 8921 control steps against the recorded 6283); the frozen scene rebuilt there within tolerance but not bit-exactly (instance_exact 0), so the solution's online planning took another path: this reference solution does not succeed on that host class. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:behavior-0.1.2` |
 
 ## Task
@@ -28,7 +28,7 @@ starts from the loaded state, no reset); an in-process reset is only approximate
 grader cannot read or with the wrong shape is `bad_trajectory`; a replay that dies or runs out of time, and a frozen
 instance that does not rebuild in the verifier (`instance_ok` 0), are `grader_error` + `infra_error` (no verdict on the agent).
 
-Oracle `partial`: the reference solution scored 1 on earlier versions of this task (`task.toml` `oracle_evidence`) and was not re-run on this one; the family is reviewed by a maintainer (PROTOCOL §2.7) in the pull request that adds it.
+Oracle `partial`: the reference solution scored 1 on earlier versions of this task (`task.toml` `oracle_evidence`) and was not re-run on this one; the family is reviewed by a maintainer (PROTOCOL §4) in the pull request that adds it.
 
 ## Resources
 Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.

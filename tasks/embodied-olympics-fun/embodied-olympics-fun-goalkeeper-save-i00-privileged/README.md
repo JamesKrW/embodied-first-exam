@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `goalkeeper_save` / seed 0 |
 | Oracle | `full` — Reference: the H1-2 walks along the goal line into each shot's line (walking policy, closed loop on the pelvis), feet on the line at each kick; three 20 m/s machine shots hit the body and stay out. It learns each machine's real crossing (scatter up to 0.4 m) and side offsets over privileged resets (2-6 attempts); 10 of 10 perturbations (aims, speeds 19 and 21 m/s, kick time) succeed. Measured: success after 26.7 s of the 27 s limit, live and in a fresh replay, ending in the same state. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

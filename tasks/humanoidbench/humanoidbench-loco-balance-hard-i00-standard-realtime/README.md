@@ -8,12 +8,12 @@
 | Simulator / robot | `humanoidbench` / `unitree-h1` |
 | Family / instance | `balance_hard` / seed 0 |
 | Oracle | `none` — none known: no run has passed it, and published RL reaches 31% of the bar (paper 57, FastTD3 244, bar 800) with upstream's mesh feet on MuJoCo 3.1.6 (box feet since image 0.2.0); human review in PR #83 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 50 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:humanoidbench-0.2.0` |
 
 ## Task
-Standard-realtime mode (robot as a service on a clock that does not stop, `eai-standard/2.3`, PROTOCOL §4b) of
+Standard-realtime mode (robot as a service on a clock that does not stop, `eai-standard/2.3`, PROTOCOL §3) of
 `humanoidbench-loco-balance-hard-i00-privileged`: the same frozen instance and the same success rule as it and
 as `humanoidbench-loco-balance-hard-i00-standard`, but time does not stop. Once an episode's clock starts (its
 first `submit`), the robot runs at 50 Hz in real time and holds its last servo targets while the agent thinks,
@@ -38,7 +38,7 @@ run it in the background, and improve it between episodes from what it observed.
 
 ## Reference solution
 None. Requiring one would cap the benchmark at what we can already solve, which systematically removes the
-interesting tasks. What replaces it (docs/protocol/README.md §2.7): the floor above (doing nothing cannot
+interesting tasks. What replaces it (docs/protocol/README.md §4): the floor above (doing nothing cannot
 pass), the evidence that the task has a solution (`oracle_evidence` in task.toml), and a human reviewer.
 
 ## Verification
@@ -76,6 +76,6 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | mode / sensors | standard-realtime: head-camera RGB + joint angles and velocities (HumanoidBench's own `image` and `proprio` sensors), a pelvis IMU and a camera fixed in the room; no root pose, no board or roller pose, no reward; 50 resets (a new episode from the frozen start each, paused until its first `submit`; only the last episode is graded) |
 | time | the episode's clock starts at its first `submit` (or `get_obs(seconds > 0)`) and runs one control step every 0.02 s of wall time until the episode ends; `submit` writes a plan of future targets (from step `at`) and answers at once; the last target is held when the plan runs out |
 | action space | HumanoidBench's own: 19 normalised position targets, 50 Hz, streamed one row at a time or in chunks of up to 10 s |
-| knobs (compose env) | `RCB_SLOWDOWN` (1: real time, the official configuration; S: one control step every S x 0.02 s, results reported apart from S = 1), `RCB_RESET_BUDGET` (50: HumanoidBench's configuration, an exception to the mode's default of 0, PROTOCOL §4.5), `RCB_OBS_PROPRIO` (1), `RCB_OBS_IMU` (1), `RCB_OBS_ROOM_CAMERA` (1), `RCB_OBS_DEPTH` (0): the defaults are this task's configuration; a run that changes one is reported separately, and `episode.jsonl` records the `/spec` it ran under |
+| knobs (compose env) | `RCB_SLOWDOWN` (1: real time, the official configuration; S: one control step every S x 0.02 s, results reported apart from S = 1), `RCB_RESET_BUDGET` (50: HumanoidBench's configuration, an exception to the mode's default of 0, PROTOCOL §2), `RCB_OBS_PROPRIO` (1), `RCB_OBS_IMU` (1), `RCB_OBS_ROOM_CAMERA` (1), `RCB_OBS_DEPTH` (0): the defaults are this task's configuration; a run that changes one is reported separately, and `episode.jsonl` records the `/spec` it ran under |
 | agent API | `environment/rcb_client.py` (the realtime client; its docstring is the reference); `instruction.md` lists the endpoints |
 | physics vs upstream | upstream's model (HumanoidBench cb11890) on MuJoCo 3.3.7, not the 3.1.6 upstream pins, whose convex collision reported wrong contacts; results on image 0.1.6 or earlier are other physics and are reported apart (tasks/humanoidbench/README.md, Physics). Also fixed here: **box feet**: a mesh foot on a box gets one contact point, which on 3.1.6 reported wrong depths (a robot with every joint locked slid off a stair tread) and on 3.3.7 never comes to rest; each foot is four boxes that follow the mesh's hull, the sole exactly (`images/humanoidbench/box_feet.py`). |

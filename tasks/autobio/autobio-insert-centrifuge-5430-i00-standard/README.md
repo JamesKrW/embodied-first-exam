@@ -8,7 +8,7 @@
 | Simulator / robot | `autobio` / `ur5e-robotiq-2f85` |
 | Family / instance | `insert_centrifuge_5430` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:autobio-0.1.0` |
 
 ## Task

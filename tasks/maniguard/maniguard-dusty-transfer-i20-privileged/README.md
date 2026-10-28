@@ -8,7 +8,7 @@
 | Simulator / robot | `maniguard` / `franka-panda-longfinger` |
 | Family / instance | `dusty_transfer` / seed 20 |
 | Oracle | `none` — No positive example yet (oracle = "none": the 16 ManiGuard tasks added on 2026-10-04 for variety ship without one, user decision). Upstream reference, cited only: ManiGuard's 40 scripted demonstrations of this task, episodes 800-839 of the Hugging Face dataset IDEAS-Lab-Northwestern/datagen-dusty-v1-joint-5cam (revision ac57d863, LeRobot, 30 Hz, CC BY-NC 4.0), recorded by ManiGuard's data generator in a differently built scene; none has been replayed through this verifier and none is copied into the task. The frozen instance (state sha ed90dd164ff74206) was made on an RTX PRO 6000 (2026-10-04); a second fresh load gave the same hash. Human review per task (PROTOCOL §4). |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:maniguard-0.2.1` |
 
 ## Task
@@ -36,7 +36,7 @@ outcome classes, and `/logs/verifier/replay.mp4`. A file that is not a trajector
 more than 50,000 rows) is `bad_trajectory`; `grader_error = 1` (with `infra_error = 1`) means no verdict on the agent (a replay process that died
 or ran out of time, a frozen instance this host did not rebuild).
 
-No oracle; human review in the pull request that adds this task (PROTOCOL §2.7: per task, this task and its twin, a positive example and the `nop` result).
+No oracle; human review in the pull request that adds this task (PROTOCOL §4: per task, this task and its twin, a positive example and the `nop` result).
 
 ## Resources
 Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
@@ -49,7 +49,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: GPU memory and CPU from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack); the verifier 15.8 GB (a per-container memory sampler); the standard twin's sim service, the same simulator, in one trial: anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s)
-- Measured (caps): GPU memory: cap 18 GiB (owner); measured peaks 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling), so a run may exceed it; recorded, enforced only when RCB_LIMITS_ENFORCE=1; processes and disk: defaults, not measured
+- Measured (caps): GPU memory: cap 18 GiB, the benchmark's choice, below the measured peaks of 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling): a trial over it is recorded and fails only when a run sets RCB_LIMITS_ENFORCE=1 (tasks/maniguard/README.md "GPU memory"); processes and disk: defaults, not measured
 
 ## Details
 | | |

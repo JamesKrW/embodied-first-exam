@@ -8,7 +8,7 @@
 | Simulator / robot | `humanoidbench` / `unitree-h1` |
 | Family / instance | `door` / seed 0 |
 | Oracle | `none` — Claude Opus 5.5's privileged-mode trajectory (676.02 / 600 on image 0.1.6, MuJoCo 3.1.6), run `claude_code-claude_opus_5_5-medium` on the results site; it is open-loop, so it does not carry over to image 0.2.0's physics (9.24 / 600 there); human review in PR #9 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:humanoidbench-0.2.0` |
 
 ## Task
@@ -28,7 +28,7 @@ simulator of its own, and 50 resets instead of unlimited ones: every try is a re
 
 ## Reference solution
 None. Requiring one would cap the benchmark at what we can already solve, which systematically removes the
-interesting tasks. What replaces it (docs/protocol/README.md §2.7): the floor above (doing nothing cannot
+interesting tasks. What replaces it (docs/protocol/README.md §4): the floor above (doing nothing cannot
 pass), the evidence that the task has a solution (`oracle_evidence` in task.toml), and a human reviewer.
 
 ## Verification

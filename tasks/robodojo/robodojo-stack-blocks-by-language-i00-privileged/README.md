@@ -8,24 +8,24 @@
 | Simulator / robot | `robodojo` / `arx-x5-bimanual` |
 | Family / instance | `stack_blocks_by_language` / seed 0 |
 | Oracle | `none` — positive example: a model trial solved this task (Codex + GPT-6 Luna, effort xhigh, run `codex-gpt6_luna-xhigh`, 2026-10-10; 1616 actions, graded by this verifier); no reference solution (RoboDojo releases no expert); human review in PR #142 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:robodojo-0.2.1` |
 
 ## Task
 Stack the three coloured cubes into a tower in the bottom-to-top colour order given by the instruction, then return the robot arm(s) to the start pose. (RoboDojo's `stack_blocks_by_language`). RoboDojo capability dimension: Open. Instance i00 is RoboDojo's own evaluation layout
 `arx_x5/0/stack_blocks_by_language_0.json` (sha256 `03aa18bd083b56ac`), frozen in `instance.json`. The deliverable is one replayable trajectory of
 RoboDojo's 14-D joint action at 25 Hz (`/app/output/trajectory.npz`), graded by RoboDojo's own reward check for the task,
-with no step cap (RoboDojo's own evaluation gives a policy 400 actions; PROTOCOL D1).
+with no step cap (RoboDojo's own evaluation gives a policy 400 actions; PROTOCOL §3).
 
 ## Difficulty
-A RoboDojo Open task (rigid (cubes on table) objects), graded by RoboDojo's own success thresholds (its evaluation gives a policy 400 actions; no step cap here, PROTOCOL D1). Privileged mode gives every object's pose and bounding box, the check's code, unlimited resets and
+A RoboDojo Open task (rigid (cubes on table) objects), graded by RoboDojo's own success thresholds (its evaluation gives a policy 400 actions; no step cap here, PROTOCOL §3). Privileged mode gives every object's pose and bounding box, the check's code, unlimited resets and
 self-replay; the helpers are only joint moves, gripper commands and RoboDojo's IK. This mode is the control for the
 standard twin.
 
 ## Reference solution
 None. RoboDojo releases no expert or planner script, and its training demonstrations (Hugging Face
 `RoboDojo-Benchmark/RoboDojo`, `data/`) record no initial state or layout, so none replays on a frozen layout. The task is
-reported separately until it has a positive example (PROTOCOL §7, Open 4).
+marked unvalidated (PROTOCOL §2 `validated`).
 
 ## Verification
 `tests/grade.py` replays `/app/output/trajectory.npz` from the frozen layout once, in a fresh process
