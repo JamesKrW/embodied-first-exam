@@ -32,16 +32,15 @@ grades the drawn seed's instance from its own copy (`build = "runtime"`: from it
 seed, or one drawn from the allowed list, let the runner write a copy and run that:
 
 ```bash
-python3 scripts/task_seed.py list tasks/<benchmark>/<task>                      # {'default': 0, 'allowed': [0, ...], 'oracle': [...]}
+python3 scripts/task_seed.py list tasks/<benchmark>/<task>                      # {'default': 0, 'allowed': [0, ...], 'oracle': [...]}; default = instance_seed
 python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --seed draw --out /tmp/run1   # prints the copy and the seed
 harbor run -p /tmp/run1/<task> -a <agent> ...
 ```
 
 The agent never chooses or sees the list: another seed's instance lives under the privileged task's `tests/seeds/`,
-and the copy carries only the drawn one. Every task allows its default seed only today, so
-`scripts/run_agent_batch.sh` runs each job from a stamped copy of the task as it is (with the gateway, the copy's
-egress is the gateway; with a CPU cap above the host's count, `HOST_CPUS`, the copy has that cap clamped, Resources
-below); it materializes a seed per trial once a benchmark allows more than one.
+and the copy carries only the drawn one. Every task allows its default seed only, and `scripts/run_agent_batch.sh`
+runs each job on it, from a stamped copy of the task as it is (with the gateway, the copy's egress is the gateway; with
+a CPU cap above the host's count, `HOST_CPUS`, the copy has that cap clamped, Resources below).
 
 ## Network
 The default is the allowlist (PROTOCOL Appendix H.6); whether a task has open network is its author's decision,
@@ -66,15 +65,16 @@ repository's `harbor run` (`scripts/efe.py`) pulls that image first when it is m
 
 The list is the one switch.
 - Another host for every task: add it to `HOSTS` (to `PACKAGE_HOSTS` too if a run through the gateway should reach it
-  directly), update the generators' copies of the list, `python3 scripts/set_agent_egress.py allowlist`,
-  `python3 scripts/task_conventions.py tasks/*/*/` (normalize refreshes each DIGEST).
+  directly), then `python3 scripts/set_agent_egress.py allowlist` and `python3 scripts/task_conventions.py tasks/*/*/`
+  (normalize refreshes each DIGEST).
 - A run with no restriction at all (the agent may reach anything): run a copy of the tasks, since CI keeps the list
   in `tasks/`:
   `cp -a tasks /some/dir/tasks && python3 scripts/set_agent_egress.py public /some/dir/tasks/*/*/`, then
-  `harbor run -p /some/dir/tasks/<benchmark> ...` (with `scripts/run_agent_batch.sh`: a copy of the repository with that `tasks/`,
-  and `GATEWAY_EGRESS=task`, or the runner narrows each job's copy again; the copies say `network_mode = "public"`, so
-  their results record `network` = open). The instructions' last sentence about the
-  network is then no longer true: change `EXTERNAL_TEXT` in `scripts/task_conventions.py` if that becomes the default.
+  `harbor run -p /some/dir/tasks/<benchmark> ...` (with `scripts/run_agent_batch.sh`: a copy of the repository with that
+  `tasks/`; the copies say `network_mode = "public"`, so the runner keeps each job's copy open, with the gateway or
+  without, `set_agent_egress.py allowlist` skips them, and their results record `network` = open). The instructions'
+  last sentence about the network does not hold for such a run: `EXTERNAL_TEXT` in `scripts/task_conventions.py` is
+  the text every allowlist task carries.
 
 ## Infrastructure failures: one full retry
 The rule is PROTOCOL Appendix H.5; how the runner applies it:
@@ -129,10 +129,10 @@ their names and are not evaluated by official runs; results they already have ar
 summary marks them in their configuration's table and leaves them out of its rate). `set` in `config.json` is the
 value when the result was written; a report derives it from `docs/core_set.toml` at the commit it publishes.
 
-A standard-mode result recorded while a grading replay still decided is re-read from its own `final.json` (the live
-episode's success, where that record applied the task's whole rule); the recorded verdict stays beside it, and a trial
-without such a live verdict, started off the frozen instance (`instance_mismatch`) or re-graded under a stricter rule
-keeps the recorded one (benchmark docs name their fields where they differ).
+A standard-mode result whose recorded verdict a grading replay decided (no `graded_by_live`) is re-read from its own
+`final.json` (the live episode's success, where that record applied the task's whole rule); the recorded verdict stays
+beside it, and a trial without such a live verdict, started off the frozen instance (`instance_mismatch`) or
+re-graded under a stricter rule keeps the recorded one (benchmark docs name their fields where they differ).
 
 ## Resources: caps and their enforcement
 Every resource number of a task is an upper bound for one container; where each is set: PROTOCOL §6. This section is
@@ -145,8 +145,8 @@ how a run applies and enforces them.
   cannot cap it (a card may be shared between trials): the monitor measures it, and the agent is told its cap.
 - **Placing trials.** Harbor caps each container and does not check whether a machine has room (concurrency is `-n`).
   A machine that holds the sum of a phase's caps (agent; verifier) never runs short; packing more is the runner's call.
-  GPU memory: `x-gpu-memory-gb`; an RTX-class card where `gpu_types` is set. A separate verifier whose
-  `[verifier.environment]` lacks `cpus` or `memory_mb` runs without that cap.
+  GPU memory: `x-gpu-memory-gb`; an RTX-class card where `gpu_types` is set. The verifier's caps (a key its
+  `[verifier.environment]` lacks is no cap): PROTOCOL §6.
 - **Monitor**: the `rcb_monitor` sidecar samples every few seconds into its own record (`rcb-monitor/1`), sealed in the
   first collect hook: GPU memory (NVML per process, summed), memory (cgroup `anon + shmem`), processes, disk (growth of
   the files under `/app`, `/tmp`, `/root` of the agent's container), per container and summed over its scope (privileged:
@@ -344,16 +344,16 @@ event). `LOG_MIRROR=0` / `MEM_GUARD=0` skip starting the first two.
 
 ## The agent's time (the cutoff)
 Every task gives the agent a fixed wall-clock time, its cutoff: Harbor's `[agent] timeout_sec` in the task's own
-`task.toml`, set by the task's author in the pull request that adds or changes the task  `ci_checks/check-cutoffs.py` checks per task: a whole number
-of seconds, at most 14400 (`CUTOFF_CAP`), 3600 unless the pull request justifies another; the instruction's closing
-`## Time limit`, the README's `Agent time budget` row and, in the standard modes, the sim service's `RCB_WALL_CLOCK_S`
-state the same number; nothing else in the instruction states the limit as a duration. A task's privileged and
-standard versions have the same cutoff (H.7, the mode registry's `same_cutoff_as`). A benchmark uses one number for all its tasks of a mode unless the pull
-request says why.
+`task.toml`, set by the task's author in the pull request that adds or changes the task, within the rules of PROTOCOL
+§2 (3600 s unless the pull request justifies another number, at most 14400 s, `CUTOFF_CAP`; the same for a task's
+privileged and standard versions, H.7; one number for a benchmark's tasks of a mode unless the pull request says why).
+`ci_checks/check-cutoffs.py` checks per task that the number is a whole number of seconds within the cap and that the
+instruction's closing `## Time limit`, the README's `Agent time budget` row and, in the standard modes, the sim
+service's `RCB_WALL_CLOCK_S` state the same number; nothing else in the instruction states the limit as a duration.
 
-**What the agent is told.** `normalize` ends every `instruction.md` with `## Time limit`: "You have N seconds to
-complete this task. Do not cheat by using online solutions or hints specific to this task.", then what the cutoff means
-in the mode (`CUTOFF_NOTE` in `scripts/task_conventions.py`: wall-clock time from the start of the session; at the cutoff
+**What the agent is told.** `normalize` ends every `instruction.md` with `## Time limit`: the cutoff sentence
+(`CUTOFF_SENTENCE` in `scripts/task_conventions.py`, the task's number in Terminal-Bench's format), then what the cutoff
+means in the mode (`CUTOFF_NOTE`: wall-clock time from the start of the session; at the cutoff
 the agent is stopped and only `/app/output/` (privileged) or the episode as it stands (standard modes) is graded;
 `/run/rcb-limits/usage.json` gives `time_left_s` and `deadline_utc`; long waits in tool calls count). A benchmark's own
 text about its time says "the time limit (`## Time limit`)", never a number.
@@ -417,8 +417,8 @@ allowlist.
 
 **Model-API calls only, and the only way out (Official runs above).** The gateway forwards the requests listed per provider
 in `scripts/usage_gateway/api_paths.json` (responses, messages, token counting, the model list; chat completions only
-to a self-hosted upstream: no official run used them, and at the providers that API serves models that search the web
-without any tool declaration) and answers anything else 403 without forwarding it: connectors and apps,
+to a self-hosted upstream: official runs do not use them, and at the providers that API serves models that search the
+web without any tool declaration) and answers anything else 403 without forwarding it: connectors and apps,
 plugins, files, conversations, web search. A model request is forwarded as it is or not at all: its body must be one
 JSON object the gateway can read (one Content-Length of at most 256 MiB, at most one Content-Encoding), and every tool
 it declares (top-level `tools`, and the `tools` of an `input` item, where Codex declares its own) must be one the agent
@@ -446,8 +446,8 @@ registries (`scripts/set_agent_egress.py only <GATEWAY_BIND>,<PACKAGE_HOSTS>`; H
 host, not remove one). `GATEWAY_EGRESS=task` keeps the task's own allowlist (the hosts reachable directly; not for
 official runs).
 Harbor's allowlist names addresses, not ports: every TCP service that listens on the gateway's address (the docker
-bridge) of the runner host is reachable from a trial, as it has been since the gateway exists; bind the host's other
-services to 127.0.0.1 or firewall the bridge.
+bridge) of the runner host is reachable from a trial; bind the host's other services to 127.0.0.1 or firewall the
+bridge.
 One exception, Codex with a ChatGPT login: before its first model call Codex 0.160.1 asks
 `chatgpt.com/backend-api/wham/accounts/check` for the account's workspace, at `chatgpt_base_url` and not at the model's
 base URL, and it accepts only an HTTPS origin there, which the plain-HTTP gateway is not (through the gateway the lookup

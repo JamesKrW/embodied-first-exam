@@ -61,21 +61,21 @@ Guide for maintainers. The contract is [protocol/README.md](protocol/README.md);
   infrastructure and which the agent's), the `MODE_REGISTRY` entry and `CUTOFF_NOTE`, CI support keyed on the registry
   (no new hard-coded list of mode names anywhere) with a self-test case, at least one benchmark using it, the TAXONOMY
   entry, and a stated cutoff relation (`same_cutoff_as`, or free)? Is the runner side (runners, the results
-  site) told the new suffix? A new mode is an owner-visible protocol change: one pull request of its own, shared files
+  site) told the new suffix? A new mode is a protocol change the maintainers decide: one pull request of its own, shared files
   only, merged before the benchmark that uses it.
-- Time cutoff (PROTOCOL §2): does every task set its own `[agent] timeout_sec` , 3600 s unless the pull request justifies another number, at most 14400 s, the same for a task's
-  privileged and standard versions and, unless the pull request says why, for all the benchmark's tasks of a mode (the
-  pull request's overview lists the numbers)? Does `instruction.md` end with the rendered `## Time limit` section and
+- Time cutoff: does every task set its own `[agent] timeout_sec` within the rules of PROTOCOL §2 (the pull request's
+  overview lists the numbers)? Does `instruction.md` end with the rendered `## Time limit` section and
   state the limit nowhere else? Does the benchmark's own text say what the cutoff costs here (simulator start-up, what
   the service's `time_left_s` counts from, a service that ends the episode itself)? A pull request that changes the
-  cutoff of existing tasks (label `cutoff-change`): the author's decision (the owner steps in only where official
+  cutoff of existing tasks (label `cutoff-change`): the author's decision (the maintainers step in only where official
   results must stay comparable), old -> new and why in its description, the tasks normalized (their `DIGEST` files changed with them), nothing else changed.
 - Resources (PROTOCOL §6, protocol/running.md "Resources"): every number is a cap for one container. Are the caps
   measured with a margin (what do `measured` / `caps_measured` in `scripts/task_resources.toml` cite, and do they say
   where there are no measurements)? Would an honest agent and the oracle stay inside them (one simulator at the
-  task's defaults on the largest card it runs on, the tooling's own replay checks, videos it is told to write)? Does
+  task's defaults on the largest card it runs on, the tooling's own replay checks, videos it is told to write), or
+  does the benchmark's README state the exception? Does
   `gpu_types` match the simulator (Isaac Sim / Omniverse: an RTX-class GPU)? Does a separate verifier need caps in
-  `[verifier.environment]` (a table without `cpus` / `memory_mb` runs it uncapped)? CI checks the rest.
+  `[verifier.environment]` (PROTOCOL §6)? CI checks the rest.
 
 ## Human review (oracle `partial` or `none`)
 Review per family (same scene template and predicate), at least two instances per family:

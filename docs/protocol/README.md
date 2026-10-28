@@ -19,8 +19,6 @@ benchmark document can override them, and the required CI job `invariants` fails
 the runner refuses a run that would. The only setting Appendix H leaves to the task's author is the agent's network:
 the allowlist unless the task declares open egress (H.6).
 
-Tasks and code that cite v1 section numbers (§2.10): the table at the end maps them.
-
 ## 1. What a task is
 
 A task is a self-contained Harbor task directory under `tasks/<benchmark>/` (one folder per benchmark); the benchmark adds as little as possible on top of
@@ -48,7 +46,7 @@ own choices are documented in `tasks/<benchmark>/README.md`.
 
 ## 2. Task-declared settings
 
-Each task (or its benchmark's generator) chooses these and declares them; CI checks that the declarations agree with
+Each task chooses these and declares them; CI checks that the declarations agree with
 each other, not that they take a particular value. The defaults are what templates write when a task says nothing.
 Every trial records its **effective configuration** (protocol version, mode, cutoff, reset budget, S, seed, network,
 validated; `scripts/task_conventions.py` `effective_config`), and results are ranked only among trials with the same
@@ -59,7 +57,7 @@ configuration (`config_key`; running.md "Results").
 | Modes offered (§3): any subset; a task without its privileged twin says why in its README Twin row | the task directories it ships | — |
 | Cutoff: the agent's wall-clock time, decided by the task's author | `[agent] timeout_sec` (a whole number of seconds) | 3600 s; at most 14400 s; equal in a task's privileged and standard versions (H.7) |
 | Reset budget N (standard modes) | the `sim` service's `RCB_RESET_BUDGET` default (`/spec.budget.reset`), the instruction | standard 0; standard-realtime 10 |
-| Slowdown S (standard-realtime) | `RCB_SLOWDOWN` default, `[metadata] slowdown`, the instruction (`S = <S>`) | S = 1 when the service's real-time factor is ≥ 3, else ⌈1.5 / RTF⌉ |
+| Slowdown S (standard-realtime) | the `sim` service's `RCB_SLOWDOWN` default (`/spec.timing.slowdown`), the instruction (`S = <S>`) | S = 1 when the service's real-time factor is ≥ 3, else ⌈1.5 / RTF⌉ |
 | Observation and action extensions | `/spec`, the instruction, the benchmark doc | the `eai-standard` core |
 | Grading kind | the instruction, the frozen instance, `reward.json` (`replays`, `graded_by_live`) | privileged: two fresh replays, or one by the task's choice; standard modes: the live episode (H.4) |
 | Seeds | `[metadata] instance_seed` (the default seed); `[metadata.seeds]` `allowed` (list, `{from, to}`, `"any"`), `oracle`, `build`, only where they differ from the defaults | the default seed only (`allowed` = `oracle` = [the default seed], `oracle` = [] without a reference solution; `build = "frozen"`) |
@@ -110,7 +108,7 @@ infrastructure, a reference implementation, one benchmark using it, CI support t
 | The success condition is written in terms the agent can observe in that mode: each object is named by its appearance and/or its starting place; an object's axis or point is described physically ("the keyboard's short edge", "the key's teeth end"), saying whether the condition already holds at the start; upstream identifiers (labels, function names, indices, asset metadata) may follow, only in brackets; thresholds stay exact and equal to the grader's. No benchmark is exempt | `check-instruction.sh` (standard modes: code-like terms with no physical description next to them) |
 | It ends with three sections `normalize` renders: `## External material` (the honour rule: install packages and read what is installed, do not fetch a ready-made solution; the open-network paragraph for an open task), `## Resources` (the caps of the agent's own container, §6), `## Time limit` (the cutoff and what it means in the mode: running.md "The agent's time"); no second statement of the limit | `check-cutoffs.py`, `check-resources.py` |
 | Everything a task needs at run time is in its image or directory; nothing tells the agent to download something | |
-| A trial that fetched a solution is flagged and judged case by case by the owner; installing a general-purpose package never is | running.md |
+| A trial that fetched a solution is flagged and judged case by case by the maintainers; installing a general-purpose package never is | running.md |
 
 ## 6. Resources
 
@@ -149,9 +147,8 @@ the run sets `RCB_LIMITS_ENFORCE=1` (off by default). The GPU-memory cap it enfo
 its scope (main, and in privileged mode the services the agent drives; at most one of them holds a GPU); a scope without
 a GPU has no GPU-memory cap, and GPU memory seen there anyway is only recorded. The `x-gpu-memory-gb` of a recorded
 service (a standard mode's simulator sidecar, RoboPaint's scorer) and of the verifier is a cap stated for the reader:
-nothing measures it against that cap. A machine that holds the sum of a phase's caps never runs short; packing more is
-the runner's call. The agent reads its own container's caps in `## Resources` (§5) and in `/run/rcb-limits/usage.json`.
-Enforcement and the reward fields: running.md "Resources".
+nothing measures it against that cap. The agent reads its own container's caps in `## Resources` (§5) and in
+`/run/rcb-limits/usage.json`. Placing trials, enforcement and the reward fields: running.md "Resources".
 
 ## 7. Versions
 
@@ -163,6 +160,10 @@ by (`CONFIG_KEYS`, running.md "Results"). The wire protocol's versions:
 bounds; shared layer `embodied_first_exam/standard/`), 2.3 (2.2 + realtime), 2.4 (2.3 + operation ids and deadlines; layer
 `embodied_first_exam/standard/v2_4/`). Minor versions only add; `/spec.protocol` equals `metadata.protocol`. A protocol change is
 an issue, then one pull request updating standard_mode.md, the reference implementation and an example task.
+In this version a task declares its open egress only as `[agent] network_mode = "public"`, its reset budget and S only
+in its `sim` service, and its default seed as `[metadata] instance_seed`; CI fails a task.toml with `[metadata] network`
+(H.6), and a standard-realtime task's with `[metadata]` `reset_budget` or `slowdown`, and warns on these and `mode`
+elsewhere; `normalize` rewrites such a task into this form.
 
 ## Appendix H. Invariants (binding)
 
@@ -236,29 +237,11 @@ The verifier has no network (`[verifier] network_mode = "no-network"` in every t
 of `tests/docker-compose.yaml` with a network setting other than `none`). *CI:* `check-verifier-isolation.sh`.
 
 **H.7 Comparable twins.** Where a task ships both a privileged and a standard (or standard-realtime) version, they
-share one frozen instance (byte-identical copies), one success rule and the same seeds (`default`, `allowed`,
-`build`), and the privileged and standard versions have the same cutoff (`same_cutoff_as` in the mode registry).
+share one frozen instance (byte-identical copies), one success rule and the same seeds (`instance_seed`, and
+`[metadata.seeds]` `allowed` and `build`), and the privileged and standard versions have the same cutoff (`same_cutoff_as` in the mode registry).
 *CI:* `check-twins.py`, `check-instance-copies.sh`.
 
 **H.8 DIGEST.** `tasks/<benchmark>/<task>/DIGEST` is the digest Harbor publishes the task under (`sha256:<hex>` over the relative
 path and content hash of `task.toml`, `instruction.md`, `README.md` and every file under `environment/`, `tests/`,
 `solution/`), written last by `normalize` and equal to the digest of the task's current files. Results are attributed
 to a task by its digest; a changed file is a changed task. *CI:* `check-dataset-manifest.sh`.
-
-## v1 section numbers (cited by some task READMEs, `tests/test.sh` and shared code)
-
-| v1 | Now |
-|---|---|
-| §0, D1–D12 | §2 (settings), §3 (modes), §7; D3/D4 §4; D5 §1; D8 §2, H.7; D10/D11 running.md |
-| §1 checklist, §2.1–2.5 | §1, §5 |
-| §2.6 verifier | H.1 (isolation), §4 (fields) |
-| §2.7 solutions, oracle, nop | H.2, §4 |
-| §2.8 identity | H.8, §1 |
-| §2.9, §2.10 resources and limits | §6 (caps per container), running.md "Resources" |
-| §2.11 external material, network | §5, H.6, running.md "Network" |
-| §2.12 cutoff | §2, §5, running.md "The agent's time" |
-| §2.13 seeds | §2, running.md "Seeds" |
-| §2.14 dynamics, §2.15 modes shipped, §2.16 adding a mode | §2 (TAXONOMY.md "Dynamics"), §3, H.7 |
-| §3 privileged; §4, §4.1–4.9 standard; §4b realtime; §4c exported | §3, H.3, H.4, §4; wire details standard_mode.md |
-| §4.7 crash recovery | H.5 (retry); in-trial resume is an implementation detail of the shared layers (standard_mode.md) |
-| §5 results, token budget; §6 versioning; §7 migration | §4, running.md; §7; the migration is complete (no rule) |

@@ -482,7 +482,7 @@ standard-realtime tasks only (directories ending in `-standard-realtime`, `proto
 is `embodied_first_exam/standard/realtime/rcb_realtime.py`, which other benchmarks' realtime services use unchanged. 2.3
 is 2.2 plus the realtime capability below; every 2.2 addition stays optional, so a 2.1 service with this capability is a
 2.3 service. Same endpoints, RCB1 frames and grading as 2.1. `/spec.timing` declares it: `realtime: true`, `slowdown` S
-(`RCB_SLOWDOWN`; each task declares its default, `[metadata] slowdown`), `control_dt`, `wall_s_per_control_step`,
+(`RCB_SLOWDOWN`; each task declares its default in its `sim` service), `control_dt`, `wall_s_per_control_step`,
 `max_ahead_steps`. Each task declares its reset budget (Part 1, "Optional reset capability"). S and the reset budget
 are part of a result's configuration (running.md).
 - **Clock.** An episode starts paused at its starting state. Its clock starts at its first `/submit` or `/observe`

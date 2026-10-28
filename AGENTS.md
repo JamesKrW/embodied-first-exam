@@ -31,19 +31,13 @@ invariants of Appendix H bind and no task value overrides them), `docs/protocol/
   host's CPU count is the runner's to clamp (docker refuses it); the values in `scripts/task_resources.toml` stay.
   The same step's `sanitize` line in every `tests/test.sh` removes links and special files from `/app/output` before
   the grader reads the agent's files.
-- The agent's time cutoff (PROTOCOL §2) is each task's own `[agent] timeout_sec` (as in Terminal-Bench): its author sets it in the pull request. There is no table and no apply script. `normalize` writes from it the standard
-  modes' `RCB_WALL_CLOCK_S`, the README row and the last section of every `instruction.md`, `## Time limit` ("You have N
-  seconds to complete this task. Do not cheat by using online solutions or hints specific to this task.", then what the
-  cutoff means in the mode), after `## External material` and `## Resources`: rendered like those two. A
-  benchmark's own text says "the time limit (`## Time limit`)", never a duration. `ci_checks/check-cutoffs.py` (per task):
-  a whole number of seconds, at most 14400, and the instruction, README and sim service agree (advisory); the twins'
-  equal number is an invariant (`ci_checks/check-twins.py`, Appendix H.7). To change a time (the author's decision): set the number, normalize, and state old -> new in the pull request (docs/protocol/running.md "The agent's time").
-- Every task names its seeds (PROTOCOL §2, docs/protocol/running.md "Seeds"): `[metadata] instance_seed` is the default
-  seed; `[metadata.seeds]` `allowed` / `oracle` / `build` only where they are not the defaults (`normalize` drops the
-  rest); `allowed` is a list, `{ from, to }` or "any"
-  (the last two only with `build = "runtime"`: the task builds a seed's instance from a file `seed`); committed
-  non-default instances under the privileged task's `tests/seeds/<seed>/` (never under `environment/`); reference solutions
-  are per seed. The runner picks the seed (`scripts/task_seed.py materialize`); `ci_checks/check-seeds.py` checks it.
+- The agent's time cutoff is each task's own `[agent] timeout_sec`, set by its author in the pull request (rules:
+  PROTOCOL §2; what `normalize` renders from it, `## Time limit` last in every `instruction.md`, and how to change it:
+  docs/protocol/running.md "The agent's time"). A benchmark's own text says "the time limit (`## Time limit`)", never a
+  duration. Checks: `ci_checks/check-cutoffs.py` (advisory), the twins' equal number `ci_checks/check-twins.py` (H.7).
+- Seeds: `[metadata] instance_seed` is the default seed, `[metadata.seeds]` only where a task allows others (PROTOCOL
+  §2; how a runner draws one: docs/protocol/running.md "Seeds"). Committed non-default instances live under the
+  privileged task's `tests/seeds/<seed>/` (never under `environment/`); `ci_checks/check-seeds.py` checks them.
 - CI has two tiers. `ci_checks/run_invariants.sh [task dirs]` (the required job `invariants`) runs only the checks that
   enforce PROTOCOL Appendix H and fails on any failure, error or incomplete run; `ci_checks/run_all.sh [task dirs]` runs
   it and then every advisory check (`--tier advisory` alone: exit 3 = warnings only). New per-task check =
@@ -55,11 +49,12 @@ invariants of Appendix H bind and no task value overrides them), `docs/protocol/
   service-layer tests that need numpy + requests (CI job `unit-tests`). Everything runs concurrently
   (`ci_checks/parallel.py`, `RCB_CI_JOBS` caps it). CI on a pull request runs `run_all.sh --changed`: the scope from
   `ci_checks/ci_scope.py` (one benchmark's own paths -> its tasks; shared code -> the full
-  suite); pushes to main and the nightly run are the full suite. A new benchmark gets its row in `ci_scope.py` `UNITS`
-  (without one, its pull requests run the full suite).
+  suite); pushes to main and the nightly run are the full suite. A benchmark's own paths come from
+  `scripts/task_conventions.py` `BENCHMARK_TABLE`; a `ci_scope.py` `UNITS` row only names an image directory of another
+  name (`ci_scope.py --check`).
 - `tasks/<benchmark>/<task>/DIGEST`: the task's content digest (PROTOCOL Appendix H.8), written last by `normalize` (after a hand edit: `python3 scripts/task_conventions.py tasks/<benchmark>/<task>`);
   `ci_checks/check-dataset-manifest.sh` recomputes it. The release manifest `tasks/dataset.toml` is generated
-  (`scripts/dataset_manifest.py write`) and not committed: pull requests no longer conflict on it. The task list
+  (`scripts/dataset_manifest.py write`) and not committed, so pull requests do not conflict on it. The task list
   (`TASKS.md`, `tasks.json`, `dataset.toml`) is generated after every merge to main and pushed to the branch
   `task-list` (`.github/workflows/task-list.yml`; `scripts/dataset_manifest.py list --out DIR` locally).
 - Local docker sandbox has no `[environment].gpus`. RoboTwin and MuJoCo tasks pass a GPU through
@@ -71,10 +66,8 @@ invariants of Appendix H bind and no task value overrides them), `docs/protocol/
   token usage, and is then, with the package registries, the agent container's only egress (docs/protocol/running.md "Official runs"). No tool that runs
   outside the container in official runs: the harness's web search is off (`run_agent_batch.sh` default
   `WEB_SEARCH=disabled`), as are account connectors, apps and plugins.
-- A task's agent egress is the model APIs and the package registries by default (`[agent] network_mode = "allowlist"`, the
-  hosts of `scripts/set_agent_egress.py`; Appendix H.6), unless its author declares `[agent] network_mode = "public"` (then
-  the task's own `## External material` paragraph); `normalize` ends every `instruction.md` with `## External material`
-  (PROTOCOL §5, rendered like `## Resources`). Scene dynamics are each task's `[metadata] dynamics` (no
+- A task's agent egress: Appendix H.6 and docs/protocol/running.md "Network" (`[agent] network_mode`, "allowlist" or
+  "public"); `normalize` ends every `instruction.md` with `## External material` (PROTOCOL §5). Scene dynamics are each task's `[metadata] dynamics` (no
   central table). A task needs no download at run time: bake it into the image or
   the task directory. Nothing an agent can read (image, tooling, instance metadata) names or locates a solution.
   Unattended batches: `scripts/run_agent_batch.sh` (lanes with per-job claims; configured by environment variables,
