@@ -2,8 +2,8 @@
 # Arm, wrist, ignore lists and buffers follow the stock X-Trainer configuration; the J1_7/J1_8/J2_7/J2_8
 # collision spheres cover the printed GelSight-Mini fingers (greedy sphere cover of finger + sensor shell,
 # nothing within 0.5 mm of the gel face).
-# Paths are relative to this file's directory; the loader (tactilelab_tasks.backends.curobo_planner) makes them
-# absolute before handing the dictionary to cuRobo.
+# cuRobo is not installed in the task images: this file is read only for its collision spheres (the hand clearance of
+# tactilelab_tasks.soft.cables.load_hand_spheres); the cuRobo planner and its URDF are not part of the package.
 # Position-mode FK readout order.
 info_links: ["J1_6", "J2_6"]
 
