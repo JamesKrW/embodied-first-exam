@@ -38,11 +38,251 @@ RUN uv python install 3.11.17 && uv venv -p 3.11.17 /opt/tactilelab/.venv && \
 RUN VIRTUAL_ENV=/opt/tactilelab/.venv uv pip install "pin==4.0.0" "pin-pink==4.2.0" "daqp==0.7.2" "qpsolvers==4.8.2" && \
     VIRTUAL_ENV=/opt/tactilelab/.venv uv pip install --no-deps --reinstall "numpy==1.26.0" && \
     rm -rf /root/.cache/uv
+# Pin: the steps above follow the install sequence the tasks were developed with; this one sets every package of the Isaac
+# environment to the version of the reference build (the list below, 229 packages, without resolving), removes any package an
+# unpinned step above pulls in today that the list does not hold, and fails unless the environment is exactly the list
+RUN printf '%s\n' \
+      'absl-py==2.5.1' \
+      'aioboto3==15.1.0' \
+      'aiobotocore==2.24.0' \
+      'aiodns==3.1.1' \
+      'aiofiles==23.2.1' \
+      'aiohappyeyeballs==2.4.4' \
+      'aiohttp==3.11.11' \
+      'aioitertools==0.11.0' \
+      'aiosignal==1.3.2' \
+      'annotated-doc==0.0.5' \
+      'annotated-types==0.8.0' \
+      'antlr4-python3-runtime==4.9.3' \
+      'anyio==4.14.2' \
+      'asteval==1.0.6' \
+      'async-timeout==5.0.1' \
+      'attrs==25.1.0' \
+      'awscrt==0.23.8' \
+      'azure-core==1.28.0' \
+      'azure-identity==1.13.0' \
+      'azure-storage-blob==12.17.0' \
+      'boto3==1.39.11' \
+      'botocore==1.39.11' \
+      'certifi==2026.10.23' \
+      'cffi==2.1.1' \
+      'charset-normalizer==3.3.2' \
+      'click==8.1.7' \
+      'cloudpickle==3.1.2' \
+      'cmeel==0.61.0' \
+      'cmeel-assimp==6.0.5' \
+      'cmeel-boost==1.90.0' \
+      'cmeel-console-bridge==1.0.2.3' \
+      'cmeel-octomap==1.10.0' \
+      'cmeel-qhull==8.0.2.1' \
+      'cmeel-tinyxml==2.6.2.3' \
+      'cmeel-tinyxml2==11.0.0' \
+      'cmeel-urdfdom==6.0.0' \
+      'cmeel-zlib==1.3.2' \
+      'coal==3.0.3' \
+      'contourpy==1.3.1' \
+      'coverage==7.4.4' \
+      'cryptography==44.0.0' \
+      'cycler==0.11.0' \
+      'daqp==0.7.2' \
+      'decorator==5.3.1' \
+      'eigenpy==3.13.0' \
+      'einops==0.8.2' \
+      'farama-notifications==0.0.6' \
+      'fastapi==0.115.7' \
+      'filelock==3.13.1' \
+      'flaky==3.8.1' \
+      'flatdict==4.0.1' \
+      'fonttools==4.55.3' \
+      'frozenlist==1.5.0' \
+      'fsspec==2024.6.1' \
+      'gitdb==4.0.12' \
+      'gitpython==3.2.1' \
+      'grpcio==1.85.0' \
+      'gunicorn==23.0.0' \
+      'gymnasium==1.2.0' \
+      'h11==0.16.0' \
+      'h5py==3.16.0' \
+      'hf-xet==1.7.0' \
+      'hidapi==0.14.0.post2' \
+      'hpp-fcl==2.4.4' \
+      'httpcore==1.0.9' \
+      'httptools==0.6.1' \
+      'httpx==0.28.1' \
+      'huggingface-hub==1.16.1' \
+      'hydra-core==1.3.8' \
+      'idna==3.10' \
+      'idna-ssl==1.1.0' \
+      'imageio==2.37.0' \
+      'imageio-ffmpeg==0.7.0' \
+      'importlib-metadata==10.1.0' \
+      'iniconfig==2.3.1' \
+      'isaaclab==2.3.2' \
+      'isaacsim==5.1.0.0' \
+      'isaacsim-app==5.1.0.0' \
+      'isaacsim-asset==5.1.0.0' \
+      'isaacsim-benchmark==5.1.0.0' \
+      'isaacsim-code-editor==5.1.0.0' \
+      'isaacsim-core==5.1.0.0' \
+      'isaacsim-cortex==5.1.0.0' \
+      'isaacsim-example==5.1.0.0' \
+      'isaacsim-extscache-kit==5.1.0.0' \
+      'isaacsim-extscache-kit-sdk==5.1.0.0' \
+      'isaacsim-extscache-physics==5.1.0.0' \
+      'isaacsim-gui==5.1.0.0' \
+      'isaacsim-kernel==5.1.0.0' \
+      'isaacsim-replicator==5.1.0.0' \
+      'isaacsim-rl==5.1.0.0' \
+      'isaacsim-robot==5.1.0.0' \
+      'isaacsim-robot-motion==5.1.0.0' \
+      'isaacsim-robot-setup==5.1.0.0' \
+      'isaacsim-ros1==5.1.0.0' \
+      'isaacsim-ros2==5.1.0.0' \
+      'isaacsim-sensor==5.1.0.0' \
+      'isaacsim-storage==5.1.0.0' \
+      'isaacsim-template==5.1.0.0' \
+      'isaacsim-test==5.1.0.0' \
+      'isaacsim-utils==5.1.0.0' \
+      'isodate==0.6.1' \
+      'jinja2==3.1.6' \
+      'jmespath==1.0.1' \
+      'junitparser==5.0.3' \
+      'kiwisolver==1.4.4' \
+      'lazy-loader==0.4' \
+      'libcoal==3.0.3' \
+      'libpinocchio==4.0.0' \
+      'llvmlite==0.42.0' \
+      'loop-rate-limiters==1.2.0' \
+      'markdown==3.11.2' \
+      'markdown-it-py==4.2.0' \
+      'markupsafe==2.1.3' \
+      'matplotlib==3.10.3' \
+      'mdurl==0.1.2' \
+      'ml-dtypes==0.5.4' \
+      'moviepy==2.2.1' \
+      'mpmath==1.3.0' \
+      'msal==1.27.0' \
+      'msal-extensions==1.0.0' \
+      'multidict==6.1.0' \
+      'nest-asyncio==1.5.6' \
+      'networkx==3.3' \
+      'numba==0.59.1' \
+      'numpy==1.26.0' \
+      'nvidia-cublas-cu12==12.8.3.14' \
+      'nvidia-cuda-cupti-cu12==12.8.57' \
+      'nvidia-cuda-nvrtc-cu12==12.8.61' \
+      'nvidia-cuda-runtime-cu12==12.8.57' \
+      'nvidia-cudnn-cu12==9.7.1.26' \
+      'nvidia-cufft-cu12==11.3.3.41' \
+      'nvidia-cufile-cu12==1.13.0.11' \
+      'nvidia-curand-cu12==10.3.9.55' \
+      'nvidia-cusolver-cu12==11.7.2.55' \
+      'nvidia-cusparse-cu12==12.5.7.53' \
+      'nvidia-cusparselt-cu12==0.6.3' \
+      'nvidia-nccl-cu12==2.26.2' \
+      'nvidia-nvjitlink-cu12==12.8.61' \
+      'nvidia-nvtx-cu12==12.8.55' \
+      'oauthlib==3.2.2' \
+      'omegaconf==2.3.1' \
+      'onnx==1.23.2' \
+      'onnx-ir==1.1.0' \
+      'onnxscript==0.7.2' \
+      'opencv-python-headless==4.11.0.86' \
+      'orjson==3.13.0' \
+      'osqp==0.6.7.post3' \
+      'packaging==23.0' \
+      'pandas==3.0.6' \
+      'pillow==11.3.0' \
+      'pin==4.0.0' \
+      'pin-pink==4.2.0' \
+      'pint==0.20.1' \
+      'pluggy==1.7.0' \
+      'portalocker==2.7.0' \
+      'prettytable==3.3.0' \
+      'proglog==0.1.12' \
+      'propcache==0.2.1' \
+      'protobuf==7.36.2' \
+      'psutil==5.9.8' \
+      'pycares==4.8.0' \
+      'pycparser==3.12' \
+      'pydantic==2.11.10' \
+      'pydantic-core==2.33.2' \
+      'pyglet==1.5.31' \
+      'pygments==2.21.0' \
+      'pyjwt==2.15.1' \
+      'pyparsing==3.0.9' \
+      'pyperclip==1.8.0' \
+      'pypng==0.20220715.0' \
+      'pytest==9.1.1' \
+      'pytest-mock==3.17.0' \
+      'python-dateutil==2.9.0.post0' \
+      'python-dotenv==1.2.4' \
+      'python-multipart==0.0.20' \
+      'pytz==2024.1' \
+      'pyvers==0.2.3' \
+      'pyyaml==6.0.2' \
+      'qdldl==0.1.7.post5' \
+      'qpsolvers==4.8.2' \
+      'qrcode==7.4.2' \
+      'regex==2026.9.29' \
+      'requests==2.32.3' \
+      'requests-oauthlib==1.3.1' \
+      'rich==15.0.0' \
+      'rsl-rl-lib==3.0.1' \
+      'rtree==1.3.0' \
+      's3transfer==0.13.1' \
+      'safetensors==0.8.0' \
+      'scikit-image==0.24.0' \
+      'scipy==1.15.3' \
+      'sentry-sdk==2.29.1' \
+      'setuptools==78.1.0' \
+      'shellingham==1.5.4' \
+      'six==1.17.0' \
+      'skrl==2.1.1' \
+      'smmap==5.0.3' \
+      'stable-baselines3==2.8.0' \
+      'starlette==0.45.3' \
+      'sympy==1.13.3' \
+      'tensorboard==2.21.0' \
+      'tensorboard-data-server==0.7.2' \
+      'tensordict==0.14.3' \
+      'tifffile==2024.8.30' \
+      'tokenizers==0.23.3' \
+      'toml==0.10.2' \
+      'torch==2.7.0+cu128' \
+      'torchaudio==2.7.0' \
+      'torchvision==0.22.0+cu128' \
+      'tornado==6.5.1' \
+      'tqdm==4.70.1' \
+      'transformers==5.17.0' \
+      'trimesh==4.5.1' \
+      'triton==3.3.0' \
+      'typer==0.27.3' \
+      'typing-extensions==4.12.2' \
+      'typing-inspection==0.4.2' \
+      'urllib3==2.8.0' \
+      'uvicorn==0.29.0' \
+      'warp-lang==1.18.0' \
+      'watchdog==4.0.0' \
+      'wcwidth==0.9.4' \
+      'websockets==12.0' \
+      'werkzeug==3.1.9' \
+      'wheel==0.48.0' \
+      'wrapt==1.16.0' \
+      'yarl==1.18.3' \
+      'zipp==4.1.2' \
+      > /opt/tactilelab/requirements.lock && \
+    VIRTUAL_ENV=/opt/tactilelab/.venv uv pip install --no-deps --index-strategy unsafe-best-match \
+      --extra-index-url https://download.pytorch.org/whl/cu128 --extra-index-url https://pypi.nvidia.com \
+      -r /opt/tactilelab/requirements.lock && rm -rf /root/.cache/uv && \
+    VIRTUAL_ENV=/opt/tactilelab/.venv uv pip freeze | grep -vxFf /opt/tactilelab/requirements.lock | sed 's/[ =@].*//' | \
+      xargs -r env VIRTUAL_ENV=/opt/tactilelab/.venv uv pip uninstall && \
+    VIRTUAL_ENV=/opt/tactilelab/.venv uv pip freeze | diff - /opt/tactilelab/requirements.lock && echo "environment == requirements.lock"
 ENV PATH="/opt/tactilelab/.venv/bin:${PATH}" VIRTUAL_ENV=/opt/tactilelab/.venv
 # the Newton sidecar of the cloth / cable / dough / FEM tasks: its own Python 3.12 environment (Newton needs warp >= 1.17,
 # the Isaac side ships 1.12); the tasks' sidecar code goes next to it, in /opt/tactilelab/sidecar (from tactilelab-files)
 RUN uv python install 3.12.13 && uv venv -p 3.12.13 /opt/tactilelab/sidecar/.venv && \
-    VIRTUAL_ENV=/opt/tactilelab/sidecar/.venv uv pip install "newton==1.7.0" "warp-lang==1.18.0" "numpy" && \
+    VIRTUAL_ENV=/opt/tactilelab/sidecar/.venv uv pip install --no-deps "newton==1.7.0" "warp-lang==1.18.0" "numpy==2.5.4" && \
     rm -rf /root/.cache/uv
 ENV WARP_CACHE_PATH=/cache/warp
 # Kit caches (shaders, extension registry, user data) live under /cache so a task's compose can keep them in a volume
@@ -61,10 +301,10 @@ WORKDIR /app
 # the declared artifacts (/app/output/).
 FROM tactilelab-base
 COPY grade.py instance.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe-private:tactilelab-files-0.1.0@sha256:193ca076d46974fc3401025d33c9280254b260cecc8e3482d1d3bb6179eeb197 /tactilelab_tasks /opt/tactilelab/tactilelab_tasks
+COPY --from=ghcr.io/mll-lab-nu/efe-private:tactilelab-files-0.2.0@sha256:865900a1d4e308e8c2818824da8cb88423a6f3b22c15cef85d45f3003629c9b5 /tactilelab_tasks /opt/tactilelab/tactilelab_tasks
 COPY --from=ghcr.io/mll-lab-nu/efe-private:tactilelab-assets-files-0.1.0@sha256:d58c3a36a5f5ea031d65f14b95c3c4f7c68268f5d9977dd1b963ce286bd6bcd7 /tactilelab_tasks /opt/tactilelab/tactilelab_tasks
-COPY --from=ghcr.io/mll-lab-nu/efe-private:tactilelab-files-0.1.0@sha256:193ca076d46974fc3401025d33c9280254b260cecc8e3482d1d3bb6179eeb197 /sidecar /opt/tactilelab/sidecar
-COPY --from=ghcr.io/mll-lab-nu/efe-private:tactilelab-files-0.1.0@sha256:193ca076d46974fc3401025d33c9280254b260cecc8e3482d1d3bb6179eeb197 /rcb_tactilelab.py /tests/rcb_tactilelab.py
+COPY --from=ghcr.io/mll-lab-nu/efe-private:tactilelab-files-0.2.0@sha256:865900a1d4e308e8c2818824da8cb88423a6f3b22c15cef85d45f3003629c9b5 /sidecar /opt/tactilelab/sidecar
+COPY --from=ghcr.io/mll-lab-nu/efe-private:tactilelab-files-0.2.0@sha256:865900a1d4e308e8c2818824da8cb88423a6f3b22c15cef85d45f3003629c9b5 /rcb_tactilelab.py /tests/rcb_tactilelab.py
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests:/opt/tactilelab
 WORKDIR /tests
