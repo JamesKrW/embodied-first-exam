@@ -41,13 +41,13 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 7 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 2 | 5 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 4 | 4 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: memory: sim 0.7 GB (a per-container memory sampler); CPU only; CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 20 past trials: the agent's container memory 2.2 GiB, 148 threads, CPU 1.7 cores, disk 1.0 GiB; the sim service memory 0.6 GiB (0.7 GiB in an earlier measurement), 107 threads, CPU at its cap (4)
 
 ## Details
 | | |

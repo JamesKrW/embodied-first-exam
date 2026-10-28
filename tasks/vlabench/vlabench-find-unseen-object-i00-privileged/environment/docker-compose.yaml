@@ -1,7 +1,7 @@
 # main is built from environment/Dockerfile, whose first stage is the VLABench image (vlabench-base).
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     build:

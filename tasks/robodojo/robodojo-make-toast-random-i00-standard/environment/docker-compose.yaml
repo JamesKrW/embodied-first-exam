@@ -8,14 +8,14 @@
 # watchdog, at least twice the slowest measured scene build (about 3.5 min per start on a warm shader cache).
 services:
   main:
-    pids_limit: 16384   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
   sim:
     cpus: 16   # rcb-monitor
     mem_limit: 25600m   # rcb-monitor
-    pids_limit: 16384   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     x-gpu-memory-gb: 16   # GiB   # rcb-monitor
     build:
       context: ./sim

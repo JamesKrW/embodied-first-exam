@@ -47,12 +47,12 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
-| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
+| `main` (the agent's) | 2 | 9 GiB | 1024 | no GPU | 10 GiB |
+| verifier (as `main`) | 2 | 9 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
 - Measured: pot_shelf_transfer oracle and nop trials (CPU only, cgroup memory.peak): the verifier 3.68 GiB with two concurrent replays (3.92 GiB for two Wuji replays); sweep_dustpan: one oracle replay 1.93 GiB max RSS (599 s); two cores for the verifier's two concurrent replays
-- Measured (caps): processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 9 past trials: the agent's container memory 6.0 GiB, 157 threads, disk 1.8 GiB
 
 ## Details
 

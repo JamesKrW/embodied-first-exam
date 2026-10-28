@@ -28,13 +28,13 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 2 | 6 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 6 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 2 | 6 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 4 | 6 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: Harbor oracle on a cloud CPU host (anycar-tracking, anycar-compact-lap-monaco-6, anycar-tight-drift-park, neuralfly-general-skydio, go2-weave; docker stats and cgroup memory.peak every 3-6 s): the sidecar 1.7-1.9 cores during deployments, its 4-CPU cap during finalization (the held-out cases twice on 4 workers, then the video: 79-199 s), peak 0.6-2.13 GiB (go2-weave); the agent's container at most 0.23 GiB; the verifier phase is the sidecar's collect hook (4 cores, at most 2.13 GiB); the verifier itself only reads JSON (~20 s)
-- Measured (caps): processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 110 past trials: the agent's container memory 4.5 GiB, 162 threads, CPU at its cap (2), disk 1.3 GiB; the sim service memory 1.0 GiB (2.1 GiB in an earlier measurement), 30 threads, CPU 1.9 cores
 
 ## Details
 

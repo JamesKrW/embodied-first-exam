@@ -32,13 +32,13 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 20 GiB | 8192 | 6 GiB | 10 GiB |
-| verifier | 4 | 16 GiB | no cap | 6 GiB | no cap |
+| `main` (the agent's) | 8 | 13 GiB | 1024 | 5 GiB | 10 GiB |
+| verifier | 4 | 16 GiB | no cap | 5 GiB | no cap |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
 - Measured: GPU memory 0.7-1.2 GB (per-trial peaks of past trials); memory: privileged container 3.0 GB (a per-container memory sampler); CPU: an estimate (MuJoCo and two ONNX policies on the CPU)
-- Measured (caps): GPU memory: a per-trial peak of 1.2 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB; processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 32 past trials: the agent's container memory 8.1 GiB, 209 threads, CPU 7.9 cores, GPU memory 2.4 GiB, disk 1.0 GiB
 
 ## Details
 | | |

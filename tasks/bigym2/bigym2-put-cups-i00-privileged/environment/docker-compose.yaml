@@ -3,8 +3,8 @@
 # merging this onto the main service passes the device through. `graphics` mounts the EGL vendor library.
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
-    x-gpu-memory-gb: 6   # GiB   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
+    x-gpu-memory-gb: 5   # GiB   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     environment:

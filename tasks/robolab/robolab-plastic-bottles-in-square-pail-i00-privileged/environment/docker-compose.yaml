@@ -4,8 +4,8 @@
 # teardown, `compose down --volumes`, deletes it): every trial compiles its shaders once (~2 min).
 services:
   main:
-    pids_limit: 16384   # rcb-monitor
-    x-gpu-memory-gb: 24   # GiB   # rcb-monitor
+    pids_limit: 2048   # rcb-monitor
+    x-gpu-memory-gb: 22   # GiB   # rcb-monitor
     build:
       cache_from: ["ghcr.io/mll-lab-nu/efe-private:robolab-0.2.1"]   # our prebuilt image: its layers are reused when you can pull it, else Docker builds the recipe
     shm_size: "8gb"

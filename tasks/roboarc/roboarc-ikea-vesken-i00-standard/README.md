@@ -47,14 +47,14 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
+| `main` (the agent's) | 4 | 10 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 2 | 7 GiB | 1024 | 4 GiB | — |
 | verifier | 2 | 2 GiB | no cap | no GPU | no cap |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: RTX 4090 24GB / L4 24GB (an NVIDIA GPU with Vulkan and EGL).
 - Measured: a Harbor standard oracle of svallet on an RTX 4090 host (docker stats and nvidia-smi per process every 20 s): the sim sidecar peaked at 1.8 GiB of memory and 0.8 GiB of GPU memory (the Nyx render process), the agent's container (the client) below 0.1 GiB
-- Measured (caps): GPU memory (the sim service): at most 0.8 GiB (the Nyx render process); capped at 4 GiB, room for longer scenes
+- Measured (caps): GPU memory (the sim service): at most 0.8 GiB (the Nyx render process); capped at 4 GiB, room for longer scenes; per-container peaks in 64 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 4 trials), 242 threads, CPU at its cap (4), disk 5.0 GiB; the sim service memory 3.6 GiB, 123 threads, CPU 1.2 cores, GPU memory 1.4 GiB
 
 ## Details
 | | |

@@ -28,14 +28,14 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 7 GiB | 8192 | 7 GiB | — |
+| `main` (the agent's) | 3 | 16 GiB | 1024 | no GPU | 11 GiB |
+| `sim` | 4 | 4 GiB | 1024 | 5 GiB | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
 - Measured: GPU memory: per-trial peaks of past trials 0.3-0.9 GB on 24 GB cards and up to 2.1 GiB on a 48 GB card; memory: sim p90 0.9 GB (a per-container memory sampler); CPU: an estimate
-- Measured (caps): GPU memory (the sim service): a per-trial peak of 2.1 GiB on a 48 GB card -> max(1.5 x peak, peak + 4), rounded up: 7 GiB; processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 70 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 1 trial), 210 threads, CPU 2.6 cores, disk 7.0 GiB; the sim service memory 0.7 GiB (0.9 GiB in an earlier measurement), 97 threads, CPU at its cap (4), GPU memory 0.3 GiB (2.1 GiB in an earlier measurement)
 
 ## Details
 | | |

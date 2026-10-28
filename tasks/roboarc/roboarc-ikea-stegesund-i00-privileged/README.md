@@ -37,11 +37,12 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `main` (the agent's) | 4 | 4 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: peak RSS of one Session 0.27-0.45 GB per scene (3000 reference rows and final_check, on a laptop); the verifier runs two replays and the video replay at once
+- Measured (caps): per-container peaks in 64 past trials: the agent's container memory 1.9 GiB, 265 threads, CPU at its cap (4), disk 5.7 GiB
 
 ## Details
 | | |

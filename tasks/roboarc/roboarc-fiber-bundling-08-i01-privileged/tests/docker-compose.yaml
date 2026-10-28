@@ -5,7 +5,7 @@
 # NVIDIA_VISIBLE_DEVICES=all it can expose every GPU of the host.
 services:
   main:
-    x-gpu-memory-gb: 12   # GiB   # rcb-monitor
+    x-gpu-memory-gb: 4   # GiB   # rcb-monitor
     shm_size: "2gb"
     environment:
       NVIDIA_DRIVER_CAPABILITIES: all

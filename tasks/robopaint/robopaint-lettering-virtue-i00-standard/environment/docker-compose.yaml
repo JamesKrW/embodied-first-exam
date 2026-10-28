@@ -5,15 +5,15 @@
 # compose restarts the same container (its /data record stays) and the service resumes the episode from its journal.
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
+    pids_limit: 2048   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
   sim:
-    cpus: 4   # rcb-monitor
-    mem_limit: 10240m   # rcb-monitor
-    pids_limit: 8192   # rcb-monitor
-    x-gpu-memory-gb: 5   # GiB   # rcb-monitor
+    cpus: 3   # rcb-monitor
+    mem_limit: 5120m   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
+    x-gpu-memory-gb: 3   # GiB   # rcb-monitor
     build:   # environment/sim/Dockerfile: the base image, sim/ at /srv, the files shared with other tasks
       context: sim
       dockerfile: Dockerfile

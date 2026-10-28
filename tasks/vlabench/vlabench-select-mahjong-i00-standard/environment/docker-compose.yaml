@@ -3,14 +3,14 @@
 # CPU only: MuJoCo physics and OSMesa rendering (~15 ms per 320x320 image); no GPU reservation.
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
   sim:
-    cpus: 4   # rcb-monitor
-    mem_limit: 15360m   # rcb-monitor
-    pids_limit: 8192   # rcb-monitor
+    cpus: 3   # rcb-monitor
+    mem_limit: 11264m   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     build:   # the VLABench image: environment/sim/Dockerfile
       context: ./sim
       dockerfile: Dockerfile

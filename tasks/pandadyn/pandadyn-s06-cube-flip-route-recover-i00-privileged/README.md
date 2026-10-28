@@ -43,13 +43,13 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 20 GiB | 8192 | 5 GiB | 10 GiB |
-| verifier | 4 | 8 GiB | no cap | 5 GiB | no cap |
+| `main` (the agent's) | 4 | 10 GiB | 1024 | 3 GiB | 10 GiB |
+| verifier | 4 | 8 GiB | no cap | 3 GiB | no cap |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU with Vulkan (RTX 4090 / L4).
 - Measured: 50 oracle trials, 25 per mode (the trial's resource monitor every 5 s, RTX 4090): the privileged trial's peak 0.79 GiB (anon + shmem), GPU memory 0.05 GiB; CPU p90 about 1 core per container; one filmed scene (render_video, S12 and D07): RSS 1.2-1.3 GiB, GPU memory 0.25 GiB; CPU: one core per scene (CPU PhysX, single-threaded) plus one for the agent
-- Measured (caps): GPU memory: 0.25 GiB per scene -> max(1.5 x peak, peak + 4), rounded up: 5 GiB, room for a few scenes at once; processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 62 past trials: the agent's container memory 6.3 GiB, 87 threads, CPU 4.0 cores, GPU memory 0.4 GiB, disk 1.0 GiB
 
 ## Details
 | | |

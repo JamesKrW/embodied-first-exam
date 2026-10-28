@@ -45,13 +45,13 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
-| `sim` | 2 | 8 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 2 | 10 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 2 | 5 GiB | 1024 | no GPU | — |
 | verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
 - Measured: 30 Harbor trials of both modes of the six essential families (12 oracle, 12 nop, 6 Wuji) plus the hamburger and paper oracle and nop trials, CPU only, the trial's resource monitor every 5 s: the sim service at most 0.65 GiB (paper 0.51 GiB); the agent's container at most 0.03 GiB; one core per replay process
-- Measured (caps): processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 38 past trials: the agent's container memory 8.4 GiB, 304 threads, disk 2.0 GiB; the sim service memory 1.2 GiB, 89 threads
 
 ## Details
 

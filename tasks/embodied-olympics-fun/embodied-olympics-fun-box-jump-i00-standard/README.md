@@ -32,12 +32,13 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `sim` | 4 | 5 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
+- Measured (caps): per-container peaks in 573 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 6 trials), 5946 threads, CPU at its cap (4), disk 5.1 GiB; the sim service memory 1.0 GiB, 111 threads, CPU at its cap (4)
 
 ## Details
 | | |

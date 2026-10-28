@@ -3,13 +3,13 @@
  "caps": {
   "main": {
    "cpus": 8.0,
-   "disk_gb": 20.0,
+   "disk_gb": 10.0,
    "gpu_memory_gb": 16.0,
-   "memory_gb": 39.0,
-   "pids": 16384
+   "memory_gb": 32.0,
+   "pids": 2048
   }
  },
- "disk_gb": 20.0,
+ "disk_gb": 10.0,
  "disk_tick_sec": 60,
  "format": "rcb-limits/2",
  "gpu": true,

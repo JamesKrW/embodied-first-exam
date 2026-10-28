@@ -5,13 +5,13 @@
    "cpus": 4.0,
    "disk_gb": 10.0,
    "memory_gb": 10.0,
-   "pids": 8192
+   "pids": 1024
   },
   "sim": {
-   "cpus": 4.0,
-   "gpu_memory_gb": 4.0,
+   "cpus": 2.0,
+   "gpu_memory_gb": 3.0,
    "memory_gb": 8.0,
-   "pids": 8192
+   "pids": 1024
   }
  },
  "disk_gb": 10.0,

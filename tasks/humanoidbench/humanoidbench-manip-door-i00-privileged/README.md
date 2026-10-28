@@ -60,12 +60,12 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 16 | 20 GiB | 8192 | no GPU | 10 GiB |
+| `main` (the agent's) | 16 | 20 GiB | 2048 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: memory: privileged container median 2.2 GB (p90 11 GB when agents run parallel rollouts) (a per-container memory sampler); CPU only; CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 49 past trials: the agent's container memory 17.0 GiB, 781 threads, CPU at its cap (16), disk 6.5 GiB
 
 ## Details
 | | |

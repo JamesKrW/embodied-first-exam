@@ -7,7 +7,7 @@
 # sockets and no SO_MARK, which could bypass the egress proxy's mark.
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim, practice]
@@ -22,7 +22,7 @@ services:
     working_dir: /srv
     command: python3 /srv/core/launch.py
     cpus: 6
-    mem_limit: 8g
+    mem_limit: 7g
     pids_limit: 256
     cap_drop: [NET_RAW]
     environment:
@@ -69,7 +69,7 @@ services:
     working_dir: /srv
     command: python3 /practice/practice_server.py
     cpus: 4
-    mem_limit: 8g
+    mem_limit: 7g
     pids_limit: 256
     cap_drop: [NET_RAW]
     environment:

@@ -55,9 +55,9 @@ allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.
 
 [environment]
 build_timeout_sec = 1800.0
-cpus = 4
+cpus = 3
 memory_mb = 16384
-storage_mb = 20480
+storage_mb = 11264
 
 [verifier.environment]
 build_timeout_sec = 600.0

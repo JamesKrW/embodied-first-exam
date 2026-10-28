@@ -4,8 +4,8 @@
 # it only over HTTP (scorer:8001, or localhost:8001 when Harbor's egress control puts the services in one network namespace).
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
-    x-gpu-memory-gb: 5   # GiB   # rcb-monitor
+    pids_limit: 2048   # rcb-monitor
+    x-gpu-memory-gb: 3   # GiB   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [scorer]
@@ -18,9 +18,9 @@ services:
               capabilities: [gpu]
   scorer:
     cpus: 2   # rcb-monitor
-    mem_limit: 7168m   # rcb-monitor
-    pids_limit: 8192   # rcb-monitor
-    x-gpu-memory-gb: 5   # GiB   # rcb-monitor
+    mem_limit: 4096m   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
+    x-gpu-memory-gb: 3   # GiB   # rcb-monitor
     build:   # environment/scorer/Dockerfile: the base image, scorer/ at /srv, the files shared with other tasks
       context: scorer
       dockerfile: Dockerfile

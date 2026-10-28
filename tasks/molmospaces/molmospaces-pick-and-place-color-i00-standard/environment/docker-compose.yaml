@@ -6,15 +6,15 @@
 # environment setup begins, docs/protocol/standard_mode.md §13.4).
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
   sim:
-    cpus: 4   # rcb-monitor
-    mem_limit: 12288m   # rcb-monitor
-    pids_limit: 8192   # rcb-monitor
-    x-gpu-memory-gb: 7   # GiB   # rcb-monitor
+    cpus: 2   # rcb-monitor
+    mem_limit: 8192m   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
+    x-gpu-memory-gb: 5   # GiB   # rcb-monitor
     build:   # environment/sim/Dockerfile: the base image, sim/ at /srv, the files shared with other tasks
       context: sim
       dockerfile: Dockerfile

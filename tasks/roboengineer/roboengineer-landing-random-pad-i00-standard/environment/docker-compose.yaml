@@ -1,6 +1,6 @@
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     # Start the idle client immediately so the monitor can discover its beacon.
@@ -13,8 +13,8 @@ services:
       retries: 3
   sim:
     cpus: 4   # rcb-monitor
-    mem_limit: 6144m   # rcb-monitor
-    pids_limit: 8192   # rcb-monitor
+    mem_limit: 5120m   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     build:   # environment/sim/Dockerfile: the base image, sim/ at /srv, the files shared with other tasks
       context: sim
       dockerfile: Dockerfile

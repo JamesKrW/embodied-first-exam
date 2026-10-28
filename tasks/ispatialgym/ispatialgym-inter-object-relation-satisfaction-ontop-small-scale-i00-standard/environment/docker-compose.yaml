@@ -7,14 +7,14 @@
 # resumes the same episode from its journal. The sidecar is TRUSTED: its Kit cache is a volume of this trial only.
 services:
   main:
-    pids_limit: 16384   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
   sim:
     cpus: 12   # rcb-monitor
-    mem_limit: 32768m   # rcb-monitor
-    pids_limit: 16384   # rcb-monitor
+    mem_limit: 21504m   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     x-gpu-memory-gb: 9   # GiB   # rcb-monitor
     build:
       context: ./sim

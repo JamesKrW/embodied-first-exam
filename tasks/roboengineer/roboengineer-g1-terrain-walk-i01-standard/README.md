@@ -28,14 +28,14 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 12 GiB | 8192 | 20 GiB | 20 GiB |
-| `sim` | 4 | 6 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 4 | 12 GiB | 1024 | 20 GiB | 10 GiB |
+| `sim` | 4 | 6 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: L40S 48GB (all measurements; a 24 GB card fits the memory but trains slower, so fewer iterations fit the cutoff).
 - Measured: Harbor oracle (the reference: 4096 environments, 12638 s of training and deployments) and smoke trials on two L40S hosts (docker stats, cgroup memory.peak and nvidia-smi per container every 3-6 s): the agent's container 16.1 GiB (16492 MiB) of GPU memory, 5.3 GiB of memory (5.6 GiB cgroup peak, growing over the 3.5 h run), 1.0-1.6 cores (one Python thread drives the GPU); the public trainer's default 256 environments 1.8 GB, its cap of 1024 4.7 GB; the sidecar 2.2-2.6 cores during deployments (OSMesa), its 4-CPU cap during finalization (12 held-out cases twice and the video: 419 s), peak 2.06 GiB; at most 0.86 GiB of new files and 6 processes in the agent's container
-- Measured (caps): GPU memory: the reference (4096 environments) peaked at 16.1 GiB -> x 1.15, rounded up with headroom: 20 GiB (enough for about 4900 environments); disk: at most 0.86 GiB of new files in the reference
+- Measured (caps): GPU memory: the reference (4096 environments) peaked at 16.1 GiB -> x 1.15, rounded up with headroom: 20 GiB (enough for about 4900 environments); per-container peaks in 16 past trials: the agent's container memory 12.0 GiB (OOM-killed at the cap in 1 trial), 72 threads, CPU at its cap (4), GPU memory 17.5 GiB, disk 2.8 GiB; the sim service memory 0.9 GiB (2.1 GiB in an earlier measurement), 19 threads, CPU 2.6 cores
 
 ## Details
 

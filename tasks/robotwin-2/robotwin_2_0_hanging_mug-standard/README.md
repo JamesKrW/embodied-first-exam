@@ -39,14 +39,14 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 6 | 10 GiB | 8192 | 13 GiB | — |
-| verifier (as `main`) | 4 | 16 GiB | no cap | no GPU | 20 GiB |
+| `main` (the agent's) | 3 | 4 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 2 | 7 GiB | 1024 | 13 GiB | — |
+| verifier (as `main`) | 3 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: RTX 4090 24GB / L4 24GB.
 - Measured: GPU memory: per-trial peaks of past trials up to 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card (the oracle 6.9 GB on an RTX 4090, 5.8 GB on an L4); memory: sim p90 3.2 GB (a per-container memory sampler); CPU: an estimate
-- Measured (caps): GPU memory (the sim service): per-trial peaks of 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card -> max(1.5 x peak, peak + 4), rounded up: 13 GiB; processes and disk: defaults, not measured
+- Measured (caps): GPU memory (the sim service): per-trial peaks of 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card -> max(1.5 x peak, peak + 4), rounded up: 13 GiB; per-container peaks in 36 past trials: the agent's container memory 0.4 GiB, 122 threads, CPU 2.1 cores, disk 1.2 GiB; the sim service memory 3.3 GiB, 161 threads, CPU 1.7 cores, GPU memory 6.4 GiB (8.6 GiB in an earlier measurement)
 
 ## Details
 | | |

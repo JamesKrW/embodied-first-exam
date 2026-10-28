@@ -10,14 +10,14 @@
 # results under other settings are reported separately.
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
   sim:
-    cpus: 4   # rcb-monitor
-    mem_limit: 7168m   # rcb-monitor
-    pids_limit: 8192   # rcb-monitor
+    cpus: 2   # rcb-monitor
+    mem_limit: 4096m   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     x-gpu-memory-gb: 4   # GiB   # rcb-monitor
     build:   # environment/sim/Dockerfile: the base image, sim/ at /srv, the files shared with other tasks
       context: sim

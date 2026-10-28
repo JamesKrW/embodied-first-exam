@@ -8,14 +8,14 @@
 # trial's project, and Harbor's teardown `compose down --volumes` deletes it), never mounted where agent code runs.
 services:
   main:
-    pids_limit: 16384   # rcb-monitor
+    pids_limit: 8192   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
   sim:
     cpus: 12   # rcb-monitor
-    mem_limit: 51200m   # rcb-monitor
-    pids_limit: 16384   # rcb-monitor
+    mem_limit: 32768m   # rcb-monitor
+    pids_limit: 2048   # rcb-monitor
     x-gpu-memory-gb: 16   # GiB   # rcb-monitor
     build:
       context: ./sim

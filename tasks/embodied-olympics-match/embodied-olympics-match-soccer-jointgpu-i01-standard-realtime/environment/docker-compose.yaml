@@ -7,7 +7,7 @@
 # sockets and no SO_MARK, which could bypass the egress proxy's mark.
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
+    pids_limit: 2048   # rcb-monitor
     x-gpu-memory-gb: 12   # GiB   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor

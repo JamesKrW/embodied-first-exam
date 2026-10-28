@@ -2,8 +2,8 @@
 # sandbox rejects [environment].gpus, so the device is passed through by merging this onto the main service.
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
-    x-gpu-memory-gb: 7   # GiB   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
+    x-gpu-memory-gb: 5   # GiB   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     shm_size: "8gb"

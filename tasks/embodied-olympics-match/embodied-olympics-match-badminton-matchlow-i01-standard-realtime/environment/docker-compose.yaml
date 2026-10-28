@@ -9,7 +9,7 @@
 # decision 28: RCB_SKILL_REMOTE_ONLY; step() one bounded synchronous call per due control step: TIMING sync).
 services:
   main:
-    pids_limit: 8192   # rcb-monitor
+    pids_limit: 2048   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
@@ -23,7 +23,7 @@ services:
     working_dir: /srv
     command: python3 /srv/core/launch.py
     cpus: 6
-    mem_limit: 8g
+    mem_limit: 6g
     pids_limit: 256
     cap_drop: [NET_RAW]
     environment:

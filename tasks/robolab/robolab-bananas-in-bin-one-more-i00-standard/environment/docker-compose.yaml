@@ -8,15 +8,15 @@
 # watchdog, at least twice the slowest measured scene build (99-217 s, tasks/robolab/README.md).
 services:
   main:
-    pids_limit: 16384   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
   sim:
     cpus: 8   # rcb-monitor
     mem_limit: 23552m   # rcb-monitor
-    pids_limit: 16384   # rcb-monitor
-    x-gpu-memory-gb: 24   # GiB   # rcb-monitor
+    pids_limit: 2048   # rcb-monitor
+    x-gpu-memory-gb: 22   # GiB   # rcb-monitor
     build:
       context: ./sim
       dockerfile: Dockerfile

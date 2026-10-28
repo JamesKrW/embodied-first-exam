@@ -9,14 +9,14 @@
 # (tasks/maniguard/README.md; provisional until measured).
 services:
   main:
-    pids_limit: 16384   # rcb-monitor
+    pids_limit: 1024   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor
     depends_on: [sim]
   sim:
     cpus: 12   # rcb-monitor
-    mem_limit: 43008m   # rcb-monitor
-    pids_limit: 16384   # rcb-monitor
+    mem_limit: 39936m   # rcb-monitor
+    pids_limit: 2048   # rcb-monitor
     x-gpu-memory-gb: 18   # GiB   # rcb-monitor
     # maniguard-base (the first stage of the Dockerfile) is built from public sources; with read access to the prebuilt
     # image its layers are pulled instead (cache_from)

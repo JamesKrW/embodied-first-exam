@@ -138,7 +138,7 @@ as every container has its caps. A rule is a `[[cap]]` table:
   `memory_gb`, `pids` }; `gpu_memory_gb` on, and only on, a service that reserves a GPU. Memory, disk and GPU memory are
   in GiB; memory and disk a whole number of MiB (a multiple of 1/1024 GiB), since they are written in MiB.
 - optional: `gpu_types` (written to `[environment]`), `recommended_gpu`, `measured` (what the task was measured to use)
-  and `caps_measured` (where the GPU-memory and disk caps come from), each shown in the task README's `## Resources`
+  and `caps_measured` (the measured peaks the caps come from), each shown in the task README's `## Resources`
   (`gpu_types` as its `GPU:` line).
 
 **Who enforces a cap.** The run-time switch `RCB_LIMITS_ENFORCE` (default `0`) decides. With `0`, Docker and Harbor

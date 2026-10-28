@@ -41,12 +41,12 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `main` (the agent's) | 4 | 10 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: verifier 1.6 GB (a per-container memory sampler); the rest estimated (robosuite, CPU only, 256x256 OSMesa cameras)
-- Measured (caps): processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 62 past trials: the agent's container memory 6.5 GiB, 425 threads, CPU at its cap (4), disk 1.0 GiB
 
 ## Details
 | | |

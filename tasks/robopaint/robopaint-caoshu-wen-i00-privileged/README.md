@@ -76,14 +76,14 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 20 GiB | 8192 | 5 GiB | 10 GiB |
-| `scorer` | 2 | 7 GiB | 8192 | 5 GiB | — |
-| verifier | no cap | no cap | no cap | 5 GiB | no cap |
+| `main` (the agent's) | 8 | 12 GiB | 2048 | 3 GiB | 10 GiB |
+| `scorer` | 2 | 4 GiB | 1024 | 3 GiB | — |
+| verifier | no cap | no cap | no cap | 3 GiB | no cap |
 
 - GPU: any NVIDIA GPU, held by `main` and `scorer`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
 - Measured: GPU memory 0.25-0.5 GB (per-trial peaks of past trials); memory: privileged container p90 2.5 GB plus the scorer's 0.7 GB (a per-container memory sampler); CPU: an estimate
-- Measured (caps): GPU memory: a per-trial peak of 0.5 GiB -> max(1.5 x peak, peak + 4), rounded up: 5 GiB; the scorer service (the benchmark's own, recorded only) has the same 5 GiB; processes and disk: defaults, not measured
+- Measured (caps): per-container peaks in 53 past trials: the agent's container memory 7.8 GiB, 675 threads, CPU at its cap (8), GPU memory 0.3 GiB (0.5 GiB in an earlier measurement), disk 1.1 GiB; the scorer service memory 0.7 GiB, 50 threads, CPU 1.2 cores, GPU memory under 0.1 GiB (0.5 GiB in an earlier measurement)
 
 ## Details
 | | |

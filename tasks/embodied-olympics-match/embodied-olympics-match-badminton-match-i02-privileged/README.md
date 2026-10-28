@@ -33,12 +33,12 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
+| `main` (the agent's) | 4 | 8 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: Harbor oracle trials on two RTX 4090 workstations: CPU-only MuJoCo, no cameras in the match; the verifier holds the service, the program (2 GiB address space), one replay and the video renderer; 4 CPUs pinned (the match runs on the wall clock)
-- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
+- Measured (caps): per-container peaks in 24 past trials: the agent's container memory 5.3 GiB, 75 threads, CPU at its cap (4), disk 1.5 GiB
 
 ## Details
 

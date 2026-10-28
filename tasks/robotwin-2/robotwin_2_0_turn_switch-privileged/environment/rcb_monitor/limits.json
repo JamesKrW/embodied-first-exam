@@ -5,8 +5,8 @@
    "cpus": 4.0,
    "disk_gb": 10.0,
    "gpu_memory_gb": 13.0,
-   "memory_gb": 20.0,
-   "pids": 8192
+   "memory_gb": 10.0,
+   "pids": 1024
   }
  },
  "disk_gb": 10.0,
