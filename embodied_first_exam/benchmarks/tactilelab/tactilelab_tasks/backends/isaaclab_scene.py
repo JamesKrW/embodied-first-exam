@@ -179,7 +179,17 @@ class IsaacLabScene:
         self.sim.set_camera_view(eye=(1.2, -1.6, 1.9), target=(0.0, 0.0, 1.15))
 
         # ground, light, desk
-        sim_utils.GroundPlaneCfg().func("/World/ground", sim_utils.GroundPlaneCfg())
+        # the ground: a local static slab with the stock ground plane's friction. Isaac Lab's GroundPlaneCfg loads its USD
+        # from the Omniverse asset server, which a task container cannot reach (the verifier has no network, the
+        # agent's allowlist does not name it); nothing in the tasks rests on the ground (the robot and the desk stand
+        # on their own), it only catches a dropped object
+        ground = sim_utils.CuboidCfg(
+            size=(20.0, 20.0, 0.02),
+            collision_props=sim_utils.CollisionPropertiesCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.3, 0.3, 0.3)),
+            physics_material=sim_utils.RigidBodyMaterialCfg(static_friction=0.5, dynamic_friction=0.5),
+        )
+        ground.func("/World/ground", ground, translation=(0.0, 0.0, -0.01))
         light = sim_utils.DomeLightCfg(intensity=c.light_intensity, color=(1.0, 1.0, 1.0))
         light.func("/World/Light", light)
         if c.desk:
