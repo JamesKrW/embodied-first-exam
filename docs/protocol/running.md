@@ -157,9 +157,11 @@ Where each cap is set and who enforces it on which host: PROTOCOL §6. This sect
   settings, with `by`; a count of processes and threads over in two samples in a row), `kill` (`resource`: `memory`,
   `pids`, `disk`, `gpu_memory`; `pid`, `value`, `cap`), `throttle_start` / `throttle_end` (CPU, `method`: `cgroup` or
   `signal`; `sec`: the time its stops reached the container's processes, `engaged_sec`: the time it was engaged),
+  `throttle_insufficient` (the CPU cap could not be held: short processes alone used more than it),
   `unobservable` and `no_victim` (the backstop could not act), `backstop_error` (an action failed, or no pidfds on the
   host), `oom` (a kernel OOM kill, `cause` `cap` or
-  `host`). The verifier recomputes what was
+  `host`). The summary counts the record writes that failed (`write_errors`, per file) and the reads that failed for
+  want of a file descriptor (`fd_exhausted`). The verifier recomputes what was
   over a cap from the raw samples with its own copy of the caps (`tests/rcb_limits.json`, format `rcb-limits/2`). A
   missing, unsealed or mostly empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`; with
   `RCB_LIMITS_ENFORCE=1` that is not a result (`infra_error = 1`: the backstop that was asked for did not run).

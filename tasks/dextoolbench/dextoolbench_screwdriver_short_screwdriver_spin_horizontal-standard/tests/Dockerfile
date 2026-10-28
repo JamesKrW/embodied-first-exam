@@ -4,5 +4,5 @@ COPY test.sh /tests/
 COPY --from=ghcr.io/mll-lab-nu/efe:dextoolbench-files-0.3.0@sha256:e15e01e5c682e09c96b9c6e2d48def61a483a1ff8d2df74b813c4d3d845847a9 /standard/tests/grade.py /tests/grade.py
 RUN chmod +x /tests/test.sh
 # resources (PROTOCOL §6) # rcb-monitor
-COPY --from=ghcr.io/mll-lab-nu/efe:monitor-0.5.0@sha256:3209fb078999b179d0c2b249822172ecd8296cb4ee6f36389198b667ca879a0d /opt/rcb_monitor/rcb_limits.py /tests/rcb_limits.py
+COPY --from=ghcr.io/mll-lab-nu/efe:monitor-0.5.0@sha256:ecc5f24f1516ca11711d7c2d3ac07c89f79cd9220812c1244498ec71e352402a /opt/rcb_monitor/rcb_limits.py /tests/rcb_limits.py
 COPY rcb_limits.json /tests/rcb_limits.json

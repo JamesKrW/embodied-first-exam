@@ -131,7 +131,7 @@ roboEngineer task except the eight `roboengineer-neuralfly-*` ones.
 Rules: `scripts/task_resources.toml` (`^roboengineer-`), measured on 2026-10-18 (Harbor 0.23 trials,
 docker stats, cgroup `memory.peak` and per-container `nvidia-smi` every 3-6 s). The verifier only reads JSON (~20 s).
 
-- **28 CPU tasks** (all but G1; caps: each task's `task.toml`). The sidecar uses 1.7-1.9 cores while a deployment runs (one worker, OSMesa), its full 4 cores while it
+- **28 CPU tasks** (all but G1; caps: main's in each task's `task.toml`, the sidecar's in its `environment/docker-compose.yaml`; PROTOCOL §6). The sidecar uses 1.7-1.9 cores while a deployment runs (one worker, OSMesa), its full 4 cores while it
   finalizes (held-out cases twice on four single-threaded workers, then the video: 79-199 s) and, for Neural Landing,
   through the per-case reference search before the agent starts (~480 s); its peak memory is 0.6-2.1 GiB (go2-weave
   the largest), 1.2 GiB for landing. The reference runs' agent containers stay below 0.25 GiB. The sidecar's 4 cores

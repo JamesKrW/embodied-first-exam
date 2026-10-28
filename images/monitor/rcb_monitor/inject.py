@@ -50,12 +50,12 @@ try:
 except ImportError:                      # run as a script from this directory
     import rcb_limits  # type: ignore[no-redef]
 CODE = ("monitor.py", "rcb_limits.py", "selftest.py")   # in the monitor image at /opt/rcb_monitor/ (images/monitor/Dockerfile)
-IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.5.0@sha256:3209fb078999b179d0c2b249822172ecd8296cb4ee6f36389198b667ca879a0d"
+IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.5.0@sha256:ecc5f24f1516ca11711d7c2d3ac07c89f79cd9220812c1244498ec71e352402a"
 # The sha256 of each CODE file in IMAGE (`inject.py verify-image` reads them back from the image; `inject.py contents`
 # prints them for this directory's files). A change to a CODE file needs a new image: build images/monitor/, bump its
 # VERSION, push it, then put the new digest in IMAGE and the new hashes here.
 CONTENTS = {
-    "monitor.py": "e771f6f3b8834dc28cfea37faa3df11a2998d04e9407876cf99b1ad536acdd78",
+    "monitor.py": "b08e767164013f052d0eaa4063d2e526906cf8a6bc01b60ebd41170f21ed79b1",
     "rcb_limits.py": "4eadc759714606651cc07493dc5e160930865d8a00d578431a396353ea04bc4b",
     "selftest.py": "c9052986c2ad5d0dcbf8e87bd6a53e570bd36b26eb8bb2e07d199046210114b7",
 }

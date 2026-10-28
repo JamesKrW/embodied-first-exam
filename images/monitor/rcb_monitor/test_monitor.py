@@ -68,7 +68,7 @@ class Fake:
         return r
 
     def _entry(self, base, mnt, root, start, state="S", ppid=1, nspid=None, threads=1, rss_kb=1024, pss_kb=None,
-               write_bytes=None, cpu_ticks=10):
+               write_bytes=None, cpu_ticks=10, child_ticks=0):
         os.makedirs(os.path.join(base, "ns"), exist_ok=True)
         for link, target in ((os.path.join(base, "ns", "mnt"), mnt), (os.path.join(base, "root"), root)):
             if os.path.lexists(link):
@@ -76,8 +76,8 @@ class Fake:
             if target is not None:
                 os.symlink(target, link)
         pid = os.path.basename(base)
-        fields = [state, str(ppid)] + ["0"] * 9 + [str(cpu_ticks // 2), str(cpu_ticks - cpu_ticks // 2)] + ["0"] * 6 \
-            + [str(start)] + ["0"] * 10
+        fields = [state, str(ppid)] + ["0"] * 9 + [str(cpu_ticks // 2), str(cpu_ticks - cpu_ticks // 2)] \
+            + [str(child_ticks // 2), str(child_ticks - child_ticks // 2)] + ["0"] * 4 + [str(start)] + ["0"] * 10
         with open(os.path.join(base, "stat"), "w") as f:
             f.write(f"{pid} (x) " + " ".join(fields) + "\n")
         with open(os.path.join(base, "status"), "w") as f:
@@ -1720,13 +1720,435 @@ def test_review6_minor():
         f.close()
 
 
+class Clock:
+    """monitor.now() moved by hand."""
+
+    def __init__(self, t=1000.0):
+        self.t, self.real = t, monitor.now
+
+    def __enter__(self):
+        monitor.now = lambda: self.t
+        return self
+
+    def __exit__(self, *a):
+        monitor.now = self.real
+
+
+def test_pids_zombies_for_good():
+    """The backstop's own victims stay discounted for as long as they are zombies (a parent that never reaps keeps
+    them for good: no ratchet after any time); a reaped victim's PID taken by a new process is that process's."""
+    f = Fake()
+    try:
+        _agent_container(f, {101: {"threads": 3}})            # 7 of 5
+        m = f.monitor(LIM, enforce="1")
+        with Clock() as c, Kills() as k:
+            _one(m)
+            c.t += 5
+            _one(m, 105.0)
+            check(k.killed() == [104, 102], f"the first kills: {k.killed()}")
+            for p, start in ((104, 6000), (102, 5001)):
+                f.pid(p, None, None, start=start, state="Z", ppid=101)
+                f.thread(p, p, None, None, start=start)
+            for i in range(4):                                  # 0 s, 700 s, 1400 s, 2100 s later
+                c.t += 700
+                _, ms = _one(m, c.t)
+                c.t += 5
+                _, ms = _one(m, c.t)
+            check(len(k.killed()) == 2 and ms[0]["zombies"] == 2, f"no second kill after 2100 s: {k.killed()} {ms[0]}")
+            # 104 is reaped and its PID taken by a new process: not discounted any more (102 still is)
+            f.pid(104, "mnt:[111]", f.root("main"), start=9000, ppid=101, nspid=12)
+            _one(m, c.t + 5)
+            check(set(m.recent) == {102}, f"only the zombie with its start time is the kill's: {m.recent}")
+        # a victim that has not died yet (SIGKILL sent, exit under way) is neither counted nor killed again
+        f2 = Fake()
+        try:
+            _agent_container(f2, {101: {"threads": 3}})
+            m2 = f2.monitor(LIM, enforce="1")
+            with Kills() as k2:
+                _one(m2)
+                _one(m2, 105.0)
+                _one(m2, 110.0)
+                _one(m2, 115.0)
+            check(k2.killed() == [104, 102], f"killed, still there (Kills sends nothing): never again: {k2.killed()}")
+        finally:
+            f2.close()
+    finally:
+        f.close()
+
+
+def _hb_gaps(conts):
+    """The longest run of periods without a SIGCONT, in periods."""
+    gap = best = 0
+    for c in conts:
+        gap = 0 if c else gap + 1
+        best = max(best, gap)
+    return best + 1
+
+
+def test_throttle_churn():
+    """Processes that start while a container is throttled are stopped in the same period (they are looked for twice
+    in every period, between the full refreshes), with a cgroup (its process list) and without one (new PIDs of
+    /proc); the ones gone are dropped."""
+    import signal
+    for with_cg in (True, False):
+        f = Fake()
+        try:
+            _agent_container(f)
+            if with_cg:
+                f.cgroup("docker-" + "cd" * 32 + ".scope", pids=[100, 101, 102, 103, 104], anon_gb=0.1)
+            m = f.monitor(LIM, enforce="1")
+            groups = m.groups()
+            g = next(iter(groups.values()))
+            mnt = g["mnt"]
+            x = m.measure(g, {}, 100.0)
+            check(bool(g.get("cg")) == with_cg, f"cgroup: {g.get('cg')}")
+            x["cpu"] = 8.0                                      # share 0.25
+            vt = [0.0]
+
+            def vsleep(dt):
+                vt[0] += dt
+            with Kills() as k:
+                m.backstop(g, x, 100.0)
+                e = m.throttle.active[mnt]
+                if with_cg:
+                    e["method"] = "signal"                      # the cgroup's quota not writable: signals
+                m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+                check(set(e["procs"]) == {101, 102, 104}, f"the set: {e['procs']}")
+                # a compiler job starts: in the same period it is stopped with the rest, not a second later
+                f.pid(105, "mnt:[111]", f.root("main"), start=7000, ppid=102, nspid=13)
+                if with_cg:
+                    f.cgroup("docker-" + "cd" * 32 + ".scope", pids=[100, 101, 102, 103, 104, 105])
+                del k.calls[:]
+                e["refreshed"] = monitor.now()                  # well inside THROTTLE_REFRESH_SEC
+                m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+                check((105, signal.SIGSTOP) in k.calls and 105 in e["procs"],
+                      f"with_cg={with_cg}: the new process stopped in its first period: {k.calls}")
+                # it ends: dropped at the next look, without a signal
+                f.gone(105)
+                if with_cg:
+                    f.cgroup("docker-" + "cd" * 32 + ".scope", pids=[100, 101, 102, 103, 104])
+                del k.calls[:]
+                m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+                check(105 not in e["procs"] and all(p != 105 for p, _ in k.calls), f"dropped: {k.calls}")
+                # another trial's process (another root, no beacon) is never added
+                f.pid(106, "mnt:[111]", f.host, start=7100, ppid=1, nspid=106)
+                m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+                check(106 not in e["procs"] and all(p != 106 for p, _ in k.calls), "not the trial's: never signalled")
+                m.throttle.release_all("test")
+        finally:
+            f.close()
+
+
+def test_throttle_controller():
+    """The share under churn: what new processes used before they were first seen ran free (escape) and is taken off
+    the cap; the rest is the throttled processes' demand. The share never goes under the floor, so a long-lived
+    process (a heartbeat) is never held for more than 0.4 s; when the escape alone is over the cap,
+    `throttle_insufficient` once, and no release while the container still uses more than the cap."""
+    import signal
+    f = Fake()
+    try:
+        _agent_container(f)
+        m = f.monitor(LIM, enforce="1")
+        groups = m.groups()
+        g = next(iter(groups.values()))
+        mnt = g["mnt"]
+        x = m.measure(g, {}, 100.0)
+        check(monitor.Throttler.floor(0.25, 1) == 0.25 and monitor.Throttler.floor(0.25, 64) == 0.005 and
+              monitor.Throttler.floor(2.0, 16) == 0.125, "the floor: the cap over the CPUs, at least 0.005")
+        cap, HZ = 2.0, monitor.HZ
+        with Clock(1000.0) as c, Kills() as k:
+            x["cpu"] = 8.0
+            m.backstop(g, x, 100.0)
+            e = m.throttle.active[mnt]
+            check(abs(e["frac"] - 0.25) < 1e-9 and e["floor"] == monitor.THROTTLE_MIN_FRACTION, f"engaged: {e['frac']}")
+
+            def tick(escape):                                   # 5 s: the set wants 8 CPUs, new processes ran free
+                c.t += 5                                        # for `escape` CPUs before they were seen
+                e["escape_ticks"] = int(escape * 5 * HZ)
+                x["cpu"] = 8.0 * e["frac"] + escape
+                m.backstop(g, x, c.t)
+            for _ in range(6):
+                tick(0.5)
+            held = 8.0 * e["frac"] + 0.5
+            check(m.throttle.throttled(mnt) and abs(held - cap) < 0.02, f"the cap is held: {held} {e['frac']}")
+            check(not f.events("throttle_insufficient"), "the floor not reached")
+            for _ in range(5):                                  # the churn alone uses more than the cap
+                tick(3.0)
+            check(m.throttle.throttled(mnt) and e["frac"] == e["floor"], f"at the floor: {e['frac']}")
+            ev = f.events("throttle_insufficient")
+            check(len(ev) == 1 and ev[0]["escape"] == 3.0 and ev[0]["cap"] == cap, f"said once: {ev}")
+            # the set idle (or frozen), the churn still over the cap: not "demand 0.0", still throttled
+            c.t += 5
+            e["escape_ticks"] = int(2.5 * 5 * HZ)
+            x["cpu"] = 2.5
+            m.backstop(g, x, c.t)
+            check(m.throttle.throttled(mnt), "the escape alone over the cap: no release")
+            # at the floor a long-lived process runs at least every 0.4 s
+            vt = [0.0]
+
+            def vsleep(dt):
+                vt[0] += dt
+            conts = []
+            for _ in range(24):
+                n0 = len(k.calls)
+                m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+                conts.append(any(p == 101 and sg == signal.SIGCONT for p, sg in k.calls[n0:]))
+            gap = _hb_gaps(conts) * m.throttle.period
+            check(gap <= 0.4 + 1e-9, f"the longest hold of a process: {gap} s")
+            # the demand falls: released, with the record saying the cap was not held
+            c.t += 5
+            e["escape_ticks"] = 0
+            x["cpu"] = 8.0 * e["frac"] * 0.1
+            m.backstop(g, x, c.t)
+            check(not m.throttle.throttled(mnt), "released")
+            check(f.events("throttle_end")[-1].get("insufficient") is True, f"{f.events('throttle_end')}")
+        # a process that joins the set brings what it used before it was seen into the escape
+        f.pid(105, "mnt:[111]", f.root("main"), start=7000, ppid=102, nspid=13, cpu_ticks=3 * HZ)
+        with Kills():
+            x["cpu"] = 8.0
+            m.backstop(g, x, 200.0)
+            e = m.throttle.active[mnt]
+            m.throttle._catch_up(mnt, e)
+            check(105 in e["procs"] and e["escape_ticks"] == 3 * HZ, f"escape: {e.get('escape_ticks')}")
+            m.throttle.release_all("test")
+    finally:
+        f.close()
+
+
+def test_emergency_never_blocks():
+    """SIGTERM while another thread holds the state lock and the throttle's lock: the handler lets every process the
+    monitor stopped go at once, writes no state.json, and no SIGSTOP goes out after it."""
+    import signal
+    import threading
+    f = Fake()
+    try:
+        _agent_container(f)
+        m = f.monitor(LIM, enforce="1")
+        groups = m.groups()
+        g = next(iter(groups.values()))
+        mnt = g["mnt"]
+        x = m.measure(g, {}, 100.0)
+        x["cpu"] = 8.0
+        vt = [0.0]
+
+        def vsleep(dt):
+            vt[0] += dt
+        with Kills() as k:
+            m.backstop(g, x, 100.0)
+            m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+            f.pid(102, "mnt:[111]", f.root("main"), start=5001, ppid=101, nspid=10, state="T")   # 102: T, ours
+            f.pid(101, "mnt:[111]", f.root("main"), start=5000, ppid=77, nspid=9, state="T")
+            m.throttle.active[mnt]["ours"].pop(101)        # 101 stopped by the agent since: dropped as not ours
+            hold, done = threading.Event(), threading.Event()
+
+            def holder():
+                with m.state_lock, m.throttle.lock:
+                    hold.set()
+                    done.wait(10)
+            th = threading.Thread(target=holder, daemon=True)
+            th.start()
+            hold.wait(5)
+            os.remove(os.path.join(f.rec, "state.json")) if os.path.exists(os.path.join(f.rec, "state.json")) else None
+            del k.calls[:]
+            t0 = monitor.now()
+            em = threading.Thread(target=m.throttle.emergency, daemon=True)
+            em.start()
+            em.join(5)
+            check(not em.is_alive() and monitor.now() - t0 < 2, "never waits for a lock")
+            done.set()
+            th.join(5)
+            check({p for p, sg in k.calls if sg == signal.SIGCONT} == {102, 104} and
+                  not os.path.exists(os.path.join(f.rec, "state.json")),
+                  f"what it stopped is let go, no state written: {k.calls}")
+            del k.calls[:]
+            m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+            check(all(sg != signal.SIGSTOP for _, sg in k.calls), f"no SIGSTOP after it: {k.calls}")
+    finally:
+        f.close()
+
+
+def test_cumulative_cpu():
+    """No cgroup: a process that starts and ends between two samples is counted (through its parent's count of reaped
+    children, or through all it used when it started after the last sample), and never twice."""
+    f = Fake()
+    try:
+        with open(os.path.join(f.proc, "stat"), "w") as fh:
+            fh.write("cpu 0 0 0 0\nbtime 0\n")
+        _agent_container(f)
+        m = f.monitor(LIM, enforce="0")
+        HZ = monitor.HZ
+        with Clock(1000.0) as c:
+            _, ms = _one(m, 100.0)
+            check(ms[0]["cpu"] == 0, "the first sample: nothing to compare with")
+            # 10 s: 102 used 2 s of its own; a make job (child of 102) ran 5 s and was reaped by 102
+            c.t += 10
+            f.pid(102, "mnt:[111]", f.root("main"), start=5001, ppid=101, nspid=10, cpu_ticks=10 + 2 * HZ,
+                  child_ticks=5 * HZ)
+            _, ms = _one(m, 110.0)
+            check(abs(ms[0]["cpu"] - 0.7) < 0.011, f"2 + 5 s over 10 s: {ms[0]['cpu']}")
+            # 10 s: a new process, started after the last sample, used 3 s and is still there
+            c.t += 10
+            f.pid(105, "mnt:[111]", f.root("main"), start=int(1015 * HZ), ppid=102, nspid=13, cpu_ticks=3 * HZ)
+            _, ms = _one(m, 120.0)
+            check(abs(ms[0]["cpu"] - 0.3) < 0.011, f"the new one's 3 s: {ms[0]['cpu']}")
+            # 10 s: 105 ends after 1 s more; 102 reaps it (its count rises by all 4 s): only the 1 s is new
+            c.t += 10
+            f.gone(105)
+            f.pid(102, "mnt:[111]", f.root("main"), start=5001, ppid=101, nspid=10, cpu_ticks=10 + 2 * HZ,
+                  child_ticks=9 * HZ)
+            _, ms = _one(m, 130.0)
+            check(abs(ms[0]["cpu"] - 0.1) < 0.011, f"not counted twice: {ms[0]['cpu']}")
+            # an old process seen for the first time (it started long before) is not counted with all it used
+            c.t += 10
+            f.pid(106, "mnt:[111]", f.root("main"), start=10, ppid=100, nspid=14, cpu_ticks=500 * HZ)
+            _, ms = _one(m, 140.0)
+            check(ms[0]["cpu"] == 0, f"started before the last sample: {ms[0]['cpu']}")
+    finally:
+        f.close()
+
+
+def test_write_errors():
+    """A record write that fails is counted (summary.json `write_errors`), never raised; the fd limit is raised."""
+    soft0 = None
+    try:
+        import resource
+        soft0 = resource.getrlimit(resource.RLIMIT_NOFILE)
+    except ImportError:
+        pass
+    n = monitor.raise_nofile()
+    if soft0:
+        check(n is None or n >= soft0[0], f"the soft limit raised: {soft0} -> {n}")
+        import resource
+        resource.setrlimit(resource.RLIMIT_NOFILE, soft0)
+    f = Fake()
+    try:
+        m = f.monitor(LIM, enforce="1")
+        before = dict(monitor.IO_ERRORS["write"])
+        monitor.REC = os.path.join(f.d, "missing")
+        monitor.event("x")
+        monitor.append("samples.jsonl", {})
+        m.save_state()
+        w = monitor.IO_ERRORS["write"]
+        check(w.get("events.jsonl", 0) == before.get("events.jsonl", 0) + 1 and
+              w.get("samples.jsonl", 0) == before.get("samples.jsonl", 0) + 1 and
+              w.get("state.json", 0) == before.get("state.json", 0) + 1, f"counted: {w}")
+        monitor.REC = f.rec
+        _write_meta(f)
+        m.seal()
+        s = rcb_limits.read_json(os.path.join(f.rec, "summary.json"))
+        check(s["write_errors"].get("events.jsonl", 0) >= 1 and "fd_exhausted" in s, f"in the summary: {s}")
+    finally:
+        f.close()
+
+
+def _write_meta(f):
+    with open(os.path.join(f.rec, "meta.json"), "w") as fh:
+        json.dump({"started": 0}, fh)
+
+
+def test_real_pidfd():
+    """The shipped path, on real processes and this kernel's /proc: pidfds held while throttled, SIGSTOP / SIGCONT
+    through them, a process that dies is skipped, a new one is stopped in its first period; beyond the fd budget a
+    process is signalled by PID; every fd is closed when the throttle ends."""
+    import signal
+    import time
+    if not hasattr(os, "pidfd_open") or not os.path.isdir("/proc/self"):
+        print("test_real_pidfd: skipped (no os.pidfd_open here)")
+        return
+    try:
+        os.close(os.pidfd_open(os.getpid()))
+    except OSError:
+        print("test_real_pidfd: skipped (pidfd_open refused here)")
+        return
+    saved = monitor.PROC, monitor.REC
+    rec = tempfile.mkdtemp(prefix="rcb-monitor-real-")
+    kids = []
+
+    def state(p):
+        return monitor.state_of(f"/proc/{p}")
+
+    def wait_state(p, want, sec=2.0):
+        t = time.time()
+        while time.time() - t < sec:
+            if state(p) == want:
+                return True
+            time.sleep(0.005)
+        return False
+    try:
+        monitor.PROC, monitor.REC = "/proc", rec
+        kids = [subprocess.Popen(["sleep", "60"]) for _ in range(3)]
+        ids = {k.pid for k in kids}
+
+        class Mon:                                              # the trial: these children only
+            threads = False
+            members = set(ids)
+
+            def in_trial(self, p):
+                return p in self.members
+
+            def live_thread(self, p):
+                return None
+
+            def spared(self, pids):
+                return set()
+
+            def save_state(self):
+                pass
+        mon = Mon()
+        th = monitor.Throttler(mon)
+        mnt = os.readlink("/proc/self/ns/mnt")
+        g = {"pids": sorted(ids), "role": "main", "service": "main", "cg": None}
+        th.engage(mnt, g, 0.25, 1.0, 0.0)
+        e = th.active[mnt]
+        check(set(e["procs"]) == ids and all(isinstance(v[1], int) and isinstance(v[2], int) for v in e["procs"].values()) and
+              th.fds == 6,
+              f"a pidfd per process: {e['procs']}")
+        th.cycle()
+        check(all(wait_state(p, "T") for p in ids), "stopped through the pidfds")
+        # one dies while stopped: its pidfd says so, the others go on
+        kids[0].kill()
+        kids[0].wait()
+        th.cycle()
+        # a new process of the trial: stopped in its first period, through a pidfd of its own
+        new = subprocess.Popen(["sleep", "60"])
+        kids.append(new)
+        mon.members.add(new.pid)
+        e["refreshed"] = monitor.now()
+        th.cycle()
+        check(new.pid in e["procs"] and wait_state(new.pid, "T"), "a new process: stopped in its first period")
+        # beyond the budget: by PID, checked before every signal
+        th.fd_budget = th.fds + 1
+        more = subprocess.Popen(["sleep", "60"])
+        kids.append(more)
+        mon.members.add(more.pid)
+        th.cycle()
+        check(e["procs"][more.pid][1] is None and e["procs"][more.pid][2] is None and wait_state(more.pid, "T"), "by PID beyond the budget")
+        check(any("open-file limit" in (x.get("why") or "") for x in
+                  rcb_limits.read_jsonl(os.path.join(rec, "events.jsonl")) if x.get("event") == "backstop_error"),
+              "said once")
+        th.release_all("test")
+        live = [k.pid for k in kids[1:]]
+        check(all(wait_state(p, "S") for p in live) and th.fds == 0, f"all let go, every fd closed: {th.fds}")
+    finally:
+        for k in kids:
+            try:
+                k.kill()
+                k.wait(5)
+            except Exception:
+                pass
+        monitor.PROC, monitor.REC = saved
+        shutil.rmtree(rec, ignore_errors=True)
+
+
 def main():
     for t in (test_classify_race, test_dead_leader_and_zombies, test_disk_walk, test_disk_baseline, test_backstop_memory,
               test_backstop_pids, test_backstop_cpu, test_backstop_gpu, test_backstop_disk, test_runtime_first,
               test_throttle_signals, test_cgroup_container, test_runtime_while_starting, test_bad_tolerance, test_selftest_fixtures, test_backstop_services,
               test_backstop_record, test_switch, test_verify_edges, test_oom_watch, test_oom_verdicts, test_sanitize, test_default_is_neutral,
               test_clock_and_beacon, test_session_log_copy, test_stop_without_cgroup,
-              test_throttle_restart_and_ownership, test_review6_minor):
+              test_throttle_restart_and_ownership, test_review6_minor, test_pids_zombies_for_good, test_throttle_churn,
+              test_throttle_controller, test_emergency_never_blocks, test_cumulative_cpu, test_write_errors,
+              test_real_pidfd):
         t()
     shutil.rmtree(os.environ["RCB_MONITOR_RECORD"], ignore_errors=True)
     print("rcb_monitor test_monitor: ok")

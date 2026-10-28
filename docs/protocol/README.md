@@ -147,10 +147,12 @@ of 1.5 × the peak and the peak + 2 GiB, at least 16 GiB for Isaac Sim; CPU at l
 the cap and on hosts that did not, and a simulator that runs in real time keeps the CPU its slowdown was measured with;
 processes and threads a power of two at least 2 × the peak thread count (4 × for Isaac Sim, whose thread count follows
 the host's cores), at least 1024; disk at least 10 GiB. The peaks never raise a cap above the rule's earlier cap, for
-any resource: such a cap stays where it was. From the largest call the task allows: a simulator service that builds a
-response of frames in memory gets at least its resident size + 1.2 × what building the largest legal response holds,
-in whole GiB, and 2 GiB more where that leaves no margin over thin data. Only this rule, or an owner's decision, raises a
-cap above the earlier one.
+any resource: such a cap stays where it was. A cap with no per-container measurement is kept at the earlier cap. From
+the largest call the task allows: a simulator service that builds a response of frames in memory gets at least its
+resident size + 1.2 × what building the largest legal response holds, in whole GiB, and 2 GiB more where that leaves no
+margin over thin data. A cap may be set above what the peaks give only by (a) this largest-call rule, (b) kernel OOM
+kills recorded at the earlier cap, or (c) an owner's decision, which may also set a cap below. `caps_measured` names
+which one applies.
 
 **Who enforces a cap.** The container's runtime first: Docker and Harbor apply what the host lets them (the table).
 The resource monitor (the `rcb_monitor` sidecar) reads each container's own cgroup limits (`cpu.max`, `memory.max`,
@@ -186,7 +188,13 @@ The fallback is used only where the container's runtime does not hold its CPU an
 (rootless runtimes; `cgroup: host` is read-only on most hosts). A stop the agent sends to a process while the monitor
 holds it stopped cannot be told from the monitor's own, and is undone with it. A restarted monitor resumes every stopped
 process of a throttled container that is not known to have been stopped by the agent. A container is its own cgroup when it has one: a process
-of it in another mount namespace still counts in it.
+of it in another mount namespace still counts in it. The fallback looks for new processes twice per period, so a short
+process can run free for up to one period before it is stopped. The share never drops below the cap divided by the
+container's CPUs, or 0.5 %, so no throttled process is held for more than 0.4 s. When the short processes alone use more
+than the cap, the monitor holds what it can and records `throttle_insufficient`. Without a cgroup of its own (Quest
+apptainer, rootless podman without delegation), the monitor counts a container's CPU from its processes, including the
+children they have reaped. A process that ends between two samples counts only through its parent, so CPU use may be
+under-recorded when the parent is outside the container or never waits.
 
 On cgroup v1, Docker applies CPU, memory and processes through the v1 controllers; the monitor then measures memory
 by PSS and reads no kernel OOM counters. It reads the runtime's limits from the container's directories (and their
