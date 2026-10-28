@@ -31,7 +31,7 @@ parts:
 extract: {target: tube_base, slot: hole, clearance: 0.01, retrieve: 0.1, substeps: 300}
 success: {assembled_margin: 0.042, assembled_lateral: 0.01, assembled_axis_deg: 8.0, release_clear: 0.15, jaw_open_width: 0.09,
   require_grasp_latch: true, grasp_lift_thresh: 0.04, grasp_hold_thresh: 0.3, end_on_release: false, drop_z: 0.95, carry_lost: 0.45,
-  target_move: 0.05}
+  target_move: 0.05, final_check: {margin: 0.0420}}
 tactile:
   enabled: true
   targets: [tube]

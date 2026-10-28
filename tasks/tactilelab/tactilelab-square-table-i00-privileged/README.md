@@ -12,7 +12,7 @@
 | Base image | `ghcr.io/mll-lab-nu/efe-private:tactilelab-0.1.0` |
 
 ## Task
-Insert and screw all four legs into the four corner bores of the fixed table top.
+Insert all four legs into the four corner bores of the fixed table top and leave them seated.
 
 ## Difficulty
 Contact-rich manipulation with a tactile gripper, driven through end-effector targets only.

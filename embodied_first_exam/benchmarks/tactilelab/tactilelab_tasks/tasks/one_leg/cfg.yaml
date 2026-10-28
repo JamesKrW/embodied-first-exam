@@ -23,7 +23,7 @@ scene:
 parts:
 - {held: square_table_leg, target: square_table_top, slot: corner_pn, screw: true}
 success: {assembled_margin: 0.005, assembled_lateral: 0.008, assembled_axis_deg: 15.0, require_grasp_latch: true, end_on_release: true,
-  release_open_mm: 10.0, release_settle_steps: 0, assembled_clear: 0.35, grasp_lift_thresh: 0.04, grasp_hold_thresh: 0.3}
+  release_open_mm: 10.0, release_settle_steps: 0, assembled_clear: 0.35, grasp_lift_thresh: 0.04, grasp_hold_thresh: 0.3, final_check: {margin: 0.0050}}
 tactile:
   enabled: true
   targets: [square_table_leg, square_table_top]

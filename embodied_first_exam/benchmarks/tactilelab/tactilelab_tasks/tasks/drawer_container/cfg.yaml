@@ -30,7 +30,7 @@ parts:
 - {held: drawer_container_bottom, target: drawer_box, slot: slot_lower, screw: false, push: true, push_target: 0.165}
 - {held: drawer_container_top, target: drawer_box, slot: slot_upper, screw: false, push: true, push_target: 0.165, joint_approach: true}
 success: {assembled_margin: 0.012, assembled_lateral: 0.006, assembled_axis_deg: 12.0, settle_ticks: 30, settle_eps: 0.0005,
-  assembled_clear: 0.0, require_grasp_latch: true, grasp_lift_thresh: 0.04, grasp_hold_thresh: 0.3, end_on_release: false}
+  assembled_clear: 0.0, require_grasp_latch: true, grasp_lift_thresh: 0.04, grasp_hold_thresh: 0.3, end_on_release: false, final_check: {margin: 0.0120}}
 tactile:
   enabled: true
   targets: [drawer_container_bottom, drawer_container_top]

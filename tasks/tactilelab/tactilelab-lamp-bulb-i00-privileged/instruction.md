@@ -1,6 +1,6 @@
 # TactileLab · lamp_bulb — frozen instance
 
-Pick up the light bulb, screw it into the socket of the lamp base, then put the lampshade (hood) over it onto the base, and let go.
+Pick up the light bulb, put it down into the socket of the lamp base (turning it is allowed, not required), then put the lampshade (hood) over it onto the base, and let go.
 
 Objects: `lamp_base` (fixed, at about (-0.004, -0.166), mounted upside down so its socket opens upward), `lamp_bulb` (the bulb, 38.5 g, standing upright at about (-0.003, 0.077)) and `lamp_hood` (the shade, 50 g, standing upright at about (-0.080, 0.249)). The bulb goes into the base's slot `socket`, the hood onto its slot `hood_seat`. Insertion geometry (tips, axes, bores) is in the objects' `Annotation/insertion_pose.json` files, in each object's own frame: the tip is `insertion_axis.head_local`, the axis runs tail to head, a bore runs from `hole_top_local` to `hole_bottom_local` of its slot.
 
@@ -9,7 +9,7 @@ The success predicate, checked after every control step, is reached once all of 
 - the hood counts as inserted (and stays so: a later pop-out does not undo it) at the first step where its insertion tip is in the bore: lateral offset from the bore axis at most **8 mm**, angle between its insertion axis and the bore axis at most **15°**, depth along the bore at least **41.3 mm** (the bore is 46.3 mm long)
 - the bulb was lifted more than **4 cm** above its starting height while the right end-effector (wrist link) was within 0.3 m of it (the robot picked it up)
 - the right gripper has made a release (Conventions) that has held for 60 steps
-Once reached, the task stays solved for the rest of the episode.
+Once reached, the predicate stays reached for the rest of the episode. The task is solved when it was reached and, at the end of the replay (after its 60-step hold), the bulb and the hood are each still in its bore within the bounds above (lateral offset, angle, depth): a part pulled out again after the predicate was reached fails.
 
 This is a *fixed scene instance*: the objects and the robot always start at the same poses. You may reset and
 retry as many times as you want. Your deliverable is **one replayable trajectory**, not a general policy.

@@ -24,7 +24,7 @@ parts:
 - {held: hdmi, target: hdmi_slot, slot: hole, screw: false}
 success: {assembled_margin: 0.005, assembled_lateral: 0.006, assembled_axis_deg: 15.0, release_clear: 0.15, jaw_open_width: 0.09,
   require_grasp_latch: true, grasp_lift_thresh: 0.02, grasp_hold_thresh: 0.3, end_on_release: false, drop_z: 0.95, carry_lost: 0.45,
-  target_move: 0.05}
+  target_move: 0.05, final_check: {margin: 0.0050}}
 tactile:
   enabled: true
   targets: [hdmi]

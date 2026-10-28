@@ -46,6 +46,7 @@ extract:                            # the rack bore the tube is pulled out of fi
   substeps: 300
 
 success:
+  final_check: {margin: 0.0420}   # every part still in its bore when the episode is judged (rigid/task.py)
   assembled_margin: 0.042           # success depth = bore length (0.0822) - margin = 4.0 cm
   assembled_lateral: 0.01           # tip within this of the bore axis
   assembled_axis_deg: 8.0           # tube axis within this of the bore axis

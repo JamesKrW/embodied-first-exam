@@ -7,7 +7,7 @@ Objects: `bolt_m16` (fixed, at about (-0.06, -0.08)) and `nut_m16` (30 g, on the
 The success predicate, checked after every control step, is reached once all of these hold:
 - the nut counts as threaded (and stays so) at the first step where its tip is at least **3.5 mm** below the thread top, with lateral offset at most 8 mm and axis angle at most 15° (about 1.5 mm, three quarters of a turn, further down than at the start)
 - the right gripper has made a release (Conventions) that has held for 30 steps
-Once reached, the task stays solved for the rest of the episode.
+Once reached, the predicate stays reached for the rest of the episode. The task is solved when it was reached and, at the end of the replay (after its 60-step hold), the nut is still on the bolt within the bounds above (lateral offset, angle, depth below the thread top): a part pulled out again after the predicate was reached fails.
 
 This is a *fixed scene instance*: the objects and the robot always start at the same poses. You may reset and
 retry as many times as you want. Your deliverable is **one replayable trajectory**, not a general policy.

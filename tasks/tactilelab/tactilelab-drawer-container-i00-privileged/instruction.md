@@ -7,7 +7,7 @@ Objects: `drawer_box` (fixed at about (0.16, -0.03), its opening facing -x), `dr
 The success predicate, checked after every control step, is reached once all of these hold:
 - each container counts as stowed (and stays so) at the first step where its tip is on its rails: lateral offset at most **6 mm**, axis angle at most **12°**, depth at least **77 mm** (of 89 mm), and its depth has changed by less than 0.5 mm over the last 30 steps
 - the bottom container was lifted more than **4 cm** above its starting height while the right end-effector (wrist link) was within 0.3 m of it (the robot picked it up)
-Once reached, the task stays solved for the rest of the episode.
+Once reached, the predicate stays reached for the rest of the episode. The task is solved when it was reached and, at the end of the replay (after its 60-step hold), each container is still in its place within the bounds above (lateral offset, angle, depth; the 30-step settling is not asked again): a part pulled out again after the predicate was reached fails.
 
 This is a *fixed scene instance*: the objects and the robot always start at the same poses. You may reset and
 retry as many times as you want. Your deliverable is **one replayable trajectory**, not a general policy.

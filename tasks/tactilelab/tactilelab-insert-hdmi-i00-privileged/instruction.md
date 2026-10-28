@@ -8,7 +8,7 @@ The success predicate, checked after every control step, is reached once all of 
 - the plug was lifted more than **2 cm** above its starting height while the right end-effector (wrist link) was within 0.3 m of it (the robot picked it up)
 - the plug's tip is in the port: lateral offset at most **6 mm**, axis angle at most **15°**, depth at least **4.9 mm** (all at the same step)
 - the right wrist link is more than **0.15 m** from the plug's origin and the right gripper is wider than **0.09 m**
-Once reached, the task stays solved for the rest of the episode.
+Once reached, the predicate stays reached for the rest of the episode. The task is solved when it was reached and, at the end of the replay (after its 60-step hold), the plug is still in the slot within the bounds above (lateral offset, angle, depth): a part pulled out again after the predicate was reached fails.
 
 This is a *fixed scene instance*: the objects and the robot always start at the same poses. You may reset and
 retry as many times as you want. Your deliverable is **one replayable trajectory**, not a general policy.

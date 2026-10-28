@@ -12,7 +12,7 @@
 | Base image | `ghcr.io/mll-lab-nu/efe-private:tactilelab-0.1.0` |
 
 ## Task
-Screw the bulb into the lamp base and seat the hood on top.
+Seat the bulb in the lamp base's socket and the hood on top.
 
 ## Difficulty
 Contact-rich manipulation with a tactile gripper, driven through end-effector targets only.

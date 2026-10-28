@@ -3,7 +3,7 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/tactilelab-square-table-i00-privileged"
-description = "TactileLab square_table (dual-arm X-Trainer whose right gripper carries two GelSight Mini tactile sensors, Isaac Lab 2.3 / Isaac Sim 5.1, PhysX on the GPU): produce one replayable trajectory. Insert and screw all four legs into the four corner bores of the fixed table top. Frozen scene instance (the fixed nominal scene, seed 0)."
+description = "TactileLab square_table (dual-arm X-Trainer whose right gripper carries two GelSight Mini tactile sensors, Isaac Lab 2.3 / Isaac Sim 5.1, PhysX on the GPU): produce one replayable trajectory. Insert all four legs into the four corner bores of the fixed table top and leave them seated. Frozen scene instance (the fixed nominal scene, seed 0)."
 authors = [{ name = "Haoran Lu" }]
 keywords = ["robotics", "tactilelab", "isaac-lab", "isaac-sim", "x-trainer", "tactile", "gelsight-mini", "code-as-policy", "trajectory", "square_table"]
 

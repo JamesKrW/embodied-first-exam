@@ -1,14 +1,14 @@
 # TactileLab · square_table — frozen instance
 
-Pick up the four table legs one after the other, put each stud into its corner bore of the table top, screw each leg down and let go.
+Pick up the four table legs one after the other, push each stud down into its corner bore of the table top (turning a leg is allowed, not required) and let go.
 
 Objects: `square_table_top` (fixed, at about (-0.062, -0.181), yawed -30°) and `square_table_leg1` .. `square_table_leg4` (23 g each, standing upright at about (-0.045, 0.016), (-0.071, 0.107), (-0.122, 0.188) and (-0.192, 0.251)). leg1 goes into the bore `corner_pn`, leg2 into `corner_nn`, leg3 into `corner_pp`, leg4 into `corner_np` (slots of the top's `insertion_pose.json`). Insertion geometry (tips, axes, bores) is in the objects' `Annotation/insertion_pose.json` files, in each object's own frame: the tip is `insertion_axis.head_local`, the axis runs tail to head, a bore runs from `hole_top_local` to `hole_bottom_local` of its slot.
 
 The success predicate, checked after every control step, is reached once all of these hold:
 - every leg counts as inserted (and stays so: a later pop-out does not undo it) at the first step where its insertion tip is in the bore: lateral offset from the bore axis at most **8 mm**, angle between its insertion axis and the bore axis at most **15°**, depth along the bore at least **22.2 mm** (the bore is 27.2 mm long); and at the step of success every leg is still in its bore (lateral ≤ 8 mm, angle ≤ 15°) at a depth of at least **24.2 mm**
 - the first leg (`square_table_leg1`) was lifted more than **4 cm** above its starting height while the right end-effector (wrist link) was within 0.3 m of it (the robot picked it up)
-- the right gripper has made a release (Conventions) that has held for 0 steps
-Once reached, the task stays solved for the rest of the episode.
+- the right gripper has made a release (Conventions)
+Once reached, the predicate stays reached for the rest of the episode. The task is solved when it was reached and, at the end of the replay (after its 60-step hold), every leg is still in its bore within the inserted bounds above (lateral offset, angle, depth at least 22.2 mm): a part pulled out again after the predicate was reached fails.
 
 This is a *fixed scene instance*: the objects and the robot always start at the same poses. You may reset and
 retry as many times as you want. Your deliverable is **one replayable trajectory**, not a general policy.

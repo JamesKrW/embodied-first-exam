@@ -21,12 +21,12 @@ the pad against the touched meshes, rendered to 240 x 320 RGB with a Taxim look-
 | `tactilelab-handover-i00` | privileged | Hand the rod over from the right gripper to the left gripper. |
 | `tactilelab-insert-hdmi-i00` | privileged | Pick up the HDMI plug and insert it into the port. |
 | `tactilelab-insert-tube-i00` | privileged | Pull the test tube out of its rack and insert it into the inclined bore of the tube slot. |
-| `tactilelab-lamp-bulb-i00` | privileged | Screw the bulb into the lamp base and seat the hood on top. |
+| `tactilelab-lamp-bulb-i00` | privileged | Seat the bulb in the lamp base's socket and the hood on top. |
 | `tactilelab-lift-i00` | privileged | Pick up the lying bottle, stand it upright on the green pad and let go. |
 | `tactilelab-nut-thread-i00` | privileged | Turn the M16 nut further down the fixed bolt and let go. |
-| `tactilelab-one-leg-i00` | privileged | Insert one square-table leg into a corner bore of the fixed table top and screw it in. |
+| `tactilelab-one-leg-i00` | privileged | Insert one square-table leg into a corner bore of the fixed table top and leave it seated. |
 | `tactilelab-sleeve-pull-on-forearm-i00` | privileged | Pull the sleeve along the other arm's forearm to the target band. |
-| `tactilelab-square-table-i00` | privileged | Insert and screw all four legs into the four corner bores of the fixed table top. |
+| `tactilelab-square-table-i00` | privileged | Insert all four legs into the four corner bores of the fixed table top and leave them seated. |
 
 ## Conventions (all tasks)
 - Env frame, metres, z up; quaternions WXYZ. Table top z = 1.102, robot base at (-0.5, 0, 1.1) facing +x.

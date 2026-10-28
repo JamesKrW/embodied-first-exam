@@ -12,7 +12,7 @@
 | Base image | `ghcr.io/mll-lab-nu/efe-private:tactilelab-0.1.0` |
 
 ## Task
-Insert one square-table leg into a corner bore of the fixed table top and screw it in.
+Insert one square-table leg into a corner bore of the fixed table top and leave it seated.
 
 ## Difficulty
 Contact-rich manipulation with a tactile gripper, driven through end-effector targets only.

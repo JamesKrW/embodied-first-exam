@@ -132,6 +132,7 @@ screw:
   sym_order: 4
 
 success:
+  final_check: {margin: 0.0050}   # every part still in its bore when the episode is judged (rigid/task.py)
   assembled_margin: 0.005
   assembled_lateral: 0.008
   assembled_axis_deg: 15.0

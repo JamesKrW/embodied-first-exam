@@ -76,6 +76,7 @@ screw:
   finger_effort_limit: 10.0
 
 success:
+  final_check: {margin: 0.0215}   # every part still in its bore when the episode is judged (rigid/task.py)
   assembled_margin: 0.0215           # deep latch 3.5 mm below the thread top
   assembled_lateral: 0.008
   assembled_axis_deg: 15.0

@@ -22,7 +22,7 @@ scene:
 parts:
 - {held: nut_m16, target: bolt_m16, slot: slot_0, screw: true, skip_lift: true, skip_insert: true}
 success: {assembled_margin: 0.0215, assembled_lateral: 0.008, assembled_axis_deg: 15.0, require_grasp_latch: false, end_on_release: true,
-  release_open_mm: 10.0, release_settle_steps: 30, assembled_clear: 0.35}
+  release_open_mm: 10.0, release_settle_steps: 30, assembled_clear: 0.35, final_check: {margin: 0.0215}}
 tactile:
   enabled: true
   targets: [nut_m16, bolt_m16]

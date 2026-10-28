@@ -49,6 +49,7 @@ parts:                              # working order; the judge needs every part 
                                     # limit and a straight end-effector move jams the arm 0.1 m short of the staging
 
 success:
+  final_check: {margin: 0.0120}   # every part still in its bore when the episode is judged (rigid/task.py)
   assembled_margin: 0.012           # per part: slide depth >= rail length (0.089) - margin
   assembled_lateral: 0.006
   assembled_axis_deg: 12.0
