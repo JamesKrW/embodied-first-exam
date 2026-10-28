@@ -37,7 +37,7 @@ main = { cpus = 4, memory_gb = 4, pids = 1024, disk_gb = 10 }
 sim = { cpus = 2, memory_gb = 6, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
 measured = "GPU memory 0.7-1.2 GB (per-trial peaks of past trials); memory: no samples of the sim service or the agent's container (the privileged twin's container, which runs the same simulator, 3.0 GB; a per-container memory sampler); CPU: an estimate (MuJoCo and two ONNX policies on the CPU)"
-caps_measured = "per-container peaks in 36 past trials: the agent's container memory 0.4 GiB, 116 threads, CPU at its cap (4), disk 1.0 GiB; the sim service memory 0.8 GiB (3.0 GiB in an earlier measurement), 48 threads, CPU 1.0 cores, GPU memory 0.6 GiB (1.2 GiB in an earlier measurement); the sim service's memory covers its largest legal call (3 cameras 84x84, 752 frames each): 0.3 GiB to build the response on top of the simulator's 3.0 GiB"
+caps_measured = "per-container peaks in 36 past trials: the agent's container memory 0.4 GiB, 116 threads, CPU at its cap (4), disk 1.0 GiB; the sim service memory 0.8 GiB (3.0 GiB in an earlier measurement), 48 threads, CPU 1.0 cores, GPU memory 0.6 GiB (1.2 GiB in an earlier measurement); the sim service's memory covers its largest legal call (3 cameras 84x84 with depth, 752 frames each): 0.2 GiB to build the response on top of the simulator's 3.0 GiB"
 
 # 13 task(s)
 [[cap]]
@@ -46,7 +46,7 @@ main = { cpus = 4, memory_gb = 4, pids = 1024, disk_gb = 10 }
 sim = { cpus = 4, memory_gb = 6, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
 measured = "GPU memory 0.7-1.2 GB (per-trial peaks of past trials); memory: no samples of the sim service or the agent's container (the privileged twin's container, which runs the same simulator, 3.0 GB; a per-container memory sampler); CPU: an estimate (MuJoCo and two ONNX policies on the CPU)"
-caps_measured = "per-container peaks in 60 past trials: the agent's container memory 0.4 GiB, 261 threads, CPU at its cap (4), disk 1.0 GiB; the sim service memory 0.9 GiB (3.0 GiB in an earlier measurement), 50 threads, CPU 0.9 cores, GPU memory 0.6 GiB (1.2 GiB in an earlier measurement); the sim service's memory covers its largest legal call (3 cameras 84x84, 752 frames each): 0.3 GiB to build the response on top of the simulator's 3.0 GiB"
+caps_measured = "per-container peaks in 60 past trials: the agent's container memory 0.4 GiB, 261 threads, CPU at its cap (4), disk 1.0 GiB; the sim service memory 0.9 GiB (3.0 GiB in an earlier measurement), 50 threads, CPU 0.9 cores, GPU memory 0.6 GiB (1.2 GiB in an earlier measurement); the sim service's memory covers its largest legal call (3 cameras 84x84 with depth, 752 frames each): 0.2 GiB to build the response on top of the simulator's 3.0 GiB"
 
 # 8 task(s)
 [[cap]]
@@ -59,9 +59,9 @@ caps_measured = "per-container peaks in 43 past trials: the agent's container me
 [[cap]]
 match = "^dexhand-(essential-cube-layer|essential-held-joystick|essential-pen-regrasp|essential-two-object|essential-rotary-gait|essential-cube-reorient|assemble-hamburger|paper-half-fold)-i00-standard$"
 main = { cpus = 2, memory_gb = 10, pids = 1024, disk_gb = 10 }
-sim = { cpus = 2, memory_gb = 8, pids = 1024 }
+sim = { cpus = 2, memory_gb = 5, pids = 1024 }
 measured = "30 Harbor trials of both modes of the six essential families (12 oracle, 12 nop, 6 Wuji) plus the hamburger and paper oracle and nop trials, CPU only, the trial's resource monitor every 5 s: the sim service at most 0.65 GiB (paper 0.51 GiB); the agent's container at most 0.03 GiB; one core per replay process"
-caps_measured = "per-container peaks in 38 past trials: the agent's container memory 8.4 GiB, 304 threads, disk 2.0 GiB; the sim service memory 1.2 GiB, 89 threads; the sim service's memory covers its largest legal call (1 camera 640x480 with depth, 500 frames (max_frames_per_call 1000 images)): 4.9 GiB to build the response on top of the simulator's 1.2 GiB"
+caps_measured = "per-container peaks in 38 past trials: the agent's container memory 8.4 GiB, 304 threads, disk 2.0 GiB; the sim service memory 1.2 GiB, 89 threads; the sim service's memory covers its largest legal call (1 camera 640x480, 1000 frames (1000 images)): 0.9 GiB to build the response on top of the simulator's 1.2 GiB"
 
 # 2 task(s)
 [[cap]]
@@ -74,9 +74,9 @@ caps_measured = "per-container peaks in 9 past trials: the agent's container mem
 [[cap]]
 match = "^dexhand-(pot-shelf-transfer|sweep-dustpan)-i00-standard$"
 main = { cpus = 2, memory_gb = 4, pids = 1024, disk_gb = 10 }
-sim = { cpus = 2, memory_gb = 9, pids = 1024 }
+sim = { cpus = 2, memory_gb = 6, pids = 1024 }
 measured = "pot_shelf_transfer oracle and nop trials (CPU only; the trial's resource monitor every 5 s for the agent's container, cgroup memory.peak for the sim service): the sim service 2.25-2.53 GiB, the agent's container under 0.06 GiB; sweep_dustpan: the sim service 2.20 GiB"
-caps_measured = "per-container peaks in 9 past trials: the agent's container memory 0.6 GiB, 182 threads, disk 1.0 GiB; the sim service memory 2.6 GiB, 69 threads; the sim service's memory covers its largest legal call (1 camera 640x480 with depth, 500 frames (max_frames_per_call 1000 images)): 4.9 GiB to build the response on top of the simulator's 2.6 GiB"
+caps_measured = "per-container peaks in 9 past trials: the agent's container memory 0.6 GiB, 182 threads, disk 1.0 GiB; the sim service memory 2.6 GiB, 69 threads; the sim service's memory covers its largest legal call (1 camera 640x480, 1000 frames (1000 images)): 0.9 GiB to build the response on top of the simulator's 2.6 GiB"
 
 # 7 task(s)
 [[cap]]
@@ -96,17 +96,17 @@ caps_measured = "per-container peaks in 88 past trials: the agent's container me
 [[cap]]
 match = "^dexhand-(vacuum-bin-reseat|drying-rack-unfold|fan-guard-install|stool-brace-insert|ram-module-install|binder-page-load|tray-glass-carry)-i00-standard$"
 main = { cpus = 2, memory_gb = 10, pids = 1024, disk_gb = 10 }
-sim = { cpus = 2, memory_gb = 8, pids = 1024 }
+sim = { cpus = 2, memory_gb = 5, pids = 1024 }
 measured = "one Sharpa oracle per family in each mode (CPU only, cgroup memory.peak): the sim service at most 0.96 GiB, the agent's container under 0.05 GiB"
-caps_measured = "per-container peaks in 49 past trials: the agent's container memory 8.7 GiB, 184 threads, CPU 0.9 cores, disk 1.1 GiB; the sim service memory 1.3 GiB, 123 threads, CPU at its cap (2); the sim service's memory covers its largest legal call (1 camera 640x480 with depth, 500 frames (max_frames_per_call 1000 images)): 4.9 GiB to build the response on top of the simulator's 1.3 GiB"
+caps_measured = "per-container peaks in 49 past trials: the agent's container memory 8.7 GiB, 184 threads, CPU 0.9 cores, disk 1.1 GiB; the sim service memory 1.3 GiB, 123 threads, CPU at its cap (2); the sim service's memory covers its largest legal call (1 camera 640x480, 1000 frames (1000 images)): 0.9 GiB to build the response on top of the simulator's 1.3 GiB"
 
 # 13 task(s)
 [[cap]]
 match = "^dexhand-(remote-battery-swap|coffee-stir|jar-lid-open|grinder-crank|pancake-serve|picture-hang|usb-plug-insert|boot-sole-brush|paper-staple|envelope-letter-insert|book-page-turn|batter-whisk|bicycle-pump-stroke)-i00-standard$"
 main = { cpus = 2, memory_gb = 4, pids = 1024, disk_gb = 10 }
-sim = { cpus = 2, memory_gb = 10, pids = 1024 }
+sim = { cpus = 2, memory_gb = 7, pids = 1024 }
 measured = "one Sharpa oracle per Marvin-arm family in each mode (CPU only, cgroup memory.peak): the sim service 2.13-2.65 GiB, the agent's container under 0.05 GiB"
-caps_measured = "per-container peaks in 90 past trials: the agent's container memory 1.9 GiB, 318 threads, CPU 1.0 cores, disk 1.2 GiB; the sim service memory 3.4 GiB, 123 threads, CPU at its cap (2); the sim service's memory covers its largest legal call (1 camera 640x480 with depth, 500 frames (max_frames_per_call 1000 images)): 4.9 GiB to build the response on top of the simulator's 3.4 GiB"
+caps_measured = "per-container peaks in 90 past trials: the agent's container memory 1.9 GiB, 318 threads, CPU 1.0 cores, disk 1.2 GiB; the sim service memory 3.4 GiB, 123 threads, CPU at its cap (2); the sim service's memory covers its largest legal call (1 camera 640x480, 1000 frames (1000 images)): 0.9 GiB to build the response on top of the simulator's 3.4 GiB"
 
 # 11 task(s)
 [[cap]]
@@ -119,9 +119,9 @@ caps_measured = "per-container peaks in 38 past trials: the agent's container me
 [[cap]]
 match = "^dexjoco-.*-standard$"
 main = { cpus = 4, memory_gb = 10, pids = 1024, disk_gb = 10 }
-sim = { cpus = 4, memory_gb = 9, pids = 1024 }
+sim = { cpus = 4, memory_gb = 6, pids = 1024 }
 measured = "memory: sim 1.9 GB (a per-container memory sampler); CPU only; 4 CPUs visible to each container that runs the simulator (cpuset / affinity, not a quota): OpenBLAS runs no more threads than that and DexJoCo's result differs below 4 (tasks/dexjoco/README.md, Threads); with fewer there is no verdict (too_few_cpus, infra_error)"
-caps_measured = "per-container peaks in 33 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 1 trial), 156 threads, CPU 1.7 cores, disk 1.1 GiB; the sim service memory 2.3 GiB, 119 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (1 camera 640x480 with depth, 500 frames (max_frames_per_call 1000 images)): 4.9 GiB to build the response on top of the simulator's 2.3 GiB"
+caps_measured = "per-container peaks in 33 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 1 trial), 156 threads, CPU 1.7 cores, disk 1.1 GiB; the sim service memory 2.3 GiB, 119 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (1 camera 640x480, 1000 frames (1000 images)): 0.9 GiB to build the response on top of the simulator's 2.3 GiB"
 
 # 21 task(s)
 [[cap]]
@@ -138,7 +138,7 @@ main = { cpus = 3, memory_gb = 16, pids = 1024, disk_gb = 11 }
 sim = { cpus = 4, memory_gb = 4, pids = 1024, gpu_memory_gb = 5 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
 measured = "GPU memory: per-trial peaks of past trials 0.3-0.9 GB on 24 GB cards and up to 2.1 GiB on a 48 GB card; memory: sim p90 0.9 GB (a per-container memory sampler); CPU: an estimate"
-caps_measured = "per-container peaks in 70 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 1 trial), 210 threads, CPU 2.6 cores, disk 7.0 GiB; the sim service memory 0.7 GiB (0.9 GiB in an earlier measurement), 97 threads, CPU at its cap (4), GPU memory 0.3 GiB (2.1 GiB in an earlier measurement); the sim service's memory covers its largest legal call (4 cameras 240x320, 902 frames each (fps 24 captures at 30)): 2.5 GiB to build the response on top of the simulator's 0.9 GiB"
+caps_measured = "per-container peaks in 70 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 1 trial), 210 threads, CPU 2.6 cores, disk 7.0 GiB; the sim service memory 0.7 GiB (0.9 GiB in an earlier measurement), 97 threads, CPU at its cap (4), GPU memory 0.3 GiB (2.1 GiB in an earlier measurement); the sim service's memory covers its largest legal call (4 cameras 240x320, 750 frames each (3000 images)): 0.7 GiB to build the response on top of the simulator's 0.9 GiB"
 
 # 10 task(s)
 [[cap]]
@@ -154,7 +154,7 @@ main = { cpus = 3, memory_gb = 4, pids = 1024, disk_gb = 10 }
 sim = { cpus = 2, memory_gb = 4, pids = 1024, gpu_memory_gb = 5 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
 measured = "GPU memory 1.1-2.3 GB (per-trial peaks of past trials); memory: sim 0.7 GB (a per-container memory sampler); CPU: an estimate"
-caps_measured = "per-container peaks in 17 past trials: the agent's container memory 0.4 GiB, 114 threads, CPU 2.0 cores, disk 1.3 GiB; the sim service memory 0.5 GiB (0.7 GiB in an earlier measurement), 48 threads, CPU 1.0 cores, GPU memory 2.1 GiB (2.3 GiB in an earlier measurement); the sim service's memory covers its largest legal call (3 cameras 256x256, 752 frames each): 1.4 GiB to build the response on top of the simulator's 0.7 GiB"
+caps_measured = "per-container peaks in 17 past trials: the agent's container memory 0.4 GiB, 114 threads, CPU 2.0 cores, disk 1.3 GiB; the sim service memory 0.5 GiB (0.7 GiB in an earlier measurement), 48 threads, CPU 1.0 cores, GPU memory 2.1 GiB (2.3 GiB in an earlier measurement); the sim service's memory covers its largest legal call (3 cameras 256x256 with depth, 500 frames each (3000 images)): 0.5 GiB to build the response on top of the simulator's 0.7 GiB"
 
 # 10 task(s)
 [[cap]]
@@ -163,7 +163,7 @@ main = { cpus = 4, memory_gb = 4, pids = 1024, disk_gb = 10 }
 sim = { cpus = 4, memory_gb = 4, pids = 1024, gpu_memory_gb = 5 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
 measured = "GPU memory 1.1-2.3 GB (per-trial peaks of past trials); memory: sim 0.7 GB (a per-container memory sampler); CPU: an estimate"
-caps_measured = "per-container peaks in 52 past trials: the agent's container memory 1.9 GiB, 247 threads, CPU at its cap (4), disk 2.2 GiB; the sim service memory 0.6 GiB (0.7 GiB in an earlier measurement), 50 threads, CPU 0.7 cores, GPU memory 2.1 GiB (2.3 GiB in an earlier measurement); the sim service's memory covers its largest legal call (3 cameras 256x256, 752 frames each): 1.4 GiB to build the response on top of the simulator's 0.7 GiB"
+caps_measured = "per-container peaks in 52 past trials: the agent's container memory 1.9 GiB, 247 threads, CPU at its cap (4), disk 2.2 GiB; the sim service memory 0.6 GiB (0.7 GiB in an earlier measurement), 50 threads, CPU 0.7 cores, GPU memory 2.1 GiB (2.3 GiB in an earlier measurement); the sim service's memory covers its largest legal call (3 cameras 256x256 with depth, 500 frames each (3000 images)): 0.5 GiB to build the response on top of the simulator's 0.7 GiB"
 
 # 5 task(s)
 [[cap]]
@@ -179,7 +179,7 @@ main = { cpus = 4, memory_gb = 16, pids = 1024, disk_gb = 10 }
 sim = { cpus = 2, memory_gb = 5, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
 measured = "GPU memory 1.2-1.3 GB (the oracle 1.2 GB on an RTX 4090; per-trial peaks of past trials); memory: sim 1.1 GB (a per-container memory sampler); CPU: an estimate"
-caps_measured = "per-container peaks in 8 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 1 trial), 154 threads, CPU at its cap (4), disk 1.2 GiB; the sim service memory 0.7 GiB (1.1 GiB in an earlier measurement), 96 threads, CPU 1.0 cores, GPU memory 0.9 GiB (1.3 GiB in an earlier measurement); the sim service's memory covers its largest legal call (observe 30 s, 2 cameras 480x640 + wrist depth, 302 frames (RGBA buffers)): 3.1 GiB to build the response on top of the simulator's 1.1 GiB"
+caps_measured = "per-container peaks in 8 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 1 trial), 154 threads, CPU at its cap (4), disk 1.2 GiB; the sim service memory 0.7 GiB (1.1 GiB in an earlier measurement), 96 threads, CPU 1.0 cores, GPU memory 0.9 GiB (1.3 GiB in an earlier measurement); the sim service's memory covers its largest legal call (observe 30 s, 2 cameras 480x640 + wrist depth, 302 frames (RGBA buffers)): 0.9 GiB to build the response on top of the simulator's 1.1 GiB"
 
 # 64 task(s)
 [[cap]]
@@ -194,7 +194,7 @@ match = "^libero-max-.*-standard$"
 main = { cpus = 3, memory_gb = 10, pids = 1024, disk_gb = 10 }
 sim = { cpus = 3, memory_gb = 6, pids = 1024 }
 measured = "the sim service estimated (robosuite, CPU only, 256x256 OSMesa cameras); the privileged twin's verifier, which replays the same simulator, 1.6 GB (a per-container memory sampler)"
-caps_measured = "per-container peaks in 52 past trials: the agent's container memory 7.2 GiB, 274 threads, CPU 2.9 cores, disk 1.0 GiB; the sim service memory 2.5 GiB, 67 threads, CPU 2.0 cores; the sim service's memory covers its largest legal call (2 cameras 256x256 with depth, 602 frames each): 1.4 GiB to build the response on top of the simulator's 2.5 GiB"
+caps_measured = "per-container peaks in 52 past trials: the agent's container memory 7.2 GiB, 274 threads, CPU 2.9 cores, disk 1.0 GiB; the sim service memory 2.5 GiB, 67 threads, CPU 2.0 cores; the sim service's memory covers its largest legal call (2 cameras 256x256 with depth, 602 frames each): 0.5 GiB to build the response on top of the simulator's 2.5 GiB"
 
 # 30 task(s)
 [[cap]]
@@ -228,7 +228,7 @@ match = "^metaworldplus-.*-standard$"
 main = { cpus = 2, memory_gb = 5, pids = 1024, disk_gb = 10 }
 sim = { cpus = 4, memory_gb = 4, pids = 1024 }
 measured = "memory: sim 0.7 GB (a per-container memory sampler); CPU only; CPU: an estimate"
-caps_measured = "per-container peaks in 20 past trials: the agent's container memory 2.2 GiB, 148 threads, CPU 1.7 cores, disk 1.0 GiB; the sim service memory 0.6 GiB (0.7 GiB in an earlier measurement), 107 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (4 cameras 240x320, 802 frames each (fps 23 captures at 26.7)): 2.3 GiB to build the response on top of the simulator's 0.7 GiB"
+caps_measured = "per-container peaks in 20 past trials: the agent's container memory 2.2 GiB, 148 threads, CPU 1.7 cores, disk 1.0 GiB; the sim service memory 0.6 GiB (0.7 GiB in an earlier measurement), 107 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (4 cameras 240x320, 750 frames each (3000 images)): 0.7 GiB to build the response on top of the simulator's 0.7 GiB"
 
 # 8 task(s)
 [[cap]]
@@ -242,10 +242,10 @@ caps_measured = "GPU memory: a per-trial peak of 2.7 GiB on a 48 GB card -> max(
 [[cap]]
 match = "^molmospaces-.*-standard$"
 main = { cpus = 3, memory_gb = 4, pids = 1024, disk_gb = 12 }
-sim = { cpus = 2, memory_gb = 17, pids = 1024, gpu_memory_gb = 5 }
+sim = { cpus = 2, memory_gb = 8, pids = 1024, gpu_memory_gb = 5 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4 / L40S)"
 measured = "GPU memory 2.7 GB on an L40S (per-trial peaks of past trials); memory and CPU estimated (MuJoCo, CPU physics, EGL rendering)"
-caps_measured = "per-container peaks in 11 past trials: the agent's container memory 0.6 GiB, 113 threads, CPU 2.0 cores, disk 7.5 GiB; the sim service memory 4.4 GiB, 170 threads, CPU 1.8 cores, GPU memory 2.6 GiB (2.7 GiB in an earlier measurement); the sim service's memory covers its largest legal call (open-door: observe 30 s, 3 cameras 576x1024 with depth, 302 frames each (no frame limit)): 9.9 GiB to build the response on top of the simulator's 4.4 GiB"
+caps_measured = "per-container peaks in 11 past trials: the agent's container memory 0.6 GiB, 113 threads, CPU 2.0 cores, disk 7.5 GiB; the sim service memory 4.4 GiB, 170 threads, CPU 1.8 cores, GPU memory 2.6 GiB (2.7 GiB in an earlier measurement); the sim service's memory covers its largest legal call (open-door: observe 30 s, 3 cameras 576x1024 with depth, 302 frames each (1812 images)): 2.9 GiB to build the response on top of the simulator's 4.4 GiB"
 
 # 9 task(s)
 [[cap]]
@@ -266,18 +266,18 @@ caps_measured = "GPU memory: a per-trial peak of 1.3 GiB -> max(1.5 x peak, peak
 [[cap]]
 match = "^mujoco_playground_.*-standard$"
 main = { cpus = 2, memory_gb = 4, pids = 1024, disk_gb = 10 }
-sim = { cpus = 4, memory_gb = 9, pids = 1024 }
+sim = { cpus = 4, memory_gb = 4, pids = 1024 }
 measured = "memory: sim 0.7 GB (a per-container memory sampler); CPU only; CPU p90 1.9 cores (a per-container sampler every 30 s)"
-caps_measured = "per-container peaks in 31 past trials: the agent's container memory 0.8 GiB, 163 threads, CPU 1.2 cores, disk 0.8 GiB; the sim service memory 0.9 GiB, 116 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (observe a whole episode at 50 fps, 4 cameras 240x320 with depth, 1002 frames each (no frame limit)): 6.0 GiB to build the response on top of the simulator's 0.9 GiB"
+caps_measured = "per-container peaks in 31 past trials: the agent's container memory 0.8 GiB, 163 threads, CPU 1.2 cores, disk 0.8 GiB; the sim service memory 0.9 GiB, 116 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (4 cameras 240x320, 750 frames each (3000 images)): 0.7 GiB to build the response on top of the simulator's 0.9 GiB"
 
 # 1 task(s)
 [[cap]]
 match = "^mujoco_playground_barkour_joystick-standard-realtime$"
 main = { cpus = 2, memory_gb = 4, pids = 1024, disk_gb = 10 }
-sim = { cpus = 4, memory_gb = 5, pids = 1024, gpu_memory_gb = 4 }
+sim = { cpus = 4, memory_gb = 4, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "any NVIDIA GPU with EGL (RTX 4090 / L4)"
 measured = "as the standard twin; the GPU only renders the cameras over EGL: GPU memory 1.0-1.3 GB (per-trial peaks of past trials); memory: sim 0.7 GB; CPU p90 1.9 cores"
-caps_measured = "GPU memory (the sim service): EGL camera rendering only (1.0-1.3 GiB in the standard twin's trials); capped at 4 GiB; per-container peaks in 5 past trials: the agent's container memory 0.4 GiB, 166 threads, CPU 1.8 cores, disk 1.1 GiB; the sim service memory 0.2 GiB (0.7 GiB in an earlier measurement), 50 threads, CPU 0.5 cores, GPU memory 0.2 GiB (1.3 GiB in an earlier measurement); the sim service's memory covers its largest legal call (a whole episode at 50 fps, 2 cameras 240x320 with depth, 1002 frames each (no frame limit)): 3.4 GiB to build the response on top of the simulator's 0.9 GiB"
+caps_measured = "GPU memory (the sim service): EGL camera rendering only (1.0-1.3 GiB in the standard twin's trials); capped at 4 GiB; per-container peaks in 5 past trials: the agent's container memory 0.4 GiB, 166 threads, CPU 1.8 cores, disk 1.1 GiB; the sim service memory 0.2 GiB (0.7 GiB in an earlier measurement), 50 threads, CPU 0.5 cores, GPU memory 0.2 GiB (1.3 GiB in an earlier measurement); the sim service's memory covers its largest legal call (2 cameras 240x320 with depth, 750 frames each (3000 images)): 0.7 GiB to build the response on top of the simulator's 0.9 GiB"
 
 # 4 task(s)
 [[cap]]
@@ -299,18 +299,18 @@ caps_measured = "per-container peaks in 90 past trials: the agent's container me
 [[cap]]
 match = "^myosuite-.*-standard$"
 main = { cpus = 4, memory_gb = 7, pids = 2048, disk_gb = 10 }
-sim = { cpus = 4, memory_gb = 8, pids = 1024 }
+sim = { cpus = 4, memory_gb = 5, pids = 1024 }
 measured = "memory: sim p90 1.4 GB (a per-container memory sampler); CPU only; CPU: an estimate"
-caps_measured = "per-container peaks in 98 past trials: the agent's container memory 4.3 GiB, 606 threads, CPU at its cap (4), disk 1.8 GiB; the sim service memory 1.5 GiB, 195 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (1 camera 640x480 with depth, 500 frames (1000 images)): 4.8 GiB to build the response on top of the simulator's 1.5 GiB"
+caps_measured = "per-container peaks in 98 past trials: the agent's container memory 4.3 GiB, 606 threads, CPU at its cap (4), disk 1.8 GiB; the sim service memory 1.5 GiB, 195 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (1 camera 640x480, 1000 frames (1000 images)): 0.9 GiB to build the response on top of the simulator's 1.5 GiB"
 
 # 1 task(s)
 [[cap]]
 match = "^myosuite-.*-standard-realtime$"
 main = { cpus = 4, memory_gb = 10, pids = 8192, disk_gb = 20 }
-sim = { cpus = 4, memory_gb = 11, pids = 8192, gpu_memory_gb = 4 }
+sim = { cpus = 4, memory_gb = 8, pids = 8192, gpu_memory_gb = 4 }
 recommended_gpu = "any NVIDIA GPU with EGL (RTX 4090 / L4)"
 measured = "as the standard twin (sim 1.2-1.4 GB); the GPU only renders the cameras over EGL (5 ms a frame on an RTX 4090); the sim keeps the GPU through the collect hook, which renders the video"
-caps_measured = "GPU memory (the sim service): EGL camera rendering only, under 1 GiB; capped at 4 GiB; processes and disk: defaults, not measured; the sim service's memory covers its largest legal call (a watch until the episode's end at 3 s, 5 cameras 480x640 with depth, 299 frames each (3000 images)): 7.3 GiB to build the response on top of the simulator's 1.5 GiB"
+caps_measured = "GPU memory (the sim service): EGL camera rendering only, under 1 GiB; capped at 4 GiB; processes and disk: defaults, not measured"
 
 # 29 task(s)
 [[cap]]
@@ -325,7 +325,7 @@ match = "^robocasa-(?!gr1-).*-standard$"
 main = { cpus = 2, memory_gb = 5, pids = 1024, disk_gb = 10 }
 sim = { cpus = 6, memory_gb = 15, pids = 1024 }
 measured = "memory: robosuite sim p90 9.7 GB (RoboCasa and RoboCasa-GR1 together; a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate"
-caps_measured = "per-container peaks in 26 past trials: the agent's container memory 2.2 GiB, 205 threads, CPU 1.5 cores, disk 2.2 GiB; the sim service memory 9.7 GiB, 192 threads, CPU 4.8 cores; the sim service's memory covers its largest legal call (4 cameras 240x320 with depth, 536 frames each (fps 14 captures at 20)): 2.5 GiB to build the response on top of the simulator's 9.8 GiB"
+caps_measured = "per-container peaks in 26 past trials: the agent's container memory 2.2 GiB, 205 threads, CPU 1.5 cores, disk 2.2 GiB; the sim service memory 9.7 GiB, 192 threads, CPU 4.8 cores; the sim service's memory covers its largest legal call (4 cameras 240x320 with depth, 375 frames each (3000 images)): 0.6 GiB to build the response on top of the simulator's 9.8 GiB"
 
 # 24 task(s)
 [[cap]]
@@ -355,7 +355,7 @@ match = "^robocasa365-.*-standard$"
 main = { cpus = 4, memory_gb = 6, pids = 1024, disk_gb = 10 }
 sim = { cpus = 4, memory_gb = 10, pids = 1024 }
 measured = "memory: sim p90 5.6 GB (a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate"
-caps_measured = "per-container peaks in 124 past trials: the agent's container memory 3.9 GiB, 278 threads, CPU at its cap (4), disk 3.2 GiB; the sim service memory 6.4 GiB, 110 threads, CPU 3.1 cores; the sim service's memory covers its largest legal call (4 cameras 240x320 with depth, 536 frames each (fps 14 captures at 20)): 2.5 GiB to build the response on top of the simulator's 6.4 GiB"
+caps_measured = "per-container peaks in 124 past trials: the agent's container memory 3.9 GiB, 278 threads, CPU at its cap (4), disk 3.2 GiB; the sim service memory 6.4 GiB, 110 threads, CPU 3.1 cores; the sim service's memory covers its largest legal call (4 cameras 240x320 with depth, 375 frames each (3000 images)): 0.6 GiB to build the response on top of the simulator's 6.4 GiB"
 
 # 1 task(s)
 [[cap]]
@@ -378,11 +378,11 @@ caps_measured = "GPU memory: 9.0 GiB per Isaac Session on the heaviest scene (RT
 [[cap]]
 match = "^robodojo-.*-standard$"
 main = { cpus = 2, memory_gb = 8, pids = 1024, disk_gb = 10 }
-sim = { cpus = 16, memory_gb = 35, pids = 2048, gpu_memory_gb = 16 }
+sim = { cpus = 16, memory_gb = 25, pids = 2048, gpu_memory_gb = 16 }
 gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "the heaviest scene (pour_liquid_into_cup_random), a client driving 12 joint_position chunks, on an RTX 4090: sim sidecar peak 16.0 GiB (anon 14.9), GPU memory 9.5 GiB, up to 16 cores while Isaac starts; the agent's container under 0.1 GiB (a per-container sampler every 10 s); the collect hook only encodes the live video on the CPU, so the sidecar's peak is the live service's"
-caps_measured = "GPU memory (the sim service): 9.5 GiB on the heaviest scene (RTX 4090) -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 47 past trials: the agent's container memory 5.1 GiB, 305 threads, CPU 1.6 cores, disk 1.9 GiB; the sim service memory 16.9 GiB, 479 threads, CPU at its cap (16), GPU memory 9.6 GiB; the sim service's memory covers its largest legal call (1 camera 640x480 with depth, 1500 frames (3000 images, depth counted)): 14.7 GiB to build the response on top of the simulator's 16.9 GiB"
+caps_measured = "GPU memory (the sim service): 9.5 GiB on the heaviest scene (RTX 4090) -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 47 past trials: the agent's container memory 5.1 GiB, 305 threads, CPU 1.6 cores, disk 1.9 GiB; the sim service memory 16.9 GiB, 479 threads, CPU at its cap (16), GPU memory 9.6 GiB; the sim service's memory covers its largest legal call (1 camera 640x480 with depth, 1500 frames (3000 images)): 2.2 GiB to build the response on top of the simulator's 16.9 GiB"
 
 # 53 task(s)
 [[cap]]
@@ -416,10 +416,10 @@ caps_measured = "per-container peaks in 53 past trials: the agent's container me
 [[cap]]
 match = "^robopaint-.*-standard$"
 main = { cpus = 8, memory_gb = 5, pids = 2048, disk_gb = 10 }
-sim = { cpus = 3, memory_gb = 11, pids = 1024, gpu_memory_gb = 3 }
+sim = { cpus = 3, memory_gb = 5, pids = 1024, gpu_memory_gb = 3 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
 measured = "GPU memory 0.25-0.5 GB (per-trial peaks of past trials); memory: sim p90 1.7 GB (a per-container memory sampler); CPU: an estimate"
-caps_measured = "per-container peaks in 61 past trials: the agent's container memory 2.4 GiB, 531 threads, CPU at its cap (8), disk 1.1 GiB; the sim service memory 1.8 GiB, 144 threads, CPU 2.9 cores, GPU memory 0.3 GiB (0.5 GiB in an earlier measurement); the sim service's memory covers its largest legal call (observe 30 s, canvas_cam 1024x1024, 602 frames): 7.1 GiB to build the response on top of the simulator's 1.8 GiB"
+caps_measured = "per-container peaks in 61 past trials: the agent's container memory 2.4 GiB, 531 threads, CPU at its cap (8), disk 1.1 GiB; the sim service memory 1.8 GiB, 144 threads, CPU 2.9 cores, GPU memory 0.3 GiB (0.5 GiB in an earlier measurement); the sim service's memory covers its largest legal call (observe 30 s, canvas_cam 1024x1024, 602 frames): 1.8 GiB to build the response on top of the simulator's 1.8 GiB"
 
 # 54 task(s)
 [[cap]]
@@ -433,10 +433,10 @@ caps_measured = "GPU memory: a per-trial peak of 1.1 GiB on 24 GB cards, measure
 [[cap]]
 match = "^roboarc-(interlocked-claws|buzz-wire-3d|cast-keyhole|cast-coil|hedgehog-in-cage|horseshoe-ring|lock-picking)-.*-standard$"
 main = { cpus = 4, memory_gb = 16, pids = 4096, disk_gb = 10 }
-sim = { cpus = 4, memory_gb = 15, pids = 1024, gpu_memory_gb = 4 }
+sim = { cpus = 4, memory_gb = 9, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer)"
 measured = "MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards"
-caps_measured = "per-container peaks in 166 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 10 trials), 1158 threads, CPU at its cap (4), disk 5.9 GiB; the sim service memory 5.4 GiB, 134 threads, CPU at its cap (4), GPU memory 1.2 GiB; the sim service's memory covers its largest legal call (4 cameras 480x848, 500 frames each (2000 images)): 7.4 GiB to build the response on top of the simulator's 5.4 GiB"
+caps_measured = "per-container peaks in 166 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 10 trials), 1158 threads, CPU at its cap (4), disk 5.9 GiB; the sim service memory 5.4 GiB, 134 threads, CPU at its cap (4), GPU memory 1.2 GiB; the sim service's memory covers its largest legal call (4 cameras 480x848 with depth, 250 frames each (2000 images)): 2.3 GiB to build the response on top of the simulator's 5.4 GiB"
 
 # 31 task(s)
 [[cap]]
@@ -450,10 +450,10 @@ caps_measured = "per-container peaks in 92 past trials: the agent's container me
 [[cap]]
 match = "^roboarc-(rope-threading|knot-untying|fiber-bundling|slotted-post-ring|orbits)-.*-standard$"
 main = { cpus = 4, memory_gb = 16, pids = 1024, disk_gb = 10 }
-sim = { cpus = 2, memory_gb = 15, pids = 1024, gpu_memory_gb = 4 }
+sim = { cpus = 2, memory_gb = 9, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer)"
 measured = "MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards"
-caps_measured = "per-container peaks in 83 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 6 trials), 310 threads, CPU at its cap (4), disk 4.5 GiB; the sim service memory 5.4 GiB, 131 threads, CPU 1.7 cores, GPU memory 1.1 GiB; the sim service's memory covers its largest legal call (4 cameras 480x848, 500 frames each (2000 images)): 7.4 GiB to build the response on top of the simulator's 5.4 GiB"
+caps_measured = "per-container peaks in 83 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 6 trials), 310 threads, CPU at its cap (4), disk 4.5 GiB; the sim service memory 5.4 GiB, 131 threads, CPU 1.7 cores, GPU memory 1.1 GiB; the sim service's memory covers its largest legal call (4 cameras 480x848 with depth, 250 frames each (2000 images)): 2.3 GiB to build the response on top of the simulator's 5.4 GiB"
 
 # 13 task(s)
 [[cap]]
@@ -476,10 +476,10 @@ caps_measured = "GPU memory (the sim service): EGL camera rendering only (not me
 [[cap]]
 match = "^roboarc-(blanket-flatten|blanket-fold)-.*-standard$"
 main = { cpus = 3, memory_gb = 4, pids = 1024, disk_gb = 10 }
-sim = { cpus = 8, memory_gb = 15, pids = 1024, gpu_memory_gb = 4 }
+sim = { cpus = 8, memory_gb = 9, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer)"
 measured = "MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards"
-caps_measured = "per-container peaks in 25 past trials: the agent's container memory 0.7 GiB, 305 threads, CPU 2.1 cores, disk 4.3 GiB; the sim service memory 4.2 GiB, 159 threads, CPU at its cap (8), GPU memory 1.2 GiB; the sim service's memory covers its largest legal call (4 cameras 480x848, 500 frames each (2000 images)): 7.4 GiB to build the response on top of the simulator's 5.4 GiB"
+caps_measured = "per-container peaks in 25 past trials: the agent's container memory 0.7 GiB, 305 threads, CPU 2.1 cores, disk 4.3 GiB; the sim service memory 4.2 GiB, 159 threads, CPU at its cap (8), GPU memory 1.2 GiB; the sim service's memory covers its largest legal call (4 cameras 480x848 with depth, 250 frames each (2000 images)): 2.3 GiB to build the response on top of the simulator's 5.4 GiB"
 
 # 47 task(s)
 [[cap]]
@@ -496,7 +496,7 @@ main = { cpus = 3, memory_gb = 4, pids = 1024, disk_gb = 10 }
 sim = { cpus = 2, memory_gb = 7, pids = 1024, gpu_memory_gb = 13 }
 recommended_gpu = "RTX 4090 24GB / L4 24GB"
 measured = "GPU memory: per-trial peaks of past trials up to 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card (the oracle 6.9 GB on an RTX 4090, 5.8 GB on an L4); memory: sim p90 3.2 GB (a per-container memory sampler); CPU: an estimate"
-caps_measured = "GPU memory (the sim service): per-trial peaks of 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card -> max(1.5 x peak, peak + 2), rounded up: 13 GiB; per-container peaks in 36 past trials: the agent's container memory 0.4 GiB, 122 threads, CPU 2.1 cores, disk 1.2 GiB; the sim service memory 3.3 GiB, 161 threads, CPU 1.7 cores, GPU memory 6.4 GiB (8.6 GiB in an earlier measurement); the sim service's memory covers its largest legal call (5 cameras 240x320, 626 frames each (fps 24 captures at 25; RGBA buffers)): 2.9 GiB to build the response on top of the simulator's 3.3 GiB"
+caps_measured = "GPU memory (the sim service): per-trial peaks of 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card -> max(1.5 x peak, peak + 2), rounded up: 13 GiB; per-container peaks in 36 past trials: the agent's container memory 0.4 GiB, 122 threads, CPU 2.1 cores, disk 1.2 GiB; the sim service memory 3.3 GiB, 161 threads, CPU 1.7 cores, GPU memory 6.4 GiB (8.6 GiB in an earlier measurement); the sim service's memory covers its largest legal call (5 cameras 240x320 with depth, 300 frames each (3000 images)): 0.8 GiB to build the response on top of the simulator's 3.3 GiB"
 
 # 3 task(s)
 [[cap]]
@@ -519,10 +519,10 @@ caps_measured = "per-container peaks in 18 past trials: the agent's container me
 [[cap]]
 match = "^robowits-.*-standard$"
 main = { cpus = 4, memory_gb = 5, pids = 1024, disk_gb = 10 }
-sim = { cpus = 4, memory_gb = 12, pids = 1024, gpu_memory_gb = 4 }
+sim = { cpus = 4, memory_gb = 8, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
 measured = "GPU memory 0.5-1.4 GB (physics on the CPU, the GPU renders the cameras; per-trial peaks of past trials); memory: sim p90 4.5 GB (a per-container memory sampler); CPU: an estimate (single-threaded Genesis CPU backend)"
-caps_measured = "per-container peaks in 27 past trials: the agent's container memory 2.0 GiB, 243 threads, CPU at its cap (4), disk 2.1 GiB; the sim service memory 3.8 GiB (4.5 GiB in an earlier measurement), 151 threads, CPU at its cap (4), GPU memory 0.8 GiB (1.4 GiB in an earlier measurement); the sim service's memory covers its largest legal call (2 cameras 480x848, 750 frames each): 6.0 GiB to build the response on top of the simulator's 4.5 GiB"
+caps_measured = "per-container peaks in 27 past trials: the agent's container memory 2.0 GiB, 243 threads, CPU at its cap (4), disk 2.1 GiB; the sim service memory 3.8 GiB (4.5 GiB in an earlier measurement), 151 threads, CPU at its cap (4), GPU memory 0.8 GiB (1.4 GiB in an earlier measurement); the sim service's memory covers its largest legal call (2 cameras 480x848, 750 frames each (1500 images)): 1.8 GiB to build the response on top of the simulator's 4.5 GiB"
 
 # 36 task(s)
 [[cap]]
@@ -537,7 +537,7 @@ match = "^vlabench-.*-standard$"
 main = { cpus = 4, memory_gb = 5, pids = 1024, disk_gb = 10 }
 sim = { cpus = 4, memory_gb = 11, pids = 1024 }
 measured = "memory: sim p90 6.9 GB (a per-container memory sampler); CPU only; CPU: an estimate"
-caps_measured = "per-container peaks in 26 past trials: the agent's container memory 2.2 GiB, 405 threads, CPU at its cap (4), disk 1.5 GiB; the sim service memory 5.7 GiB (6.9 GiB in an earlier measurement), 69 threads, CPU 2.1 cores; the sim service's memory covers its largest legal call (4 cameras 320x320 with depth, 302 frames each): 2.1 GiB to build the response on top of the simulator's 6.9 GiB"
+caps_measured = "per-container peaks in 26 past trials: the agent's container memory 2.2 GiB, 405 threads, CPU at its cap (4), disk 1.5 GiB; the sim service memory 5.7 GiB (6.9 GiB in an earlier measurement), 69 threads, CPU 2.1 cores; the sim service's memory covers its largest legal call (4 cameras 320x320 with depth, 302 frames each): 0.7 GiB to build the response on top of the simulator's 6.9 GiB"
 
 # 10 task(s)
 [[cap]]
@@ -569,25 +569,25 @@ caps_measured = "per-container peaks in 500 past trials: the agent's container m
 [[cap]]
 match = "^embodied-olympics-fun-.*-standard$"
 main = { cpus = 4, memory_gb = 10, pids = 8192, disk_gb = 10 }
-sim = { cpus = 4, memory_gb = 6, pids = 1024 }
+sim = { cpus = 4, memory_gb = 5, pids = 1024 }
 measured = "estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client"
-caps_measured = "per-container peaks in 573 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 6 trials), 5946 threads, CPU at its cap (4), disk 5.1 GiB; the sim service memory 1.0 GiB, 111 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (5 cameras 270x480, 600 frames each (3000 images)): 3.5 GiB to build the response on top of the simulator's 1.0 GiB"
+caps_measured = "per-container peaks in 573 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 6 trials), 5946 threads, CPU at its cap (4), disk 5.1 GiB; the sim service memory 1.0 GiB, 111 threads, CPU at its cap (4); the sim service's memory covers its largest legal call (5 cameras 270x480, 600 frames each (3000 images)): 1.1 GiB to build the response on top of the simulator's 1.0 GiB"
 
 # 71 task(s)
 [[cap]]
 match = "^ese-.*-standard$"
 main = { cpus = 4, memory_gb = 8, pids = 1024, disk_gb = 10 }
-sim = { cpus = 6, memory_gb = 13, pids = 1024 }
+sim = { cpus = 6, memory_gb = 6, pids = 1024 }
 measured = "oracle and nop trials of every task on 32-core CPU nodes of a university HPC cluster (rootless podman on cgroups v1, where the caps are not applied), /proc PSS and CPU of each container's processes every 5 s: the sim sidecar's CPU p90 4.74 / max 5.28 cores while it finalized, over 414 trials (that finalize ran two replays side by side and the video; the current one renders the video only and was not re-measured), hence its 6 CPUs; its PSS max 2.84 GB; main PSS max 0.74 GB over 805 containers; a whole trial's PSS max 4.75 GB over 1219 trials; the verifier's container under 0.1 GB (the finalize runs in the sim sidecar)"
-caps_measured = "per-container peaks in 1821 past trials: the agent's container memory 8.0 GiB (OOM-killed at the cap in 4 trials), 275 threads, CPU 3.2 cores, disk 2.9 GiB; the sim service memory 2.2 GiB (2.8 GiB in an earlier measurement), 118 threads, CPU 4.4 cores; the sim service's memory covers its largest legal call (4 cameras 480x640, 750 frames each (3000 images)): 8.4 GiB to build the response on top of the simulator's 2.8 GiB"
+caps_measured = "per-container peaks in 1821 past trials: the agent's container memory 8.0 GiB (OOM-killed at the cap in 4 trials), 275 threads, CPU 3.2 cores, disk 2.9 GiB; the sim service memory 2.2 GiB (2.8 GiB in an earlier measurement), 118 threads, CPU 4.4 cores; the sim service's memory covers its largest legal call (4 cameras 480x640, 750 frames each (3000 images)): 2.6 GiB to build the response on top of the simulator's 2.8 GiB"
 
 # 5 task(s)
 [[cap]]
 match = "^ese-.*-standard-realtime$"
 main = { cpus = 3, memory_gb = 8, pids = 1024, disk_gb = 10 }
-sim = { cpus = 6, memory_gb = 13, pids = 1024 }
+sim = { cpus = 6, memory_gb = 6, pids = 1024 }
 measured = "the standard tasks' measurements (the sim sidecar's CPU p90 4.74 / max 5.28 cores while it finalized with two replays and the video; the current finalize, the video only, was not re-measured; its PSS max 2.84 GB; main PSS max 0.74 GB; a whole trial's PSS max 4.75 GB), the same simulator and finalize; the realtime clock keeps about a fifth of one core busy (4 ms of physics per 20 ms step)"
-caps_measured = "per-container peaks in 83 past trials: the agent's container memory 8.0 GiB (OOM-killed at the cap in 1 trial), 403 threads, CPU 2.4 cores, disk 1.1 GiB; the sim service memory 1.2 GiB (2.8 GiB in an earlier measurement), 69 threads, CPU 1.1 cores; the sim service's memory covers its largest legal call (4 cameras 480x640, 750 frames each (3000 images)): 8.4 GiB to build the response on top of the simulator's 2.8 GiB"
+caps_measured = "per-container peaks in 83 past trials: the agent's container memory 8.0 GiB (OOM-killed at the cap in 1 trial), 403 threads, CPU 2.4 cores, disk 1.1 GiB; the sim service memory 1.2 GiB (2.8 GiB in an earlier measurement), 69 threads, CPU 1.1 cores; the sim service's memory covers its largest legal call (4 cameras 480x640, 750 frames each (3000 images)): 2.6 GiB to build the response on top of the simulator's 2.8 GiB"
 
 # 15 task(s)
 [[cap]]
@@ -617,10 +617,10 @@ caps_measured = "per-container peaks in 62 past trials: the agent's container me
 [[cap]]
 match = "^pandadyn-.*-standard$"
 main = { cpus = 4, memory_gb = 10, pids = 2048, disk_gb = 10 }
-sim = { cpus = 2, memory_gb = 11, pids = 1024, gpu_memory_gb = 3 }
+sim = { cpus = 2, memory_gb = 5, pids = 1024, gpu_memory_gb = 3 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU with Vulkan (RTX 4090 / L4)"
 measured = "50 oracle trials, 25 per mode (the trial's resource monitor every 5 s, RTX 4090): the sim service's peak 0.94 GiB, GPU memory 0.35 GiB, the agent's container 0.03 GiB; CPU p90 about 1 core per container; one filmed scene (render_video, S12 and D07): RSS 1.2-1.3 GiB, GPU memory 0.25 GiB; the sim service is one scene, rebuilt on every reset and once after the verdict to film the graded episode in the same process; CPU: one core per scene plus one for the agent"
-caps_measured = "per-container peaks in 49 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 1 trial), 752 threads, CPU at its cap (4), disk 9.3 GiB; the sim service memory 1.3 GiB, 45 threads, CPU 1.0 cores, GPU memory 0.6 GiB; the sim service's memory covers its largest legal call (observe 30 s, 2 cameras 480x640 with depth, 750 frames each (3000 images)): 8.0 GiB to build the response on top of the simulator's 1.3 GiB"
+caps_measured = "per-container peaks in 49 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 1 trial), 752 threads, CPU at its cap (4), disk 9.3 GiB; the sim service memory 1.3 GiB, 45 threads, CPU 1.0 cores, GPU memory 0.6 GiB; the sim service's memory covers its largest legal call (observe 30 s, 2 cameras 480x640 with depth, 750 frames each (3000 images)): 2.6 GiB to build the response on top of the simulator's 1.3 GiB"
 
 # 19 task(s)
 [[cap]]
@@ -629,7 +629,7 @@ main = { cpus = 4, memory_gb = 10, pids = 1024, disk_gb = 10 }
 sim = { cpus = 4, memory_gb = 12, pids = 1024, gpu_memory_gb = 3 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU with Vulkan (RTX 4090 / L4)"
 measured = "50 oracle trials, 25 per mode (the trial's resource monitor every 5 s, RTX 4090): the sim service's peak 0.94 GiB, GPU memory 0.35 GiB, the agent's container 0.03 GiB; CPU p90 about 1 core per container; one filmed scene (render_video, S12 and D07): RSS 1.2-1.3 GiB, GPU memory 0.25 GiB; the sim service is one scene; the graded episode is replayed in one fresh process while the live scene is still up (two scenes at once), then filmed by the live scene; CPU: one core per scene plus one for the agent"
-caps_measured = "per-container peaks in 66 past trials: the agent's container memory 9.4 GiB, 510 threads, CPU at its cap (4), disk 6.5 GiB; the sim service memory 8.0 GiB (OOM-killed at the cap in 1 trial), 27 threads, CPU 1.0 cores, GPU memory 0.6 GiB; the sim service's memory covers its largest legal call (observe 30 s, 2 cameras 480x640 with depth, 750 frames each (3000 images)): 8.0 GiB to build the response on top of the simulator's 1.3 GiB; the sim service's memory is 12 GiB, 1.5 x its own peak of 7.68 GiB: above the earlier cap of 8 GiB, at which it was OOM-killed once"
+caps_measured = "per-container peaks in 66 past trials: the agent's container memory 9.4 GiB, 510 threads, CPU at its cap (4), disk 6.5 GiB; the sim service memory 8.0 GiB (OOM-killed at the cap in 1 trial), 27 threads, CPU 1.0 cores, GPU memory 0.6 GiB; the sim service's memory covers its largest legal call (observe 30 s, 2 cameras 480x640 with depth, 750 frames each (3000 images)): 2.6 GiB to build the response on top of the simulator's 1.3 GiB; the sim service's memory is 12 GiB, 1.5 x its own peak of 7.68 GiB: above the earlier cap of 8 GiB, at which it was OOM-killed once"
 
 # 8 task(s)
 [[cap]]
@@ -644,11 +644,11 @@ caps_measured = "GPU memory: a Session with cameras peaks at 4.6 GiB (its render
 [[cap]]
 match = "^ambench-.*-standard$"
 main = { cpus = 2, memory_gb = 4, pids = 1024, disk_gb = 10 }
-sim = { cpus = 11, memory_gb = 23, pids = 1024, gpu_memory_gb = 16 }
+sim = { cpus = 11, memory_gb = 21, pids = 1024, gpu_memory_gb = 16 }
 gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada", "RTX PRO 6000 Blackwell"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "an RTX 4090 (conformance run and oracle trials, nvidia-smi every 15 s): the sim sidecar runs the camera-free physics process (2.0 GiB of memory, 1.2 GiB of GPU memory with one environment's PhysX buffers; 2.65 GiB with Isaac Lab's) and the render worker (11.9 GiB, 3.4 GiB): 14 GiB and 4.6 GiB; the agent's container holds the client only; the collect hook films through the render worker (4.6 GiB)"
-caps_measured = "GPU memory (the sim service): the physics process and the render worker, 4.6 GiB at most -> at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 11 past trials: the agent's container memory 0.3 GiB, 85 threads, CPU 1.1 cores, disk 0.9 GiB; the sim service memory 10.0 GiB (14.0 GiB in an earlier measurement), 221 threads, CPU 7.8 cores, GPU memory 5.6 GiB; the sim service's memory covers its largest legal call (observe 30 s, 2 cameras 384x384 with depth, 902 frames each): 5.8 GiB to build the response on top of the simulator's 14.0 GiB, 2 GiB more for thin data"
+caps_measured = "GPU memory (the sim service): the physics process and the render worker, 4.6 GiB at most -> at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 11 past trials: the agent's container memory 0.3 GiB, 85 threads, CPU 1.1 cores, disk 0.9 GiB; the sim service memory 10.0 GiB (14.0 GiB in an earlier measurement), 221 threads, CPU 7.8 cores, GPU memory 5.6 GiB; the sim service's memory covers its largest legal call (observe, 2 cameras 384x384 with depth, 750 frames each (3000 images)): 1.3 GiB to build the response on top of the simulator's 14.0 GiB, 2 GiB more for thin data"
 
 # 12 task(s)
 [[cap]]
@@ -680,10 +680,10 @@ caps_measured = "per-container peaks in 64 past trials: the agent's container me
 [[cap]]
 match = "^roboarc-ikea-.*-standard$"
 main = { cpus = 4, memory_gb = 10, pids = 1024, disk_gb = 10 }
-sim = { cpus = 2, memory_gb = 9, pids = 1024, gpu_memory_gb = 4 }
+sim = { cpus = 2, memory_gb = 7, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "RTX 4090 24GB / L4 24GB (an NVIDIA GPU with Vulkan and EGL)"
 measured = "a Harbor standard oracle of svallet on an RTX 4090 host (docker stats and nvidia-smi per process every 20 s): the sim sidecar peaked at 1.8 GiB of memory and 0.8 GiB of GPU memory (the Nyx render process), the agent's container (the client) below 0.1 GiB"
-caps_measured = "GPU memory (the sim service): at most 0.8 GiB (the Nyx render process); capped at 4 GiB, room for longer scenes; per-container peaks in 64 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 4 trials), 242 threads, CPU at its cap (4), disk 5.0 GiB; the sim service memory 3.6 GiB, 123 threads, CPU 1.2 cores, GPU memory 1.4 GiB; the sim service's memory covers its largest legal call (1 camera 480x848, 902 frames): 4.1 GiB to build the response on top of the simulator's 3.6 GiB"
+caps_measured = "GPU memory (the sim service): at most 0.8 GiB (the Nyx render process); capped at 4 GiB, room for longer scenes; per-container peaks in 64 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 4 trials), 242 threads, CPU at its cap (4), disk 5.0 GiB; the sim service memory 3.6 GiB, 123 threads, CPU 1.2 cores, GPU memory 1.4 GiB; the sim service's memory covers its largest legal call (1 camera 480x848, 902 frames): 1.1 GiB to build the response on top of the simulator's 3.6 GiB"
 
 # 1 task(s)
 [[cap]]
@@ -761,9 +761,9 @@ caps_measured = "processes and disk: defaults, not measured"
 [[cap]]
 match = "^autobio-.*-standard$"
 main = { cpus = 4, memory_gb = 4, pids = 1024, disk_gb = 10 }
-sim = { cpus = 4, memory_gb = 39, pids = 1024 }
+sim = { cpus = 4, memory_gb = 12, pids = 1024 }
 measured = "CPU only; the benchmark's own estimate is 4 CPUs and 8 GB per trial; 11 standard trials (the trial's resource monitor): the sim service at most 1.1 GiB of memory"
-caps_measured = "per-container peaks in 11 past trials: the agent's container memory 0.5 GiB, 147 threads, CPU at its cap (4), disk 1.2 GiB; the sim service memory 1.1 GiB, 123 threads, CPU 3.8 cores; the sim service's memory covers its largest legal call (observe 30 s at 50 fps, 4 cameras 480x640 with depth, 1502 frames each (the 3000 limit is per camera)): 31.1 GiB to build the response on top of the simulator's 1.1 GiB"
+caps_measured = "per-container peaks in 11 past trials: the agent's container memory 0.5 GiB, 147 threads, CPU at its cap (4), disk 1.2 GiB; the sim service memory 1.1 GiB, 123 threads, CPU 3.8 cores; the sim service's memory covers its largest legal call (4 cameras 480x640 with depth, 375 frames each (3000 images)): 2.6 GiB to build the response on top of the simulator's 1.1 GiB"
 
 # 6 task(s)
 [[cap]]
@@ -787,11 +787,11 @@ caps_measured = "GPU memory: about 7 GiB in the oracle on an RTX 4090 -> max(1.5
 [[cap]]
 match = "^labutopia-.*-standard$"
 main = { cpus = 8, memory_gb = 32, pids = 16384, disk_gb = 20 }
-sim = { cpus = 16, memory_gb = 26, pids = 16384, gpu_memory_gb = 16 }
+sim = { cpus = 16, memory_gb = 24, pids = 16384, gpu_memory_gb = 16 }
 gpu_types = ["RTX 4090", "L40S"]
 recommended_gpu = "RTX 4090 24GB / L40S 48GB"
 measured = "oracle checks on an RTX 4090, lab_001 pick: the rendering container peaks at 17 GB of memory, about 7 GB of GPU memory, 8 CPUs (start-up bursts to 16 cores for about 70 s); lab_003 families 21 GB at the peak (on an 8 vCPU host)"
-caps_measured = "GPU memory (the sim service): about 7 GiB in the oracle on an RTX 4090 -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults, not measured; the sim service's memory covers its largest legal call (observe at fps 24 (captured at 30), 3 cameras 512x512 with depth, 374 frames each): 5.5 GiB to build the response on top of the simulator's 17.0 GiB, 2 GiB more for thin data"
+caps_measured = "GPU memory (the sim service): about 7 GiB in the oracle on an RTX 4090 -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults, not measured"
 
 # 3 task(s)
 [[cap]]
@@ -815,10 +815,10 @@ caps_measured = "GPU memory: a rendering Session 0.9 GiB -> max(1.5 x peak, peak
 [[cap]]
 match = "^abc-sim-.*-standard(-realtime)?$"
 main = { cpus = 4, memory_gb = 10, pids = 8192, disk_gb = 20 }
-sim = { cpus = 4, memory_gb = 13, pids = 8192, gpu_memory_gb = 5 }
+sim = { cpus = 4, memory_gb = 10, pids = 8192, gpu_memory_gb = 5 }
 recommended_gpu = "any NVIDIA GPU with EGL (RTX 4090 / L4)"
 measured = "oracle trials of all 60 directories on an RTX 4090 workstation (docker stats every 3 s, the trial's resource monitor): the sim sidecar 2.1 GB and 0.83 GiB of GPU memory (standard, chess; realtime 0.8 GB and 0.72 GiB), the agent's container (the client) 0.03 GB; the collect hook renders the video inside the sidecar (EGL)"
-caps_measured = "GPU memory (the sim service): at most 0.83 GiB in the oracle trials -> max(1.5 x peak, peak + 2), rounded up: 3 GiB; kept at the earlier cap (no per-container data): 5 GiB; processes and disk: defaults, not measured; the sim service's memory covers its largest legal call (4 cameras, 750 frames each (3000 images)): 8.4 GiB to build the response on top of the simulator's 2.4 GiB"
+caps_measured = "GPU memory (the sim service): at most 0.83 GiB in the oracle trials -> max(1.5 x peak, peak + 2), rounded up: 3 GiB; kept at the earlier cap (no per-container data): 5 GiB; processes and disk: defaults, not measured"
 
 # 24 task(s)
 [[cap]]
