@@ -15,7 +15,7 @@ services:
     depends_on: [sim]
   sim:
     cpus: 11   # rcb-monitor
-    mem_limit: 23552m   # rcb-monitor
+    mem_limit: 21504m   # rcb-monitor
     pids_limit: 1024   # rcb-monitor
     x-gpu-memory-gb: 16   # GiB   # rcb-monitor
     # ambench-base (the first stage of the Dockerfile) is built from public sources; with read access to the prebuilt

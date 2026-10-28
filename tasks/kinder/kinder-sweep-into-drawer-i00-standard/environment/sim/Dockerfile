@@ -3,8 +3,8 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:kinder-0.1.6
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.3.1@sha256:77cfe73759fc3961ef393bfa6f119d635a29ea905175a12e4001298018ec2e56 /rcb1.py /srv/rcb1.py
-COPY --from=ghcr.io/mll-lab-nu/efe:kinder-files-0.3.1@sha256:28ae8c1aebd73de12ba242d818f665b2e3f8eb9df28fe8c9f52bea45744ec116 \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:f8652e8f64c8da11b6c60b1acbdb76db5cb48813bd6ae17d11ecbabebe3fa184 /rcb1.py /srv/rcb1.py
+COPY --from=ghcr.io/mll-lab-nu/efe:kinder-files-0.4.0@sha256:803df11db01efc416434ec0fcfc33474856c2e7b7d068efd2c41749ab1b7abd3 \
      /privileged/environment/rcb_kinder.py \
      /sim/rcb_service.py \
      /sim/server.py \

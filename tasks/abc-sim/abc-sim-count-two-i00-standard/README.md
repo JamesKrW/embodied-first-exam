@@ -9,7 +9,7 @@
 | Family / instance | `count_two` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
-| Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.1.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.2.0` |
 
 ## Task
 ABC Sim `count_two_into_opaque_box` (two I2RT YAM arms (6 revolute joints and a parallel two-finger gripper each) side by side at the near edge of a table, facing +x (the left arm is the one at +y)): Follow the directive **"put exactly 2 objects in the box"**. Success: the box holds exactly 2 objects (of any kind). An object is in the box when its centre is inside the box's interior (between its walls, below the lid); the count is read anew at every step, so taking an object out again, or dropping in one too many, undoes it. The goal must hold for 30 consecutive control steps (1.02 s); the episode then ends in success.
@@ -30,7 +30,7 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 13 GiB | 8192 | 5 GiB | — |
+| `sim` | 4 | 10 GiB | 8192 | 5 GiB | — |
 | verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.

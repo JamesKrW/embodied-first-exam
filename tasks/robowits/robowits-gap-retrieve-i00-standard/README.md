@@ -46,7 +46,7 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 5 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 4 | 12 GiB | 1024 | 4 GiB | — |
+| `sim` | 4 | 8 GiB | 1024 | 4 GiB | — |
 | verifier (as `main`) | 4 | 5 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.

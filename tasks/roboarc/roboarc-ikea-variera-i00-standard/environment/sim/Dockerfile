@@ -3,7 +3,7 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:ikea-mujoco-sim-0.4.0
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.3.0@sha256:8396e542e144afe82fb30773316193b23d5c942e05363888f857bccdf163d7fa \
+COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.4.0@sha256:09c2edb7f498299584a839c6abc665072731abb0009a95e1c9bc6f0fb2997682 \
      /sim/finalize.sh \
      /sim/ikea_nyx.py \
      /sim/ikea_rig.py \
@@ -11,8 +11,8 @@ COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.3.0@sha256:8396e542e144af
      /sim/rig.json \
      /sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.3.0@sha256:525ec49ce1eda97825dabe79807ede9a4f38a18d57fef1de7bcc0188cbccfefb /nyx_direct.py /srv/nyx_direct.py
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.3.1@sha256:77cfe73759fc3961ef393bfa6f119d635a29ea905175a12e4001298018ec2e56 \
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0@sha256:beb13ec1db0d85df2c5527529cda03101b15dd6cf524d34b9b288273131f44ca /nyx_direct.py /srv/nyx_direct.py
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:f8652e8f64c8da11b6c60b1acbdb76db5cb48813bd6ae17d11ecbabebe3fa184 \
      /rcb1.py \
      /v2_4/rcb_limited.py \
      /run.sh \

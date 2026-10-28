@@ -9,7 +9,7 @@
   },
   "sim": {
    "cpus": 2.0,
-   "memory_gb": 9.0,
+   "memory_gb": 6.0,
    "pids": 1024
   }
  },

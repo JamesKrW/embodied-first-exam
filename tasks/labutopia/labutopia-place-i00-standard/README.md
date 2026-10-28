@@ -30,7 +30,7 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 32 GiB | 16384 | no GPU | 20 GiB |
-| `sim` | 16 | 26 GiB | 16384 | 16 GiB | — |
+| `sim` | 16 | 24 GiB | 16384 | 16 GiB | — |
 | verifier (as `main`) | 8 | 32 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: RTX 4090, L40S, held by `sim`.
