@@ -34,7 +34,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: CPU only; 4 CPUs and 8 GB per trial, the verifier the same (the benchmark's estimate)
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

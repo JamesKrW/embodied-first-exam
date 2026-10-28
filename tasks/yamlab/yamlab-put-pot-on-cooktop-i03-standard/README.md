@@ -50,14 +50,13 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 4 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 16 | 21 GiB | 1024 | 16 GiB | — |
-| verifier (as `main`) | 4 | 4 GiB | no cap | no GPU | 10 GiB |
+| `main` (the agent's) | 5 | 4 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 16 | 21 GiB | 2048 | 16 GiB | — |
+| verifier (as `main`) | 5 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, RTX PRO 6000 Blackwell, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: GPU memory 3.8-4.0 GB per trial, anon memory 11.1-11.8 GB, CPU p90 5.8-8.7 cores over 12 trials (a per-container sampler every 30 s); per-trial peaks of past trials 5.5-6.5 GB of GPU memory on 24 GB cards; about 11 GB of memory and 8 CPUs per simulator
-- Measured (caps): GPU memory (the sim service): per-trial peaks of 10.4 GiB on a 48 GB card and 6.5 GiB on a 24 GB card -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 8 past trials: the agent's container memory 1.7 GiB, 119 threads, CPU 4.0 cores, disk 0.5 GiB; the sim service memory 13.4 GiB, 278 threads, CPU at its cap (16), GPU memory 4.0 GiB (10.4 GiB in an earlier measurement)
 
 ## Details
 | | |

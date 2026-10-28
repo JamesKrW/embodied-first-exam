@@ -50,7 +50,6 @@ Caps per container (PROTOCOL §6).
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
 - Measured: GPU memory 0.5-1.4 GB (physics on the CPU, the GPU renders the cameras; per-trial peaks of past trials); memory: privileged container p90 4.7 GB, verifier 2.4 GB (a per-container memory sampler); CPU: an estimate (single-threaded Genesis CPU backend)
-- Measured (caps): per-container peaks in 18 past trials: the agent's container memory 8.4 GiB, 391 threads, CPU at its cap (4), GPU memory 2.1 GiB, disk 1.0 GiB; the blenderkit service memory 0.7 GiB, 96 threads, CPU at its cap (1)
 
 ## Details
 | | |

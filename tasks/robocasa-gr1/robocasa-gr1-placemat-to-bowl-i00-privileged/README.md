@@ -33,7 +33,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: memory: verifier p90 4.0 GB (RoboCasa and RoboCasa-GR1 together; a per-container memory sampler); the standard twin's sim service, the same robosuite simulator, p90 9.7 GB; CPU only (OSMesa cameras); CPU: an estimate
-- Measured (caps): per-container peaks in 54 past trials: the agent's container memory 19.1 GiB, 294 threads, CPU at its cap (4), disk 1.0 GiB
 
 ## Details
 | | |

@@ -38,7 +38,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: a Harbor oracle trial on an RTX 4090 workstation: CPU-only MuJoCo with two Booster T1 humanoids per team; the verifier holds the service, the program, one replay and the video renderer; 6 CPUs pinned (the match runs on the wall clock)
-- Measured (caps): per-container peaks in 8 past trials: the agent's container memory 5.4 GiB, 86 threads, CPU at its cap (6), disk 1.0 GiB
 
 ## Details
 

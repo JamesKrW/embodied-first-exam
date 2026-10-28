@@ -47,7 +47,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: Embodied Olympics' joint-level soccer pilot on two RTX 4090 workstations (docker stats): the agent's container uses its 6 cores (drills, CPU-parallel rollouts, practice matches), the sim up to its 6 cores (the world, the opponent, the cameras), the practice service up to 4 worlds on its 4 cores; CPU tier: no GPU
-- Measured (caps): per-container peaks in 11 past trials: the agent's container memory 10.2 GiB, 400 threads, CPU at its cap (6), disk 1.0 GiB; the practice service memory 3.1 GiB, 57 threads, CPU 3.5 cores; the sim service memory 3.1 GiB, 57 threads, CPU 3.5 cores
 
 ## Details
 | | |

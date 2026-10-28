@@ -43,7 +43,6 @@ Caps per container (PROTOCOL §6).
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
 - Measured: as the standard twin, but the sidecar renders the cameras on the GPU over EGL; estimated on an RTX 4090 workstation: the sim sidecar steps the physics on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Measured (caps): GPU memory (the sim service): EGL camera rendering only (not measured); capped at 4 GiB
 
 ## Details
 | | |

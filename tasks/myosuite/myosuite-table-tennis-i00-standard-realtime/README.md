@@ -37,7 +37,6 @@ Caps per container (PROTOCOL §6).
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
 - Measured: as the standard twin (sim 1.2-1.4 GB); the GPU only renders the cameras over EGL (5 ms a frame on an RTX 4090); the sim keeps the GPU through the collect hook, which renders the video
-- Measured (caps): GPU memory (the sim service): EGL camera rendering only, under 1 GiB; capped at 4 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

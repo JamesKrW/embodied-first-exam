@@ -57,7 +57,6 @@ Caps per container (PROTOCOL §6).
 - GPU: any NVIDIA GPU, held by `main` and `scorer`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
 - Measured: GPU memory 0.25-0.5 GB (per-trial peaks of past trials); memory: privileged container p90 2.5 GB plus the scorer's 0.7 GB (a per-container memory sampler); CPU: an estimate
-- Measured (caps): per-container peaks in 53 past trials: the agent's container memory 7.8 GiB, 675 threads, CPU at its cap (8), GPU memory 0.3 GiB (0.5 GiB in an earlier measurement), disk 1.1 GiB; the scorer service memory 0.7 GiB, 50 threads, CPU 1.2 cores, GPU memory under 0.1 GiB (0.5 GiB in an earlier measurement)
 
 ## Details
 | | |

@@ -36,4 +36,3 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: Harbor oracle on a cloud CPU host (docker stats and cgroup memory.peak every 3-6 s): the sidecar holds its 4-CPU cap through the reference search before the agent starts (~480 s, the agent's container idle) and the finalization (136 s), peak 1.18 GiB; the sidecar 1-2 cores during deployments; the agent's container 0.06 GiB; the agent waits for the sidecar's health check and is stopped before finalization, so the sidecar's 4 cores never coincide with the agent's work; the verifier itself only reads JSON (~20 s)
-- Measured (caps): per-container peaks in 9 past trials: the agent's container memory 0.3 GiB, 67 threads, CPU at its cap (2), disk 1.0 GiB; the sim service memory 0.6 GiB (1.2 GiB in an earlier measurement), 19 threads, CPU at its cap (4)

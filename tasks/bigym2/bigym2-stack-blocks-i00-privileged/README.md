@@ -38,7 +38,6 @@ Caps per container (PROTOCOL §6).
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
 - Measured: GPU memory 0.7-1.2 GB (per-trial peaks of past trials); memory: privileged container 3.0 GB (a per-container memory sampler); CPU: an estimate (MuJoCo and two ONNX policies on the CPU)
-- Measured (caps): per-container peaks in 32 past trials: the agent's container memory 8.1 GiB, 209 threads, CPU 7.9 cores, GPU memory 2.4 GiB, disk 1.0 GiB
 
 ## Details
 | | |

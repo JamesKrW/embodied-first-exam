@@ -137,9 +137,18 @@ as every container has its caps. A rule is a `[[cap]]` table:
   (`rcb_monitor` aside). `main` = { `cpus` (whole), `memory_gb`, `pids`, `disk_gb` }; every other service = { `cpus`,
   `memory_gb`, `pids` }; `gpu_memory_gb` on, and only on, a service that reserves a GPU. Memory, disk and GPU memory are
   in GiB; memory and disk a whole number of MiB (a multiple of 1/1024 GiB), since they are written in MiB.
-- optional: `gpu_types` (written to `[environment]`), `recommended_gpu`, `measured` (what the task was measured to use)
-  and `caps_measured` (the measured peaks the caps come from), each shown in the task README's `## Resources`
-  (`gpu_types` as its `GPU:` line).
+- optional: `gpu_types` (written to `[environment]`), `recommended_gpu` and `measured` (what the task was measured to
+  use), each shown in the task README's `## Resources` (`gpu_types` as its `GPU:` line); `caps_measured` (the measured
+  peaks the caps come from), kept in the rules file only.
+
+How a rule's caps are chosen from measurements (the provenance in `caps_measured`): memory is the larger of 1.5 × the
+peak and the peak plus a margin (+2 GiB for main, +3 GiB for another service); GPU memory the larger of 1.5 × the peak
+and the peak + 2 GiB, at least 16 GiB for Isaac Sim; CPU at least every reading, on hosts that applied the cap and on
+hosts that did not (never above the earlier cap for the latter), and a simulator that runs in real time keeps the CPU
+its slowdown was measured with; processes and threads a power of two at least 2 × the peak thread count (4 × for Isaac
+Sim, whose thread count follows the host's cores), at least 1024; disk at least 10 GiB. A cap also covers the largest
+call the task allows, not only the peaks seen: a simulator service that builds a response of frames in memory gets at
+least its resident size + 1.2 × what building the largest legal response holds, in whole GiB.
 
 **Who enforces a cap.** The container's runtime first: Docker and Harbor apply what the host lets them (the table).
 The resource monitor (the `rcb_monitor` sidecar) reads each container's own cgroup limits (`cpu.max`, `memory.max`,

@@ -47,13 +47,12 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 2 | 4 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 2 | 4 GiB | 1024 | 4 GiB | — |
+| `sim` | 4 | 5 GiB | 1024 | 4 GiB | — |
 | verifier (as `main`) | 2 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
 - Measured: as the standard twin; the GPU only renders the cameras over EGL: GPU memory 1.0-1.3 GB (per-trial peaks of past trials); memory: sim 0.7 GB; CPU p90 1.9 cores
-- Measured (caps): GPU memory (the sim service): EGL camera rendering only (1.0-1.3 GiB in the standard twin's trials); capped at 4 GiB; per-container peaks in 5 past trials: the agent's container memory 0.4 GiB, 166 threads, CPU 1.8 cores, disk 1.1 GiB; the sim service memory 0.2 GiB (0.7 GiB in an earlier measurement), 50 threads, CPU 0.5 cores, GPU memory 0.2 GiB (1.3 GiB in an earlier measurement)
 
 ## Details
 | | |

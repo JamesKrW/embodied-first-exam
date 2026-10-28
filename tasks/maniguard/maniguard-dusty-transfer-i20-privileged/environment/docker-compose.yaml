@@ -6,7 +6,7 @@
 # trial only: no fixed name, so compose names it after the trial's project and Harbor's teardown deletes it.
 services:
   main:
-    pids_limit: 4096   # rcb-monitor
+    pids_limit: 8192   # rcb-monitor
     x-gpu-memory-gb: 18   # GiB   # rcb-monitor
     # maniguard-base (the first stage of the Dockerfile) is built from public sources; with read access to the prebuilt
     # image its layers are pulled instead (cache_from)

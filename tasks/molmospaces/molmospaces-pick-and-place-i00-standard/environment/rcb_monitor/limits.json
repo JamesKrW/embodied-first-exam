@@ -2,7 +2,7 @@
  "agent_timeout_sec": 3600,
  "caps": {
   "main": {
-   "cpus": 2.0,
+   "cpus": 3.0,
    "disk_gb": 12.0,
    "memory_gb": 4.0,
    "pids": 1024
@@ -10,7 +10,7 @@
   "sim": {
    "cpus": 2.0,
    "gpu_memory_gb": 5.0,
-   "memory_gb": 8.0,
+   "memory_gb": 17.0,
    "pids": 1024
   }
  },

@@ -8,7 +8,7 @@
    "pids": 1024
   },
   "sim": {
-   "cpus": 5.0,
+   "cpus": 6.0,
    "memory_gb": 15.0,
    "pids": 1024
   }

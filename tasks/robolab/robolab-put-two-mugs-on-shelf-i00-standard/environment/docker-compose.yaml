@@ -15,7 +15,7 @@ services:
   sim:
     cpus: 8   # rcb-monitor
     mem_limit: 23552m   # rcb-monitor
-    pids_limit: 2048   # rcb-monitor
+    pids_limit: 4096   # rcb-monitor
     x-gpu-memory-gb: 22   # GiB   # rcb-monitor
     build:
       context: ./sim

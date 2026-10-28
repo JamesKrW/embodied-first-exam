@@ -46,7 +46,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: verifier 1.6 GB (a per-container memory sampler); the rest estimated (robosuite, CPU only, 256x256 OSMesa cameras)
-- Measured (caps): per-container peaks in 62 past trials: the agent's container memory 6.5 GiB, 425 threads, CPU at its cap (4), disk 1.0 GiB
 
 ## Details
 | | |

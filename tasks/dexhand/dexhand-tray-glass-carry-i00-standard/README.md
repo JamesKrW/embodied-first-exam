@@ -54,13 +54,12 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 1 | 10 GiB | 1024 | no GPU | 10 GiB |
+| `main` (the agent's) | 2 | 10 GiB | 1024 | no GPU | 10 GiB |
 | `sim` | 2 | 5 GiB | 1024 | no GPU | — |
-| verifier (as `main`) | 1 | 10 GiB | no cap | no GPU | 10 GiB |
+| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
 - Measured: one Sharpa oracle per family in each mode (CPU only, cgroup memory.peak): the sim service at most 0.96 GiB, the agent's container under 0.05 GiB
-- Measured (caps): per-container peaks in 49 past trials: the agent's container memory 8.7 GiB, 184 threads, CPU 0.9 cores, disk 1.1 GiB; the sim service memory 1.3 GiB, 123 threads, CPU at its cap (2)
 
 ## Details
 

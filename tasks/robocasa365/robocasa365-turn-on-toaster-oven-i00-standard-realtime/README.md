@@ -35,7 +35,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: as the standard twin (the same service process and fresh-replay session); memory: sim p90 5.6 GB; CPU only (OSMesa cameras); CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

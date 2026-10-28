@@ -34,7 +34,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: memory: sim p90 5.6 GB (a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate
-- Measured (caps): per-container peaks in 124 past trials: the agent's container memory 3.9 GiB, 278 threads, CPU at its cap (4), disk 3.2 GiB; the sim service memory 6.4 GiB, 110 threads, CPU 3.1 cores
 
 ## Details
 | | |

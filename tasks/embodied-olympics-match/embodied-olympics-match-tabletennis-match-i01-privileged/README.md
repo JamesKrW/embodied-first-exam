@@ -41,4 +41,3 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo 3.3.7, no cameras; one world about 0.4 GB, 470 control steps/s on one core; the verifier holds the service, the policy (2 GiB address space) and two fresh replays
-- Measured (caps): per-container peaks in 16 past trials: the agent's container memory 1.9 GiB, 86 threads, CPU at its cap (4), disk 1.0 GiB

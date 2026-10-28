@@ -131,12 +131,10 @@ never copied into the task and not replayed here.
 - One Isaac simulator per 32 GB of host RAM; the compose files cap torch / OpenMP pools at 8 threads.
 
 ## GPU memory
-The GPU-memory cap of the container that runs the simulator (`main` in privileged mode, `sim` in standard mode) is
-18 GiB in both modes, the benchmark's choice. It is below the peaks measured in trials, 18.1 GiB on a 24 GB card and
-19.4 GiB on a 48 GB card (the tooling sets no texture budget), so an honest trial, the oracle's included, can go over
-it: the monitor records that, and only in a run that enforces the caps (`RCB_LIMITS_ENFORCE=1`, docs/protocol/README.md
-§6) it kills the process that holds the GPU memory, which can fail the trial. This is the one exception to "the oracle
-stays inside the caps" in ManiGuard.
+The container that runs the simulator (`main` in privileged mode, `sim` in standard mode) peaked at 18.1 GiB of GPU
+memory on a 24 GB card and 19.4 GiB on a 48 GB card (the tooling sets no texture budget). Its GPU-memory cap, in
+`task.toml`, is below those peaks, so an honest trial, the oracle's included, can go over it (PROTOCOL §6 says what
+happens then). This is the one exception to "the oracle stays inside the caps" in ManiGuard.
 
 ## Tasks
 - Every task dir (both modes) carries the tooling (`environment/rcb_maniguard.py`), the task's instance files in

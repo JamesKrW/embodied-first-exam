@@ -4,7 +4,7 @@
 # teardown, `compose down --volumes`, deletes it): every trial compiles its shaders once (~2 min).
 services:
   main:
-    pids_limit: 2048   # rcb-monitor
+    pids_limit: 4096   # rcb-monitor
     x-gpu-memory-gb: 16   # GiB   # rcb-monitor
     # yamlab-base (the first stage of the Dockerfile) is built from public sources; with read access to the prebuilt
     # image its layers are pulled instead (cache_from)

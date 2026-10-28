@@ -42,7 +42,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: 30 Harbor trials of both modes of the six essential families (12 oracle, 12 nop, 6 Wuji) plus the hamburger and paper oracle and nop trials, CPU only, the trial's resource monitor every 5 s: one fresh replay process 0.25-0.32 GiB max RSS (paper 0.31, hamburger 0.28), and the verifier runs two at once (at most 0.65 GiB); the agent's container at most 0.03 GiB without an agent; one core per replay process; an agent's own simulator sessions take about 0.3 GiB each
-- Measured (caps): per-container peaks in 43 past trials: the agent's container memory 1.6 GiB, 218 threads, disk 1.0 GiB
 
 ## Details
 

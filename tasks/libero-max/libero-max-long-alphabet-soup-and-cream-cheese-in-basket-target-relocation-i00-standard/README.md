@@ -46,12 +46,11 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 3 | 10 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 2 | 6 GiB | 1024 | no GPU | — |
+| `sim` | 3 | 6 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: the sim service estimated (robosuite, CPU only, 256x256 OSMesa cameras); the privileged twin's verifier, which replays the same simulator, 1.6 GB (a per-container memory sampler)
-- Measured (caps): per-container peaks in 52 past trials: the agent's container memory 7.2 GiB, 274 threads, CPU 2.9 cores, disk 1.0 GiB; the sim service memory 2.5 GiB, 67 threads, CPU 2.0 cores
 
 ## Details
 | | |

@@ -10,7 +10,7 @@
   "sim": {
    "cpus": 2.0,
    "gpu_memory_gb": 3.0,
-   "memory_gb": 5.0,
+   "memory_gb": 11.0,
    "pids": 1024
   }
  },

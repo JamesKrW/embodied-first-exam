@@ -6,7 +6,7 @@
    "disk_gb": 32.0,
    "gpu_memory_gb": 22.0,
    "memory_gb": 29.0,
-   "pids": 4096
+   "pids": 8192
   }
  },
  "disk_gb": 32.0,

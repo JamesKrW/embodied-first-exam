@@ -48,4 +48,3 @@ Caps per container (PROTOCOL §6).
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
 - Measured: GPU memory 1.2-1.3 GB (the oracle 1.2 GB on an RTX 4090; per-trial peaks of past trials); memory: sim 1.1 GB (a per-container memory sampler); CPU: an estimate
-- Measured (caps): per-container peaks in 8 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 1 trial), 154 threads, CPU at its cap (4), disk 1.2 GiB; the sim service memory 0.7 GiB (1.1 GiB in an earlier measurement), 96 threads, CPU 1.0 cores, GPU memory 0.9 GiB (1.3 GiB in an earlier measurement)

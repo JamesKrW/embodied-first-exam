@@ -58,12 +58,11 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 3 | 8 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 6 | 6 GiB | 1024 | no GPU | — |
+| `sim` | 6 | 13 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: the standard tasks' measurements (the sim sidecar's CPU p90 4.74 / max 5.28 cores while it finalized with two replays and the video; the current finalize, the video only, was not re-measured; its PSS max 2.84 GB; main PSS max 0.74 GB; a whole trial's PSS max 4.75 GB), the same simulator and finalize; the realtime clock keeps about a fifth of one core busy (4 ms of physics per 20 ms step)
-- Measured (caps): per-container peaks in 83 past trials: the agent's container memory 8.0 GiB (OOM-killed at the cap in 1 trial), 403 threads, CPU 2.4 cores, disk 1.1 GiB; the sim service memory 1.2 GiB (2.8 GiB in an earlier measurement), 69 threads, CPU 1.1 cores
 
 ## Details
 | | |

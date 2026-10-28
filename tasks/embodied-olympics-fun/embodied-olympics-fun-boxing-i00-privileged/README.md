@@ -35,7 +35,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Measured (caps): per-container peaks in 500 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 3 trials), 281 threads, CPU at its cap (8), disk 2.5 GiB
 
 ## Details
 | | |

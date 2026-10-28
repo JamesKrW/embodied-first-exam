@@ -4,7 +4,7 @@
 # with the verifier: the first Session with cameras in a container takes 5 to 27 minutes to start.
 services:
   main:
-    pids_limit: 2048   # rcb-monitor
+    pids_limit: 4096   # rcb-monitor
     x-gpu-memory-gb: 16   # GiB   # rcb-monitor
     volumes:   # rcb-monitor
       - rcb_limits:/run/rcb-limits:ro   # rcb-monitor

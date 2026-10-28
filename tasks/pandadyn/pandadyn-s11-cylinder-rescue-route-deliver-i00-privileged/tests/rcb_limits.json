@@ -2,7 +2,7 @@
  "agent_timeout_sec": 3600,
  "caps": {
   "main": {
-   "cpus": 4.0,
+   "cpus": 5.0,
    "disk_gb": 10.0,
    "gpu_memory_gb": 3.0,
    "memory_gb": 10.0,

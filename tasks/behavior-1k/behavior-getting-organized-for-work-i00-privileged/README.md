@@ -42,13 +42,12 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 29 GiB | 4096 | 22 GiB | 32 GiB |
+| `main` (the agent's) | 8 | 29 GiB | 8192 | 22 GiB | 32 GiB |
 | verifier | no cap | no cap | no cap | 22 GiB | no cap |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: GPU memory 8.3-9.0 GB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (a per-container sampler every 30 s, trials on 14 GPU hosts); CPU 6-9 cores per trial; 13-16 GB of memory per Isaac process
-- Measured (caps): per-container peaks in 143 past trials: the agent's container memory 29.0 GiB (OOM-killed at the cap in 2 trials), 1093 threads, CPU at its cap (8), GPU memory 18.6 GiB, disk 30.2 GiB
 
 ## Details
 | | |

@@ -828,11 +828,10 @@ def readme_resources(task: Path, old_readme: str = "") -> list[str]:
     if r:
         notes += [f"- Recommended GPU: {r['recommended_gpu']}."] if r.get("recommended_gpu") else []
         notes += [f"- Measured: {r['measured']}"] if r.get("measured") else []
-        notes += [f"- Measured (caps): {r['caps_measured']}"] if r.get("caps_measured") else []
     else:
         sec = re.search(rf"(?ms)^{re.escape(RESOURCES_HEADING)}\n(.*?)(?=^## |\Z)", old_readme or "")
         notes += [ln for ln in (sec.group(1).splitlines() if sec else [])
-                  if ln.startswith(("- Recommended GPU:", "- Measured:", "- Measured (caps):"))]
+                  if ln.startswith(("- Recommended GPU:", "- Measured:"))]
     return [RESOURCES_HEADING, "Caps per container (PROTOCOL §6).", "", *rows, "", *notes]
 
 

@@ -44,7 +44,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: the values Embodied Olympics measured for its exported matches (tasks/embodied-olympics-fun/README.md): the sim takes up to 6 CPUs, the agent 2; memory: sim 0.7-1.4 GB, agent 2.2 GB (a per-container memory sampler); CPU only, real time needs the cores
-- Measured (caps): per-container peaks in 131 past trials: the agent's container memory 1.2 GiB (2.2 GiB in an earlier measurement), 593 threads, CPU at its cap (2), disk 1.3 GiB; the sim service memory 2.0 GiB, 58 threads, CPU 2.0 cores
 
 ## Details
 

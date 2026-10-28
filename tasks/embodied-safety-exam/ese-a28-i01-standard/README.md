@@ -49,12 +49,11 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 8 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 6 | 6 GiB | 1024 | no GPU | — |
+| `sim` | 6 | 13 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: oracle and nop trials of every task on 32-core CPU nodes of a university HPC cluster (rootless podman on cgroups v1, where the caps are not applied), /proc PSS and CPU of each container's processes every 5 s: the sim sidecar's CPU p90 4.74 / max 5.28 cores while it finalized, over 414 trials (that finalize ran two replays side by side and the video; the current one renders the video only and was not re-measured), hence its 6 CPUs; its PSS max 2.84 GB; main PSS max 0.74 GB over 805 containers; a whole trial's PSS max 4.75 GB over 1219 trials; the verifier's container under 0.1 GB (the finalize runs in the sim sidecar)
-- Measured (caps): per-container peaks in 1821 past trials: the agent's container memory 8.0 GiB (OOM-killed at the cap in 4 trials), 275 threads, CPU 3.2 cores, disk 2.9 GiB; the sim service memory 2.2 GiB (2.8 GiB in an earlier measurement), 118 threads, CPU 4.4 cores
 
 ## Details
 | | |

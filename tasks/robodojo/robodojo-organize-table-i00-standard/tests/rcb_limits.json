@@ -11,7 +11,7 @@
    "cpus": 16.0,
    "gpu_memory_gb": 16.0,
    "memory_gb": 25.0,
-   "pids": 1024
+   "pids": 2048
   }
  },
  "disk_gb": 10.0,

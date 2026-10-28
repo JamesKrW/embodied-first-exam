@@ -28,13 +28,12 @@ Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 2 | 16 GiB | 1024 | no GPU | 10 GiB |
+| `main` (the agent's) | 3 | 16 GiB | 1024 | no GPU | 10 GiB |
 | `sim` | 3 | 14 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: memory: robosuite sim p90 9.7 GB (RoboCasa and RoboCasa-GR1 together; a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate
-- Measured (caps): per-container peaks in 53 past trials: the agent's container memory 16.0 GiB (OOM-killed at the cap in 1 trial), 202 threads, CPU 1.8 cores, disk 2.5 GiB; the sim service memory 5.9 GiB (9.7 GiB in an earlier measurement), 110 threads, CPU 2.4 cores
 
 ## Details
 | | |

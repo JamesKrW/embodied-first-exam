@@ -52,7 +52,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: pot_shelf_transfer oracle and nop trials (CPU only; the trial's resource monitor every 5 s for the agent's container, cgroup memory.peak for the sim service): the sim service 2.25-2.53 GiB, the agent's container under 0.06 GiB; sweep_dustpan: the sim service 2.20 GiB
-- Measured (caps): per-container peaks in 9 past trials: the agent's container memory 0.6 GiB, 182 threads, disk 1.0 GiB; the sim service memory 2.6 GiB, 69 threads
 
 ## Details
 

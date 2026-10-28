@@ -43,13 +43,12 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 5 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 12 | 21 GiB | 1024 | 9 GiB | — |
+| `sim` | 12 | 21 GiB | 2048 | 9 GiB | — |
 | verifier (as `main`) | 8 | 5 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: freezing the 14 instances on an RTX 4090 (docker stats and nvidia-smi every 20 s, four Isaac processes at once): one Isaac process with the robot's three 1080x1080 cameras holds 12-13 GiB of memory and 3.5-4.6 GiB of GPU memory, 4-7 cores while Isaac starts and the scene loads, about 1 core after; the sim service is one such process (plus the live video's encoder, 540 px at 10 fps, not measured), graded live (the collect hook replays nothing); the agent's container runs the client only
-- Measured (caps): GPU memory (the sim service): one Isaac process with three cameras, 3.5-4.6 GiB -> max(1.5 x peak, peak + 4), rounded up: 9 GiB; per-container peaks in 47 past trials: the agent's container memory 2.4 GiB, 120 threads, CPU 7.4 cores, disk 1.7 GiB; the sim service memory 13.8 GiB, 360 threads, CPU at its cap (12), GPU memory 17.0 GiB (above the cap)
 
 ## Details
 | | |

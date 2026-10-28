@@ -39,7 +39,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: not needed.
 - Measured: memory: privileged container p90 2.6 GB (a per-container memory sampler); CPU only; CPU p90 1.9 cores (a per-container sampler every 30 s)
-- Measured (caps): per-container peaks in 35 past trials: the agent's container memory 10.0 GiB (OOM-killed at the cap in 1 trial), 960 threads, CPU 3.4 cores, disk 1.0 GiB
 
 ## Details
 | | |

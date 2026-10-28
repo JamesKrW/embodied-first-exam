@@ -59,13 +59,12 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 6 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 12 | 39 GiB | 2048 | 18 GiB | — |
+| `sim` | 12 | 39 GiB | 4096 | 18 GiB | — |
 | verifier (as `main`) | 8 | 6 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: one trial: sim anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s); GPU memory and CPU otherwise from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack)
-- Measured (caps): GPU memory (the sim service): cap 18 GiB, the benchmark's choice, below the measured peaks of 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling): a trial over it is recorded; a run with RCB_LIMITS_ENFORCE=1 kills the process that holds it (tasks/maniguard/README.md "GPU memory"); per-container peaks in 26 past trials: the agent's container memory 3.1 GiB, 163 threads, CPU at its cap (8), disk 1.1 GiB; the sim service memory 25.5 GiB, 559 threads, CPU at its cap (12), GPU memory 4.8 GiB (19.4 GiB in an earlier measurement, above the cap)
 
 ## Details
 | | |

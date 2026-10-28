@@ -44,4 +44,3 @@ Caps per container (PROTOCOL §6).
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: RTX 4090 24GB / L4 24GB.
 - Measured: GPU memory: per-trial peaks of past trials up to 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card (the oracle 6.9 GB on an RTX 4090, 5.8 GB on an L4); memory: privileged agent container p90 6.4 GB, verifier 4.2 GB (a per-container memory sampler); CPU: an estimate
-- Measured (caps): GPU memory: per-trial peaks of 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card -> max(1.5 x peak, peak + 4), rounded up: 13 GiB; per-container peaks in 40 past trials: the agent's container memory 4.8 GiB (6.4 GiB in an earlier measurement), 229 threads, CPU at its cap (4), GPU memory 7.3 GiB (8.6 GiB in an earlier measurement), disk 1.0 GiB
