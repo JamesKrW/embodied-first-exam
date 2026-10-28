@@ -50,18 +50,28 @@ def _check(cond, msg):
 def test_rule():
     sys.path.insert(0, HERE)
     import rcb_limits as r
-    tick = 5.0
-    over = [(i * tick, 10.0 if 20 <= i < 33 else 1.0) for i in range(60)]          # 65 s over the limit
-    _check(abs(r.sustained(over, 5, 60, 120, tick) - 160.0) < 0.01, "65 s over: confirmed at 60 s")
-    short = [(i * tick, 10.0 if 20 <= i < 31 else 1.0) for i in range(60)]         # 55 s
-    _check(r.sustained(short, 5, 60, 120, tick) is None, "55 s over: no violation")
-    flap = [(i * tick, 10.0 if (i % 2 == 0 and i >= 20) else 1.0) for i in range(80)]  # half the time, never 60 s straight
-    _check(r.sustained(flap, 5, 60, 120, tick) is not None, "59 s on / 1 s off does not escape: 60 s in any 120 s")
-    sparse = [(i * 25.0, 10.0) for i in range(4)]                                   # 25 s gaps count 15 s each
-    _check(r.sustained(sparse, 5, 60, 120, tick) is None, "gaps never count against the agent")
-    _check(r.sustained(over, 0, 60, 120, tick) is None, "limit 0 = not limited")
-    disk = [(0, 1.0), (60, 30.0), (120, 1.0), (180, 30.0), (240, 31.0)]
-    _check(r.consecutive(disk, 20) == 240, "disk: two consecutive measurements over")
+    lim = {"format": "rcb-limits/2", "disk_gb": 10.0,
+           "caps": {"main": {"cpus": 4, "memory_gb": 8.0, "pids": 100, "gpu_memory_gb": 4.0, "disk_gb": 10.0, "gpu": True}}}
+
+    def sample(t, **c):
+        base = {"kind": "scope", "role": "main", "service": "main", "cpu": 1.0, "memory_gb": 1.0, "pids": 10,
+                "gpu_memory_gb": 0.5}
+        return {"t": t, "scope": {"disk_gb": c.pop("disk_gb", None)}, "containers": [dict(base, **c)]}
+    _check(r.violations([sample(0)], lim) == [], "within the caps")
+    _check(r.violations([sample(0, memory_gb=8.3)], lim, tol=0.05) == [], "within the tolerance: not over")
+    v = r.violations([sample(0, memory_gb=8.5), sample(5, memory_gb=9.0)], lim, tol=0.05)
+    _check([x["metric"] for x in v] == ["memory_gb"] and v[0]["at"] == 0 and v[0]["peak"] == 9.0 and v[0]["samples"] == 2,
+           f"memory over its cap at one sample is over: {v}")
+    _check([x["metric"] for x in r.violations([sample(0, pids=101)], lim, tol=0.5)] == ["pids"], "counts are exact")
+    _check([x["metric"] for x in r.violations([sample(0, cpu=4.5)], lim)] == ["cpus"], "CPU over its cap")
+    _check([x["metric"] for x in r.violations([sample(0, gpu_memory_gb=4.5)], lim)] == ["gpu_memory_gb"], "GPU memory")
+    _check([x["metric"] for x in r.violations([sample(0, disk_gb=11.0)], lim)] == ["disk_gb"], "disk")
+    nogpu = dict(lim, caps={"main": dict(lim["caps"]["main"], gpu=False)})
+    _check(r.violations([sample(0, gpu_memory_gb=9.0)], nogpu) == [], "no GPU in the service: GPU memory is recorded only")
+    side = {"t": 0, "scope": {}, "containers": [{"kind": "observe", "role": "sidecar", "memory_gb": 99.0, "pids": 10 ** 6}]}
+    _check(r.violations([side], lim) == [], "a benchmark-owned service is recorded only")
+    _check(r.parse_tolerance("0.1") == (0.1, None) and r.parse_tolerance(None)[0] == r.TOLERANCE
+           and r.parse_tolerance("x")[1] and r.parse_tolerance("2")[1], "the tolerance switch")
 
 
 def test_verify():
@@ -69,7 +79,7 @@ def test_verify():
     import rcb_limits as r
     lim = {"format": "rcb-limits/2", "gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5,
            "caps": {"main": {"cpus": 4, "memory_gb": 8.0, "pids": 8192, "gpu_memory_gb": 4.0, "disk_gb": 10.0}}}
-    for enforce, gpu, want in ((1, 6.0, "fail"), (0, 6.0, "observe"), (1, 3.0, "pass")):
+    for enforce, gpu, want in ((1, 6.0, "over"), (0, 6.0, "over"), (1, 3.0, "pass")):
         with tempfile.TemporaryDirectory() as d:
             rec, tests, logs = (os.path.join(d, x) for x in ("rec", "tests", "logs"))
             for x in (rec, tests, logs):
@@ -93,12 +103,10 @@ def test_verify():
                            capture_output=True)
             out = json.load(open(os.path.join(logs, "reward.json")))
             txt = open(os.path.join(logs, "reward.txt")).read().strip()
-            if want == "fail":
-                _check(out["success"] == 0 and out["resource_limit_exceeded"] == 1 and out["success_before_limits"] == 1
-                       and txt == "0" and out["over_gpu_memory_gb"] == 1, f"enforced violation fails: {out}")
-            elif want == "observe":
+            if want == "over":
                 _check(out["success"] == 1 and out["limits_violation_observed"] == 1 and txt == "1"
-                       and "resource_limit_exceeded" not in out, f"observe mode only records: {out}")
+                       and out["over_gpu_memory_gb"] == 1 and "resource_limit_exceeded" not in out
+                       and out.get("infra_error", 0) == 0, f"a cap exceeded is recorded, the grade stands: {out}")
             else:
                 _check(out["success"] == 1 and out["limits_violation_observed"] == 0 and out["resource_monitor_missing"] == 0,
                        f"within limits: {out}")

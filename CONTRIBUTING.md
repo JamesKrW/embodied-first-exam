@@ -117,9 +117,8 @@ has its own prefix (`task_conventions.py benchmarks --check`, `ci_scope.py --che
    `deploy.resources.limits`. A separate verifier's caps are `cpus` / `memory_mb` you set in `[verifier.environment]`
    (PROTOCOL §6). Measure the oracle (and agent trials if you can: `docker stats` / cgroup `memory.peak`,
    `nvidia-smi`), set the caps a generous margin above the peaks (e.g. `max(1.5 x peak, peak + 4 GiB)`) and make sure
-   the oracle stays inside them, unless the benchmark's README states an exception: memory over its cap is an OOM kill,
-   and GPU memory or disk over theirs fails the trial when a run enforces them (`RCB_LIMITS_ENFORCE=1`). Then run
-   `scripts/task_conventions.py` on the tasks; `check-resources.py` checks the result.
+   the oracle stays inside them, unless the benchmark's README states an exception: a process over any cap but CPU can
+   be killed (PROTOCOL §6). Then run `scripts/task_conventions.py` on the tasks; `check-resources.py` checks the result.
 4. Base images: `images/<sim>/Dockerfile`, versioned in `images/<sim>/VERSION`, built and pushed with
    `scripts/build_images.sh` / `scripts/push_images.sh`. Images that cannot be published carry `images/<sim>/BUILD_ONLY`
    and build instructions. A task on a private image builds it itself when the runner cannot pull it: its Dockerfile

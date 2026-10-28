@@ -16,12 +16,13 @@ A process whose first thread has exited is found through a thread that lives; a 
 
 Every tick (5 s; disk every 60 s) it samples, per container and summed over the scope: GPU memory (NVML, per process,
 compute and graphics), memory (cgroup anon+shmem when the container has its own cgroup, else PSS anon+shmem), processes
-(TGIDs, zombies included), disk growth under rcb_limits.DISK_PATHS in the agent's container (complete walks only, in
-slices between the samples), CPU (recorded only). It appends to /var/rcb-monitor/samples.jsonl and
-events.jsonl and writes the agent-visible /run/rcb-limits/usage.json: the current values, the caps of the agent's own
-container (`caps`), the two caps the monitor may enforce (`limits`: GPU memory and disk) and the agent's
-clock (`elapsed_s`, `time_left_s`, `deadline_utc`: the task's `[agent] timeout_sec`, counted from the monitor's start,
-which is the trial environment's start, a little before the agent's session starts, so it never overstates the time left).
+and threads (TGIDs and their threads, zombies included: what a cgroup's pids.max counts), CPU (the cgroup's cpu.stat,
+else the processes' /proc stat), disk growth under rcb_limits.DISK_PATHS in the agent's container (complete walks only,
+in slices between the samples). It appends to /var/rcb-monitor/samples.jsonl and events.jsonl and writes the
+agent-visible /run/rcb-limits/usage.json: the agent's container's current use (`own`) and caps (`caps`), the scope's sums,
+what the backstop did, and the agent's clock (`elapsed_s`, `time_left_s`, `deadline_utc`: the task's `[agent]
+timeout_sec`, counted from the monitor's start, which is the trial environment's start, a little before the agent's
+session starts, so it never overstates the time left).
 
 The agent-side session log: the privileged tooling writes /app/output/rcb_session_log.jsonl
 from the agent's own process, so the agent can delete or rewrite it. Every tick the monitor copies what was appended to
@@ -37,15 +38,26 @@ recorded) and why (`cause`): "cap" when the container's own `oom` counter rose w
 reached its own cap), else "host" (the host's OOM killer, or an enclosing cgroup's: not this container's doing).
 Only a "cap" kill in the scope is a violation (rcb_limits.violations); the verifier step reports the others.
 
-RCB_LIMITS_ENFORCE=1 (run-time switch; compose default 0; 0/1/true/false, anything else is a fatal record): once a
-violation is confirmed (GPU memory or disk over its cap, by the protocol's rules; a kernel OOM kill at a container's own
-memory cap) (rcb_limits.violations, the verifier's own rule) the monitor SIGKILLs every in-scope process
-except each container's PID 1, so the agent stops at once and Harbor goes on to collection and the verifier (an agent
-killed this way ends like one that exited non-zero). It also protects the host (`emergency_kill` events, never a
-violation by themselves): above EMERGENCY_GPU_FACTOR x the GPU-memory cap at one sample it kills the scope's process
-that holds the most GPU memory; where the runtime applies no kernel memory cap, it stands in for it and kills the
-largest process once the scope is above its declared memory caps.
-0: it only records.
+A container's caps are those of its compose service (limits.json `caps`): the agent's container is `main`; another
+container in the scope is the one other service in limits.json `scope_services` (inject.py allows at most one).
+A measurement above cap x (1 + RCB_LIMITS_TOLERANCE, default rcb_limits.TOLERANCE) is over it (process and thread
+counts: above the cap itself); the first time per resource and container an `over` event says so, in both settings.
+
+RCB_LIMITS_ENFORCE=1 (run-time switch; compose default 0; 0/1/true/false, anything else is a fatal record): the monitor
+is the backstop for every cap of every container in the scope, at every sample, the way Docker acts where it can
+(docs/protocol/README.md §6). The benchmark's own (observed) services are recorded only.
+  memory     over the cap: SIGKILL the process with the largest RSS, again while the container is still over (its
+             victims' PSS taken off), like the kernel's OOM killer
+  pids       over the cap: SIGKILL the newest processes until the count is back at it, like a fork that fails
+  cpu        over the cap: never a kill. The container's processes are duty-cycled with SIGSTOP / SIGCONT (Throttler,
+             cpulimit-style, THROTTLE_PERIOD_SEC) so that their use stays at the cap, only while their demand is above it
+  disk       over the cap at a disk measurement: SIGKILL the process that wrote the most since the previous one
+             (/proc/<pid>/io write_bytes), like a write that fails with ENOSPC
+  gpu memory over the container's x-gpu-memory-gb: SIGKILL the process holding the most GPU memory, again while over
+Never PID 1 or what started with it (spared(): the container stays up for collection). Every action is a `kill` /
+`throttle_start` / `throttle_end` event; a resource the monitor cannot observe (NVML not telling a process's memory, an
+unreadable /proc/<pid>/io, a service whose caps it cannot tell) is an `unobservable` event and nothing is killed for it.
+None of this changes the grade (rcb_limits.verify). 0: it only records; Docker / Harbor enforce what the host lets them.
 
 After the seal it stays up until the runtime stops it, except in a container without a cgroup of its own (rootless
 podman without a delegated cgroup), which its runtime cannot stop (own_cgroup): it then ends itself.
@@ -78,7 +90,9 @@ LIMITS = os.path.join(HERE, "limits.json")
 HZ = os.sysconf("SC_CLK_TCK")
 PAGE = os.sysconf("SC_PAGE_SIZE")
 GIB = float(2 ** 30)
-EMERGENCY_GPU_FACTOR = 1.5      # host protection (enforced runs): above this x the GPU-memory cap at one sample
+THROTTLE_PERIOD_SEC = 0.1       # CPU backstop: one SIGCONT / SIGSTOP cycle (the kernel's CFS period is 100 ms too)
+THROTTLE_MIN_FRACTION = 0.02    # ... the smallest share of a period a throttled container runs
+THROTTLE_REFRESH_SEC = 1.0      # ... how often the processes of a throttled container are looked up again
 DISK_SLICE_SEC = 1.5            # of every tick a running disk walk may take (the monitor's CPU cap is half a core)
 DISK_WALK_MAX_SEC = 300.0       # a walk not finished by then is partial: a gap in the record, never a baseline
 OOM_COLD_SEC = 0.02             # OomWatch: every memory.events is read this often (or at once, when the kernel notifies)
@@ -189,10 +203,9 @@ def usage_caps(lim):
     return {k: main.get(k) for k in ("cpus", "memory_gb", "pids", "disk_gb", "gpu_memory_gb")}
 
 
-def usage_limits(lim):
-    """usage.json `limits`: the caps the monitor may enforce (RCB_LIMITS_ENFORCE=1) and the protocol's rule for them."""
-    return {"gpu_memory_gb": lim.get("gpu_memory_gb"), "disk_gb": lim.get("disk_gb"),
-            "sustain_sec": rcb_limits.SUSTAIN_SEC, "window_sec": rcb_limits.WINDOW_SEC}
+def usage_limits(lim, tol=rcb_limits.TOLERANCE):
+    """usage.json `limits`: the scope's GPU-memory and disk caps and the tolerance a measurement is over a cap by."""
+    return {"gpu_memory_gb": lim.get("gpu_memory_gb"), "disk_gb": lim.get("disk_gb"), "tolerance": tol}
 
 
 def open_in_root(root, rel):
@@ -451,13 +464,13 @@ class OomWatch:
         self.thread = None
         self.stopped = False         # set at the seal: the record is closed, like the samples
 
-    def watch(self, cg, role, scope, t):
+    def watch(self, cg, role, scope, t, service=None):
         """The sampler saw this container's cgroup at time t."""
         with self.lock:
             e = self.w.get(cg)
             if e is None:
                 e = self.w[cg] = {"fd": None, "kill": None, "oom": None, "sig": None, "cap_t": None}
-            e.update(role=role, scope=bool(scope), seen=t)
+            e.update(role=role, scope=bool(scope), seen=t, service=service)
 
     @staticmethod
     def _close(e):
@@ -516,7 +529,7 @@ class OomWatch:
                     e["cap_t"] = t
                 if kill > e["kill"]:
                     at_cap = e["cap_t"] is not None and t - e["cap_t"] <= OOM_CAP_WINDOW_SEC
-                    kw = {"role": e["role"], "scope": e["scope"], "count": kill - e["kill"],
+                    kw = {"role": e["role"], "service": e.get("service"), "scope": e["scope"], "count": kill - e["kill"],
                           "cause": "cap" if at_cap else "host", "cap_hits": oom - e["oom"]}
                     for name, key in (("memory.max", "memory_cap_gb"), ("memory.current", "memory_current_gb")):
                         v = (read(cg + "/" + name) or "").strip()      # evidence only: the cause is the counters'
@@ -559,6 +572,205 @@ class OomWatch:
                 time.sleep(OOM_COLD_SEC)
 
 
+# --------------------------------------------------------------------------------------------------- CPU backstop
+class Throttler:
+    """The CPU backstop (RCB_LIMITS_ENFORCE=1): a container whose CPU use is over its cap is duty-cycled, cpulimit-style.
+    Every THROTTLE_PERIOD_SEC its processes get SIGCONT, run for `frac` of the period, then get SIGSTOP for the rest
+    (parents stopped before their children, children continued before their parents, so that a shell waiting for a
+    child never sees it stopped). frac = cap / demand, where demand is the CPU the container would use unthrottled: at
+    each sample, the CPU it used over the last tick divided by the share it was let run. When the demand is back under
+    the cap the container is released (SIGCONT to all). Its own thread; every process is let go (SIGCONT) when the
+    container is released, at the seal, when the monitor is stopped, and by a restarted monitor (Monitor.restore).
+    Never PID 1 or what started with it (Monitor.spared). Signals go through a pidfd where the kernel has them (a PID
+    reused by another process is never signalled), else after a check of the process's start time."""
+
+    def __init__(self, mon):
+        self.mon = mon
+        self.lock = threading.Lock()
+        self.active = {}          # mnt ns -> {"frac", "cap", "since", "service", "role", "keep", "procs": {pid: (start, fd)},
+        #                           "refreshed"}
+        self.thread = None
+        self.stopped = False
+        self.said = set()
+
+    # ---- engaging and releasing (the sampler's thread)
+    def engage(self, mnt, g, cap, demand, t):
+        frac = max(THROTTLE_MIN_FRACTION, min(1.0, cap / demand)) if demand > 0 else 1.0
+        with self.lock:
+            e = self.active.get(mnt)
+            if e is None:
+                keep = {(p, (proc_stat(p) or (None,))[0]) for p in self.mon.spared(g["pids"])}
+                e = self.active[mnt] = {"frac": frac, "cap": cap, "since": now(), "service": g.get("service"),
+                                        "role": g["role"], "keep": keep, "procs": {}, "refreshed": 0.0}
+                self._refresh(mnt, e, g["pids"])
+                event("throttle_start", resource="cpu", service=g.get("service"), role=g["role"], value=round(demand, 2),
+                      cap=cap, fraction=round(frac, 3))
+            else:
+                e["frac"] = frac
+        self.start()
+
+    def adjust(self, mnt, used):
+        """A sample of a throttled container: `used` = CPUs it used over the last tick. Released when its demand
+        (used / its share) fits under the cap; else its share follows the demand."""
+        with self.lock:
+            e = self.active.get(mnt)
+            if e is None:
+                return
+            demand = used / e["frac"] if e["frac"] > 0 else used
+            frac, cap = e["frac"], e["cap"]
+        if demand <= cap:
+            self.release(mnt, "demand under the cap", demand=round(demand, 2))
+        else:
+            with self.lock:
+                if mnt in self.active:
+                    self.active[mnt]["frac"] = max(THROTTLE_MIN_FRACTION, min(1.0, frac * cap / max(used, 1e-6)
+                                                                              if used > 0 else 1.0))
+
+    def release(self, mnt, why, **kw):
+        with self.lock:
+            e = self.active.pop(mnt, None)
+            if e is None:
+                return
+            self._signal(e, signal.SIGCONT)
+            self._close(e)
+        event("throttle_end", resource="cpu", service=e["service"], role=e["role"], why=why,
+              sec=round(now() - e["since"], 1), **kw)
+
+    def release_all(self, why):
+        for mnt in list(self.active):
+            self.release(mnt, why)
+
+    def throttled(self, mnt):
+        return mnt in self.active
+
+    # ---- the processes of a throttled container
+    def _refresh(self, mnt, e, pids=None):
+        """Look up the container's processes again (new ones started since are throttled too, gone ones dropped)."""
+        if pids is None:
+            pids = []
+            try:
+                names = os.listdir(PROC)
+            except OSError:
+                names = []
+            for d in names:
+                if d.isdigit() and rl(f"{PROC}/{d}/ns/mnt") == mnt:
+                    pids.append(int(d))
+        keep_pids = {p for p, _ in e["keep"]}
+        old = e["procs"]
+        new = {}
+        for p in pids:
+            if p in keep_pids:
+                continue
+            ps = proc_stat(p)
+            if ps is None:
+                continue
+            if p in old and old[p][0] == ps[0]:
+                new[p] = old.pop(p)
+                continue
+            new[p] = (ps[0], self._pidfd(p, ps[0]))
+        for _, fd in old.values():
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        e["procs"], e["refreshed"] = new, now()
+
+    @staticmethod
+    def _pidfd(p, start):
+        if PROC != "/proc" or not hasattr(os, "pidfd_open"):
+            return None
+        try:
+            fd = os.pidfd_open(p)
+        except OSError:
+            return None
+        ps = proc_stat(p)
+        if not ps or ps[0] != start:        # the PID now names another process
+            os.close(fd)
+            return None
+        return fd
+
+    @staticmethod
+    def _close(e):
+        for _, fd in e["procs"].values():
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        e["procs"] = {}
+
+    def _signal(self, e, sig):
+        order = sorted(e["procs"].items(), key=lambda kv: kv[1][0], reverse=(sig == signal.SIGCONT))
+        for p, (start, fd) in order:
+            try:
+                if fd is not None:
+                    signal.pidfd_send_signal(fd, sig)
+                else:
+                    ps = proc_stat(p)
+                    if not ps or ps[0] != start:
+                        continue
+                    os.kill(p, sig)
+            except ProcessLookupError:
+                pass
+            except OSError as err:
+                if ("signal", type(err).__name__) not in self.said:
+                    self.said.add(("signal", type(err).__name__))
+                    event("backstop_error", resource="cpu", why=f"signal to a process: {type(err).__name__}: {err}"[:300])
+
+    # ---- the thread
+    def start(self):
+        if self.thread is None and not self.stopped and self.mon.threads:
+            self.thread = threading.Thread(target=self._loop, name="rcb-throttle", daemon=True)
+            self.thread.start()
+
+    def cycle(self, sleep=time.sleep, clock=time.monotonic):
+        """One period: every throttled container runs for its share of it, then is stopped for the rest."""
+        t0 = clock()
+        with self.lock:
+            items = list(self.active.items())
+            for mnt, e in items:
+                if now() - e["refreshed"] >= THROTTLE_REFRESH_SEC:
+                    self._refresh(mnt, e)
+                self._signal(e, signal.SIGCONT)
+        for mnt, e in sorted(items, key=lambda kv: kv[1]["frac"]):
+            wait = t0 + e["frac"] * THROTTLE_PERIOD_SEC - clock()
+            if wait > 0:
+                sleep(wait)
+            with self.lock:
+                if self.active.get(mnt) is e and e["frac"] < 1.0:
+                    self._signal(e, signal.SIGSTOP)
+        wait = t0 + THROTTLE_PERIOD_SEC - clock()
+        if wait > 0:
+            sleep(wait)
+
+    def _loop(self):
+        try:
+            while not self.stopped:
+                if not self.active:
+                    time.sleep(0.2)
+                    continue
+                try:
+                    self.cycle()
+                except Exception as err:          # never leave a container stopped
+                    with self.lock:
+                        for e in self.active.values():
+                            self._signal(e, signal.SIGCONT)
+                    if "loop" not in self.said:
+                        self.said.add("loop")
+                        event("backstop_error", resource="cpu", why=f"throttle: {type(err).__name__}: {err}"[:300])
+                    time.sleep(0.5)
+        finally:
+            with self.lock:
+                for e in self.active.values():
+                    self._signal(e, signal.SIGCONT)
+
+    def stop(self, why):
+        """The seal or the monitor's own end: every throttled process is let go, the thread ends."""
+        self.stopped = True
+        self.release_all(why)
+
+
 # --------------------------------------------------------------------------------------------------- the monitor
 class Monitor:
     def __init__(self):
@@ -566,23 +778,31 @@ class Monitor:
         self.tick = float(self.lim.get("tick_sec", 5))
         self.disk_tick = float(self.lim.get("disk_tick_sec", 60))
         self.enforce, self.switch_error = rcb_limits.parse_switch(os.environ.get("RCB_LIMITS_ENFORCE"))
+        self.tol, tol_error = rcb_limits.parse_tolerance(os.environ.get("RCB_LIMITS_TOLERANCE"))
+        if tol_error:
+            self.switch_error = "; ".join(x for x in (self.switch_error, tol_error) if x)
         self.me_mnt = rl(f"{PROC}/self/ns/mnt")
         self.beacon = {"scope": stat_id(SCOPE_BEACON), "observe": stat_id(OBSERVE_BEACON)}
         self.cls = {}            # mnt ns -> {"kind", "role", "witness": (proc path, starttime)}: only what IS watched
         self.neg, self.ok = set(), set()     # this tick: namespaces that said no / whose witness still lives
         self.via = {}            # pid -> /proc path of a living thread, for a process whose first thread has exited
         self.prev_cpu = {}       # pid -> (starttime, ticks, t)
+        self.prev_cg_cpu = {}    # cgroup dir -> (usage_usec, t)
+        self.prev_io = {}        # pid -> (starttime, write_bytes): the agent's container, at the last disk measurement
         self.oomw = OomWatch()   # kernel OOM kills of the watched containers (its own thread in run())
         self.disk_base = None    # GiB under DISK_PATHS at the first complete walk (kept in state.json across restarts)
         self.disk_last = 0.0
         self.disk_gb = None
         self.walk = None         # (DiskWalk, mnt ns, proc path, starttime) of the measurement under way
         self.slog = SessionLogCopy()
-        self.series = []         # [(t, {metric: value})] of the last window, for enforcement decisions
-        self.confirmed = {}      # metric -> time
-        self.kill_until = 0.0
+        self.over_seen = set()   # (resource, mnt ns): an `over` event was written
+        self.said = set()        # (kind, resource, why) of the `unobservable` / `no_victim` events written
         self.killed = 0
-        self.emergency = []      # the emergency_kill events of this run
+        self.recent = {}         # pid -> time: killed by the backstop (its zombie is the kill's, not the agent's fork)
+        self.kills = {r: 0 for r in rcb_limits.RESOURCES if r != "cpu"}   # processes the backstop killed, per resource
+        self.throttle = Throttler(self)
+        self.threads = False     # run(): the OOM watch and the throttle run in threads of their own (tests: not)
+        self.resume_after_restart = False
         self.scope_seen = False
         self.gpu_unknown = False
         self.caps = selftest.capabilities()
@@ -643,6 +863,21 @@ class Monitor:
             self.neg.add(mnt)
         return None
 
+    def service_of(self, kind, role):
+        """The compose service whose caps bind a container in the scope: `main` for the agent's, else the one other
+        service of limits.json `scope_services` (inject.py allows at most one); None when it cannot be told (an
+        observed container, or several candidates: its caps are then unknown and nothing is enforced on it)."""
+        if kind != "scope":
+            return None
+        if role == "main":
+            return "main"
+        others = [n for n in (self.lim.get("scope_services") or ["main"]) if n != "main"]
+        return others[0] if len(others) == 1 else None
+
+    def group(self, c, mnt):
+        return {"kind": c["kind"], "role": c["role"], "service": self.service_of(c["kind"], c["role"]), "mnt": mnt,
+                "pids": [], "zombies": 0}
+
     def live_thread(self, pid):
         """/proc path of a thread of `pid` that still runs (its first thread has exited: /proc/<pid>/ns is empty)."""
         try:
@@ -676,7 +911,7 @@ class Monitor:
                 continue
             c = self.classify(mnt, f"{PROC}/{pid}")
             if c:
-                out.setdefault(mnt, {"kind": c["kind"], "role": c["role"], "pids": [], "zombies": 0})["pids"].append(pid)
+                (out[mnt] if mnt in out else out.setdefault(mnt, self.group(c, mnt)))["pids"].append(pid)
         zombies = []
         for pid in lost:
             b = self.live_thread(pid)
@@ -692,7 +927,7 @@ class Monitor:
             c = self.classify(mnt, b)
             if c:
                 self.via[pid] = b
-                out.setdefault(mnt, {"kind": c["kind"], "role": c["role"], "pids": [], "zombies": 0})["pids"].append(pid)
+                (out[mnt] if mnt in out else out.setdefault(mnt, self.group(c, mnt)))["pids"].append(pid)
         for pid in zombies:
             st = status(pid)
             if st.get("State", "").startswith("Z"):  # a zombie holds a PID until its parent reaps it: counted there
@@ -702,6 +937,7 @@ class Monitor:
                     g = None
                 if g:
                     g["zombies"] += 1
+                    g.setdefault("zombie_pids", []).append(pid)
         self.cls = {m: c for m, c in self.cls.items() if m in self.ok}
         return out
 
@@ -740,19 +976,29 @@ class Monitor:
         return tot / 1024.0 / 1024.0          # GiB
 
     def measure(self, g, gpu_per, t, gpu_unknown=()):
+        """The container's values for this sample. Also keeps, in g["info"], each process's (start time, threads, RSS
+        KiB, GPU MiB) for the backstop."""
         pids = g["pids"]
-        threads = cpu = 0.0
+        threads = cpu = 0
+        info = {}
         for p in pids:
-            threads += int(status(p).get("Threads", "0") or 0)
+            st = status(p)
+            n = int(st.get("Threads", "0") or 0) if (st.get("Threads", "0") or "0").isdigit() else 0
+            threads += n
             ps = proc_stat(p)
+            tt = now()                                   # the time of this reading, not the tick's
             if ps:
                 pv = self.prev_cpu.get(p)
-                if pv and pv[0] == ps[0] and t > pv[2]:
-                    cpu += max(0, ps[1] - pv[1]) / HZ / (t - pv[2])
-                self.prev_cpu[p] = (ps[0], ps[1], t)
+                if pv and pv[0] == ps[0] and tt > pv[2]:
+                    cpu += max(0, ps[1] - pv[1]) / HZ / (tt - pv[2])
+                self.prev_cpu[p] = (ps[0], ps[1], tt)
+            info[p] = {"start": ps[0] if ps else None, "threads": max(n, 1), "rss_kb": kb(st.get("VmRSS")),
+                       "gpu_mib": gpu_per.get(p, 0)}
+        g["info"] = info
         cg = self.cgroup_of(pids)
-        m = {"kind": g["kind"], "role": g["role"], "processes": len(pids) + g.get("zombies", 0),
-             "zombies": g.get("zombies", 0), "threads": int(threads), "cpu": round(cpu, 2),
+        m = {"kind": g["kind"], "role": g["role"], "service": g.get("service"),
+             "processes": len(pids) + g.get("zombies", 0), "zombies": g.get("zombies", 0), "threads": int(threads),
+             "pids": int(threads) + g.get("zombies", 0), "cpu": round(cpu, 2),
              "gpu_memory_gb": round(sum(gpu_per.get(p, 0) for p in pids) / 1024.0, 3), "cgroup": int(cg is not None)}
         unknown = sum(1 for p in pids if p in gpu_unknown)
         if unknown:
@@ -768,10 +1014,25 @@ class Monitor:
                 m["memory_gb"] = round(self.mem_pss(pids), 3)
             mx = (read(cg + "/memory.max") or "").strip()
             m["memory_cap_gb"] = None if mx in ("", "max") else round(int(mx) / GIB, 2)
-            self.oomw.watch(cg, g["role"], g["kind"] == "scope", now())
+            use = None
+            for line in (read(cg + "/cpu.stat") or "").splitlines():
+                if line.startswith("usage_usec "):
+                    v = line.split()[1]
+                    use = int(v) if v.isdigit() else None
+            tt = now()
+            if use is not None:                       # the cgroup counts every process, short-lived ones too
+                pv = self.prev_cg_cpu.get(cg)
+                if pv and tt > pv[1] and use >= pv[0]:
+                    m["cpu"] = round((use - pv[0]) / 1e6 / (tt - pv[1]), 2)
+                self.prev_cg_cpu[cg] = (use, tt)
+            self.oomw.watch(cg, g["role"], g["kind"] == "scope", now(), g.get("service"))
         else:
             m["memory_gb"] = round(self.mem_pss(pids), 3)
         return m
+
+    def pss_gb(self, p):
+        """GiB of anonymous and shared memory the process holds (its share of what it shares): what killing it frees."""
+        return self.mem_pss([p])
 
     # ---- disk
     def main_proc(self, groups):
@@ -829,29 +1090,29 @@ class Monitor:
             pass
 
     def restore(self):
-        """After a restart: the disk baseline, the confirmed violations and the last window of samples come back from
-        the record, so that a crash neither resets the baseline nor forgets time already spent over a limit."""
+        """After a restart: the disk baseline, the session log's copy and the backstop's counts come back from the
+        record, so that a crash neither resets the baseline nor loses what was done. A throttle the previous instance
+        left open (it died between a SIGSTOP and a SIGCONT) is closed: every process of the scope gets SIGCONT at the
+        first sample (resume_after_restart)."""
         st = rcb_limits.read_json(os.path.join(REC, "state.json")) or {}
         if isinstance(st.get("disk_base"), (int, float)):
             self.disk_base = float(st["disk_base"])
         if isinstance(st.get("session_log"), dict):
             self.slog = SessionLogCopy(st["session_log"])
         _, samples, events = rcb_limits.load_record(REC)
-        window = float(self.lim.get("window_sec", rcb_limits.WINDOW_SEC))
-        self.series = [(s["t"], s.get("scope") or {}) for s in samples
-                       if isinstance(s.get("t"), (int, float)) and s["t"] >= self.t0 - window - 3 * self.tick]
+        open_thr = 0
         for e in events:
             k = e.get("event")
-            if k == "violation" and e.get("metric"):
-                self.confirmed.setdefault(e["metric"], e.get("t") or self.t0)
-            elif k in ("kill", "emergency_kill"):
-                self.killed += int(e.get("processes") or 0)
-                if k == "emergency_kill":
-                    self.emergency.append(e)
+            if k == "kill" and e.get("resource") in self.kills:
+                self.kills[e["resource"]] += 1
+                self.killed += 1
+            elif k == "throttle_start":
+                open_thr += 1
+            elif k == "throttle_end":
+                open_thr -= 1
             elif k == "scope_found":
                 self.scope_seen = True
-        if self.enforce and self.confirmed and self.t0 - max(self.confirmed.values()) < 60:
-            self.kill_until = max(self.confirmed.values()) + 60
+        self.resume_after_restart = open_thr > 0
 
     # ---- enforcement
     @staticmethod
@@ -876,98 +1137,161 @@ class Monitor:
                 keep.add(p)
         return keep
 
-    def kill_scope(self, groups, why):
-        n = 0
-        for mnt, g in groups.items():
-            if g["kind"] != "scope":
-                continue
-            snap = {p: proc_stat(p) for p in g["pids"]}
-            keep = self.spared(g["pids"])
-            for p in g["pids"]:
-                if p in keep:
-                    continue                          # PID 1 and its keepalive: the container stays up for collection
-                if rl(self.base(p) + "/ns/mnt") != mnt or not snap[p] or proc_stat(p) is None \
-                        or proc_stat(p)[0] != snap[p][0]:
-                    continue                          # gone, or its PID now names another process
-                try:
-                    os.kill(p, signal.SIGKILL)
-                    n += 1
-                except OSError:
-                    pass
-        if n:
-            self.killed += n
-            event("kill", why=why, processes=n)
-        return n
+    def kill(self, g, p, resource, value, cap, **why):
+        """SIGKILL one process of the container `g` for `resource` (the backstop), when it is still the process that was
+        measured (same start time, same container). Recorded as a `kill` event. True when the signal went out."""
+        info = (g.get("info") or {}).get(p) or {}
+        ps = proc_stat(p)
+        if ps is None or (info.get("start") is not None and ps[0] != info["start"]):
+            return False                              # gone, or its PID now names another process
+        mnt = g.get("mnt")
+        if mnt and rl(self.base(p) + "/ns/mnt") != mnt:
+            return False
+        try:
+            os.kill(p, signal.SIGKILL)
+        except ProcessLookupError:
+            return False
+        except OSError as err:
+            self.note("backstop_error", resource, f"SIGKILL: {type(err).__name__}: {err}"[:200])
+            return False
+        self.killed += 1
+        self.recent[p] = now()
+        self.kills[resource] = self.kills.get(resource, 0) + 1
+        event("kill", resource=resource, service=g.get("service"), role=g["role"], pid=p, value=round(value, 3),
+              cap=cap, **why)
+        return True
 
-    def scope_memory_cap(self):
-        """GiB: the memory caps of the services in the monitor's scope, summed (None: not declared)."""
-        caps = self.lim.get("caps") or {}
-        names = self.lim.get("scope_services") or ["main"]
-        vals = [float(caps[n]["memory_gb"]) for n in names if isinstance(caps.get(n), dict) and caps[n].get("memory_gb")]
-        return sum(vals) if vals else None
+    def note(self, kind, resource, why, **kw):
+        """An `unobservable` / `no_victim` / `backstop_error` event, once per (kind, resource, why)."""
+        k = (kind, resource, why)
+        if k not in self.said:
+            self.said.add(k)
+            event(kind, resource=resource, why=why, **kw)
 
-    def check(self, t, scope_vals, groups):
-        self.series.append((t, scope_vals))
-        window = float(self.lim.get("window_sec", rcb_limits.WINDOW_SEC))
-        self.series = [x for x in self.series if x[0] >= t - window - 3 * self.tick]
-        samples = [{"t": a, "scope": b} for a, b in self.series]
-        for v in rcb_limits.violations(samples, self.lim):
-            if v["metric"] not in self.confirmed:
-                self.confirmed[v["metric"]] = t
-                event("violation", **v)
-                if self.enforce:
-                    self.kill_until = t + 60
-        if self.enforce and t <= self.kill_until:
-            self.kill_scope(groups, ",".join(sorted(self.confirmed)))
-        # Host protection (enforced runs only; PROTOCOL §6). An emergency kill is never a violation by itself: the
-        # trial fails only by the rules above (GPU memory or disk over its cap) or a kernel OOM kill at its own memory
-        # cap. These are the trial's own doing (its scope's use against its own caps), never the state of a card or host it
-        # shares with other trials.
-        if self.enforce:
-            cap = self.scope_memory_cap()
-            lim_gpu = float(self.lim.get("gpu_memory_gb") or 0)
-            if cap and scope_vals["memory_gb"] > cap and not any(
-                    m.get("memory_cap_gb") for m in self._last_measures if m["kind"] == "scope"):
-                # no kernel memory cap holds here (e.g. rootless podman without cgroups): stand in for it
-                self._emergency(groups, "memory", cap, scope_vals["memory_gb"], key="mem")
-            if lim_gpu and scope_vals["gpu_memory_gb"] > EMERGENCY_GPU_FACTOR * lim_gpu:
-                self._emergency(groups, "gpu_memory", lim_gpu, scope_vals["gpu_memory_gb"], key="gpu")
+    def over(self, resource, g, value, cap, exact=False):
+        """Whether the container's `value` is over `cap` (rcb_limits.over); the first time per resource and container
+        an `over` event says so (in both settings)."""
+        if not rcb_limits.over(value, cap, self.tol, exact):
+            return False
+        k = (resource, g.get("mnt"))
+        if k not in self.over_seen:
+            self.over_seen.add(k)
+            event("over", resource=resource, service=g.get("service"), role=g["role"], value=round(value, 3), cap=cap,
+                  enforced=self.enforce)
+        return True
 
-    def _emergency(self, groups, why, limit, observed, key):
-        best, bv = None, 0                            # only a process that holds some: never one with none of it
-        for g in groups.values():
-            if g["kind"] != "scope":
-                continue
-            keep = self.spared(g["pids"])
-            for p in g["pids"]:
-                if p in keep:
+    def victims(self, g, key):
+        """The container's processes the backstop may kill (not spared), in the order it kills them."""
+        keep = self.spared(g["pids"])
+        info = g.get("info") or {}
+        return sorted((p for p in g["pids"] if p not in keep and p in info), key=key)
+
+    def backstop(self, g, m, t):
+        """Docker's caps, applied by the monitor to one container of the scope (RCB_LIMITS_ENFORCE=1 acts; 0 only the
+        `over` events). See the module's doc for what each resource gets."""
+        svc = g.get("service")
+        caps = (self.lim.get("caps") or {}).get(svc) if svc else None
+        if not isinstance(caps, dict):
+            self.note("unobservable", "caps", f"the caps of the {g['role']} container: its service cannot be told "
+                                              "(limits.json scope_services)", role=g["role"])
+            return
+        info = g.get("info") or {}
+        # memory: like the OOM killer, the largest first, again while over
+        cap = caps.get("memory_gb")
+        if self.over("memory", g, m.get("memory_gb"), cap) and self.enforce:
+            left = float(m["memory_gb"])
+            for p in self.victims(g, key=lambda q: -info[q]["rss_kb"]):
+                if not rcb_limits.over(left, cap, self.tol):
+                    break
+                freed = self.pss_gb(p)
+                if freed <= 0 and info[p]["rss_kb"] <= 0:
                     continue
-                v = self._gpu_per.get(p, 0) if key == "gpu" else self.rss_kb(p)
-                if v > bv:
-                    best, bv = p, v
-        if best:
-            try:
-                os.kill(best, signal.SIGKILL)
-                self.killed += 1
-                e = {"why": why, "limit": limit, "observed": round(observed, 3), "processes": 1}
-                event("emergency_kill", **e)
-                self.emergency.append(dict(e, t=round(now(), 2)))
-            except OSError:
-                pass
+                if self.kill(g, p, "memory", left, cap, rss_gb=round(info[p]["rss_kb"] / 2 ** 20, 3)):
+                    left -= freed
+            if rcb_limits.over(left, cap, self.tol):
+                self.note("no_victim", "memory", "still over the memory cap with no process left to kill but the "
+                                                 "container's PID 1 (memory in files of a tmpfs, or PID 1's own)",
+                          service=svc)
+        # processes and threads: like a fork that fails, the newest beyond the cap
+        cap = caps.get("pids")
+        for p, t0 in list(self.recent.items()):
+            if now() - t0 > 600:
+                del self.recent[p]
+        ours = sum(1 for p in g.get("zombie_pids", ()) if p in self.recent)   # the backstop's own victims, not reaped yet
+        if self.over("pids", g, m.get("pids"), cap, exact=True) and self.enforce and \
+                rcb_limits.over(int(m["pids"]) - ours, cap, 0, exact=True):
+            left = int(m["pids"]) - ours
+            for p in self.victims(g, key=lambda q: -(info[q]["start"] or 0)):
+                if left <= cap:
+                    break
+                if self.kill(g, p, "pids", left, cap, threads=info[p]["threads"]):
+                    left -= info[p]["threads"]
+        # CPU: a throttle, never a kill
+        cap = caps.get("cpus")
+        mnt = g.get("mnt")
+        if self.throttle.throttled(mnt):
+            if m.get("cpu") is not None:
+                self.throttle.adjust(mnt, float(m["cpu"]))
+        elif self.over("cpu", g, m.get("cpu"), cap) and self.enforce:
+            self.throttle.engage(mnt, g, float(cap), float(m["cpu"]), t)
+        # GPU memory: the process that holds the most, again while over
+        cap = caps.get("gpu_memory_gb") if caps.get("gpu") else None
+        if cap and self.over("gpu_memory", g, m.get("gpu_memory_gb"), cap) and self.enforce:
+            if m.get("gpu_unmeasured"):
+                self.note("unobservable", "gpu_memory", "NVML does not tell the GPU memory of some processes of the "
+                                                        "container (MIG / vGPU?): no process is killed for it", service=svc)
+            else:
+                left = float(m["gpu_memory_gb"])
+                for p in self.victims(g, key=lambda q: -info[q]["gpu_mib"]):
+                    if not rcb_limits.over(left, cap, self.tol) or info[p]["gpu_mib"] <= 0:
+                        break
+                    if self.kill(g, p, "gpu_memory", left, cap, gpu_gb=round(info[p]["gpu_mib"] / 1024.0, 3)):
+                        left -= info[p]["gpu_mib"] / 1024.0
+                if rcb_limits.over(left, cap, self.tol):
+                    self.note("no_victim", "gpu_memory", "still over the GPU-memory cap with no process left to kill "
+                                                         "but the container's PID 1", service=svc)
 
-    def rss_kb(self, p):
-        v = kb(status(p).get("VmRSS"))
-        if not v and p in self.via:                   # the first thread has exited: its status has no memory lines
-            for line in (read(self.via[p] + "/status") or "").splitlines():
-                if line.startswith("VmRSS:"):
-                    v = kb(line.partition(":")[2])
-        return v
+    def disk_backstop(self, g, disk_gb):
+        """At a disk measurement of the agent's container: over the disk cap, like a write that fails with ENOSPC, the
+        process that wrote the most since the previous measurement (/proc/<pid>/io write_bytes) is killed. The io
+        counters are read at every measurement (the baseline of the next one)."""
+        info = g.get("info") or {}
+        cur, unreadable = {}, 0
+        for p in g["pids"]:
+            io = read(self.base(p) + "/io")
+            if io is None:
+                unreadable += 1
+                continue
+            for line in io.splitlines():
+                if line.startswith("write_bytes:"):
+                    v = line.split(":", 1)[1].strip()
+                    if v.isdigit():
+                        cur[p] = ((info.get(p) or {}).get("start"), int(v))
+        prev, self.prev_io = self.prev_io, cur
+        cap = self.lim.get("disk_gb")
+        if disk_gb is None or not self.over("disk", g, disk_gb, cap) or not self.enforce:
+            return
+        if unreadable and not cur:
+            self.note("unobservable", "disk", "/proc/<pid>/io unreadable: the writer cannot be told, nothing is killed",
+                      service=g.get("service"))
+            return
+        wrote = {}
+        for p, (start, v) in cur.items():
+            pv = prev.get(p)
+            wrote[p] = v - pv[1] if pv and pv[0] == start else v    # new since: all it wrote
+        best = [p for p in self.victims(g, key=lambda q: -wrote.get(q, 0)) if wrote.get(p, 0) > 0][:1]
+        if not best:
+            self.note("no_victim", "disk", "over the disk cap, and no process of the container wrote since the "
+                                           "previous measurement", service=g.get("service"))
+            return
+        self.kill(g, best[0], "disk", disk_gb, cap, wrote_gb=round(wrote[best[0]] / GIB, 3))
 
     # ---- main loop
     def run(self):
         os.makedirs(REC, exist_ok=True)
         restarted = os.path.exists(os.path.join(REC, "meta.json"))
-        meta = {"format": rcb_limits.FORMAT, "started": round(self.t0, 2), "enforce": self.enforce, "limits": self.lim,
+        meta = {"format": rcb_limits.FORMAT, "started": round(self.t0, 2), "enforce": self.enforce, "tolerance": self.tol,
+                "limits": self.lim,
                 "capabilities": self.caps, "beacons": {k: bool(v) for k, v in self.beacon.items()}}
         if self.switch_error:
             meta["switch_error"] = self.switch_error
@@ -977,7 +1301,7 @@ class Monitor:
             event("restart", capabilities=self.caps)
         else:
             write_json(os.path.join(REC, "meta.json"), meta)
-            event("start", enforce=self.enforce, capabilities=self.caps)
+            event("start", enforce=self.enforce, tolerance=self.tol, capabilities=self.caps)
         if self.switch_error:
             event("fatal", why=self.switch_error + " (nothing is enforced; the trial is not a result)")
         if self.lim.get("format") != rcb_limits.LIMITS_FORMAT:
@@ -988,7 +1312,16 @@ class Monitor:
         if self.lim.get("gpu") and not self.nvml:
             event("fatal", why="GPU task but NVML is unavailable: " + str(self.caps.get("nvml_error")))
         sys.setswitchinterval(0.001)                  # the OOM watch must get its turn within a millisecond
+        self.threads = True
         self.oomw.start()
+
+        def stopped(signum, frame):                   # docker stop: let every throttled process go first
+            try:
+                self.throttle.stop("the monitor was stopped")
+            finally:
+                os._exit(0)
+        signal.signal(signal.SIGTERM, stopped)
+        signal.signal(signal.SIGINT, stopped)
         while not os.path.exists(os.path.join(REC, "seal.request")):
             t = now()
             try:
@@ -1034,8 +1367,21 @@ class Monitor:
         if not self.scope_seen and not self.fatal_scope and t - self.t0 > 120:
             self.fatal_scope = True
             event("fatal", why="no container mounting the trial's beacon found within 120 s")
+        if self.resume_after_restart and scope:
+            self.resume_after_restart = False         # the previous instance may have left processes stopped
+            for g in groups.values():
+                if g["kind"] == "scope":
+                    keep = self.spared(g["pids"])
+                    for p in g["pids"]:
+                        if p not in keep:
+                            try:
+                                os.kill(p, signal.SIGCONT)
+                            except OSError:
+                                pass
+            event("throttle_end", resource="cpu", why="the monitor restarted: every process of the scope continued",
+                  sec=0.0)
         disk_now = self.disk_step(t, groups)
-        _, pid = self.main_proc(groups)
+        mnt_main, pid = self.main_proc(groups)
         if pid is not None:
             before = dict(self.slog.s)
             self.slog.step(self.base(pid) + "/root")
@@ -1043,7 +1389,8 @@ class Monitor:
                 self.save_state()
         vals = {"gpu_memory_gb": round(sum(m["gpu_memory_gb"] for m in scope), 3),
                 "memory_gb": round(sum(m["memory_gb"] for m in scope), 3),
-                "processes": sum(m["processes"] for m in scope), "disk_gb": disk_now}
+                "processes": sum(m["processes"] for m in scope), "disk_gb": disk_now,
+                "cpus": round(sum(m["cpu"] or 0 for m in scope), 2), "pids": sum(m["pids"] for m in scope)}
         unknown = sum(m.get("gpu_unmeasured", 0) for m in scope)
         if unknown:
             vals["gpu_unmeasured"] = unknown
@@ -1058,25 +1405,39 @@ class Monitor:
                                              "processes": sum(m["processes"] for m in obs)},
                                  "cards": {str(k): v for k, v in cards.items()}, "containers": ms})
         self._usage_vals = vals
-        self.check(t, vals, groups)
+        self._own = next((m for m in scope if m["role"] == "main"), None)
+        for mnt in list(self.throttle.active):        # a container that is gone is no longer throttled
+            if mnt not in groups:
+                self.throttle.release(mnt, "the container is gone")
+        for (mnt, g), m in zip(groups.items(), ms):
+            if g["kind"] == "scope":
+                self.backstop(g, m, t)
+        if disk_now is not None and mnt_main in groups:
+            self.disk_backstop(groups[mnt_main], disk_now)
 
     def write_usage(self, t):
         """The agent-visible /run/rcb-limits/usage.json: the last sample's values (none before the first one), the
-        agent's container's caps, the caps the monitor may enforce, what enforcement did, and the agent's clock."""
+        agent's container's use (`own`) and caps, what the backstop did, and the agent's clock."""
         vals = self._usage_vals or {}
         u = {"t": round(t, 2), "measured": bool(vals)}
-        u.update({k: vals.get(k) for k in ("gpu_memory_gb", "memory_gb", "processes")})
-        u.update(disk_gb=self.disk_gb, enforced=self.enforce, caps=usage_caps(self.lim), limits=usage_limits(self.lim),
-                 violations=sorted(self.confirmed),
-                 # processes the monitor killed at once to protect the host (not violations by themselves)
-                 emergency_kills=len(self.emergency), last_emergency_kill=(self.emergency or [None])[-1])
+        u.update({k: vals.get(k) for k in ("gpu_memory_gb", "memory_gb", "processes", "cpus", "pids")})
+        own = getattr(self, "_own", None) or {}
+        u.update(disk_gb=self.disk_gb, enforced=self.enforce, caps=usage_caps(self.lim),
+                 own={"cpus": own.get("cpu"), "memory_gb": own.get("memory_gb"), "pids": own.get("pids"),
+                      "gpu_memory_gb": own.get("gpu_memory_gb"), "disk_gb": self.disk_gb} if own else None,
+                 limits=usage_limits(self.lim, self.tol), over=sorted({r for r, _ in self.over_seen}),
+                 kills=dict(self.kills), cpu_throttled=bool(own) and self.throttle.throttled(self._own_mnt()))
         u.update(clock(t, self.clock_t0, self.timeout))
         try:
             write_json(SCOPE_BEACON + "/usage.json", u)
         except OSError:
             pass
 
+    def _own_mnt(self):
+        return next((m for m, c in self.cls.items() if c.get("kind") == "scope" and c.get("role") == "main"), None)
+
     def seal(self):
+        self.throttle.stop("the record is sealed")   # nothing stays stopped after the agent phase
         try:
             self.oomw.scan()                          # the counters once more, whatever the watch thread is doing
         except Exception:
@@ -1085,15 +1446,16 @@ class Monitor:
         # follow (its replays) is the grader's to judge, from the hook's own evidence.
         self.oomw.stopped = True
         summary, samples, events = rcb_limits.load_record(REC)
-        viol = rcb_limits.violations(samples, self.lim, events)
+        viol = rcb_limits.violations(samples, self.lim, events, self.tol)
         meta = rcb_limits.read_json(os.path.join(REC, "meta.json")) or {}
+        bs = rcb_limits.backstop(events)
         out = {
             "format": rcb_limits.FORMAT, "sealed": True, "enforce": meta.get("enforce", self.enforce),
+            "tolerance": meta.get("tolerance", self.tol),
             "started": meta.get("started"), "ended": round(now(), 2), "n_samples": len(samples),
             "scope_seen": self.scope_seen or any((s.get("scope") or {}).get("processes") for s in samples),
-            "peaks": rcb_limits.peaks(samples), "violations": viol,
-            "killed": sum(int(e.get("processes") or 0) for e in events if e.get("event") in ("kill", "emergency_kill")),
-            "emergency_kills": sum(1 for e in events if e.get("event") == "emergency_kill"),
+            "peaks": rcb_limits.peaks(samples), "violations": viol, "backstop": bs,
+            "killed": sum(bs["kills"].values()),
             "disk_baseline_gb": self.disk_base,
             "disk_partial_walks": sum(1 for e in events if e.get("event") == "disk_partial"),
             "restarts": sum(1 for e in events if e.get("event") == "restart"),
@@ -1101,7 +1463,7 @@ class Monitor:
         if meta.get("switch_error") or self.switch_error:
             out["switch_error"] = meta.get("switch_error") or self.switch_error
         write_json(os.path.join(REC, "summary.json"), out)
-        event("seal", violations=len(viol))
+        event("seal", over_caps=len(viol), killed=out["killed"])
 
 
 def seal_cmd(wait):
@@ -1111,7 +1473,7 @@ def seal_cmd(wait):
     while now() < t_end and not os.path.exists(path):
         time.sleep(0.5)
     s = rcb_limits.read_json(path)
-    print(json.dumps({k: (s or {}).get(k) for k in ("sealed", "enforce", "n_samples", "peaks", "violations", "killed")}),
+    print(json.dumps({k: (s or {}).get(k) for k in ("sealed", "enforce", "n_samples", "peaks", "violations", "backstop")}),
           flush=True)
     try:
         open(os.path.join(REC, "seal.done"), "a").close()     # the monitor may end now (Monitor.linger)
@@ -1144,7 +1506,7 @@ def beacon(rounds=None):
     while rounds is None or n < rounds:
         t = now()
         u = {"t": round(t, 2), "measured": False, "why": BEACON_WHY, "enforced": 0, "caps": usage_caps(lim),
-             "limits": usage_limits(lim)}
+             "limits": usage_limits(lim, rcb_limits.parse_tolerance(os.environ.get("RCB_LIMITS_TOLERANCE"))[0])}
         u.update(clock(t, start, timeout))
         try:
             write_json(SCOPE_BEACON + "/usage.json", u)

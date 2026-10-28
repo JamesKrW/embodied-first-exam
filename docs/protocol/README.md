@@ -141,14 +141,32 @@ as every container has its caps. A rule is a `[[cap]]` table:
   and `caps_measured` (where the GPU-memory and disk caps come from), each shown in the task README's `## Resources`
   (`gpu_types` as its `GPU:` line).
 
-Docker enforces CPU (a throttle), memory (the kernel's OOM killer) and processes. Docker caps neither GPU memory nor disk
-on a local host (a cloud backend may apply `storage_mb`): the resource monitor measures both and enforces them only when
-the run sets `RCB_LIMITS_ENFORCE=1` (off by default). The GPU-memory cap it enforces is that of the one GPU service in
-its scope (main, and in privileged mode the services the agent drives; at most one of them holds a GPU); a scope without
-a GPU has no GPU-memory cap, and GPU memory seen there anyway is only recorded. The `x-gpu-memory-gb` of a recorded
-service (a standard mode's simulator sidecar, RoboPaint's scorer) and of the verifier is a cap stated for the reader:
-nothing measures it against that cap. The agent reads its own container's caps in `## Resources` (§5) and in
-`/run/rcb-limits/usage.json`. Placing trials, enforcement and the reward fields: running.md "Resources".
+**Who enforces a cap.** The run-time switch `RCB_LIMITS_ENFORCE` (default `0`) decides. With `0`, Docker and Harbor
+enforce what the host lets them (the table) and the resource monitor (the `rcb_monitor` sidecar) only records. With
+`1`, the monitor is also the backstop for every cap of every container in its scope (main, and in privileged mode the
+services the agent drives): at every sample (every 5 s; disk once a minute) it acts on a container over a cap the way
+Docker would, whatever the host enforces. A measurement is over a cap above cap × (1 + `RCB_LIMITS_TOLERANCE`, default
+0.05: sampling noise); a count of processes and threads is over above the cap itself. The benchmark's own services (a
+standard mode's simulator sidecar, RoboPaint's `scorer`) are recorded only, in both settings. The monitor never kills
+PID 1 of a container or what started with it, and what it cannot observe (a process whose GPU memory NVML does not
+report, an unreadable `/proc/<pid>/io`) it records and never acts on. Neither setting changes the grade: a killed
+process ends like any process that dies, the trial may fail for it, and the grader judges what the agent left; going
+over a cap is recorded (`limits_violation_observed`, running.md "Resources").
+
+| Resource | Docker / Harbor on a cgroup v2 Docker host | Hosts where they do not | Monitor backstop (`RCB_LIMITS_ENFORCE=1`) |
+|---|---|---|---|
+| CPU (`cpus`) | a throttle (CFS quota) | rootless podman without a delegated cgroup: none | duty-cycles the container's processes with `SIGSTOP` / `SIGCONT` (100 ms periods) while its demand is above the cap; never a kill |
+| Memory (`memory_gb`) | the kernel's OOM killer, at the container's own cap | rootless podman without a delegated cgroup: none | kills the process with the largest RSS, again while the container is still over |
+| Processes and threads (`pids`) | a fork or a new thread fails at the cap | rootless podman without a delegated cgroup: none | kills the newest processes until the count is back at the cap |
+| Disk (`disk_gb`, `storage_mb`) | a cloud backend may apply `storage_mb` | local Docker (overlay2 on ext4): none | at a disk measurement over the cap, kills the process that wrote the most since the previous one (`write_bytes`) |
+| GPU memory (`x-gpu-memory-gb`) | none | every card without MIG: none (a card may be shared between trials) | kills the process holding the most GPU memory in that container, again while over |
+
+On cgroup v1, Docker applies CPU, memory and processes through the v1 controllers; the monitor then measures memory
+by PSS and reads no kernel OOM counters. A runtime that refuses `pid: host` runs the monitor as a beacon (the clock in
+`usage.json`, nothing measured or enforced; running.md "Without Docker"). The `x-gpu-memory-gb` of a recorded service and
+of the verifier is a cap stated for the reader: nothing measures it. The agent reads its own container's caps in
+`## Resources` (§5) and in `/run/rcb-limits/usage.json`. Placing trials, the switches, the record and the reward
+fields: running.md "Resources".
 
 ## 7. Versions
 

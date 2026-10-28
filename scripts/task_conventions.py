@@ -180,8 +180,7 @@ RULE_KEYS = {"match": str, "gpu_types": list, "recommended_gpu": str, "measured"
 # `gpu_types` names RTX-class models only (ray-tracing cores; Harbor's spelling of the model): a task that runs on any
 # NVIDIA GPU sets none (ci_checks/check-resources.py)
 RTX_GPU_MODELS = ("L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada", "RTX PRO 6000 Blackwell", "A40", "RTX A6000")
-ENFORCE_ENV = "RCB_LIMITS_ENFORCE"   # §6: run-time switch (compose default 0 = record only; 1 = a violation fails)
-EMERGENCY_GPU_FACTOR = 1.5           # §6: host protection in enforced runs (the same value: rcb_monitor/monitor.py)
+ENFORCE_ENV = "RCB_LIMITS_ENFORCE"   # §6: run-time switch (compose default 0 = record only; 1 = the monitor's backstop)
 RESOURCES_HEADING = "## Resources"
 OLD_RESOURCES_HEADINGS = ("## Resource limits",)   # another name of the section (normalize replaces it)
 # PROTOCOL §5: an honour rule, the same words in every task's instruction.md, just before `## Resources` (rendered
@@ -743,28 +742,35 @@ def _paths(ps) -> str:
     return q[0] if len(q) == 1 else ", ".join(q[:-1]) + " and " + q[-1]
 
 
+RESOURCES_RULE = ("CPU only slows you down; a process that goes over any other cap can be killed. Usage and caps: "
+                  "`/run/rcb-limits/usage.json`.")
+
+
+def _and(xs: list[str]) -> str:
+    return ", ".join(xs[:-1]) + " and " + xs[-1] if len(xs) > 1 else "".join(xs)
+
+
 def render_resources(task: Path) -> str:
-    """instruction.md's `## Resources` (PROTOCOL §6): the caps of the agent's own container, as applied (task_caps)."""
+    """instruction.md's `## Resources` (PROTOCOL §6): the numbers of the agent's own container, as applied (task_caps),
+    and of a service it drives, then RESOURCES_RULE. Who enforces what is PROTOCOL §6's, never repeated here."""
     caps = task_caps(task)
     m = caps["main"]
     gpu = bool(m.get("gpu"))
     lim = rcb_monitor_inject.rcb_limits
     parts = []
     if m.get("cpus"):
-        parts.append(f"**{_num(m['cpus'])} CPUs** (a cap: more work only runs slower)")
+        parts.append(f"**{_num(m['cpus'])} CPUs**")
     if m.get("memory_gb"):
-        parts.append(f"**{_num(m['memory_gb'])} GiB of memory** (the kernel kills a process that goes over)")
+        parts.append(f"**{_num(m['memory_gb'])} GiB of memory**")
     if m.get("pids"):
         parts.append(f"**{int(m['pids'])} processes and threads**")
     if m.get("disk_gb"):
         parts.append(f"**{_num(m['disk_gb'])} GiB** of disk (new files under {_paths(lim.DISK_PATHS)})")
     if gpu and m.get("gpu_memory_gb"):
-        parts.append(f"**one GPU, {_num(m['gpu_memory_gb'])} GiB of its memory** (the card may be shared with other "
-                     "trials, so an allocation can fail even below this cap)")
+        parts.append(f"**one GPU, {_num(m['gpu_memory_gb'])} GiB of its memory**")
     elif gpu:
-        parts.append("**one GPU** (the card may be shared)")
-    text = ("Your container: " + (", ".join(parts[:-1]) + " and " + parts[-1] if len(parts) > 1 else "".join(parts)) + "."
-            if parts else "Your container has no declared caps.")
+        parts.append("**one GPU**")
+    text = "Your container: " + _and(parts) + "." if parts else "Your container has no declared caps."
     if not gpu:
         text += " Your container has no GPU."
     side = sidecars_of(task) if mode_of(task) in SIDECAR_MODES else []   # a standard task without a sim service (a
@@ -783,28 +789,8 @@ def render_resources(task: Path) -> str:
                f"{int(c['pids'])} processes and threads" if c.get("pids") else None,
                f"one GPU, {_num(c['gpu_memory_gb'])} GiB of its memory" if c.get("gpu") and c.get("gpu_memory_gb") else None]
         own = [x for x in own if x]
-        text += (f" `{n}` runs in its own container"
-                 + (f", capped at {', '.join(own[:-1]) + ' and ' + own[-1] if len(own) > 1 else own[0]}" if own else "")
-                 + "; the monitor counts its use with yours"
-                 + (", and when enforcement is on a process killed at its memory cap ends the trial like one killed at "
-                    "yours." if c.get("memory_gb") else "."))
-    if gpu:
-        text += " GPU memory counts what a process reserves (JAX, for example, reserves most of the card unless told not to)."
-    gpu_cap = gpu and bool(m.get("gpu_memory_gb"))
-    what = [f"going over the GPU-memory cap for {_num(lim.SUSTAIN_SEC)} s within any {_num(lim.WINDOW_SEC / 60)} minutes"
-            ] if gpu_cap else []
-    what += ["going over the disk cap at two readings in a row (one a minute)"] if m.get("disk_gb") else []
-    what += ["a process killed at your memory cap"] if m.get("memory_gb") else []
-    if what:
-        text += (" These caps may be enforced: when enforcement is on, "
-                 f"{', '.join(what[:-1]) + ' or ' + what[-1] if len(what) > 1 else what[0]} ends the trial as a failure "
-                 "(reward 0), whatever the deliverable.")
-    if gpu_cap:
-        text += (f" When enforcement is on and GPU memory goes above {_num(EMERGENCY_GPU_FACTOR)} times its cap, the "
-                 "monitor also kills the process holding the most of it at once, to protect the machine; that alone does "
-                 "not fail the trial.")
-    text += (" A monitor outside your container measures every few seconds; your current use and these caps are in "
-             "`/run/rcb-limits/usage.json`.")
+        text += f" `{n}` runs in its own container" + (f": {_and(own)}" if own else "") + "."
+    text += " " + RESOURCES_RULE
     return RESOURCES_HEADING + "\n" + text + "\n"
 
 
@@ -847,9 +833,7 @@ def readme_resources(task: Path, old_readme: str = "") -> list[str]:
         sec = re.search(rf"(?ms)^{re.escape(RESOURCES_HEADING)}\n(.*?)(?=^## |\Z)", old_readme or "")
         notes += [ln for ln in (sec.group(1).splitlines() if sec else [])
                   if ln.startswith(("- Recommended GPU:", "- Measured:", "- Measured (caps):"))]
-    return [RESOURCES_HEADING,
-            "Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what "
-            "enforces it.", "", *rows, "", *notes]
+    return [RESOURCES_HEADING, "Caps per container (PROTOCOL §6).", "", *rows, "", *notes]
 
 
 VERIFIER_NETWORK_LINE = 'network_mode = "no-network"       # PROTOCOL H.6: the verifier has no network'
