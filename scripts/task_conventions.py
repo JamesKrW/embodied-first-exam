@@ -92,6 +92,7 @@ BENCHMARK_TABLE = [
     ("robocasa-", "RoboCasa", "robocasa"),
     ("robocasa365-", "RoboCasa365", "robocasa365"),
     ("libero-max-", "LIBERO-MAX", "libero-max"),
+    ("tactilelab-", "TactileLab", "tactilelab"),
     ("roboarc-", "RoboARC", "roboarc"),  # with its IKEA furniture-assembly suite, roboarc-ikea-<item>-i00 (tasks/roboarc/README.md)
     ("bigym2-", "BiGym 2.0", "bigym2"),
     ("yamlab-", "YAMLab", "yamlab"),
