@@ -2,7 +2,7 @@
 # task's grader (EmbodiedSWE's, unchanged, at the pinned commit). /tests is root-only: the solution process (nobody)
 # cannot read it.
 FROM ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.3.0
-COPY --from=ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.3.0@sha256:8cd9ce255fcc7034d98426df007760035af5c4777f1bf208c93146a2eee78425 /rcb_embodiedswe.py /esw_proxy.py /opt/efe/
+COPY --from=ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.3.0@sha256:7980b458441ec1c964fec6ede5e5f6b914e81134daa4062fc0c4a5ebdc3c099b /rcb_embodiedswe.py /esw_proxy.py /opt/efe/
 COPY grade.py instance.json test.sh /tests/
 COPY grader/ /tests/grader/
 RUN chmod 700 /tests && chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier

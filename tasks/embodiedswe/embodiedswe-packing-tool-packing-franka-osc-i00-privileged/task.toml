@@ -30,7 +30,7 @@ recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 verifier_min_cpus = 4.0
 verifier_min_memory_gb = 13.0
 verifier_min_gpu_memory_gb = 8.0
-measured = "GPU PhysX, measured on an L40S (nvidia-smi every 2 s): a graded rollout process 3.2 to 4.6 GiB of GPU memory, the video process (cameras) 6.6 to 6.9 GiB; GPU minimum = the video peak plus headroom; memory: RoboLab's privileged figures (the same Isaac Sim 5.1 stack) as the estimate"
+measured = "GPU PhysX, measured on an L40S (nvidia-smi every 2 s): a graded rollout process 3.2 to 4.6 GiB of GPU memory, the video process (cameras) 6.6 to 7.0 GiB; GPU minimum = the video peak plus headroom; memory: RoboLab's privileged figures (the same Isaac Sim 5.1 stack) as the estimate"
 
 [metadata.resources.limits]
 # agent-phase limits in GiB (docs/protocol/README.md §2.10); scope: trial = every container, agent = the agent's container;

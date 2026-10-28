@@ -43,7 +43,7 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | GPU memory | 8 GB | 8 GB |
 
 - GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: GPU PhysX, measured on an L40S (nvidia-smi every 2 s): a graded rollout process 3.2 to 4.6 GiB of GPU memory, the video process (cameras) 6.6 to 6.9 GiB; GPU minimum = the video peak plus headroom; memory: RoboLab's privileged figures (the same Isaac Sim 5.1 stack) as the estimate
+- Measured: GPU PhysX, measured on an L40S (nvidia-smi every 2 s): a graded rollout process 3.2 to 4.6 GiB of GPU memory, the video process (cameras) 6.6 to 7.0 GiB; GPU minimum = the video peak plus headroom; memory: RoboLab's privileged figures (the same Isaac Sim 5.1 stack) as the estimate
 - Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 24 GiB GPU memory, 24 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 24 GiB GPU memory, 24 GiB memory. Limits measured: not yet measured: RoboLab's privileged limits (the same Isaac Sim stack) as the estimate.
 
 ## Details

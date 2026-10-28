@@ -340,13 +340,16 @@ def main() -> int:
         except subprocess.TimeoutExpired:
             note("the video process overran its limit: no video")
     v = v if isinstance(v, dict) else {}
+    if v.get("error"):
+        note(f"the video process failed: {str(v['error'])[-1500:]}")
     json.dump({"video_source": "recorded_states", "video_from": source["submission"],
                "video_ok": int(v.get("video_ok", 0) or 0), "frames": int(v.get("frames", 0) or 0),
                "camera_replay": v.get("camera_replay", "not_run"),
                "camera_replay_match": int(v.get("camera_replay_match", 0) or 0),
                "camera_replay_success": int(v.get("camera_replay_success", 0) or 0),
                "camera_replay_s": float(v.get("camera_replay_s", 0.0) or 0.0),
-               "camera_instance_ok": int(v.get("camera_instance_ok", 0) or 0)},
+               "camera_instance_ok": int(v.get("camera_instance_ok", 0) or 0),
+               "frames_nonfinite": int(v.get("frames_nonfinite", 0) or 0)},
               open(os.path.join(LOG_DIR, "video.json"), "w"))
     return 0
 

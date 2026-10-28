@@ -1085,7 +1085,7 @@ def load_trajectory(path: str, preset: str, action_dim: int) -> dict:
     steps = np.asarray(d["frame_step"], dtype=np.int64)
     S = np.asarray(d["frame_state"], dtype=np.float32)
     layout = json.loads(str(d["state_layout"]))
-    if S.ndim != 2 or len(S) != len(steps) or len(S) > MAX_FRAMES + 1 or not np.isfinite(S).all() \
+    if S.ndim != 2 or len(S) != len(steps) or len(S) > MAX_FRAMES + 1 \
             or (len(steps) and (steps.min() < 0 or steps.max() > len(A) or (np.diff(steps) <= 0).any())):
         raise ValueError("malformed trajectory states")
     return {"actions": A, "steps": steps, "states": S, "layout": layout,
@@ -1100,7 +1100,8 @@ def cmd_video(a) -> int:
        `camera_replay_success` (the task's public predicate at its end); at most `--replay-budget` seconds;
     2. the video: each recorded state posed on the bodies (InteractiveScene.reset_to, no physics step) and drawn, so
        the video shows the graded run's own states (Isaac Lab's scene state: poses and joints; a scene's non-physical
-       visuals are not part of it)."""
+       visuals are not part of it); a recorded state with a non-finite value is skipped (`frames_nonfinite`)."""
+    import numpy as np
     import torch
     res: dict = {}
     try:
@@ -1160,9 +1161,12 @@ def cmd_video(a) -> int:
                    camera_replay_frames=drawn[0])
         # 2. the video: the recorded states, posed and drawn
         w = imageio.get_writer(a.video, fps=a.fps, codec="libx264", quality=7, macro_block_size=8)
-        n = 0
+        n = skipped = 0
         t2 = time.monotonic()
         for row in tr["states"]:
+            if not np.isfinite(row).all():            # a state the run's physics blew up (NaN): nothing to pose
+                skipped += 1
+                continue
             env.iscene.reset_to(_unflatten(row, tr["layout"], env.device), is_relative=False)
             env.sim.forward()
             f = draw()
@@ -1171,7 +1175,7 @@ def cmd_video(a) -> int:
                 n += 1
         w.close()
         res.update(video=a.video, frames=n, video_ok=int(n > 0), video_source="recorded_states",
-                   pose_s=round(time.monotonic() - t2, 1))
+                   frames_nonfinite=skipped, pose_s=round(time.monotonic() - t2, 1))
     except Exception:  # noqa: BLE001
         res.update(video_ok=0, error=traceback.format_exc()[-4000:])
     res["wall_s"] = round(time.monotonic() - T_START, 1)
