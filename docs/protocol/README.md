@@ -93,7 +93,7 @@ RGB frame. The count is of the frames the service really captures, at the captur
 `round(control rate / video_fps)` control steps, plus the call's first and last), not at the requested rate. It is
 checked before the call runs: a call over the budget is refused with an error that says so and runs nothing. A call
 whose length is known only while it runs (`ee_pose` rows, a chunk the service plans, a watch that ends with the
-episode) stops filming at the budget and always keeps its final frame. `video` = `mp4` or `frames` changes what is
+episode) stops filming at the budget instead: the motion goes on, its last frame is always taken, and `meta["frames_skipped"]` counts the frames left out of the response (the trial's video still has them). `video` = `mp4` or `frames` changes what is
 sent, not the budget. A service builds a response holding about one copy of its frames (streamed, or written once into
 the body), and its memory cap covers the largest response the budget allows (§6). In standard-realtime mode the
 pending watches and the answers not yet sent count against one budget together.

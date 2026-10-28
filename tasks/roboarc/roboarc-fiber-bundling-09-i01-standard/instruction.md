@@ -131,7 +131,7 @@ the PD gains and the tool frames; `spec["world"]` the frame conventions (the wor
   poses, so an observed pose is a valid target. At most 50 rows per submit. A row whose IK solution lies more than
   0.5 rad from the current joints on any joint is refused the same way as a failed IK (for a small pose change that is
   another IK branch, which would swing the arm): split long moves into rows a few cm and degrees apart.
-- One call returns at most 2000 images (`spec["max_frames_per_call"]`; PROTOCOL §3 "Images per call").
+- One call returns at most 2000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 - Both action types: no gripper target goes lower than 15 mm below the tabletop; a target that would bring any part of
   a gripper lower is stopped there and listed in `meta["clipped"]`. Every response's `meta["safety"]` reports, since the
   previous call, forcing (the arms' pressing loads and forcing events), the deepest task contact, the longest time above

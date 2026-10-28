@@ -68,8 +68,7 @@ z = 0); poses are position + quaternion **XYZW**; the robot's fixed base pose is
   **fingertip centre** (no collision checking) and driven to in joint space (at most 0.02 rad per control step); `dt` is
   ignored. If no IK solution exists nothing moves and `meta["plan"]` says so. The pose is the frame of the proprio
   `tcp_pose` group, so an observed pose is a valid target. At most 50 rows per submit.
-  One call returns at most 602 frames per camera; past that an `ee_pose` call keeps moving without filming (the
-  last frame is kept), and `meta["frames_skipped"]` counts the frames left out.
+  One call returns at most 6020 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 ### Optional inputs (eai-standard/2.2; nothing changes unless you ask)
 - **Depth**: `depth=True` adds `res.last_depth[cam]` (z-depth in metres, 0 = no reading, pixel-aligned with the RGB);

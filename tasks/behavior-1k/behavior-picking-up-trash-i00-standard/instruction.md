@@ -81,8 +81,7 @@ position + quaternion **XYZW**.
   effectors together (the trunk may bend too; no collision checking) and driven to in joint space; `dt` is ignored and the
   base stands still. If no IK solution exists nothing moves, and `meta["plan"]` says so. The pose is the end-effector frame
   of the proprio `*_eef_*` entries, so an observed pose is a valid target. At most 50 rows per submit.
-  One call returns at most 902 frames per camera; past that an `ee_pose` call keeps moving without filming (the
-  last frame is kept), and `meta["frames_skipped"]` counts the frames left out.
+  One call returns at most 5412 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 ### Optional inputs (eai-standard/2.2; nothing changes unless you ask)
 - **Depth**: `depth=True` on `get_obs` / `submit` adds `res.last_depth[cam]`, float32 (224, 224) z-depth in metres (0 = no

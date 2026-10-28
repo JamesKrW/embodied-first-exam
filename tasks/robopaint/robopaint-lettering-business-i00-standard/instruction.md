@@ -130,7 +130,7 @@ view along the sheets that shows the pen height).
 - `joint_position` (7): `panda_joint1..7` absolute joint targets in radians (PD-tracked), rows `dt` apart, `interpolate` =
   `"linear"` (default) or `"hold"`; a chunk may cover at most 10 s; out-of-limit values are clipped and listed in
   `meta["clipped"]` (limits in the spec).
-- One call returns at most 640 images (`spec["max_frames_per_call"]`; PROTOCOL §3 "Images per call"): an
+- One call returns at most 640 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"): an
   `ee_pose` row slowed down to 0.25 m/s takes the control steps its distance needs.
 Wrist note: turning the pen far about the vertical can run joint 7 into its limit on one side; the other way round reaches the
 same orientation of the nib (the mark is the same for a pen turned by 180°).

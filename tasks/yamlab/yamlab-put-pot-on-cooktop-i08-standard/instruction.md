@@ -84,8 +84,7 @@ each arm's wrist; they move: `res.extrinsic_cv[cam]` has their pose at every fra
   `link_6` along `link_6`'s +z (approach) axis, with `link_6`'s orientation. At the start both arms are at their home pose
   (all joints 0, grippers open), tool frames pointing forward. At most 50 rows per submit; a position more than 3 m from
   the world origin on any axis, or a zero quaternion, is rejected (400), nothing moves.
-  One call returns at most 902 frames per camera; past that an `ee_pose` call keeps moving without filming (the
-  last frame is kept), and `meta["frames_skipped"]` counts the frames left out.
+  One call returns at most 5412 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 - A malformed request (a wrong type, a value out of range) is answered 400 with the reason and executes nothing.
 - Control runs at 30 Hz (simulated time; sim dt 1/120 s, decimation 4).
 

@@ -181,9 +181,14 @@ class Recorder:
             if (not (force or last) and self.max_images is not None
                     and (len(self.steps) + 2) * self.per_frame > self.max_images):
                 self.skipped += 1                # the budget keeps room for the last frame
+                self._skip()
             else:
                 self._capture(last)
         self.n += 1
+
+    def _skip(self) -> None:
+        """A frame not taken past the budget (max_images). Nothing here; a service whose live video records only the
+        states a call rendered overrides it to render the frame anyway (not kept in the response)."""
 
     def _capture(self, last: bool) -> None:
         want = self.mode in ("frames", "legacy") or (last and self.mode == "last")

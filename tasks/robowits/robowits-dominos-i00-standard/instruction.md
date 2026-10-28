@@ -107,7 +107,7 @@ gains and the tool frames; `spec["world"]` the frame conventions.
   number in 1 .. 30, `video`, `interpolate`, `cameras` not a list of names, `note` not a string, actions that are not
   finite (T, 16) numbers) is answered 400 before anything is executed: the client raises `ValueError`, nothing has
   moved and the episode goes on.
-- One call returns at most 1500 images (`spec["max_frames_per_call"]`; PROTOCOL §3 "Images per call").
+- One call returns at most 1500 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 Objects here: five blocks (four white, one red) standing upright, and the flat green target area on the table. The red
 block and white blocks 1-3 are out of the arms' reach.

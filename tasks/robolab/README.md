@@ -260,7 +260,7 @@ proprietary software (no redistribution), hence BUILD_ONLY.
 ## Standard-mode service details
 
 Resume class `exact` (Isaac, CPU PhysX: the resumed service is a fresh process, whose first replay is bit-exact). A
-resume replays at ~20 steps/s. One call returns at most 452 frames per camera (`ee_pose`: `meta.frames_skipped`).
+resume replays at ~20 steps/s. One call returns at most 2712 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 Per-simulator notes:
 

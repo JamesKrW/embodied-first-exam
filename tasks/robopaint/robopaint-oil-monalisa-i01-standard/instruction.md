@@ -111,7 +111,7 @@ view along the sheets that shows the brush's height).
 - `joint_position` (7): `panda_joint1..7` absolute joint targets in radians (PD-tracked), rows `dt` apart, `interpolate` =
   `"linear"` (default) or `"hold"`; a chunk may cover at most 10 s; out-of-limit values are clipped and listed in
   `meta["clipped"]` (limits in the spec).
-- One call returns at most 640 images (`spec["max_frames_per_call"]`; PROTOCOL §3 "Images per call"): an
+- One call returns at most 640 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"): an
   `ee_pose` row slowed down to 0.25 m/s takes the control steps its distance needs.
 
 The picture is a public-domain painting, Leonardo da Vinci, *Mona Lisa* (c. 1503-06; Wikimedia Commons `File:Mona Lisa, by Leonardo da Vinci, from C2RMF retouched.jpg`, Public domain), cropped to a square and downscaled to the sheet.

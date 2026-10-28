@@ -408,7 +408,7 @@ with the same locks:
 
 ## Standard-mode service details
 
-Resume class `approx` (OmniGibson 3.7.2; not measured yet). One call returns at most 602 frames per camera (`ee_pose`: `meta.frames_skipped`).
+Resume class `approx` (OmniGibson 3.7.2; not measured yet). One call returns at most 6020 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 Per-simulator notes:
 
