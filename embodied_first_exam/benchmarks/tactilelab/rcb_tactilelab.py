@@ -5,11 +5,14 @@ tactile sensors; Isaac Sim 5.1 / Isaac Lab 2.3.2): frozen instance, action recor
 Concepts
 --------
 instance   : one task in its fixed nominal scene (`seed`), the physics device it is frozen on (`device`: PhysX on the GPU,
-             as the tasks were developed; a fresh process replays a rigid scene bit for bit on the same machine) and the hash of the full scene state after reset (`state_sha`: robot joint
-             positions / velocities, every rigid object's pose and velocity, the deformable body's particles). On load,
-             `instance_exact` = hash equality and `instance_matches` = equality, or the robot and the rigid objects within
-             2e-3 (a deformable body simulated on the GPU settles to slightly different particle positions).
-trajectory : the (T, 18) rows handed to the robot, one per control step (60 Hz: physics 1/120 s, decimation 2):
+             as the tasks were developed; a fresh process replays a scene bit for bit on the same machine, the Newton
+             sidecar's deformable body included) and the
+             hash of the full scene state after reset (`state_sha`: robot joint positions / velocities, every rigid
+             object's pose and velocity, the deformable body's particles). On load, `instance_exact` = hash equality and
+             `instance_matches` = equality, or the robot and the rigid objects within CORE_TOL and (a task with a
+             deformable body) a fixed sample of its particles (`soft_sample`) within SOFT_TOL: another GPU can settle
+             to slightly different positions.
+trajectory : the (T, 22) rows handed to the robot, one per control step (60 Hz: physics 1/120 s, decimation 2):
                0-6   right end-effector target  x y z qw qx qy qz   (env frame, metres; the tactile gripper)
                7-13  left end-effector target   x y z qw qx qy qz
                14,15 right / left gripper: 0 = open, 1 = closed
@@ -19,13 +22,16 @@ trajectory : the (T, 18) rows handed to the robot, one per control step (60 Hz: 
              The right gripper's final release is physical: an open command (1 -> 0 on column 14) after a close counts as
              a release once the fingers have opened; a new close command withdraws it.
              A NaN end-effector target holds that arm where it is. The targets are tracked by a differential IK and the
-             joint PD drives. A replay holds the last row for SETTLE_STEPS more steps before the task is judged.
-budget     : no step budget; MAX_STEPS only stops runaway trajectories.
+             joint PD drives. A trajectory holds at most MAX_ROWS rows; a replay holds the last row for SETTLE_STEPS more
+             steps before the task is judged.
+budget     : no step budget; MAX_STEPS (= MAX_ROWS + SETTLE_STEPS, a full trajectory and its settle) only stops runaway
+             episodes.
 
 CLI
 ---
   python rcb_tactilelab.py make-instance --task insert_hdmi --seed 0 --out instance.json
-  python rcb_tactilelab.py replay        --task insert_hdmi --instance instance.json --traj traj.npz
+  python rcb_tactilelab.py replay        --task insert_hdmi --instance instance.json --traj traj.npz [--result r.json]
+                                         [--video replay.mp4 [--fps 15] [--video-deadline-s S]] [--final-state f.npz]
   python rcb_tactilelab.py run-oracle    --task insert_hdmi --instance instance.json --code oracle.py --out traj.npz
 
 Python (what the agent gets)
@@ -36,7 +42,7 @@ Python (what the agent gets)
   s.objects()                     # name -> {"position", "orientation_wxyz"}
   s.proprio()                     # joint_pos (16), right / left end-effector pose, gripper widths
   s.tactile()                     # per gel pad: height map (60, 80) mm, contact mask, press depth; RGB with tactile_rgb=True
-  s.step(row)                     # one control step with an (18,) row (layout above)
+  s.step(row)                     # one control step with a (22,) row (layout above; 16 or 18 numbers are padded with NaN)
   s.move_ee(arm, pose7, steps)    # straight-line interpolation of one arm's target over `steps` control steps
   s.set_gripper(arm, closed, steps)
   s.record_start(); ...; actions = s.record_stop()
@@ -60,8 +66,12 @@ from typing import Any
 import numpy as np
 
 ACTION_DIM = 22
-MAX_STEPS = 30000
+MAX_ROWS = 30000  # the most rows a trajectory may hold (the grader rejects a longer one)
 SETTLE_STEPS = 60
+MAX_STEPS = MAX_ROWS + SETTLE_STEPS  # runaway guard of one episode: a full trajectory and the replay's settle fit
+CORE_TOL = 2e-3  # instance check: robot joints and rigid object poses / velocities
+SOFT_TOL = 5e-3  # instance check: the deformable body's sampled particle / node coordinates (m)
+SOFT_SAMPLE = 256  # particles / nodes in the instance's soft_sample
 DEVICE = os.environ.get(
     "RCB_TACTILELAB_DEVICE", "cuda:0"
 )  # PhysX on the GPU, as the tasks were developed (rendering and tactile on the GPU too)
@@ -181,6 +191,26 @@ class Session:
         st = dict(self.task.get_state())
         return _flat({k: v for k, v in st.items() if k.startswith("robot") or k == "objects"})
 
+    def _soft_points(self) -> np.ndarray | None:
+        """(N, 3) positions of the deformable body (cloth / sleeve particles, cable nodes, dough / plug particles),
+        or None for a task without one."""
+        st = dict(self.task.get_state())
+        soft = st.get("soft") or {}
+        for k in ("particle_q", "cable_nodes"):
+            if k in soft and soft[k] is not None:
+                return np.asarray(soft[k], dtype=np.float64).reshape(-1, 3)
+        dough = st.get("dough") or {}
+        if dough.get("q") is not None:
+            return np.asarray(dough["q"], dtype=np.float64).reshape(-1, 3)
+        return None
+
+    def _soft_sample(self) -> np.ndarray | None:
+        pts = self._soft_points()
+        if pts is None or len(pts) == 0:
+            return None
+        idx = np.unique(np.linspace(0, len(pts) - 1, min(SOFT_SAMPLE, len(pts))).round().astype(np.int64))
+        return np.concatenate([[float(len(pts))], pts[idx].ravel()])
+
     def state_sha(self) -> str:
         return hashlib.sha1(self._state().tobytes()).hexdigest()
 
@@ -200,9 +230,18 @@ class Session:
             self.instance_exact = (want is None) or (want == self.reset_sha)
             ref = self.instance.get("core_state")
             c0 = self._core_state()
-            self.instance_matches = self.instance_exact or (
-                ref is not None and len(ref) == c0.size and float(np.max(np.abs(np.asarray(ref) - c0))) <= 2e-3
-            )
+            core_ok = ref is not None and len(ref) == c0.size and float(np.max(np.abs(np.asarray(ref) - c0))) <= CORE_TOL
+            sref, s0 = self.instance.get("soft_sample"), self._soft_sample()
+            if s0 is None:
+                soft_ok = sref is None
+            else:  # same particle count (the first entry) and the sampled coordinates within SOFT_TOL
+                soft_ok = (
+                    sref is not None
+                    and len(sref) == s0.size
+                    and sref[0] == s0[0]
+                    and float(np.max(np.abs(np.asarray(sref[1:]) - s0[1:]))) <= SOFT_TOL
+                )
+            self.instance_matches = self.instance_exact or (core_ok and soft_ok)
 
     # ------------------------------------------------------------------ actions
     def _action(self, row):
@@ -309,51 +348,86 @@ class Session:
             self.step(row)
 
     def _frame(self) -> np.ndarray:
-        obs = self.task.get_observation()["policy"]
+        """The two wrist cameras side by side, rendered now (only for a video: a graded replay renders nothing)."""
+        obs = self.task.scene.render_cameras()
         return np.concatenate([np.asarray(obs["wrist_right_rgb"]), np.asarray(obs["wrist_left_rgb"])], axis=1)
 
     def replay(
-        self, actions: np.ndarray, settle: bool = True, video: str | None = None, fps: int = 15
+        self,
+        actions: np.ndarray,
+        settle: bool = True,
+        video: str | None = None,
+        fps: int = 15,
+        video_deadline: float | None = None,
+        on_first_row=None,
     ) -> dict[str, Any]:
         """Resets (unless nothing has run since the first reset of the process: then the replay is that first episode,
-        exactly what the grader's fresh-process replay runs), replays the rows open loop, holds the last row."""
+        exactly what the grader's fresh-process replay runs), replays the rows open loop, holds the last row.
+        With `video` (a Session with cameras=True), frames are rendered every 60/fps steps and streamed to the file;
+        at the wall-clock time `video_deadline` (time.time()) the replay stops and the video is closed
+        (`video_truncated` in the status). `on_first_row` is called once, before the first row is stepped."""
         if not (self.resets == 0 and self.sim_steps == 0):
             self.reset()
-        frames: list[np.ndarray] = []
         every = max(1, int(round(60 / max(1, int(fps)))))  # 60 Hz control -> `fps` video frames per second
         rows = list(np.asarray(actions, dtype=np.float64))
         if settle and rows:
             hold = rows[-1].copy()
             hold[18:22] = np.nan  # the hold keeps the drive settings in force, as settle() does
             rows += [hold] * SETTLE_STEPS
-        for i, r in enumerate(rows):
-            self.step(r)
-            if video and self.cameras and i % every == 0 and len(frames) < 9000:
-                frames.append(self._frame())
-        st = self.status()
-        if video and frames:  # after the verdict, never part of it
-            try:
-                import imageio.v2 as imageio
+        writer, truncated = None, False
+        if video and self.cameras:
+            import imageio.v2 as imageio
 
-                imageio.mimsave(video, frames, fps=int(fps))
-            except Exception as exc:  # noqa: BLE001
-                _log(f"video not written: {exc!r}")
+            writer = imageio.get_writer(video, fps=int(fps), codec="libx264", quality=7, macro_block_size=8)
+        try:
+            if on_first_row is not None:
+                on_first_row()
+            for i, r in enumerate(rows):
+                if writer is not None and video_deadline is not None and time.time() > video_deadline:
+                    truncated = True
+                    break
+                self.step(r)
+                if writer is not None and i % every == 0:
+                    writer.append_data(self._frame())  # streamed: no frame buffer in memory
+        finally:
+            if writer is not None:
+                try:
+                    writer.close()
+                except Exception as exc:  # noqa: BLE001
+                    _log(f"video not closed: {exc!r}")
+        st = self.status()
+        if writer is not None:
+            st["video_truncated"] = bool(truncated)
         return st
 
     # ------------------------------------------------------------------ queries
+    def sim_error(self) -> str | None:
+        """The simulator error the task recorded in this episode (a Newton sidecar call or the soft-body judge that
+        failed: the episode cannot succeed), or None."""
+        e = getattr(self.task, "sim_error_reason", None)
+        return str(e) if e else None
+
     def status(self) -> dict[str, Any]:
         m = {}
         try:
-            m = {k: float(v) for k, v in self.task.metrics().items() if np.isscalar(v)}
+            for k, v in self.task.metrics().items():
+                if np.isscalar(v) and not isinstance(v, str):
+                    m[k] = float(v)
+                elif isinstance(v, str) and v:
+                    m[k] = v
         except Exception:
             pass
-        return {
-            "success": bool(self.task.is_success()),
+        err = self.sim_error()
+        out = {
+            "success": bool(self.task.is_success()) and err is None,
             "sim_steps": int(self.sim_steps),
             "resets": int(self.resets),
             "state_sha": self.state_sha(),
             "metrics": m,
         }
+        if err is not None:
+            out["sim_error"] = err
+        return out
 
     def objects(self) -> dict[str, dict]:
         out = {}
@@ -399,6 +473,74 @@ def _shutdown(code: int) -> None:
     os._exit(code)
 
 
+def _write_json(path: str | None, obj: dict) -> None:
+    """Write obj to path atomically (the grader reads the file, never this process's stdout)."""
+    if not path:
+        return
+    tmp = f"{path}.part"
+    with open(tmp, "w") as f:
+        json.dump(obj, f)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def _replay_cli(a) -> dict[str, Any]:
+    """`replay`: the phases the grader tells apart through the --result file.
+    setup  - Isaac start, scene build, reset and the instance check: a failure here is the host's (no agent row ran);
+    agent  - written just before the first trajectory row is stepped: from here on, an exception, a dead process or a
+             time-out is a simulator error on the agent's actions (the agent's 0, `sim_error`);
+    done   - the verdict of this replay."""
+    res: dict[str, Any] = {"phase": "setup"}
+    _write_json(a.result, res)
+    d = np.load(a.traj, allow_pickle=False)
+    acts = np.asarray(d["actions"], dtype=np.float64)
+    s = Session(a.task, instance=a.instance, tactile=False, cameras=bool(a.video))
+    res.update(instance_exact=bool(s.instance_exact), instance_matches=bool(s.instance_matches))
+    _write_json(a.result, res)
+    if not s.instance_matches:  # the scene rebuilt here is not the frozen instance: the host's, before any agent row
+        raise RuntimeError("the rebuilt scene does not match the instance (instance_mismatch)")
+    if s.sim_error():  # the sidecar failed while the scene was built and reset: no agent row has run
+        raise RuntimeError(f"simulator error before the first row: {s.sim_error()}")
+    t0 = time.time()
+    deadline = (t0 + float(a.video_deadline_s)) if (a.video and a.video_deadline_s) else None
+
+    def first_row() -> None:
+        res["phase"] = "agent"
+        _write_json(a.result, res)
+
+    try:
+        st = s.replay(acts, video=a.video, fps=a.fps, video_deadline=deadline, on_first_row=first_row)
+    except Exception as exc:  # noqa: BLE001 - raised while the agent's rows were stepped: the agent's result
+        import traceback
+
+        traceback.print_exc()
+        if res["phase"] != "agent":
+            raise
+        res.update(
+            phase="done", success=False, sim_error=f"{type(exc).__name__}: {exc}"[:2000], sim_steps=int(s.sim_steps)
+        )
+        res["wall_s"] = round(time.time() - t0, 1)
+        _write_json(a.result, res)
+        return res
+    res.update(
+        phase="done",
+        success=bool(st["success"]),
+        state_sha=st["state_sha"],
+        sim_steps=st["sim_steps"],
+        metrics=st["metrics"],
+        wall_s=round(time.time() - t0, 1),
+    )
+    if st.get("sim_error"):
+        res["sim_error"] = st["sim_error"]
+    if "video_truncated" in st:
+        res["video_truncated"] = st["video_truncated"]
+    if a.final_state:  # the full final state vector (the grader measures the spread between replays)
+        np.save(a.final_state, s._state(), allow_pickle=False)
+    _write_json(a.result, res)
+    return res
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -410,8 +552,11 @@ def main(argv=None) -> int:
     r.add_argument("--task", required=True)
     r.add_argument("--instance", required=True)
     r.add_argument("--traj", required=True)
-    r.add_argument("--video", default=None)
+    r.add_argument("--result", default=None, help="write the phases and the verdict of this replay to this JSON file")
+    r.add_argument("--video", default=None, help="render the two wrist cameras to this mp4 (cameras on: slower)")
     r.add_argument("--fps", type=int, default=15)
+    r.add_argument("--video-deadline-s", type=float, default=None, help="with --video: stop after this many seconds")
+    r.add_argument("--final-state", default=None, help="save the final state vector (.npy)")
     o = sub.add_parser("run-oracle")
     o.add_argument("--task", required=True)
     o.add_argument("--instance", required=True)
@@ -430,27 +575,14 @@ def main(argv=None) -> int:
                 "state_sha": s.reset_sha,
                 "core_state": s._core_state().tolist(),
             }
+            ss = s._soft_sample()
+            if ss is not None:
+                inst["soft_sample"] = [float(x) for x in ss]
             Path(a.out).write_text(json.dumps(inst, indent=1) + "\n")
             print(json.dumps({"task": a.task, "state_sha": s.reset_sha}), flush=True)
         elif a.cmd == "replay":
-            d = np.load(a.traj, allow_pickle=False)
-            acts = np.asarray(d["actions"], dtype=np.float64)
-            s = Session(a.task, instance=a.instance, tactile=False, cameras=bool(a.video))
-            t0 = time.time()
-            st = s.replay(acts, video=a.video, fps=a.fps)
-            print(
-                json.dumps(
-                    {
-                        "replays": [
-                            {"success": st["success"], "state_sha": st["state_sha"], "sim_steps": st["sim_steps"]}
-                        ],
-                        "instance_exact": bool(s.instance_exact),
-                        "instance_matches": bool(s.instance_matches),
-                        "wall_s": round(time.time() - t0, 1),
-                    }
-                ),
-                flush=True,
-            )
+            res = _replay_cli(a)
+            print(json.dumps({k: v for k, v in res.items() if k != "metrics"}), flush=True)
         elif a.cmd == "run-oracle":
             s = Session(a.task, instance=a.instance)
             ns = {"s": s, "Session": Session, "np": np}
