@@ -1,0 +1,10 @@
+{
+ "action_dim": 16,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.004166666666666667,
+ "preset": "assembly.so101.bimanual_franka.osc",
+ "seed": 0,
+ "state_sha": "ba33cec0ac0641e705c176fc57aecf988f0f5bde7085c5199aab1fdf60de5e6a"
+}

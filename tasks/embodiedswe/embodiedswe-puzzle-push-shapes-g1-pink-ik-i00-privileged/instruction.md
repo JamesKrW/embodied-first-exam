@@ -115,7 +115,9 @@ refusals (it takes a few minutes: one Isaac Sim launch plus your rollout).
 - Physics runs on the CPU, so a fresh process repeats a run bit for bit; the proxy adds a little time per call
   (about 0.05 ms per read or step request, measured), so a closed-loop solve that reads state every step is fine.
 - You can look at the scene: add a camera (`make_env(cameras=True)`, then Isaac Lab's `Camera`), save frames to PNG
-  and look at the images themselves.
+  and look at the images themselves. Rendering can change the physics: a run with frames drawn between steps may
+  not repeat bit for bit without them (in some scenes it ends elsewhere). The graded run draws nothing, so judge a
+  recorded action sequence by `check`, not by a rendered run.
 
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.

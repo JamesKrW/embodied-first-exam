@@ -27,7 +27,9 @@ reads answered with copies, `env.step(action)` executed and recorded, everything
 `solve` returns or raises, its process dies, or the rollout time limit passes (the verdict is then read from the state
 at that moment, as EmbodiedSWE's grader does at its budget kill). Every process of `nobody` is killed before the
 verdict is read. Verdict: success = the grader's `check_success` on the final state (their end predicate); progress =
-the grader's rubric score (its peak recorded progress). An exception from `env.step` is raised in `solve`, as
+the grader's rubric score (its peak recorded progress); a task with a tool-only rule (puzzle.spatula: the hand or a
+finger touching the bread disqualifies the episode) scores success 0 and progress 0 once PhysX reports such a contact
+(ToolOnlyMonitor, read after every physics substep). An exception from `env.step` is raised in `solve`, as
 EmbodiedSWE's GradedEnv lets it propagate: the rollout goes on if `solve` handles it. Actions are applied as given
 (robobench's controllers scale task-space deltas by pos_scale / rot_scale without clipping); only the shape and
 finiteness of an action are checked. The replay and the video are diagnostics: they never change the verdict.
@@ -81,6 +83,15 @@ TASKS = {
     "cutting.dice.franka.osc": {"grader": "DiceFoodGrader", "check": "cut_success"},
     "locomanip.box_to_bin.g1.loco_pink_ik": {"grader": "BoxToBinGrader", "check": "success"},
     "locomanip.wheel_carry.g1.loco_pink_ik": {"grader": "WheelCarryGrader", "check": "success"},
+    # no success(); rendering perturbs this scene's PhysX state (measured: the first rendered frame changes later
+    # steps), so its video poses recorded states instead of rendering during the physics (cmd_video, "states")
+    "assembly.so101.bimanual_franka.osc": {"grader": "SO101AssemblyGrader", "check": "so101_success",
+                                           "video": "states"},
+    # the scene states a TOOL-ONLY rule (finger or gripper contact with the bread disqualifies the episode) and leaves
+    # it to the harness (its module docstring); the tooling enforces it (ToolOnlyMonitor)
+    "puzzle.spatula.franka.osc": {"grader": "SpatulaFlipServeGrader", "check": "success",
+                                  "tool_only": {"payload": "Bread_", "hand": ("panda_hand", "panda_leftfinger",
+                                                                              "panda_rightfinger")}},
 }
 
 
@@ -98,7 +109,124 @@ def cut_success(scene):
     return (scene.pieces_count() >= target) & ok
 
 
-CHECKS = {"cut_success": cut_success}
+def so101_success(scene):
+    """The SO101 scene's end predicate (it has no success()), exactly EmbodiedSWE's grader's (SO101AssemblyGrader.
+    check_success): every loose screw fastened (`fastened >= 0` for all twelve; the scene's `state == 2`), the servo
+    in the upper arm's pocket (its body frame on the upper_arm link frame within `cfg.motor_align_pos` and
+    `cfg.motor_align_deg`) and the forearm on the horn (the lower_arm at its elbow seat on the motor within
+    `motor_align_pos`, its orientation off the horn axis within `motor_align_deg`; any elbow angle). `(num_envs,)`."""
+    import math
+
+    from isaaclab.utils.math import quat_error_magnitude
+    c = scene.cfg
+    ap, aq = scene.upper_arm_pose()
+    motor = (((scene.motor.data.root_pos_w - ap).norm(dim=-1) < c.motor_align_pos)
+             & (quat_error_magnitude(scene.motor.data.root_quat_w, aq) < math.radians(c.motor_align_deg)))
+    lp, lq = scene.lower_arm_pose()
+    seat_p, seat_q = scene.lower_arm_seat_w()
+    _, off_axis = scene._elbow_angle_split(lq, seat_q)
+    fork = ((lp - seat_p).norm(dim=-1) < c.motor_align_pos) & (off_axis < math.radians(c.motor_align_deg))
+    return (scene.fastened >= 0).all(dim=1) & motor & fork
+
+
+CHECKS = {"cut_success": cut_success, "so101_success": so101_success}
+
+
+class ToolOnlyMonitor:
+    """A task's TOOL-ONLY rule, in the trusted process: contact between the robot's hand (`spec["hand"]`: the hand
+    body and its fingers) and the payload (the scene's present bread) disqualifies the episode. PhysX reports the
+    contacts of the payload's rigid bodies (PhysxContactReportAPI, threshold 0, plus omni.physx's contact processing,
+    both set before the simulation starts; they report, they do not change the dynamics), and after EVERY physics
+    substep (the scene's post_step) the monitor reads the contact-force matrix between them and the hand's links:
+    any pair with a nonzero force is a touch. Contacts with the absent (parked) bread sizes do not count."""
+
+    def __init__(self, env, spec: dict):
+        import torch
+        self.env, self.spec = env, spec
+        self.scene = env.scene
+        self.payload = list(self.scene.breads.values())
+        from pxr import UsdPhysics
+        root = env.stage.GetPrimAtPath(f"/World/envs/env_0/{env.robot.prim_name}")
+        links, todo = [], [root] if root.IsValid() else []
+        while todo:                              # the hand's rigid links under the robot's prim
+            p = todo.pop(0)
+            if p.HasAPI(UsdPhysics.RigidBodyAPI) and p.GetName() in spec["hand"]:
+                links.append(str(p.GetPath()))
+            todo += p.GetChildren()
+        if sorted(p.rsplit("/", 1)[-1] for p in links) != sorted(spec["hand"]):
+            raise RuntimeError(f"tool-only rule: hand links {spec['hand']} not all found ({links})")
+        sensors = [p for b in self.payload for p in b.root_physx_view.prim_paths]
+        if len(sensors) != len(self.payload):
+            raise RuntimeError(f"tool-only rule: expected one rigid body per payload, got {sensors}")
+        self.view = env.sim.physics_sim_view.create_rigid_contact_view(
+            sensors, filter_patterns=[links] * len(sensors), max_contact_data_count=64 * len(sensors) * len(links))
+        self.links, self.sensors = links, sensors
+        self.substeps = 0
+        self.touch_substeps = 0
+        self.first_touch_step = None             # control step (0-based) of the first touch
+        self.max_force = 0.0
+        self.touched_links: set = set()
+        orig = self.scene.post_step
+        period = int(env.robot.control_period)
+
+        def post_step(*a, **k):                  # the scene's own mechanics first, then the contact read
+            orig(*a, **k)
+            f = self.view.get_contact_force_matrix(dt=env.dt)
+            f = torch.as_tensor(f).reshape(len(sensors), len(links), 3).norm(dim=-1)
+            present = self.scene._present[0].reshape(-1).to(torch.bool).cpu()
+            hit = f.cpu()[present]
+            if bool((hit > 0).any()):
+                self.touch_substeps += 1
+                if self.first_touch_step is None:
+                    self.first_touch_step = self.substeps // period
+                self.max_force = max(self.max_force, float(hit.max()))
+                for j in torch.nonzero((hit > 0).any(dim=0)).reshape(-1).tolist():
+                    self.touched_links.add(links[j].rsplit("/", 1)[-1])
+            self.substeps += 1
+        self.scene.post_step = post_step
+
+    @property
+    def touched(self) -> bool:
+        return self.touch_substeps > 0
+
+    def report(self) -> dict:
+        return {"tool_only": 1, "tool_contact": int(self.touched), "tool_contact_substeps": self.touch_substeps,
+                "tool_contact_first_step": self.first_touch_step, "tool_contact_max_force": round(self.max_force, 6),
+                "tool_contact_links": sorted(self.touched_links)}
+
+
+def _enable_contact_reports(payload_prefix: str) -> None:
+    """Before the simulation starts: PhysX contact reports (threshold 0) on every rigid body of every prim of each env
+    whose name starts with `payload_prefix`, and omni.physx's contact processing on (Isaac Lab turns it off for CPU
+    physics and back on when it creates a contact sensor, as here). Only reporting: no sleep threshold or other
+    physics attribute changes."""
+    import carb
+    import omni.usd
+    from pxr import PhysxSchema, UsdPhysics
+    carb.settings.get_settings().set_bool("/physics/disableContactProcessing", False)
+    stage = omni.usd.get_context().get_stage()
+    n = 0
+    envs = stage.GetPrimAtPath("/World/envs")
+    for e in (envs.GetChildren() if envs.IsValid() else []):
+        for top in e.GetChildren():
+            if not top.GetName().startswith(payload_prefix):
+                continue
+            todo = [top]
+            while todo:
+                p = todo.pop(0)
+                if p.HasAPI(UsdPhysics.RigidBodyAPI):
+                    PhysxSchema.PhysxContactReportAPI.Apply(p).CreateThresholdAttr().Set(0.0)
+                    n += 1
+                else:
+                    todo += p.GetChildren()
+    if not n:
+        raise RuntimeError(f"tool-only rule: no rigid body named {payload_prefix}* on the stage")
+
+
+def tool_contact(env) -> dict | None:
+    """The tool-only rule's record of this env so far (None for a task without the rule)."""
+    mon = getattr(env, "_esw_tool_only", None)
+    return mon.report() if mon is not None else None
 
 
 def task_success(env, preset: str):
@@ -133,8 +261,10 @@ def launch(cameras: bool = False):
     return _APP
 
 
-def build(instance: dict):
-    """The env exactly as EmbodiedSWE's grader builds it (registered preset, seed, one trajectory), PhysX on the CPU."""
+def build(instance: dict, before_reset=None, reset_impl=None):
+    """The env exactly as EmbodiedSWE's grader builds it (registered preset, seed, one trajectory), PhysX on the CPU.
+    A task with a tool-only rule gets its contact monitor (ToolOnlyMonitor). `before_reset` / `reset_impl`: the
+    video's camera (see _build_with_camera)."""
     if BENCH_ROOT not in sys.path:
         sys.path.insert(0, BENCH_ROOT)
     import robobench
@@ -144,9 +274,35 @@ def build(instance: dict):
     if instance.get("device", DEVICE) != DEVICE:
         raise ValueError(f"instance built on {instance.get('device')!r}; these tasks run PhysX (and the G1 locomotion "
                          f"policy) on {DEVICE!r} only: another device gives another start state and other bits")
-    env = ENVS.get(instance["preset"])().build(num_envs=1, seed=seed, device=DEVICE)
+    spec = TASKS[instance["preset"]].get("tool_only")
+    hooks = [lambda: _enable_contact_reports(spec["payload"])] if spec else []
+    if before_reset:
+        hooks.append(before_reset)
+    if hooks or reset_impl is not None:
+        # run the hooks right before the env's one `sim.reset()` (what must be on the stage when PhysX starts), and
+        # take that reset from `reset_impl` if given; nothing else of the build changes
+        from isaaclab.sim import SimulationContext
+        orig = SimulationContext.reset
+        pending = list(hooks)
+
+        def reset(self, soft: bool = False):
+            while pending:
+                pending.pop(0)()
+            return (reset_impl or orig)(self, soft=soft)
+
+        SimulationContext.reset = reset
+        try:
+            env = ENVS.get(instance["preset"])().build(num_envs=1, seed=seed, device=DEVICE)
+        finally:
+            SimulationContext.reset = orig
+        if pending:
+            raise RuntimeError("the env build did not reset the simulation")
+    else:
+        env = ENVS.get(instance["preset"])().build(num_envs=1, seed=seed, device=DEVICE)
     if str(env.device) != DEVICE:
         raise RuntimeError(f"the env was built on {env.device}, not {DEVICE}")
+    if spec:
+        env._esw_tool_only = ToolOnlyMonitor(env, spec)
     env.reset(seed=seed)
     return env
 
@@ -218,7 +374,8 @@ WRITE_RE = re.compile(r"^_*(set|write|reset|apply|step|update|bind|post_step|clo
 READ_RE = re.compile(r"^_*(get|is|has|find|describe|seated|success|score|tower_height|level_counts|slots|upright|"
                      r"block_tensors|fruits_|nonfruits_|on_plate|placed|speed|ground_z|yaw_quat|grid_names|slot_xy|"
                      r"fixed_pose|radial|plate_|bulb_|in_socket|stand_xy|keys|values|items|names|count|num|name|"
-                     r"prim_name|action_dim|control_period|control_dt|actuator_limits|joint_names|body_names)",
+                     r"prim_name|action_dim|control_period|control_dt|actuator_limits|joint_names|body_names|"
+                     r"bread_r|bread_h)",
                      re.IGNORECASE)
 # Calls the proxy answers: a method whose name says it reads (READ_RE) and not that it writes (WRITE_RE), on any object
 # reachable from the env, plus ENV_CALLS on the env itself. A whitelist: an unknown verb is refused. Audited against
@@ -255,6 +412,13 @@ READ_METHODS_SCENE = {
     "pieces_count", "knife_edge", "food_height", "plane_aim_w", "plane_axis_w",
     # locomanip scenes (box_to_bin, wheel_carry)
     "placed", "carried_fraction", "box_pose", "wheel_pose",
+    # assembly.so101: frames and seats (pure reads); set_elbow_target and the fastening mechanics stay refused
+    "upper_arm_pose", "lower_arm_pose", "lower_arm_seat_w", "elbow_screw_seats_w", "elbow_horn_screw_seats_w",
+    "_hole_frames_w", "_seats_w", "_elbow_angle_split",
+    # puzzle.spatula: the instantaneous predicates and the blade-frame helpers (pure reads)
+    "tool_lifted_now", "on_blade", "on_pan", "flipped_now", "on_plate", "on_bare_surface", "loaded_now",
+    "served_now", "carry_tilt_deg", "_bread_tensors", "_bread_up", "_blade_up", "_bread_in_blade_frame",
+    "_stage_table",
 }
 READ_METHODS_ROBOT = {
     "get_state", "describe", "name", "prim_name", "action_dim", "control_period", "control_dt",
@@ -622,7 +786,26 @@ def _final(env, grader, inst: dict) -> dict:
         success, score = bool(v["success"]), float(v["score"])
     else:
         success, score = bool(task_success(env, inst["preset"])[0]), None
-    return {"success": success, "progress": score, "final_sha": state_sha(env)}
+    out = {"success": success, "progress": score, "final_sha": state_sha(env)}
+    tc = tool_contact(env)
+    if tc is not None:
+        out.update(tc, disqualified=tc["tool_contact"])
+        if tc["tool_contact"]:                   # the episode is disqualified: no success, no progress
+            out.update(success=False, progress=0.0 if score is not None else None)
+    return out
+
+
+def _unreadable_final(env, grader, exc) -> dict:
+    """The verdict when the grader cannot read the state (after a failed step): success 0, progress = the rubric's
+    peak recorded before (0 when a tool-only rule disqualified the episode)."""
+    out = {"success": False, "progress": _peak(grader), "final_sha": None,
+           "final_error": f"{type(exc).__name__}: {exc}"[:500]}
+    tc = tool_contact(env)
+    if tc is not None:
+        out.update(tc, disqualified=tc["tool_contact"])
+        if tc["tool_contact"]:
+            out["progress"] = 0.0
+    return out
 
 
 def _peak(grader) -> float:
@@ -690,8 +873,7 @@ def cmd_rollout(a) -> int:
                 res.update(_final(env, grader, inst))
             except Exception as exc:  # noqa: BLE001 — the env may be unusable after the failed step: success 0,
                 # progress = the rubric's peak recorded before it (the grader's own record of the run)
-                res.update(success=False, progress=_peak(grader), final_sha=None,
-                           final_error=f"{type(exc).__name__}: {exc}"[:500])
+                res.update(_unreadable_final(env, grader, exc))
         else:
             res.update(_final(env, grader, inst))
         A = np.stack(actions).astype(np.float32) if actions else np.zeros((0, env.robot.action_dim), np.float32)
@@ -747,8 +929,7 @@ def cmd_replay(a) -> int:
         try:
             res.update(_final(env, grader, inst))
         except Exception as exc:  # noqa: BLE001
-            res.update(success=False, progress=_peak(grader), final_sha=None,
-                       final_error=f"{type(exc).__name__}: {exc}"[:500])
+            res.update(_unreadable_final(env, grader, exc))
         res.update(n_actions=int(len(A)), replay_step_s=round(time.perf_counter() - t1, 3))
     except Exception:  # noqa: BLE001
         res.update(error=traceback.format_exc()[-4000:])
@@ -765,32 +946,36 @@ def _build_with_camera(inst: dict, make_camera):
     later physics bits (a kinematic body's pose by 1 ulp); with neither, a rendered replay repeats the graded run's
     final state bit for bit. `make_camera()` is called once and its result returned with the env."""
     from isaaclab.sim import SimulationContext
-    orig = SimulationContext.reset
     made: list = []
 
     def reset(self, soft: bool = False):        # Isaac Lab's reset minus the warm-up renders
-        if not made:
-            made.append(make_camera())
         self._disable_app_control_on_stop_handle = True
         super(SimulationContext, self).reset(soft=soft)
         if self.physics_sim_view:
             self.physics_sim_view._backend.initialize_kinematic_bodies()
         self._disable_app_control_on_stop_handle = False
 
-    SimulationContext.reset = reset
-    try:
-        env = build(inst)
-    finally:
-        SimulationContext.reset = orig
+    env = build(inst, before_reset=lambda: made or made.append(make_camera()), reset_impl=reset)
     if not made:
         raise RuntimeError("the env build did not reset the simulation: no camera")
     return env, made[0]
 
 
+def _clone(obj):
+    """A deep copy of a nested state (dicts / lists of tensors)."""
+    if isinstance(obj, dict):
+        return {k: _clone(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return type(obj)(_clone(v) for v in obj)
+    return obj.clone() if hasattr(obj, "clone") else obj
+
+
 def cmd_video(a) -> int:
     """Render a recorded rollout to an mp4: a fresh replay (the same build, reset and physics steps as `replay`) with
-    a camera, rendered between physics steps without changing them. Never part of a verdict; `final_sha` lets the
-    verifier check that the video reached the graded run's final state."""
+    a camera, rendered between physics steps without changing them. A preset whose physics a render changes
+    (TASKS "video": "states") is replayed without rendering, keeping the state of every frame to draw; once the replay
+    is done each kept state is posed on the bodies (no physics step) and drawn. Never part of a verdict; `final_sha`
+    (the replay's final state) lets the verifier check that the video reached the graded run's final state."""
     import numpy as np
     import torch
     res: dict = {}
@@ -816,6 +1001,20 @@ def cmd_video(a) -> int:
             every = int(np.ceil(len(A) / a.max_frames))
         w = imageio.get_writer(a.video, fps=a.fps, codec="libx264", quality=7, macro_block_size=8)
         n = 0
+        posed = TASKS[inst["preset"]].get("video") == "states"
+        states: list = []
+        fsha = None
+
+        def grab_frame():
+            nonlocal n
+            for _ in range(1 if n else 3):      # draw the state, no physics step; the renderer's first 2 are dark
+                env.sim.render()
+                cam.update(env.dt)
+            f = cam.data.output["rgb"][0].detach().cpu().numpy()[..., :3]
+            if f.size and f.any():
+                w.append_data(f)
+                n += 1
+
         for i, row in enumerate(A):
             grab = (i % every == 0) or i == len(A) - 1
             try:
@@ -824,20 +1023,29 @@ def cmd_video(a) -> int:
                 res.setdefault("step_error", f"{type(exc).__name__}: {exc}"[:500])
                 res.setdefault("step_error_at", i)
                 continue
-            if grab:
-                for _ in range(1 if n else 3):  # draw the state, no physics step; the renderer's first 2 are dark
-                    env.sim.render()
-                    cam.update(env.dt)
-                f = cam.data.output["rgb"][0].detach().cpu().numpy()[..., :3]
-                if f.size and f.any():
-                    w.append_data(f)
-                    n += 1
+            if grab and posed:   # keep the state; nothing is rendered until the physics is done
+                states.append(_clone(env.iscene.get_state(is_relative=False)))
+            elif grab:
+                grab_frame()
+        if posed:
+            # the replayed physics is complete: its final state is the run's, then each kept state is posed (written
+            # to the bodies, no physics step) and drawn
+            try:
+                fsha = state_sha(env)
+            except Exception:  # noqa: BLE001
+                fsha = None
+            for st in states:
+                env.iscene.reset_to(st, is_relative=False)
+                env.sim.forward()
+                grab_frame()
         w.close()
-        try:
-            fsha = state_sha(env)
-        except Exception:  # noqa: BLE001
-            fsha = None
-        res.update(video=a.video, frames=n, every=every, final_sha=fsha, video_ok=n > 0)
+        if not posed:
+            try:
+                fsha = state_sha(env)
+            except Exception:  # noqa: BLE001
+                fsha = None
+        res.update(video=a.video, frames=n, every=every, final_sha=fsha, video_ok=n > 0,
+                   video_mode="states" if posed else "render")
     except Exception:  # noqa: BLE001
         res.update(video_ok=False, error=traceback.format_exc()[-4000:])
     res["wall_s"] = round(time.monotonic() - t0, 1)

@@ -255,6 +255,9 @@ EDITS: list[tuple[str, str, str]] = [
     ('robobench/suites/puzzle/scenes/spatula_flip_serve.py',
      "    # Grasp-weld contract constants — the scene's public knobs (solutions read these off the\n    # scene, e.g. `scene.GRASP_PINCH_OFFSET`); the composed GraspWeldContract consumes them.\n",
      "    # Grasp-weld contract constants — the scene's public knobs (e.g.\n    # `scene.GRASP_PINCH_OFFSET`); the composed GraspWeldContract consumes them.\n"),
+    ('robobench/suites/assembly/scenes/so101_assembly.py',
+     "    # option. The smokes read `surface_z` too, so their choreography rides along.\n",
+     "    # option.\n"),
     ('robobench/suites/puzzle/scenes/syringe_dosing.py',
      '    # of capacity (relaxed from +/-5% — the tight band priced in kinematic-oracle\n    # metering precision, not an arm pressing the plunger through o-ring friction)\n',
      '    # of capacity\n'),
@@ -387,7 +390,7 @@ BANNED = ("calibrated grasp", "calibrated stance", "release annulus", "pink_prob
           "azimuth\n    #: 180", "pick radius", "grasp cell", "REORIENT_STUCK", "robot_binding_smoke before",
           "existing solutions", "demos' solve", "gravity-seat", "IK campaign", "solves and the grader",
           "grasps and releases reliably", "grasps AND releases reliably", "palm CAGE", "steering for",
-          "first calibration", "force smoke", "key smoke")
+          "first calibration", "force smoke", "key smoke", "smokes read")
 
 
 # every scene module the shipped tasks build (the check fails when one is missing)
@@ -399,7 +402,8 @@ SCENE_MODULES = tuple(f"robobench/suites/{m}.py" for m in (
     "packing/scenes/tool_packing", "packing/scenes/egg_carton", "packing/scenes/clear_organic_objects",
     "puzzle/scenes/classify_objects", "puzzle/scenes/push_shapes", "puzzle/scenes/coffee_service",
     "puzzle/scenes/syringe_dosing", "cutting/scenes/slice_food", "cutting/scenes/dice_food",
-    "locomanip/scenes/box_to_bin", "locomanip/scenes/wheel_carry"))
+    "locomanip/scenes/box_to_bin", "locomanip/scenes/wheel_carry", "assembly/scenes/so101_assembly",
+    "puzzle/scenes/spatula_flip_serve"))
 
 
 def code_fingerprint(src: str) -> str:

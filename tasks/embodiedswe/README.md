@@ -2,8 +2,9 @@
 
 EmbodiedSWE's robot benchmark (`robobench`, commit `67f44e8a2ca5`) on Isaac Lab 2.3.2 / Isaac Sim 5.1, PhysX on the
 CPU: the agent writes a program, `solution/solve.py` exposing `solve(env)`, that completes a manipulation or
-loco-manipulation task by stepping the env. `simulator = "embodiedswe"`. 22 tasks (assembly, packing, puzzle, cutting
-and loco-manipulation scenes, one frozen instance each), privileged mode, `task_type = "policy"`, in the full set only.
+loco-manipulation task by stepping the env. `simulator = "embodiedswe"`. 24 tasks (assembly, packing, puzzle, cutting
+and loco-manipulation scenes, one frozen instance each), privileged mode, `task_type = "policy"`, in the full set only:
+EmbodiedSWE's 28 published tasks without its 4 deformable ones (they need Newton physics and a networked VLM judge).
 
 | Task | Preset | Robot |
 |---|---|---|
@@ -29,6 +30,8 @@ and loco-manipulation scenes, one frozen instance each), privileged mode, `task_
 | `embodiedswe-cutting-dice-franka-osc-i00-privileged` | `cutting.dice.franka.osc` | Franka Panda, operational-space control |
 | `embodiedswe-locomanip-box-to-bin-g1-loco-pink-ik-i00-privileged` | `locomanip.box_to_bin.g1.loco_pink_ik` | Unitree G1 (walking), Pink IK |
 | `embodiedswe-locomanip-wheel-carry-g1-loco-pink-ik-i00-privileged` | `locomanip.wheel_carry.g1.loco_pink_ik` | Unitree G1 (walking), Pink IK |
+| `embodiedswe-assembly-so101-bimanual-franka-osc-i00-privileged` | `assembly.so101.bimanual_franka.osc` | two Franka Pandas, operational-space control |
+| `embodiedswe-puzzle-spatula-franka-osc-i00-privileged` | `puzzle.spatula.franka.osc` | Franka Panda, operational-space control |
 
 ## Grading
 
@@ -37,9 +40,13 @@ grader (EmbodiedSWE's, unchanged) and runs the delivered `solve(env)` in a separ
 without network or GPU, behind a proxy env (`embodied_first_exam/benchmarks/embodiedswe/esw_proxy.py`): reads return copies,
 `env.step(action)` steps the simulator, everything else is refused. The verdict is EmbodiedSWE's, read once on the
 state when the rollout ends (`solve` returns or raises, its process ends, or the 30-minute limit passes): success = the
-grader's end predicate (the cutting scenes have no `success()`: their graders' predicate, enough pieces and all of them
-on the board, is also the tooling's `cut_success` for the development `check`); `progress` = its rubric score, the
-peak recorded progress, so progress made before an exception or the time limit counts. An exception from
+grader's end predicate (the cutting and SO101 scenes have no `success()`: their graders' predicates, enough pieces
+and all of them on the board, and every screw fastened with the servo and the forearm seated, are also the tooling's
+`cut_success` and `so101_success` for the development `check`); `progress` = its rubric score, the peak recorded
+progress, so progress made before an exception or the time limit counts. The spatula scene's tool-only rule (the
+hand or a finger touching the bread disqualifies the episode) is enforced by the verifier: PhysX contact reports on
+the bread, read after every physics substep against the hand and finger links; a contact with a nonzero force sets
+success and progress to 0 (`disqualified`, `tool_contact` in `reward.json`). An exception from
 `env.step` is raised in `solve`, as EmbodiedSWE's `GradedEnv` lets it propagate. Actions are applied as given: as in
 EmbodiedSWE, a Franka's operational-space controller scales the 6 pose deltas by `pos_scale` / `rot_scale` without
 clipping them and clamps the joint torques (100 N·m); only an action's shape and finite values are checked. A run in
@@ -51,11 +58,24 @@ Differences from EmbodiedSWE's own grading, on purpose:
 - PhysX runs on the CPU (see Device), so a fresh process repeats a run bit for bit and the video rendered after the
   verdict shows the graded run. The video process builds, resets and steps exactly as the replay does; its camera is
   added before the simulation's single reset, Isaac Lab's warm-up renders in that reset are skipped, and frames are
-  drawn between physics steps, since each of those otherwise changes later physics bits.
+  drawn between physics steps, since each of those otherwise changes later physics bits. In the SO101 scene even a
+  frame drawn between steps changes the physics (measured: from the first frame on, the run ends elsewhere), so its
+  video process replays every step without drawing, keeps the state of each frame, and only after the last step
+  poses each kept state on the bodies (no physics step) and draws it.
 - Only the final `solution/` is graded, once: no submitted checkpoints, no best-of-N.
 - `solve` runs in a sandbox (a separate process as an unprivileged user, no network, no GPU) behind a proxy env, with
   the 30-minute limit on its wall clock.
 - One frozen instance per task, seed 0.
+- The spatula scene's tool-only rule is checked. EmbodiedSWE states it in the scene's description and leaves it to
+  the harness, whose grading does not check it.
+
+## Time budget
+
+The 30-minute limit is EmbodiedSWE's rollout limit. Measured on an L40S host (one env, CPU PhysX, `env.step` only): the
+SO101 scene, the slowest, takes 147 ms per control step at rest and 178 ms with both arms moving through the
+verifier's proxy (16 physics substeps at 240 Hz, two arms, twelve screws with continuous collision detection), so 30
+minutes hold about 10,000 to 12,000 control steps, 11 to 13.6 minutes of simulated time; the spatula scene takes 62 to
+71 ms per step, close to real time.
 
 ## Device
 

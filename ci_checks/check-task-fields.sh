@@ -8,7 +8,7 @@ def fail(m):
     global rc; print(f"FAIL {t}: {m}"); rc = 1
 if d.get("task", {}).get("name") != f"embodied-first-exam/{t.name}": fail("[task].name must be embodied-first-exam/<folder>")
 m = d.get("metadata", {})
-for k in ["author_name", "task_type", "simulator", "robot", "family", "expert_time_estimate_hours"]:
+for k in ["task_type", "simulator", "robot", "family", "expert_time_estimate_hours"]:
     if k not in m: fail(f"[metadata].{k} missing")
 if m.get("task_type") not in ("trajectory", "policy"): fail("task_type must be trajectory|policy")
 # Protocol v1.1.1 (§2.2, §2.3, D12): the directory ends in its mode (-privileged, -standard, -standard-realtime, or a mode

@@ -9,7 +9,7 @@
 | Family / instance | `locomanip.fruit_delivery.g1.loco_pink_ik` / seed 0 |
 | Oracle | `none` — No reference solution in the repository. A scripted reference solve() exists outside the repository (internal only, used to check the task is solvable through the grading path); it is not shipped. |
 | Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
-| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.2.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.3.0` |
 
 ## Task
 Deliver the fruit to the plate (Unitree G1, walking, Pink IK). EmbodiedSWE's `locomanip.fruit_delivery.g1.loco_pink_ik` task (robobench at commit `67f44e8a2ca5`), privileged mode, with a program as the

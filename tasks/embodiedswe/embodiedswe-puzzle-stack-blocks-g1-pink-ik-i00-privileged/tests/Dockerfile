@@ -1,8 +1,8 @@
 # Separate verifier sandbox (PROTOCOL H.1): the same base image, the verifier's own copy of the frozen instance and the
 # task's grader (EmbodiedSWE's, unchanged, at the pinned commit). /tests is root-only: the solution process (nobody)
 # cannot read it.
-FROM ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.2.0
-COPY --from=ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.1.0@sha256:6467db646aae38a459d12bf4213863bd86dee42d4cf4effff9b3fa6638aeeef5 /rcb_embodiedswe.py /esw_proxy.py /opt/efe/
+FROM ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.3.0
+COPY --from=ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.2.0@sha256:adbb103b7b91043b83339530224d912ca0eb66993064779e0e532b51175a162e /rcb_embodiedswe.py /esw_proxy.py /opt/efe/
 COPY grade.py instance.json test.sh /tests/
 COPY grader/ /tests/grader/
 RUN chmod 700 /tests && chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier

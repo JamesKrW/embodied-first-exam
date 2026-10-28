@@ -1,0 +1,10 @@
+{
+ "action_dim": 8,
+ "control_dt": 0.066667,
+ "device": "cpu",
+ "format": "esw-instance/1",
+ "physics_dt": 0.008333333333333333,
+ "preset": "puzzle.spatula.franka.osc",
+ "seed": 0,
+ "state_sha": "0c47045d9a6cf9048f052096b6f0ffe6d9a536f2b639e17d54e6edf51d127191"
+}

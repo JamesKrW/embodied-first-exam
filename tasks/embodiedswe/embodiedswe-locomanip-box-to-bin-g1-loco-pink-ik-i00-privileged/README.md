@@ -9,7 +9,7 @@
 | Family / instance | `locomanip.box_to_bin.g1.loco_pink_ik` / seed 0 |
 | Oracle | `none` — No reference solution in the repository, and none written for this scene yet; the build, the start-state hash, replay determinism and a do-nothing run scoring 0 are checked. |
 | Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
-| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.2.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.3.0` |
 
 ## Task
 Carry the box from the shelf to the bin (Unitree G1, walking, Pink IK). EmbodiedSWE's `locomanip.box_to_bin.g1.loco_pink_ik` task (robobench at commit `67f44e8a2ca5`), privileged mode, with a program as the

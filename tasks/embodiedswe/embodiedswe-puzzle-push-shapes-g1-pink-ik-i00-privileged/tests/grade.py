@@ -21,9 +21,10 @@ Every step runs in its own process (`rcb_embodiedswe.py`, the image's tooling; t
               video.json says whether its final state matches the rollout's (`video_mismatch`; `video_ok` 0 then).
 
 Whose failure a 0 is (every path writes a reward; `deterministic`, `grader_error` and `infra_error` are always present):
-- the agent's: no solution/solve.py (`missing_solution`), no action at all, or a final state that does not meet the
+- the agent's: no solution/solve.py (`missing_solution`), no action at all, a final state that does not meet the
   goal (whether solve returned, raised (`solve_error`), timed out (`solve_timeout`) or sent a malformed action
-  (`bad_action`: wrong shape, NaN or inf));
+  (`bad_action`: wrong shape, NaN or inf)), or, in a task with a tool-only rule, the robot's hand touching the
+  payload (`disqualified`, `tool_contact`: success 0 and progress 0);
 - the verifier's (`infra_error` = 1, no verdict on the agent): the rebuilt instance not matching the frozen one
   (`instance_mismatch`), a rollout process that ends without a result or overruns its limit, any error here.
 """
@@ -109,7 +110,9 @@ def _verify(a, ro: dict, out_dir: str, status: str, n: int, t0: float) -> dict:
            "instance_ok": 1, "n_actions": n, "sim_steps": n,
            "solve_returned": int(status == "returned"), "solve_error": int(status in ("error", "process_ended")),
            "solve_timeout": int(status == "timeout"), "bad_action": int(int(ro.get("bad_actions", 0)) > 0),
-           "step_errors": int(ro.get("step_errors", 0)),
+           "step_errors": int(ro.get("step_errors", 0)), "disqualified": int(ro.get("disqualified", 0)),
+           **({"tool_contact": int(ro.get("tool_contact", 0)),
+               "replay_tool_contact": int(rp.get("tool_contact", 0) or 0)} if ro.get("tool_only") else {}),
            "proxy_requests": int(ro.get("requests", 0)), "proxy_refused": int(ro.get("refused", 0)),
            "solve_wall_s": float(ro.get("solve_wall_s", 0.0)), "rollout_ms_per_step": float(ro.get("ms_per_step", 0.0)),
            "rollout_wall_s": round(t1 - t0, 1), "replay_wall_s": round(time.time() - t1, 1)}

@@ -9,7 +9,7 @@
 | Family / instance | `packing.clear_organic_objects.g1.pink_ik` / seed 0 |
 | Oracle | `none` — No reference solution in the repository, and none written for this scene yet; the build, the start-state hash, replay determinism and a do-nothing run scoring 0 are checked. |
 | Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
-| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.2.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe-private:embodiedswe-0.3.0` |
 
 ## Task
 Sort the front-row items into the crate and onto the tray (Unitree G1, fixed pelvis, Pink IK). EmbodiedSWE's `packing.clear_organic_objects.g1.pink_ik` task (robobench at commit `67f44e8a2ca5`), privileged mode, with a program as the
