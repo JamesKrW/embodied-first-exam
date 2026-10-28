@@ -40,12 +40,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 24 GiB | 16384 | no GPU | 20 GiB |
 | `sim` | 12 | 50 GiB | 16384 | 16 GiB | — |
-| verifier (as `main`) | 8 | 24 GiB | no cap | no GPU | — |
+| verifier (as `main`) | 8 | 24 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: GPU memory 8.3-9.0 GB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (a per-container sampler every 30 s, trials on 14 GPU hosts); CPU 6-9 cores per trial; 13-16 GB of memory per Isaac process
-- Measured (caps): GPU memory (the sim service): 9.0 GiB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (trials without the budget reached 29.0 GiB on 48 GB cards) -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB
+- Measured (caps): GPU memory (the sim service): 9.0 GiB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (trials without the budget reached 29.0 GiB on 48 GB cards) -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

@@ -51,10 +51,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
 | `sim` | 2 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | — |
+| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: one privileged and one standard Sharpa oracle per Marvin-arm family (CPU only, cgroup memory.peak): privileged verifier 3.40-3.51 GiB with two concurrent replays, standard sim sidecar 2.13-2.65 GiB, agent containers under 0.05 GiB; one fresh replay process 1.75-1.81 GiB max RSS; two cores for the verifier's two concurrent replays
+- Measured: one Sharpa oracle per Marvin-arm family in each mode (CPU only, cgroup memory.peak): the sim service 2.13-2.65 GiB, the agent's container under 0.05 GiB
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 

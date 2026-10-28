@@ -34,7 +34,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | no GPU | — |
-| verifier | no cap | no cap | no cap | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client

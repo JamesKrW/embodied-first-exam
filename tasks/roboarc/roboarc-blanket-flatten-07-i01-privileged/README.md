@@ -40,12 +40,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 30 GiB | 8192 | 20 GiB | 10 GiB |
-| verifier | no cap | no cap | no cap | 20 GiB | — |
+| verifier | no cap | no cap | no cap | 20 GiB | no cap |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer).
-- Measured: partial MuJoCo measurements (rendering off), to be calibrated; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards
-- Measured (caps): GPU memory: provisional, to be calibrated (a per-trial peak of 1.1 GiB on 24 GB cards)
+- Measured: MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards
+- Measured (caps): GPU memory: a per-trial peak of 1.1 GiB on 24 GB cards, measured with rendering off; the cap leaves room for rendering: 20 GiB
 
 ## Details
 | | |

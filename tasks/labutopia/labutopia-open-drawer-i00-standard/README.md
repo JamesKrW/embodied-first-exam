@@ -31,12 +31,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 32 GiB | 16384 | no GPU | 20 GiB |
 | `sim` | 16 | 24 GiB | 16384 | 16 GiB | — |
-| verifier (as `main`) | 8 | 32 GiB | no cap | no GPU | — |
+| verifier (as `main`) | 8 | 32 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: RTX 4090, L40S, held by `sim`.
 - Recommended GPU: RTX 4090 24GB / L40S 48GB.
 - Measured: oracle checks on an RTX 4090, lab_001 pick: the rendering container peaks at 17 GB of memory, about 7 GB of GPU memory, 8 CPUs (start-up bursts to 16 cores for about 70 s); lab_003 families 21 GB at the peak (on an 8 vCPU host)
-- Measured (caps): GPU memory (the sim service): about 7 GiB in the oracle on an RTX 4090 -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB
+- Measured (caps): GPU memory (the sim service): about 7 GiB in the oracle on an RTX 4090 -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

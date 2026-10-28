@@ -38,7 +38,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
-| verifier | no cap | no cap | no cap | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).

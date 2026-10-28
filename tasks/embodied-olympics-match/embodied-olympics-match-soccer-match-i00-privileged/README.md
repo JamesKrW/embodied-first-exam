@@ -34,7 +34,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 6 | 16 GiB | 8192 | no GPU | 20 GiB |
-| verifier | 6 | 10 GiB | no cap | no GPU | — |
+| verifier | 6 | 10 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: a Harbor oracle trial on an RTX 4090 workstation: CPU-only MuJoCo with two Booster T1 humanoids per team; the verifier holds the service, the program, one replay and the video renderer; 6 CPUs pinned (the match runs on the wall clock)

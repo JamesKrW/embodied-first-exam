@@ -44,12 +44,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 12 GiB | 8192 | 7 GiB | — |
-| verifier (as `main`) | 8 | 16 GiB | no cap | no GPU | — |
+| verifier (as `main`) | 8 | 16 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4 / L40S).
 - Measured: GPU memory 2.7 GB on an L40S (per-trial peaks of past trials); memory and CPU estimated (MuJoCo, CPU physics, EGL rendering)
-- Measured (caps): GPU memory (the sim service): a per-trial peak of 2.7 GiB on a 48 GB card -> max(1.5 x peak, peak + 4), rounded up: 7 GiB; one trial on a 24 GB card peaked at 18.4 GiB, above it (to be calibrated)
+- Measured (caps): GPU memory (the sim service): a per-trial peak of 2.7 GiB on a 48 GB card -> max(1.5 x peak, peak + 4), rounded up: 7 GiB; one trial on a 24 GB card read 18.4 GiB, above the cap (a whole-trial reading on that card, not split by container, so which container held it is not recorded); processes and disk: defaults, not measured
 
 ## Details
 | | |

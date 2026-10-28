@@ -39,12 +39,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 20 GiB | 8192 | 13 GiB | 10 GiB |
-| verifier | no cap | no cap | no cap | 13 GiB | — |
+| verifier | no cap | no cap | no cap | 13 GiB | no cap |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: RTX 4090 24GB / L4 24GB.
-- Measured: GPU memory: the oracle's peak 6.9 GB on an RTX 4090, 5.8 GB on an L4 (per-trial peaks of past trials); memory: sim p90 3.2 GB, privileged agent container p90 6.4 GB, verifier 4.2 GB (a per-container memory sampler); CPU: an estimate
-- Measured (caps): GPU memory: per-trial peaks of 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card -> max(1.5 x peak, peak + 4), rounded up: 13 GiB
+- Measured: GPU memory: per-trial peaks of past trials up to 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card (the oracle 6.9 GB on an RTX 4090, 5.8 GB on an L4); memory: privileged agent container p90 6.4 GB, verifier 4.2 GB (a per-container memory sampler); CPU: an estimate
+- Measured (caps): GPU memory: per-trial peaks of 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card -> max(1.5 x peak, peak + 4), rounded up: 13 GiB; processes and disk: defaults, not measured
 
 ## Details
 

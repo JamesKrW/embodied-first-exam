@@ -573,9 +573,10 @@ client.
 Caps (`scripts/task_resources.toml`, PROTOCOL §6; each an upper bound for one container): 4 CPUs and 8 GiB for `main`,
 6 CPUs and 8 GiB for `sim` (the finalize runs in the sim sidecar, not in the verifier).
 Measured on a university HPC cluster (rootless podman on cgroups v1, where the caps are not applied): `/proc` PSS and
-CPU of each container's processes every 5 s: the sim sidecar at most about 3.2 GB PSS (the G1; under 2.9 GB on the
-other bodies), CPU p90 up to about 5.5 cores while it finalizes, hence its 6-CPU cap; a whole trial at most about 5.5
-GB; `main` under 1 GB. Run at most 10 Embodied Safety Exam trials at once per 32 free cores.
+CPU of each container's processes every 5 s, oracle and nop trials of every task: the sim sidecar at most 2.84 GB PSS,
+CPU p90 4.74 / max 5.28 cores while it finalized (over 414 trials; that finalize ran two replays side by side and the
+video, the current one renders the video only and was not re-measured), hence its 6-CPU cap; a whole trial at most 4.75
+GB PSS; `main` at most 0.74 GB. Run at most 10 Embodied Safety Exam trials at once per 32 free cores.
 
 ## How to run
 Both sets run the same day with the same command, one Harbor job per task; nothing on the command line is

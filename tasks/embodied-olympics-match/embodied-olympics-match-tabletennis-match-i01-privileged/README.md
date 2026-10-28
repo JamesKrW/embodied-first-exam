@@ -37,7 +37,8 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 8 GiB | 8192 | no GPU | 20 GiB |
-| verifier | 4 | 8 GiB | no cap | no GPU | — |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo 3.3.7, no cameras; one world about 0.4 GB, 470 control steps/s on one core; the verifier holds the service, the policy (2 GiB address space) and two fresh replays
+- Measured (caps): processes and disk: defaults, not measured

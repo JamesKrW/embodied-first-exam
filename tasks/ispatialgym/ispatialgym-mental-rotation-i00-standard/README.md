@@ -44,7 +44,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 16 GiB | 16384 | no GPU | 20 GiB |
 | `sim` | 12 | 32 GiB | 16384 | 9 GiB | — |
-| verifier (as `main`) | 8 | 16 GiB | no cap | no GPU | — |
+| verifier (as `main`) | 8 | 16 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.

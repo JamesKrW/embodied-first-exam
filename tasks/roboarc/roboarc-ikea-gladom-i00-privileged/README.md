@@ -38,7 +38,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
-| verifier | 4 | 8 GiB | no cap | no GPU | — |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: peak RSS of one Session 0.27-0.45 GB per scene (3000 reference rows and final_check, on a laptop); the verifier runs two replays and the video replay at once

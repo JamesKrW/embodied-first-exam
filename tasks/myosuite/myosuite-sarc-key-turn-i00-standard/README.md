@@ -31,10 +31,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | — |
+| verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: not needed.
-- Measured: memory: privileged container median 6.2 GB, sim p90 1.4 GB, verifier 1.4 GB (a per-container memory sampler); CPU only; CPU: an estimate
+- Measured: memory: sim p90 1.4 GB (a per-container memory sampler); CPU only; CPU: an estimate
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

@@ -45,10 +45,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 7 GiB | 8192 | no GPU | — |
-| verifier | no cap | no cap | no cap | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: privileged container p90 2.7 GB, sim 0.7 GB (a per-container memory sampler); CPU only; CPU: an estimate
+- Measured: memory: sim 0.7 GB (a per-container memory sampler); CPU only; CPU: an estimate
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

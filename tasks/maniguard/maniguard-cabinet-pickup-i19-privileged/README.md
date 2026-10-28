@@ -56,12 +56,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 30 GiB | 16384 | 30 GiB | 20 GiB |
-| verifier | no cap | no cap | no cap | 30 GiB | — |
+| verifier | no cap | no cap | no cap | 30 GiB | no cap |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: one standard trial: sim anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s); GPU memory and CPU otherwise from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack); verifier 15.8 GB (a per-container memory sampler)
-- Measured (caps): GPU memory: per-trial peaks of 19.4 GiB on a 48 GB card and 18.1 GiB on a 24 GB card (no texture budget in its tooling) -> max(1.5 x peak, peak + 4), rounded up: 30 GiB
+- Measured: GPU memory and CPU from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack); the verifier 15.8 GB (a per-container memory sampler); the standard twin's sim service, the same simulator, in one trial: anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s)
+- Measured (caps): GPU memory: per-trial peaks of 19.4 GiB on a 48 GB card and 18.1 GiB on a 24 GB card (no texture budget in its tooling) -> max(1.5 x peak, peak + 4), rounded up: 30 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

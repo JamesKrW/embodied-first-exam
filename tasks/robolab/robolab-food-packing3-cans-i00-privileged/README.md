@@ -38,12 +38,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 29 GiB | 16384 | 24 GiB | 20 GiB |
-| verifier | no cap | no cap | no cap | 24 GiB | — |
+| verifier | no cap | no cap | no cap | 24 GiB | no cap |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, RTX PRO 6000 Blackwell, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: GPU memory 4.0-5.5 GB per trial (one simulator), anon memory 7.6-10.3 GB, CPU p90 2.4-8 cores over 7 trials (a per-container sampler every 30 s); per-trial peaks of past trials 14.5-15.7 GB of GPU memory, which include agents' extra simulator processes and Isaac's card-sized pools; one Isaac simulator per 32 GB of host memory
-- Measured (caps): GPU memory: per-trial peaks of 15.7 GiB on a 48 GB card and 15.3 GiB on a 24 GB card, agents' extra simulators included -> max(1.5 x peak, peak + 4), rounded up: 24 GiB
+- Measured (caps): GPU memory: per-trial peaks of 15.7 GiB on a 48 GB card and 15.3 GiB on a 24 GB card, agents' extra simulators included -> max(1.5 x peak, peak + 4), rounded up: 24 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

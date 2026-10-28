@@ -30,7 +30,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 12 GiB | 8192 | 20 GiB | 20 GiB |
 | `sim` | 4 | 6 GiB | 8192 | no GPU | — |
-| verifier | no cap | no cap | no cap | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: L40S 48GB (all measurements; a 24 GB card fits the memory but trains slower, so fewer iterations fit the cutoff).

@@ -30,10 +30,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 12 GiB | 8192 | no GPU | 10 GiB |
-| verifier | 4 | 8 GiB | no cap | no GPU | — |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: CPU only; 4 CPUs and 8 GB per trial, the verifier the same (the benchmark's estimate)
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

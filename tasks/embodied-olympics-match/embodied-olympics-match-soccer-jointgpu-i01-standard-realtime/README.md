@@ -43,7 +43,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | `main` (the agent's) | 6 | 16 GiB | 8192 | 12 GiB | 20 GiB |
 | `sim` | 6 | 8 GiB | 256 | no GPU | — |
 | `practice` | 4 | 8 GiB | 256 | no GPU | — |
-| verifier | no cap | no cap | no cap | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: RTX 4090 24GB / L4 24GB / L40S 48GB.

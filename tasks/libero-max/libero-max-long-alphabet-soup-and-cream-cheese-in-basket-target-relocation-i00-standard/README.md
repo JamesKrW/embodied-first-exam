@@ -47,10 +47,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 11 GiB | 8192 | no GPU | — |
-| verifier | no cap | no cap | no cap | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: verifier 1.6 GB (a per-container memory sampler); the rest estimated (robosuite, CPU only, 256x256 OSMesa cameras)
+- Measured: the sim service estimated (robosuite, CPU only, 256x256 OSMesa cameras); the privileged twin's verifier, which replays the same simulator, 1.6 GB (a per-container memory sampler)
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

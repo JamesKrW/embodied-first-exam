@@ -45,10 +45,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
-| verifier | no cap | no cap | no cap | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: sim 1.9 GB, privileged container 2.1 GB, verifier 2.1 GB (a per-container memory sampler); CPU only; 4 CPUs visible to each container that runs the simulator (cpuset / affinity, not a quota): OpenBLAS runs no more threads than that and DexJoCo's result differs below 4 (tasks/dexjoco/README.md, Threads); with fewer there is no verdict (too_few_cpus, infra_error)
+- Measured: memory: privileged container 2.1 GB, verifier 2.1 GB (a per-container memory sampler); CPU only; 4 CPUs visible to each container that runs the simulator (cpuset / affinity, not a quota): OpenBLAS runs no more threads than that and DexJoCo's result differs below 4 (tasks/dexjoco/README.md, Threads); with fewer there is no verdict (too_few_cpus, infra_error)
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

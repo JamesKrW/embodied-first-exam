@@ -37,12 +37,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 8 | 12 GiB | 8192 | 20 GiB | — |
-| verifier (as `main`) | 4 | 16 GiB | no cap | no GPU | — |
+| verifier (as `main`) | 4 | 16 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer).
-- Measured: partial MuJoCo measurements (rendering off), to be calibrated; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards
-- Measured (caps): GPU memory: provisional, to be calibrated (a per-trial peak of 1.1 GiB on 24 GB cards)
+- Measured: MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards
+- Measured (caps): GPU memory (the sim service): a per-trial peak of 1.1 GiB on 24 GB cards, measured with rendering off; the cap leaves room for rendering: 20 GiB
 
 ## Details
 

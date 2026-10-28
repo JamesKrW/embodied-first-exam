@@ -49,11 +49,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
-| verifier | 2 | 2 GiB | no cap | no GPU | — |
+| verifier | 2 | 2 GiB | no cap | no GPU | no cap |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: RTX 4090 24GB / L4 24GB (an NVIDIA GPU with Vulkan and EGL).
-- Measured: a Harbor standard oracle of svallet on an RTX 4090 host (docker stats and nvidia-smi per process every 20 s): the sim sidecar peaked at 1.8 GiB of memory and 0.8 GiB of GPU memory (the Nyx render process), the agent's container (the client) below 0.1 GiB; the privileged verifier of the same task (two replays and the video replay) at 1.6 GiB
+- Measured: a Harbor standard oracle of svallet on an RTX 4090 host (docker stats and nvidia-smi per process every 20 s): the sim sidecar peaked at 1.8 GiB of memory and 0.8 GiB of GPU memory (the Nyx render process), the agent's container (the client) below 0.1 GiB
 - Measured (caps): GPU memory (the sim service): at most 0.8 GiB (the Nyx render process); capped at 4 GiB, room for longer scenes
 
 ## Details

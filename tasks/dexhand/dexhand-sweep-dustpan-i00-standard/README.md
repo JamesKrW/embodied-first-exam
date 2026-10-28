@@ -48,10 +48,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
 | `sim` | 2 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | — |
+| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: pot_shelf_transfer oracle and nop trials (CPU only; the trial's resource monitor every 5 s for the agent's container, cgroup memory.peak for the others): privileged verifier 3.68 GiB with two concurrent replays (3.92 GiB for two Wuji replays), standard sim sidecar 2.25-2.53 GiB, agent containers under 0.06 GiB; sweep_dustpan: one oracle replay 1.93 GiB max RSS (599 s), standard sim sidecar 2.20 GiB; two cores for the verifier's two concurrent replays
+- Measured: pot_shelf_transfer oracle and nop trials (CPU only; the trial's resource monitor every 5 s for the agent's container, cgroup memory.peak for the sim service): the sim service 2.25-2.53 GiB, the agent's container under 0.06 GiB; sweep_dustpan: the sim service 2.20 GiB
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 

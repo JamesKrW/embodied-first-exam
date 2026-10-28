@@ -42,10 +42,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
-| verifier | 4 | 8 GiB | no cap | no GPU | — |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: verifier 1.6 GB (a per-container memory sampler); the rest estimated (robosuite, CPU only, 256x256 OSMesa cameras)
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

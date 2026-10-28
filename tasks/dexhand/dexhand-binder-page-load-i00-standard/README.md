@@ -48,10 +48,11 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 |---|---|---|---|---|---|
 | `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
 | `sim` | 2 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | — |
+| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: one privileged and one standard Sharpa oracle per family (CPU only, cgroup memory.peak): privileged verifier at most 0.64 GiB with two concurrent replays, standard sim sidecar at most 0.96 GiB, agent containers under 0.05 GiB; one fresh replay process 0.26-0.39 GiB max RSS; an agent's own simulator sessions take about 0.3-0.5 GiB each
+- Measured: one Sharpa oracle per family in each mode (CPU only, cgroup memory.peak): the sim service at most 0.96 GiB, the agent's container under 0.05 GiB
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 

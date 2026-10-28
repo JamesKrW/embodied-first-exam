@@ -44,12 +44,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 34 GiB | 16384 | 16 GiB | 20 GiB |
-| verifier | 8 | 24 GiB | no cap | 16 GiB | — |
+| verifier | 8 | 24 GiB | no cap | 16 GiB | no cap |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, RTX PRO 6000 Blackwell, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
 - Measured: freezing the instances, oracle trials and replays on an RTX 4090 (docker stats and nvidia-smi every 2-10 s, the trial's resource monitor): with one environment's PhysX buffers (the tooling's), a camera-free Isaac process (the default Session, the grader's replays) peaks at 2.0 GiB of memory and 1.2 GiB of GPU memory (Isaac Lab's default buffers: 2.9 / 3.2); the render worker that draws the cameras (Session(cameras=True), the verifier's filmed illustration) adds 11.9 GiB and 3.4 GiB (3.3-3.6 under every RTX preset tried); 6-10 cores while Isaac starts, about 1.5 after; the verifier runs one process at a time
-- Measured (caps): GPU memory: a Session with cameras peaks at 4.6 GiB (its render worker included), a camera-free one at 1.2 GiB; an agent may run two Sessions with cameras at once (9.2 GiB) -> at least 16 GiB for Isaac Sim: 16 GiB
+- Measured (caps): GPU memory: a Session with cameras peaks at 4.6 GiB (its render worker included), a camera-free one at 1.2 GiB; an agent may run two Sessions with cameras at once (9.2 GiB) -> at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

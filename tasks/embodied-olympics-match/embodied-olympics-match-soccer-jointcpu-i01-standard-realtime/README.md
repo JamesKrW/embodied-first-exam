@@ -43,7 +43,7 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | `main` (the agent's) | 6 | 16 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 6 | 8 GiB | 256 | no GPU | — |
 | `practice` | 4 | 8 GiB | 256 | no GPU | — |
-| verifier | no cap | no cap | no cap | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
 - Measured: Embodied Olympics' joint-level soccer pilot on two RTX 4090 workstations (docker stats): the agent's container uses its 6 cores (drills, CPU-parallel rollouts, practice matches), the sim up to its 6 cores (the world, the opponent, the cameras), the practice service up to 4 worlds on its 4 cores; CPU tier: no GPU

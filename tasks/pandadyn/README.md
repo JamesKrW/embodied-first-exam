@@ -130,8 +130,8 @@ CPU PhysX with `enable_enhanced_determinism`, one simulated scene per process, o
   backend (`render_backend="cpu"`, below) and the cameras do not change the physics (same hashes);
 - across hosts (measured for pandadyn 0.1.0, 2026-10-17; not repeated for 0.2.0): S06's arm start comes from the IK fallback (scipy `least_squares`: Pinocchio's
   IK does not converge there, joint 4 ends on its bound), whose last bits follow the BLAS kernel OpenBLAS picks for the
-  CPU. Frozen under the AVX-512 kernel, its start never rebuilt on the pool's AVX2 hosts (AWS EPYC 7R13, cluster EPYC 7402,
-  cluster EPYC 7763; 4 joints differ in the last float32 bit: `instance_mismatch`). Its containers now pin the kernel
+  CPU. Frozen under the AVX-512 kernel, its start never rebuilt on AVX2 hosts (e.g. AMD EPYC 7R13, EPYC 7402,
+  EPYC 7763; 4 joints differ in the last float32 bit: `instance_mismatch`). Its containers now pin the kernel
   (`OPENBLAS_CORETYPE=Haswell`; frozen with it, in 0.2.0 too): the start and the oracle's final state are
   the same on a Ryzen 9 7950X and an EPYC 7R13. The other 24 starts come from Pinocchio's IK and rebuild on both
   (all 25 checked on a cloud GPU host), and every oracle succeeds on both; 6 oracles (D03, D08, D10, D13, S05, S07) end in
@@ -231,7 +231,7 @@ them moves by itself) get a `-standard-realtime` twin, sharing the standard twin
   family runs at S = 1. Measured on an RTX 4090 workstation (32 cores, the service capped at 4 CPUs): the
   realtime service with its clock flat out (`RCB_SLOWDOWN=0.01`, the oracle's first 10 s planned from step 0; host load
   18-80) and the bare physics loop (`Session.step` over the oracle's first 8 s; load 39-47). S = ceil(1.5 / RTF) with
-  the lower of the two (PROTOCOL §2; a busy pool host is slower still: the same service ran 1.4-1.9 x faster at load
+  the lower of the two (PROTOCOL §2; a busy host is slower still: the same service ran 1.4-1.9 x faster at load
   20 than at load 45):
 
 | family | RTF (service, physics) | S | | family | RTF (service, physics) | S |

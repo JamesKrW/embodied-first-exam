@@ -29,12 +29,12 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | 6 GiB | 10 GiB |
-| verifier | no cap | no cap | no cap | 6 GiB | — |
+| verifier | no cap | no cap | no cap | 6 GiB | no cap |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
-- Measured: GPU memory 1.0-1.3 GB (per-trial peaks of past trials); memory: privileged container p90 2.6 GB, sim 0.7 GB (a per-container memory sampler); CPU p90 1.9 cores (a per-container sampler every 30 s)
-- Measured (caps): GPU memory: a per-trial peak of 1.3 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB
+- Measured: GPU memory 1.0-1.3 GB (per-trial peaks of past trials); memory: privileged container p90 2.6 GB (a per-container memory sampler); CPU p90 1.9 cores (a per-container sampler every 30 s)
+- Measured (caps): GPU memory: a per-trial peak of 1.3 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |
