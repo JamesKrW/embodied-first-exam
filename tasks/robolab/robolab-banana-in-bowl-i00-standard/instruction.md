@@ -83,6 +83,8 @@ Cameras: `egocentric_mirrored_camera` (static, facing the robot across the table
   tool frame**: the gripper flange moved 0.162 m along the approach axis to the ends of the closed fingertips (the pads
   extend ~5.7 cm back from there). At the reset pose the gripper points straight down. At most 50 rows per submit; a
   position more than 2 m from the robot's base on any axis, or a zero quaternion, is rejected (400), nothing moves.
+  One call returns at most 452 frames per camera; past that an `ee_pose` call keeps moving without filming (the
+  last frame is kept), and `meta["frames_skipped"]` counts the frames left out.
 - A malformed request (a wrong type, a value out of range) is answered 400 with the reason and executes nothing.
 
 Objects here: a yellow banana and a red bowl on the table.

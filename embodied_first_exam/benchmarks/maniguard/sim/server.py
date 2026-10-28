@@ -50,6 +50,8 @@ TASK = os.environ.get("RCB_TASK", "jar_transport/task_0014"); INSTANCE = os.envi
 OBS_CALIBRATION = os.environ.get("RCB_OBS_CALIBRATION", "1") == "1"
 CTRL_HZ = 20; SUBSTEPS = 6; DIM = 8
 MAX_CHUNK_S = float(os.environ.get("RCB_MAX_CHUNK_S", "10")); MAX_WATCH_S = float(os.environ.get("RCB_MAX_WATCH_S", "30"))
+MAX_CALL_FRAMES = 602   # frames per camera one call returns at most (its depth maps share them): the longest /observe
+                        # (max_watch_s at the control rate, + the first and the last frame); an ee_pose call stops filming there
 LOCK = threading.Lock()
 E = {"ready": False, "step": 0, "calls": 0, "done": False, "reason": None, "success": False, "t0": time.time(), "error": None}
 EP = L.Episode(DATA, dim=DIM, resume="approx")
@@ -183,7 +185,9 @@ SPEC = {
                                  "simulator's articulation, no collision checking, seeded with the current joints), then the arm joints are "
                                  "driven there in joint space (at most 0.02 rad per control step); `dt` is ignored; if the IK finds no "
                                  "solution nothing moves and plan[] says so; gripper +1 open, -1 closed, switched at the start of the row",
-                    "note": "the pose is the frame of the proprio tcp_pose group, so an observed pose is a valid target; at most 50 rows per submit"},
+                    "note": "the pose is the frame of the proprio tcp_pose group, so an observed pose is a valid target; at most 50 rows per submit"
+                            "; one call returns at most 602 frames per camera: an ee_pose call that runs longer takes no more frames there "
+                            "(the motion goes on, the last frame is always taken) and meta.frames_skipped counts the frames left out"},
         "not_yet": ["joint_delta", "joint_velocity", "ee_delta", "joint_torque"]},
     "proprio_layout": PROPRIO,
     "proprio_groups": GROUPS,
@@ -268,9 +272,22 @@ def note_of(meta: dict) -> str:
     return (note or "")[:500]
 
 
+class Rec(L.Recorder):
+    """The call's recorder with the frame budget: an ee_pose row lasts as long as its move, known only while it runs. At
+    MAX_CALL_FRAMES frames per camera the call takes no more frames -- the motion goes on, the last frame is always
+    taken -- and meta["frames_skipped"] counts the frames left out."""
+    skipped = 0
+
+    def _capture(self, last: bool) -> None:
+        if not last and len(self.steps) + 2 > MAX_CALL_FRAMES:
+            self.skipped += 1
+            return
+        super()._capture(last)
+
+
 def recorder(cams, fps: int, meta: dict) -> L.Recorder:
-    return L.Recorder(cams, max(1, int(round(CTRL_HZ / max(1, fps)))), grab, proprio_row, extrinsics, ctrl_steps,
-                      depth=L.depth_mode(meta), clock_hz=CTRL_HZ)
+    return Rec(cams, max(1, int(round(CTRL_HZ / max(1, fps)))), grab, proprio_row, extrinsics, ctrl_steps,
+               depth=L.depth_mode(meta), clock_hz=CTRL_HZ)
 
 
 def meta_common(cams) -> dict:
@@ -370,9 +387,10 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
     else: run_ee_pose(A, rec, plan)
     rec.tick(force=True, last=True)
     out = {**meta_common(cams), "chunk_id": E["calls"], "type": typ, "executed_rows": E["step"] - step0, "control_steps_chunk": ctrl_steps() - before,
-           "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": plan, "rejected": None, "ok": True}
+           "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": plan, "rejected": None, "ok": True,
+           **({"frames_skipped": rec.skipped} if rec.skipped else {})}
     log({"ev": "submit", "call": E["calls"], "type": typ, "rows": E["step"] - step0, "dt": dt, "interpolate": interp, "cameras": cams, "note": note,
-         "depth": rec.mode, "control_steps": ctrl_steps() - before, "n_clipped": len(clipped), "done": E["done"],
+         "depth": rec.mode, **({"frames_skipped": rec.skipped} if rec.skipped else {}), "control_steps": ctrl_steps() - before, "n_clipped": len(clipped), "done": E["done"],
          **({"stopped": EP.stop_reason} if EP.stopping else {})})
     save_call_evidence(E["calls"], {k: v for k, v in out.items() if k != "cameras"}, rec)
     out["done"] = E["done"]; out["reason"] = E["reason"]
@@ -395,7 +413,7 @@ def do_observe(meta: dict) -> tuple[dict, list]:
     E["calls"] += 1
     ran = round((ctrl_steps() - before) / CTRL_HZ, 6)     # what was watched: whole control steps, fewer if the episode ended
     out = {**meta_common(cams), "obs_id": E["calls"], "seconds": ran, "control_steps_watch": ctrl_steps() - before,
-           "physics_steps_watch": (ctrl_steps() - before) * SUBSTEPS, "ok": True}
+           "physics_steps_watch": (ctrl_steps() - before) * SUBSTEPS, "ok": True, **({"frames_skipped": rec.skipped} if rec.skipped else {})}
     log({"ev": "observe", "call": E["calls"], "seconds": ran, "seconds_requested": seconds, "cameras": cams, "depth": rec.mode, "control_steps": ctrl_steps() - before,
          **({"stopped": EP.stop_reason} if EP.stopping else {})})
     if seconds > 0: save_call_evidence(E["calls"], {k: v for k, v in out.items() if k != "cameras"}, rec)
