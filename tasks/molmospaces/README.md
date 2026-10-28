@@ -125,7 +125,7 @@ Agent, provider and effort settings: docs/protocol/running.md.
 
 Resume class `exact` (MuJoCo, CPU physics).
 
-Its service states no `max_frames_per_call` yet.
+One call returns at most 1812 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 Grading: the service judges the live episode, dumps it and exits; the hook writes `final.json` from it and renders the video once.
 

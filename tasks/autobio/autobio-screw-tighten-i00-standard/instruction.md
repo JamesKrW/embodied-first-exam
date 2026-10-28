@@ -54,7 +54,8 @@ grippers' commands, the tool frames.
 period, at most 0.5 s; a chunk covers at most 10 s), `interpolate="linear"` (default, from the previous target) or
 `"hold"`; the client sends them as float32. The control rate is 500 Hz (one physics step per control step). There is
 no step budget: the one technical cap is `spec["max_control_steps"]`, 600000 (1200 s of simulated time), at which the
-episode ends. A response carries at most 3000 frames per camera (`video_fps` up to 50, default 10).
+episode ends. A response carries at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call";
+`video_fps` up to 50, default 10).
 
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.

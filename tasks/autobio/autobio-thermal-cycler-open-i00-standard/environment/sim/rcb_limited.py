@@ -58,12 +58,21 @@ def check_frames(n_cameras: int, n_frames: int, depth_frames: bool = False, limi
     """The images one call would return (cameras x frames; per-frame depth counted again), refused above `limit`
     (ValueError -> 400, for the adapter to raise before it executes or renders anything): every frame is held in memory
     until the response is sent, so a call without a bound can exhaust the service's memory. The adapter passes the frames
-    its Recorder will capture and the limit its /spec states as `max_frames_per_call`."""
+    its Recorder will capture (frames_per_call(), with the Recorder's own `every`) and the limit its /spec states as
+    `max_frames_per_call`. A depth frame counts as one image: the Recorder keeps it as it is sent, uint16 mm or float16
+    m, at most the bytes of an RGB frame (docs/protocol/README.md §3, the per-call image budget)."""
     n = int(n_cameras) * int(n_frames) * (2 if depth_frames else 1)
     if n > limit:
         raise ValueError(f"this call would return {n} images (cameras x frames, per-frame depth counted again); the limit is "
                          f"max_frames_per_call = {limit}: ask for fewer cameras, a lower video_fps or a shorter call")
     return n
+
+
+def frames_per_call(steps: int, every: int) -> int:
+    """The frames per camera a Recorder filming every `every` clock ticks captures over a call of `steps` control
+    steps: the forced first and last frame and one every `every` steps, at most steps // every + 2. `every` is the
+    stride the Recorder is given (round(control_hz / video_fps)), not the requested fps: the count is of real captures."""
+    return int(steps) // max(1, int(every)) + 2
 DEPTH_MAX_M = 65.535                                        # uint16 millimetres; a farther surface reads 0 (no reading)
 DEPTH_NOISE = os.environ.get("RCB_DEPTH_NOISE", "off").strip().lower()   # off | realsense (as rcb-limited/2.1)
 _RNG = np.random.default_rng(int(os.environ.get("RCB_DEPTH_NOISE_SEED", "0")))
@@ -104,17 +113,32 @@ def clean_depth(z) -> np.ndarray:
     return z.astype(np.float32)
 
 
-def depth_frames_part(name: str, stack: np.ndarray) -> tuple[str, str, bytes, dict]:
-    """(N,H,W) metres -> an RCB1 "bytes" part: zlib of C-order uint16 millimetres (0 = no reading). Clients that do not
-    know it keep the raw bytes and ignore it; rcb_client decodes it back to float32 metres."""
-    mm = np.rint(np.asarray(stack, dtype=np.float64) * 1000.0)
+def depth_mm(z) -> np.ndarray:
+    """Metres -> C-order uint16 millimetres (0 = no reading), one frame at a time: what depth_frames/<cam> carries."""
+    mm = np.rint(np.asarray(z, dtype=np.float64) * 1000.0)
     mm[(mm < 0) | (mm > 65535)] = 0
-    a = np.ascontiguousarray(mm.astype("<u2"))
-    return (name, "bytes", zlib.compress(a.tobytes(), 1), {"codec": "zlib", "dtype": "uint16", "shape": list(a.shape), "unit": "mm"})
+    return np.ascontiguousarray(mm.astype("<u2"))
 
 
-def encode_mp4(frames: np.ndarray, fps: int) -> bytes:
-    """H.264 mp4 (yuv420p, faststart) of uint8 (N,H,W,3) frames: the same encoding every 2.0 service used."""
+def depth_frames_part(name: str, stack) -> tuple[str, str, bytes, dict]:
+    """(N,H,W) metres, or a list of N depth_mm() frames (emptied as it is compressed) -> an RCB1 "bytes" part: zlib of
+    C-order uint16 millimetres (0 = no reading). Clients that do not know it keep the raw bytes and ignore it;
+    rcb_client decodes it back to float32 metres."""
+    if not isinstance(stack, list):
+        a = depth_mm(stack)
+        return (name, "bytes", zlib.compress(a.tobytes(), 1), {"codec": "zlib", "dtype": "uint16", "shape": list(a.shape), "unit": "mm"})
+    shape = [len(stack), *stack[0].shape] if stack else [0]
+    z, out = zlib.compressobj(1), []       # the same bytes as zlib.compress of the stacked frames, one frame at a time
+    stack.reverse()
+    while stack:
+        out.append(z.compress(stack.pop()))
+    out.append(z.flush())
+    return (name, "bytes", b"".join(out), {"codec": "zlib", "dtype": "uint16", "shape": shape, "unit": "mm"})
+
+
+def encode_mp4(frames, fps: int) -> bytes:
+    """H.264 mp4 (yuv420p, faststart) of uint8 (N,H,W,3) frames (an array or a list of (H,W,3) frames): the same
+    encoding every 2.0 service used."""
     import imageio.v2 as imageio
     with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tf:
         path = tf.name
@@ -138,10 +162,15 @@ class Recorder:
     axis N: frames/<cam>, the mp4's frames, proprio, frame_step, frame_time_s, extrinsic_cv/<cam>, depth_frames/<cam>."""
 
     def __init__(self, cameras, every: int, grab: Callable, proprio_row: Callable, extrinsics: Callable, clock: Callable,
-                 depth: str = "none", clock_hz: float = 1.0):
+                 depth: str = "none", clock_hz: float = 1.0, max_images: int | None = None):
         if depth not in DEPTH_MODES + ("legacy",):
             raise ValueError(f"bad depth mode {depth!r}")
         self.cams = list(dict.fromkeys(cameras)); self.every = max(1, int(every)); self.mode = depth; self.hz = float(clock_hz)
+        # max_images: a call whose length is known only while it runs (ee_pose rows, a watch that ends with the
+        # episode) stops filming at the budget; the forced first and last frames are always taken (`skipped` counts
+        # the frames not taken)
+        self.max_images, self.skipped = max_images, 0
+        self.per_frame = len(self.cams) * (2 if depth in ("frames", "legacy") else 1)
         self._grab, self._prop, self._ext, self._clock = grab, proprio_row, extrinsics, clock
         self.frames: dict = {c: [] for c in self.cams}; self.depth: dict = {c: [] for c in self.cams}
         self.ext: dict = {c: [] for c in self.cams}; self.last_depth: dict = {}
@@ -149,7 +178,11 @@ class Recorder:
 
     def tick(self, force: bool = False, last: bool = False) -> None:
         if force or last or self.n % self.every == 0:
-            self._capture(last)
+            if (not (force or last) and self.max_images is not None
+                    and (len(self.steps) + 2) * self.per_frame > self.max_images):
+                self.skipped += 1                # the budget keeps room for the last frame
+            else:
+                self._capture(last)
         self.n += 1
 
     def _capture(self, last: bool) -> None:
@@ -173,8 +206,10 @@ class Recorder:
                     d = clean_depth(d)
                 if img is not None and d.shape != img.shape[:2]:
                     raise RuntimeError(f"depth of {c} is {d.shape}, its RGB {img.shape[:2]}: they must be pixel-aligned")
-                if self.mode in ("frames", "legacy"):
-                    self.depth[c].append(d)
+                if self.mode == "frames":    # kept as it is sent: uint16 mm (2 bytes a pixel, an RGB frame has 3)
+                    self.depth[c].append(depth_mm(d))
+                elif self.mode == "legacy":  # float16 metres
+                    self.depth[c].append(d.astype(np.float16))
                 if last or self.mode == "frames":
                     self.last_depth[c] = d
         self.prop.append(np.asarray(self._prop(), dtype=np.float32).reshape(-1))
@@ -186,27 +221,33 @@ class Recorder:
             self.last_depth = {c: clean_depth(dep[c]) for c in self.cams if c in dep}
         out = []
         for c in self.cams:
-            good = [f for f in self.frames[c] if f is not None]
+            frames = self.frames[c]
+            good = [f for f in frames if f is not None]
             hw = good[-1].shape[:2] if good else (1, 1)
-            if len(good) < len(self.frames[c]):
-                self.frames[c] = [f if f is not None else np.zeros(hw + (3,), np.uint8) for f in self.frames[c]]
-                self.depth[c] = [d if d.shape == hw else np.zeros(hw, np.float32) for d in self.depth[c]]
+            if len(good) < len(frames):
+                frames[:] = [f if f is not None else np.zeros(hw + (3,), np.uint8) for f in frames]
+                self.depth[c] = [d if d.shape == hw else np.zeros(hw, d.dtype) for d in self.depth[c]]
                 if c in self.last_depth and self.last_depth[c].shape != hw:
                     self.last_depth[c] = np.zeros(hw, np.float32)
-            fr = np.stack(self.frames[c]) if self.frames[c] else np.zeros((0, 1, 1, 3), np.uint8)
-            if video in ("mp4", "both") and len(fr):
-                out.append((f"video/{c}", "mp4", encode_mp4(fr, fps), {"fps": fps, "n": int(len(fr))}))
+            del good
+            # One copy of the frames: no np.stack; frames/<cam> is written into the body from this list (rcb1.Frames,
+            # which empties it), the mp4 is encoded from it, and a list nothing sends is let go of here.
+            if video in ("mp4", "both") and frames:
+                out.append((f"video/{c}", "mp4", encode_mp4(frames, fps), {"fps": fps, "n": int(len(frames))}))
+            last = frames[-1] if frames else None
             if video in ("frames", "both"):
-                out.append(rcb1.array_part(f"frames/{c}", fr))
-            if len(fr):
-                out.append(rcb1.array_part(f"last/{c}", fr[-1]))
+                out.append(rcb1.frames_part(f"frames/{c}", frames, empty=np.zeros((0, 1, 1, 3), np.uint8)))
+            self.frames[c] = []
+            if last is not None:
+                out.append(rcb1.array_part(f"last/{c}", last))
             out.append(rcb1.array_part(f"extrinsic_cv/{c}", np.stack(self.ext[c]) if self.ext[c] else np.zeros((0, 3, 4))))
             if self.mode in ("last", "frames") and c in self.last_depth:
                 out.append(rcb1.array_part(f"last_depth/{c}", self.last_depth[c]))
             if self.mode == "frames" and self.depth[c]:
-                out.append(depth_frames_part(f"depth_frames/{c}", np.stack(self.depth[c])))
+                out.append(depth_frames_part(f"depth_frames/{c}", self.depth[c]))
             if self.mode == "legacy" and self.depth[c]:
-                out.append(rcb1.array_part(f"depth/{c}", np.stack(self.depth[c]).astype(np.float16)))
+                out.append(rcb1.frames_part(f"depth/{c}", self.depth[c]))
+            self.depth[c] = []
         out.append(rcb1.array_part("proprio", np.stack(self.prop) if self.prop else np.zeros((0, 0), np.float32)))
         st = np.asarray(self.steps, dtype=np.int64)
         out.append(rcb1.array_part("frame_step", st))
@@ -216,17 +257,20 @@ class Recorder:
 
 def encode_response(meta: dict, parts: list, max_bytes: int = MAX_RESP) -> bytes:
     """The RCB1 body; over `max_bytes` the per-frame depth goes first, then the raw frames (mp4, last frames, last
-    depth, proprio and the per-frame arrays always stay), and meta["degraded"] says what was dropped."""
-    body = rcb1.encode(meta, parts)
-    dropped = []
+    depth, proprio and the per-frame arrays always stay), and meta["degraded"] says what was dropped. The size is known
+    from the parts before anything is built (rcb1.size), so the body is built once."""
+    dropped, m = [], meta
     for prefixes in (("depth_frames/", "depth/"), ("frames/",)):
-        if len(body) <= max_bytes:
+        if rcb1.size(m, parts) <= max_bytes:
             break
         keep = [p for p in parts if not p[0].startswith(prefixes)]
         if len(keep) < len(parts):
+            for p in parts:
+                if p[0].startswith(prefixes) and isinstance(p[2], rcb1.Frames):
+                    p[2].arrays.clear()              # not sent: let go of its frames now
             parts = keep; dropped += [x.rstrip("/") for x in prefixes]
-            body = rcb1.encode({**meta, "degraded": f"response over {max_bytes} bytes: {', '.join(dropped)} dropped"}, parts)
-    return body
+            m = {**meta, "degraded": f"response over {max_bytes} bytes: {', '.join(dropped)} dropped"}
+    return rcb1.encode(m, parts)
 
 
 # ---------------------------------------------------------------- kinematics
@@ -940,7 +984,10 @@ def make_handler(svc: Service):
             if self.path == "/kinematics":          # stateless: never steps physics, never waits for the episode lock
                 cid = ep.call_begin(self.path) if ep else 0
                 try:
-                    req = parse_kinematics(meta, svc.spec["kinematics"])
+                    try:
+                        req = parse_kinematics(meta, svc.spec["kinematics"])
+                    except (TypeError, OverflowError) as exc:   # wrong-typed fields (a string for q, a list for max_iters)
+                        raise ValueError(f"malformed kinematics request: {exc}") from None
                     out = svc.kinematics(req); svc.kin_calls += 1
                 except ValueError as exc:
                     return self._json(400, {"error": str(exc)[:300]})

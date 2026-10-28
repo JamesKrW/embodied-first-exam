@@ -226,4 +226,4 @@ run to the end of the agent phase and the final state is graded. The service jou
 layer (journal `record.f64`; startup watchdog `RCB_STARTUP_TIMEOUT_S`, default 300 s) and grades the live episode
 (Grading, above). It implements the optional reset capability.
 
-**Quadrupeds (`eai-standard/2.2`).** MuJoCo Playground's quadruped tasks serve the shared 2.2 layer. Their service implements the optional reset capability; the 2.2 client has no `reset()`, so the instructions call `POST /reset` through `Robot._post`. The service states no `max_frames_per_call` yet.
+**Quadrupeds (`eai-standard/2.2`).** MuJoCo Playground's quadruped tasks serve the shared 2.2 layer. Their service implements the optional reset capability; the 2.2 client has no `reset()`, so the instructions call `POST /reset` through `Robot._post`. One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"), in the standard-realtime twin too.

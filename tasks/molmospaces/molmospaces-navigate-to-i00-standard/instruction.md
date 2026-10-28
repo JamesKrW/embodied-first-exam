@@ -38,6 +38,7 @@ r.submit("done", [])                           # end the episode now
 r.status()                                     # calls, control steps, done, reason, elapsed time
 ```
 Cameras: `head_camera`, `wrist_camera_l`, `wrist_camera_r` (`spec["cameras"][cam]`: intrinsics and mount; every response carries each camera's pose).
+One call returns at most 1812 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 ### `joint_position` (25)
 `base_x`, `base_y`, `base_theta`, `torso_0`, `torso_1`, `torso_2`, `torso_3`, `torso_4`, `torso_5`, `left_arm_0`, `left_arm_1`, `left_arm_2`, `left_arm_3`, `left_arm_4`, `left_arm_5`, `left_arm_6`, `right_arm_0`, `right_arm_1`, `right_arm_2`, `right_arm_3`, `right_arm_4`, `right_arm_5`, `right_arm_6`, `left_gripper`, `right_gripper`: the targets of upstream's joint-position controllers (base_x, base_y in m and base_theta in rad (world frame); torso, arm joints in rad; grippers: the finger motor's force, -100 .. 100 (positive closes, negative opens, 0 exerts none)). Rows are `dt` apart (a

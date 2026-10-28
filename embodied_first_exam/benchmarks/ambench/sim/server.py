@@ -46,6 +46,7 @@ TEXTS = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 OBS_CALIBRATION = os.environ.get("RCB_OBS_CALIBRATION", "1") == "1"
 CTRL_HZ = 120; SUBSTEPS = 1; ACTION_DIM = 8
 MAX_CHUNK_S = float(os.environ.get("RCB_MAX_CHUNK_S", "10")); MAX_WATCH_S = float(os.environ.get("RCB_MAX_WATCH_S", "30"))
+MAX_FRAMES = L.MAX_FRAMES_PER_CALL   # /spec max_frames_per_call, 3000 images (cameras x frames, depth counted again)
 LOCK = threading.Lock(); PID_FILE = os.path.join(DATA, "server.pid")
 E = {"ready": False, "step": 0, "calls": 0, "done": False, "reason": None, "success": False, "t0": time.time(), "error": None}
 # Resume class `approx` for every AM-Bench task: GPU PhysX replays the journal to the checkpoint's state almost always, but
@@ -153,7 +154,7 @@ GROUP_TEXT = {
 SPEC = {
     "protocol": PROTOCOL, "protocol_compat": list(L.COMPAT), "simulator": "ambench (AM-Bench on Isaac Lab / Isaac Sim 5.1, GPU PhysX)",
     "robot": "ambench-fahexa", "task_text": TEXTS["task_text"], "control_hz": CTRL_HZ, "physics_substeps": SUBSTEPS,
-    "max_chunk_s": MAX_CHUNK_S, "max_watch_s": MAX_WATCH_S,
+    "max_chunk_s": MAX_CHUNK_S, "max_watch_s": MAX_WATCH_S, "max_frames_per_call": MAX_FRAMES,
     "cameras": {c: {"rgb": True, "depth": True, "mounted": MOUNT.get(c, c), "resolution": [int(FIRST[c].shape[1]), int(FIRST[c].shape[0])],
                     "calibration_in_obs": OBS_CALIBRATION, "intrinsic_cv": CAM0[c]["intrinsic_cv"], "mount": CAM0[c]["mount"],
                     "depth_range_m": CAM0[c]["depth_range_m"]} for c in CAMS},
@@ -265,8 +266,20 @@ def as_400(parse: Callable, *args):
         raise ValueError(f"malformed request: {exc!r}"[:300]) from None
 
 
+def frame_every(fps: int) -> int:
+    """The Recorder's stride in control steps: round(control rate / video_fps)."""
+    return max(1, int(round(CTRL_HZ / max(1, fps))))
+
+
+def frames_ok(steps: int, fps: int, cams, meta: dict) -> None:
+    """The images the call's Recorder captures over `steps` control steps (its real stride, every camera, per-frame
+    depth counted again), refused above max_frames_per_call before anything runs (a 400)."""
+    L.check_frames(len(dict.fromkeys(cams)), L.frames_per_call(steps, frame_every(fps)),
+                   L.depth_mode(meta) in ("frames", "legacy"), MAX_FRAMES)
+
+
 def recorder(cams, fps: int, meta: dict) -> L.Recorder:
-    return L.Recorder(cams, max(1, int(round(CTRL_HZ / max(1, fps)))), grab, proprio_row, extrinsics, ctrl_steps,
+    return L.Recorder(cams, frame_every(fps), grab, proprio_row, extrinsics, ctrl_steps, max_images=MAX_FRAMES,
                       depth=L.depth_mode(meta), clock_hz=CTRL_HZ)
 
 
@@ -366,6 +379,7 @@ def parse_submit(meta: dict, A: np.ndarray) -> tuple:
         raise ValueError(f"dt must be a multiple of the 1/{CTRL_HZ} s control period (k/{CTRL_HZ} s, k = 1..{int(0.5 * CTRL_HZ)}); got {dt}")
     if A.shape[0] * dt > MAX_CHUNK_S + 1e-9: raise ValueError(f"chunk longer than max_chunk_s={MAX_CHUNK_S}: {A.shape[0]} rows x {dt} s")
     check_ee_rows(A)
+    frames_ok(A.shape[0] * int(round(dt * CTRL_HZ)), fps, cams, meta)
     return typ, dt, interp, cams, fps, video, note
 
 
@@ -393,6 +407,7 @@ def parse_observe(meta: dict) -> tuple:
     cams = cameras(meta); seconds = number(meta, "seconds", 0.0); fps = video_fps(meta)
     video = choice(meta, "video", "frames", ("mp4", "frames", "both", "none")); L.depth_mode(meta)
     if seconds < 0 or seconds > MAX_WATCH_S: raise ValueError(f"seconds must be in [0, {MAX_WATCH_S}]")
+    frames_ok(int(round(seconds * CTRL_HZ)), fps, cams, meta)
     return cams, seconds, fps, video
 
 

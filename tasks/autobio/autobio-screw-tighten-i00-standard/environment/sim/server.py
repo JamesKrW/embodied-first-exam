@@ -31,8 +31,8 @@ INSTANCE = os.environ.get("RCB_INSTANCE", os.path.join(os.path.dirname(os.path.a
 WALL_CLOCK_S = float(os.environ.get("RCB_WALL_CLOCK_S", "3600"))
 MAX_CHUNK_S = float(os.environ.get("RCB_MAX_CHUNK_S", "10"))
 MAX_WATCH_S = float(os.environ.get("RCB_MAX_WATCH_S", "30"))
-MAX_FPS = 50  # AutoBio's own policy rate; a call returns at most MAX_FRAMES frames per camera
-MAX_FRAMES = 3000
+MAX_FPS = 50  # AutoBio's own policy rate
+MAX_FRAMES = 3000  # /spec max_frames_per_call: images per call (cameras x frames, per-frame depth counted again)
 LOCK = threading.Lock()
 PID_FILE = os.path.join(DATA, "server.pid")
 E = {
@@ -148,7 +148,7 @@ SPEC = {
             "semantics": "absolute position targets of the robot's PD drives, every entry in `layout` order, one row "
             "per control step. Rows are `dt` apart (a whole multiple of the 0.002 s control period, at most 0.5 s), "
             "`linear` (default: from the previous target) or `hold` between rows; values outside the limits are clipped "
-            "and reported. A call returns at most 3000 frames per camera (video_fps up to 50)",
+            "and reported. A call returns at most 3000 images (max_frames_per_call; video_fps up to 50)",
         },
         "done": {
             "dim": 0,
@@ -168,6 +168,7 @@ SPEC = {
         "camera_axes": "intrinsic_cv / extrinsic_cv: OpenCV camera axes (x right, y down, z forward); cam2world_gl: OpenGL axes",
     },
     "budget": {"reset": 0, "steps": None, "wall_clock_s": WALL_CLOCK_S},
+    "max_frames_per_call": MAX_FRAMES,
     "episode": EPISODE,
     "robot_spec": ROBOT_SPEC,
     "kinematics": {
@@ -294,10 +295,15 @@ def ctrl_step(a, rec) -> bool:
     return E["done"] or stop
 
 
+def frame_every(fps: int, video: str) -> int:
+    """The Recorder's stride in control steps: round(control rate / video_fps); no video: the first and last frame."""
+    return max(1, int(round(CTRL_HZ / max(1, fps)))) if video != "none" else 10**9
+
+
 def recorder(cams, fps: int, meta: dict, video: str) -> L.Recorder:
-    every = max(1, int(round(CTRL_HZ / max(1, fps)))) if video != "none" else 10**9  # no video: first and last frame
     return L.Recorder(
-        cams, every, grab, proprio_row, extrinsics, ctrl_steps, depth=L.depth_mode(meta), clock_hz=CTRL_HZ
+        cams, frame_every(fps, video), grab, proprio_row, extrinsics, ctrl_steps, depth=L.depth_mode(meta),
+        clock_hz=CTRL_HZ, max_images=MAX_FRAMES,
     )
 
 
@@ -352,9 +358,11 @@ def video_fps(meta: dict) -> int:
     return int(fps)
 
 
-def frames_ok(seconds: float, fps: int, video: str) -> None:
-    if video != "none" and seconds * fps + 2 > MAX_FRAMES:
-        raise ValueError(f"{seconds:g} s at video_fps={fps} is more than max_frames_per_call={MAX_FRAMES} frames")
+def frames_ok(steps: int, fps: int, video: str, cams, meta: dict) -> None:
+    """The images the call's Recorder captures over `steps` control steps (its real stride, every camera, per-frame
+    depth counted again), refused above max_frames_per_call before anything runs (a 400)."""
+    every = frame_every(fps, video)
+    L.check_frames(len(cams), L.frames_per_call(steps, every), L.depth_mode(meta) in ("frames", "legacy"), MAX_FRAMES)
 
 
 def cameras_of(meta: dict) -> list:
@@ -411,7 +419,7 @@ def parse_submit(meta: dict, A: np.ndarray):
         raise ValueError("interpolate must be hold|linear")
     if not isinstance(video, str) or video not in ("mp4", "frames", "both", "none"):
         raise ValueError("video must be mp4|frames|both|none")
-    frames_ok(A.shape[0] * dt, fps, video)
+    frames_ok(A.shape[0] * int(round(k)), fps, video, cams, meta)
     return typ, dt, interp, video, cams, fps, note
 
 
@@ -486,7 +494,7 @@ def parse_observe(meta: dict):
         raise ValueError(f"seconds must be in [0, {MAX_WATCH_S}]")
     if not isinstance(video, str) or video not in ("mp4", "frames", "both", "none"):
         raise ValueError("video must be mp4|frames|both|none")
-    frames_ok(seconds, fps, video)
+    frames_ok(int(round(seconds / DT)), fps, video, cams, meta)
     L.depth_mode(meta)  # a bad `depth` is a 400 here, not after the watch
     return cams, fps, seconds, video
 

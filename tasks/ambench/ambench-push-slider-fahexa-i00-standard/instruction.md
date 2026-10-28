@@ -59,6 +59,7 @@ then call it again (nothing has happened in the episode yet; your wall clock run
 
 Cameras (384×384 each, both moving with the robot): `ee_camera` (on the end effector, looking along the gripper) and
 `base_camera` (on the airframe, looking forward). `res.extrinsic_cv[cam]` has their pose at every frame.
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 ### Optional inputs (eai-standard/2.2; ask only for what you need)
 - Depth: `r.get_obs(depth=True)` -> `obs.last_depth[cam]` float32 (H,W) z-depth in metres, 0 = no reading, pixel-aligned
