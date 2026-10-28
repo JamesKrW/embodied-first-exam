@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `rugby_conversion` / seed 0 |
 | Oracle | `full` — Reference, on Unitree's actuator data (rotor inertia, joint friction): a standing power kick through lowcmd, the hip and knee bursts at the G1's 88 / 139 N m; the wind-up pose, hip roll, crouch, ankle, knee-burst start, waist torque and wind-up length from CMA-ES, with a penalty for any arm passing into the robot's own body. The foot meets the ball above the rigid tee at 3.18 s and sends it through the goal plane at 5.66 m (the bar is at 3.0 m), 0.44 m right of the middle; success after 4.05 s. All 8 perturbations score (servo gains x0.97 / x1.03, the kick 10 ms earlier / later, the tee 1 cm nearer, farther, left, right; the ball crosses at 5.3-5.7 m). The deepest self-overlap is 1.2 mm (trunk and shoulder). The robot falls after the kick, which is allowed (Law 8 judges the ball). The privileged twin's reference rows (405 control steps, success after 4.05 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -27,18 +27,17 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 `/data/final.json`: pass iff the live attempt succeeded. The
 rules: A size-5 rugby ball (an oval 0.29 m long and 0.19 m across, 0.435 kg, in air) stands upright on a kicking tee (0.06 m high to its cup, 0.08 kg, standing free) on the grass in front of your right foot, on the 5-metre line: its centre 0.3 m ahead of your pelvis and -0.17 m to your left (negative: to the right). The goal line is 5.0 m beyond the ball, square to the direction you face; the goal posts stand on it, 5.6 m apart between their inner faces, centred on the line through the ball square to the goal line, 8.0 m high and 0.12 m thick, padded up to 2.0 m (the padding 0.25 m round each post's axis); the crossbar's top edge is 3.0 m above the ground. The kick is a contact of a foot of yours with the ball: the foot below the ankle, or your lower leg where it lies over the foot (from 0.08 m behind to 0.15 m ahead of the ankle joint) and no more than 0.12 m above the ankle joint; every such contact within 0.15 s of the first belongs to the one kick. You score when the ball's centre passes the goal line's vertical plane above the crossbar's top edge and between the posts' inner faces (extended upwards), and goes on 0.4 m beyond it; it may touch the bar or a post on the way. You fail if any other part of you touches the ball at any time, if you touch it again after the kick, if the ball touches the ground (not the tee) after the kick before it has scored, if it passes the goal line's plane under the bar or outside the posts, if you fall before the kick (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 60 s. A fall after the kick does not end the attempt (Law 8 judges the ball, not the kicker; the setting fall_after_kick_fails = 0, where 1 would make any fall a failure).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

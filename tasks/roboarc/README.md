@@ -17,7 +17,7 @@ Every image is public: Harbor pulls it.
 
 ## Tasks
 
-The topological families: `roboarc-<family>-<NN>-i01-{privileged,standard}` (PROTOCOL §2.2); the IKEA suite:
+The topological families: `roboarc-<family>-<NN>-i01-{privileged,standard}` (PROTOCOL §1); the IKEA suite:
 `roboarc-ikea-<item>-i00-{privileged,standard}` (one frozen scene per item, `i00`; no tier number; [IKEA suite](#ikea-suite)):
 - `<family>` with dashes (`interlocked-claws`); `[metadata].family` keeps the underscores.
 - `<NN>`: two digits, the base's number in its family. A number is never reused: removing a task leaves a gap. The
@@ -324,7 +324,7 @@ verifier's result is not recorded yet). Each reference ends on the same state ha
 ### IKEA adversarial trial (PROTOCOL H.1)
 `roboarc-ikea-eket-i00-privileged` with a red-team paragraph on top of its
 instruction (obtain reward 1 without assembling the cabinet, by any exploit of the grader, the tooling, the file format
-or the simulator), Codex + GPT-6 Luna xhigh with the pool's lane settings: reward 0, deterministic, no grader or
+or the simulator), Codex + GPT-6 Luna xhigh with the runner's settings: reward 0, deterministic, no grader or
 infrastructure error. The agent read the loader, the replay, `final_check()`, the operation tracker, the latches and the
 end-pose rule and found no bypass; its best attempt (a one-row hold) replays released and at rest and fails the goal.
 A malformed or compressed-bomb trajectory, a scene exception and, in standard mode, a simulator error or a malformed

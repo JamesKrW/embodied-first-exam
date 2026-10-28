@@ -4,61 +4,19 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/molmospaces-pick-and-place-next-to-i00-privileged"
 description = "MolmoSpaces pick-and-place-next-to (a Franka FR3 arm with a Robotiq 2F-85 gripper on a fixed base, MuJoCo 3.5.0) in privileged mode: produce one replayable trajectory. Pick up the compact black rail mount with slots and place it next to the bread. Frozen episode: upstream benchmark procthor-objaverse/FrankaPickandPlaceNextToHardBench/FrankaPickandPlaceNextToHardBench_20260305_json_benchmark, episode 479."
-authors = [{ name = "pingyue" }]
 keywords = ["robotics", "molmospaces", "mujoco", "franka-robotiq-2f85", "code-as-policy", "trajectory", "pick-and-place-next-to"]
 
 [metadata]
-author_name = "pingyue"
 task_type = "trajectory"
 simulator = "molmospaces"          # MolmoSpaces (molmo-spaces 0.2.9) on MuJoCo 3.5.0, CPU physics
 robot = "franka-robotiq-2f85"
 family = "pick-and-place-next-to"
-mode = "privileged"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 # scene = environment/instance.json (one upstream benchmark episode + its t = 0 state hash); identity = the dataset.toml digest
+instance_seed = 0
 expert_time_estimate_hours = 2.0
 oracle = "none"
 oracle_evidence = "no reference solution (MolmoSpaces' planners and grasp files are not shipped); positive example graded 1: molmospaces-pick-and-place-next__HMjmn5X (run codex-gpt6_1_sol-high, batch molmo-v2-sol, 2026-10-16; its verifier's replays ran out of time on a loaded host (the earlier 500 s limit), so it was graded 1 offline with the verifier's replay tool: two fresh replays in the task's image, no time limit, both successes with equal final hashes); human review in PR #276"
-
-[metadata.resources]
-# minimum compute to run this task (docs/protocol/README.md §2.9)
-min_cpus = 2.0
-min_memory_gb = 6.0
-min_gpu_memory_gb = 3.5
-gpu_required = true
-gpu_class = "any"
-recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4 / L40S)"
-verifier_min_cpus = 2.0
-verifier_min_memory_gb = 4.0
-verifier_min_gpu_memory_gb = 3.5
-measured = "GPU 2.7 GB on L40S, evaluation-pool GPU profile (per-trial GPU peaks, 10-03..10); memory and CPU author estimate (MuJoCo, CPU physics, EGL rendering)"
-
-[metadata.resources.limits]
-# agent-phase limits in GiB (docs/protocol/README.md §2.10); scope: trial = every container, agent = the agent's container;
-# enforced from protocol v1.2 when RCB_LIMITS_ENFORCE=1 (a violation fails the trial), otherwise recorded only
-scope = "trial"
-max_gpu_memory_gb = 7.0
-max_memory_gb = 16.0
-max_processes = 512
-max_disk_gb = 10.0
-disk_paths = ["/app", "/tmp", "/root"]
-disk_exclude = []
-sustain_sec = 60.0
-window_sec = 120.0
-trial_max_gpu_memory_gb = 7.0
-trial_max_memory_gb = 16.0
-measured = "GPU: 2.7 GiB on a 48 GB card (the evaluation pool's GPU profile (per-trial GPU peaks by card, 10-03..10)); one trial on a 24 GB card peaked at 18.4 GiB and would exceed: calibrate -> max(1.5 x peak, peak + 4); memory: the [environment] cap 16 GiB, which every past trial ran under (no samples); processes 512 and disk 10 GiB: design defaults, not yet measured"
-
-[metadata.resources.caps]
-# docker caps per compose service, applied from protocol v1.2 (docs/protocol/README.md §2.10)
-main = { cpus = 8.0, memory_gb = 20.0, pids = 8192 }
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
 
 [verifier]
 timeout_sec = 1800.0
@@ -67,7 +25,7 @@ timeout_sec = 1800.0
 environment_mode = "separate"
 network_mode = "no-network"
 
-# Resource limits (docs/protocol/README.md §2.10): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -88,6 +46,7 @@ allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.
 build_timeout_sec = 1800.0
 cpus = 8
 memory_mb = 20480
+storage_mb = 10240
 
 [verifier.env]
 RCB_LIMITS_ENFORCE = "${RCB_LIMITS_ENFORCE:-0}"

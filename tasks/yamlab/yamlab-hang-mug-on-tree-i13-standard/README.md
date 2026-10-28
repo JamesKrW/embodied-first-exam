@@ -6,9 +6,9 @@
 | Mode | standard (`eai-standard/2.2`) |
 | Twin | `yamlab-hang-mug-on-tree-i13-privileged` |
 | Simulator / robot | `yamlab` / `i2rt-yam-bimanual` |
-| Family / instance | `hang_mug_on_tree` |
+| Family / instance | `hang_mug_on_tree` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:yamlab-0.2.1` |
 
 ## Task
@@ -45,18 +45,19 @@ episode in two fresh Isaac processes before 2026-10-17). Oracle: the live episod
 state (hash `321a9d8be0abd35a`; under the earlier rule both replays did too). `nop`: the episode ends on the time-out with no
 stage reached, reward 0.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 8 | 8 |
-| Memory | 16 GB | 15 GB |
-| GPU memory | 5 GB | 5 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 24 GiB | 16384 | no GPU | 20 GiB |
+| `sim` | 16 | 23 GiB | 16384 | 16 GiB | — |
+| verifier (as `main`) | 8 | 24 GiB | no cap | no GPU | 20 GiB |
 
-- GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: GPU 3.8-4.0 GB per trial, anon memory 11.1-11.8 GB, CPU p90 5.8-8.7 cores over 12 trials, live sampler (docker stats + cgroup anon + nvidia-smi every 30 s, 13 cloud GPU hosts + an RTX 4090 workstation, 10-10); evaluation-pool GPU profile peaks 5.5-6.5 GB on 24 GB cards; about 11 GB RAM and 8 CPUs per simulator; verifier 7.2 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 16 GiB GPU memory, 27 GiB memory. Limits measured: GPU: 10.4 GiB on a 48 GB card, 6.5 on 24 GB (the evaluation pool's GPU profile (per-trial GPU peaks by card, 10-03..10)) -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: agent container docker peak 1.5 GiB over 1 samples (mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)) -> max(1.5 x peak, peak + 4, 8), at most the 24 GiB cap; whole trial: + the sim service's 19 GiB (docker peak 12.4 GiB, 1 samples); processes 512 and disk 20 GiB: design defaults, not yet measured.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, RTX PRO 6000 Blackwell, held by `sim`.
+- Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
+- Measured: GPU memory 3.8-4.0 GB per trial, anon memory 11.1-11.8 GB, CPU p90 5.8-8.7 cores over 12 trials (a per-container sampler every 30 s); per-trial peaks of past trials 5.5-6.5 GB of GPU memory on 24 GB cards; about 11 GB of memory and 8 CPUs per simulator
+- Measured (caps): GPU memory (the sim service): per-trial peaks of 10.4 GiB on a 48 GB card and 6.5 GiB on a 24 GB card -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -67,22 +68,3 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Images | the `sim` sidecar runs efe-private:yamlab (BUILD_ONLY, `images/yamlab/BUILD_ONLY`); the agent container and the verifier run the shared client image with its pip pins (`embodied_first_exam/standard/client.env`) |
 | Crash recovery | resume class `exact`: every control step journaled, a checkpoint with the state hash after every call; `restart: on-failure:6`, the service resumes the same episode (docs/protocol/standard_mode.md §13) |
 | Benchmark notes | tasks/yamlab/README.md |
-
-### Change Log
-- 2026-10-10: grading robustness and time limits; the scene, the frozen instance and the pass rule
-  (live ∧ replay ∧ deterministic) are unchanged, so the task keeps its name. `tests/grade.py`: a missing, unreadable or
-  unfinalized `final.json`, or a replay process that ended without a result, is `infra_error` = 1 (it was the agent's 0, or
-  no reward at all). `finalize.sh`: `final.json` replaced atomically, each replay time-boxed inside the hook and retried
-  once when it dies; `[[verifier.collect]] timeout_sec` 15000 s (was 5400 s). Service: malformed requests (null or
-  wrong-type fields, an `ee_pose` position more than 3 m from the origin, a zero quaternion) are answered 400 before anything
-  moves (some ended the episode with a simulator error); `/spec` states the 100,000-step cap (`max_control_steps`). The
-  replay video of an episode longer than 18,000 control steps is a time lapse (at most 9,000 frames). A trial
-  recorded before this date with reward 0 and one of these conditions was an infrastructure failure.
-- 2026-10-10 (review round 2): the client only (`environment/rcb_client.py`). `Robot()` waits up to 3600 s for the service (was 600 s) and prints its progress to stderr once a minute, so the first `Robot()` outlasts the simulator's start (629 s measured here on a loaded host: the first `Robot()` could raise "sim service unavailable", and the instruction said to call it again); `cameras="name"` (a string) is one camera, no longer its characters. The service, the collect hook, the grader, the scene and the pass rule are unchanged.
-- 2026-10-10 (review round 3): the shared service layer and the client only (`environment/sim/rcb_limited.py`, `environment/rcb_client.py`). A camera named more than once in `cameras` is rendered and returned once (N copies of one name made the service build N x N images within the frame budget, which could exhaust its memory). A service that has given up on the episode (it could not start it, or could not resume it after its crashes) answers every request with 409 and the reason, and `Robot()` / `wait_ready()` raise `EpisodeOver` at once; before, nothing answered and they waited out their timeout (up to an hour). The adapter, the collect hook, the grader, the scene and the pass rule are unchanged.
-- 2026-10-10 (owner decision): the frozen instance file no longer names the recording it was made from
-  (`instance.json` had a `source` entry with the dataset, the file and the demonstration index, and the tooling's usage
-  text named such a file; the reference solution replays that demonstration). Nothing reads the entry: the scene, its
-  state hash, the tooling's behaviour and the pass rule are unchanged, so the task keeps its name.
-- 2026-10-13 (owner, boards 0085 and 0087): the sim service's clock (`environment/sim/rcb_limited.py`, `environment/sim/server.py`, the docstring of `environment/rcb_client.py`). `meta["time_s"]` and `meta["time_left_s"]` count from the agent's first request to the service (any endpoint), and a restarted service keeps that moment; before, they counted from the service's own start of the episode (when its scene was ready). Where the service is ready before the agent's phase begins (the harness is installed in between: a median of 79 s over the recorded standard trials), that clock ran ahead of the agent's and `time_left_s` reached 0 while the agent still had that time. `/spec` says what the clock counts from (`budget.clock`), and the instruction's `## Time limit` tells the agent to plan by `time_left_s`. The service never ended an episode on this clock: the scene, the frozen instance, the pass rule and the grader are unchanged, so the task keeps its name and earlier results stand.
-- 2026-10-17 (owner, boards 0150/0151; in place: a new DIGEST, PROTOCOL v2.0 §1 and H.8): standard modes graded by the live episode; no grading replay; video by the sim service during the live episode (`live.mp4`). `success` is the live episode's success as the service judged it (YAMLab's success check, every stage latched at a control step); it was live success ∧ both of two fresh-process replays successful ∧ equal end-state hashes. The collect hook no longer replays the trajectory: its time limit is 3600 s (was 15000 s) and it needs no GPU after the service exits. The start-state check is made by the service before it serves the agent: a rebuilt scene that is not the frozen instance ends the trial as an infrastructure failure (`instance_mismatch`, a give-up); before, the strict check made the service crash and restart until the hook timed out. The video (`replay.mp4` before) is kept by the service during the episode, a frame at the control steps the agent's own calls rendered (no extra render), and encoded after the verdict; it never decides anything. A collect hook on `main` (`kill -9 -1`) now stops whatever the agent left running in its container before the service ends the episode (PROTOCOL H.4), so nothing moves the robot after the deadline or during the hold. reward.json: `graded_by_live` = 1, `replays` = 0, no `replay_success` / `deterministic`. The scene, the frozen instance, the YAMLab success rule, the agent's interface and the time limit are unchanged; a trial recorded before this date scored live ∧ replay ∧ deterministic (tasks/yamlab/README.md, Grading, says how to re-score it by its live episode).

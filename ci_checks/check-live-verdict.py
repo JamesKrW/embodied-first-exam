@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The standard modes are graded by the live episode (docs/protocol/README.md H.4; owner, 2026-10-17): the sim
+"""The standard modes are graded by the live episode (docs/protocol/README.md H.4): the sim
 sidecar judges the episode it ran and the verifier transcribes its `final.json`; no replay grades it. Advisory: the
 invariant itself (the verdict from a trusted source) is held by check-verifier-isolation.sh; this check reports a
 standard task whose grader still follows the replay rule, and a grader that breaks the infrastructure rule of
@@ -77,7 +77,7 @@ CASES = (
 )
 
 
-# standard-realtime only (docs/protocol/standard_mode.md Part 3, 2026-10-17): a simulator error after the agent's first command is the
+# standard-realtime only (docs/protocol/standard_mode.md Part 3): a simulator error after the agent's first command is the
 # agent's result; one before it is infrastructure (the service records it so)
 RT_CASES = (
     ("standard-realtime: a simulator error after the first command",

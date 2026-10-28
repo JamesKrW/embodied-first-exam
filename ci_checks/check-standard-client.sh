@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PROTOCOL §2.4: the agent container and the verifier of every standard task share ONE client base image, pinned by
+# PROTOCOL §1: the agent container and the verifier of every standard task share ONE client base image, pinned by
 # digest, and pinned pip versions. The image and the pins are embodied_first_exam/standard/client.env (CLIENT_IMAGE) and
 # embodied_first_exam/standard/client-requirements.txt. For each standard or standard-realtime task (mode standard /
 # standard-realtime, or a -standard / -standard-realtime name), environment/Dockerfile and tests/Dockerfile:
@@ -16,7 +16,7 @@ python3 - "${1:-$root/tasks}" "$root/embodied_first_exam/standard" <<'PY'
 import os, re, shlex, sys, tomllib
 from pathlib import Path
 tasks, src = sys.argv[1], sys.argv[2]
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(src))), "scripts")); import task_conventions as tc   # the mode registry (§2.16)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(src))), "scripts")); import task_conventions as tc   # the mode registry (§3)
 env = dict(l.split("=", 1) for l in open(os.path.join(src, "client.env")).read().splitlines() if "=" in l and not l.startswith("#"))
 IMAGE = env["CLIENT_IMAGE"].strip()
 req_path = os.path.join(src, env.get("CLIENT_REQUIREMENTS", "client-requirements.txt").strip())
@@ -82,7 +82,7 @@ for t, tasks in task_dirs(tasks):
     if not os.path.isfile(tt):
         continue
     meta = tomllib.load(open(tt, "rb")).get("metadata", {})
-    if not (meta.get("mode") in tc.SIDECAR_MODES or t.endswith(tuple("-" + m for m in tc.SIDECAR_MODES))):
+    if not t.endswith(tuple("-" + m for m in tc.SIDECAR_MODES)):      # the mode: the directory's suffix
         continue
     probs, froms = [], []
     for sub in ("environment", "tests"):

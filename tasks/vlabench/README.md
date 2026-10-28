@@ -64,8 +64,7 @@ benchmark re-verifies on its frozen instance and whose instruction identifies th
   rebuilds the scene with every random source seeded and refuses to run if either hash differs. Copied into
   `environment/`, `tests/` and `environment/sim/`.
 - **Actions.** VLABench's own: 9 absolute position targets per control step (0.1 s, 100 physics steps), the 7 arm
-  joints (rad) and the 2 fingers (m, 0 … 0.04). In standard mode this is the `joint_position` action type (PROTOCOL
-  §4.4 SHOULD). VLABench's model sets no arm joint limits; the Panda's documented limits are given as facts.
+  joints (rad) and the 2 fingers (m, 0 … 0.04). In standard mode this is the `joint_position` action type (docs/protocol/standard_mode.md). VLABench's model sets no arm joint limits; the Panda's documented limits are given as facts.
 - **Success.** VLABench's own success check, the task's termination condition (`task.should_terminate_episode`). The
   native episode ends the moment it holds, so a trajectory ends there and the graded state is its final state
   (PROTOCOL §3): the privileged verifier rejects a trajectory with actions after the termination
@@ -82,7 +81,7 @@ benchmark re-verifies on its frozen instance and whose instruction identifies th
   cards VLABench's own ranking picks, which are named; `select_mahjong*` and `select_fruit_common_sense` name the
   placemat or plate; `select_poker*` say grasp and lift. The checks themselves are unchanged.
 - **Length.** Privileged deliverables have 1 ≤ T ≤ 4000 control steps (400 s of robot time; PR #4's bound). Standard
-  episodes have a technical cap of 9000 control steps (`spec.max_control_steps`, PROTOCOL §4.5 MAY): the video's
+  episodes have a technical cap of 9000 control steps (`spec.max_control_steps`, docs/protocol/standard_mode.md): the video's
   re-run of the episode (~40 ms a step, about 360 s at the cap, plus a scene build and rendering) must fit the collect
   hook, which waits for the verdict until 1440 s and for the video until 2880 s of its 2910 s.
 - **World frame.** Metres; the robot's base at (0, -0.4, 0.78) facing +y (VLABench's default; (0, -0.4, 0.6) for
@@ -182,7 +181,7 @@ Final-state hashes of some references (live = replay 1 = replay 2):
   collect hook (2910 s; a re-run costs ~40 ms a step on a 7950X). An agent can reach the cap before its time limit;
   raising it needs a longer collect timeout.
 - **Tasks without a reference.** The 57 tasks left out could come in later with `oracle = "none"` and human review
-  (PROTOCOL §2.7).
+  (PROTOCOL §4).
 - **Privileged difficulty.** With VLABench's skills as planning primitives the privileged mode is largely solved;
   the standard twin carries the difficulty.
 - **eai-standard/2.1 or 2.2.** The standard twins serve 2.1 with main's HumanoidBench layer (byte copies); moving to the

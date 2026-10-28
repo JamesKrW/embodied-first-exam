@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-bowling-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `bowling` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the 6 lb ball, held for real between the bare palms by friction only, with the palm contact of a supported human hand, rebound 0.10, taken from the hands and laid on the lane 0.35 m past the line at 8 m/s, 1.2 deg, entering 5 cm right of the head pin: a strike; entries 2-3 cm right give 8-9 pins); negatives: nop (held for the whole 40 s), arms opened (the ball drops), walking over the foul line, a gutter ball, a head-pin hit that is not a strike, touched after the release, a foul after the delivery, a fall. No controller delivers 4 m/s or more from a two-palm hold; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the 6 lb ball, held for real between the bare palms by friction only, with the palm contact of a supported human hand, rebound 0.10, taken from the hands and laid on the lane 0.35 m past the line at 8 m/s, 1.2 deg, entering 5 cm right of the head pin: a strike; entries 2-3 cm right give 8-9 pins); negatives: nop (held for the whole 40 s), arms opened (the ball drops), walking over the foul line, a gutter ball, a head-pin hit that is not a strike, touched after the release, a foul after the delivery, a fall. No controller delivers 4 m/s or more from a two-palm hold; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,20 +25,19 @@ The sim sidecar's referee judges the live attempt, and that is the verdict (`fin
 no grading replay, owner 2026-10-17); the frozen start is checked on the live simulator (`instance_mismatch`:
 infrastructure), and the video is rendered from the recorded attempt afterwards. `/tests/grade.py` reads
 `/data/final.json`: pass iff the live attempt succeeded. The
-rules: The lane is 1.0541 m wide and runs 18.288 m from the foul line to the head pin's spot, with a gutter 0.235 m wide and 0.047 m deep on each side; behind the foul line the approach, level with the lane, is 4.572 m long. Ten pins (0.381 m tall, 1.53 kg each) stand in the triangle of four rows, 0.3048 m apart, its point towards you. The ball (0.218 m across, 2.72 kg, no finger holes) starts pressed between your two palms. Your hands have no fingers and no grip: only the force of your arms and friction hold the ball, and it can slip out. Until the release the ball may touch no part of you but your hands (the palm pads and the wrists; either or both). The release: the ball has touched no part of you for 0.05 s (it is released at its last touch); after that no part of you may touch it again. The lane is oiled (friction 0.04) for the first 13.5 m in its middle, less far on its outside boards, and dry (friction 0.2) beyond. A delivery: the released ball crosses the foul line. It is a foul if any part of you touches the lane, a gutter or anything else on or beyond the foul line, at any time. Pins count only if the ball reaches them on the lane: a ball that touches a gutter before it has touched a pin knocks down nothing. A pin is down when it is tilted more than 20.0 degrees or is no longer on the lane's surface; the pins are counted 5.0 s after the ball first touches one. You succeed with a strike: all ten pins down. You fail on a foul; on a gutter ball; if fewer than ten pins are down at the count; if the ball touches a part of you other than a hand before the release; if any part of you touches the ball after the release; if you fall before the count (your pelvis lower than 0.5 m above the approach, or any part of you other than your feet on the approach or the floor); or after 40 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+rules: The lane is 1.0541 m wide and runs 18.288 m from the foul line to the head pin's spot, with a gutter 0.235 m wide and 0.047 m deep on each side; behind the foul line the approach, level with the lane, is 4.572 m long. Ten pins (0.381 m tall, 1.53 kg each) stand in the triangle of four rows, 0.3048 m apart, its point towards you. The ball (0.218 m across, 2.72 kg, no finger holes) starts pressed between your two palms. Your hands have no fingers and no grip: only the force of your arms and friction hold the ball, and it can slip out. Until the release the ball may touch no part of you but your hands (the palm pads and the wrists; either or both). The release: the ball has touched no part of you for 0.05 s (it is released at its last touch); after that no part of you may touch it again. The lane is oiled (friction 0.04) for the first 13.5 m in its middle, less far on its outside boards, and dry (friction 0.2) beyond. A delivery: the released ball crosses the foul line. It is a foul if any part of you touches the lane, a gutter or anything else on or beyond the foul line, at any time. Pins count only if the ball reaches them on the lane: a ball that touches a gutter before it has touched a pin knocks down nothing. A pin is down when it is tilted more than 20.0 degrees or is no longer on the lane's surface; the pins are counted 5.0 s after the ball first touches one. You succeed with a strike: all ten pins down. You fail on a foul; on a gutter ball; if fewer than ten pins are down at the count; if the ball touches a part of you other than a hand before the release; if any part of you touches the ball after the release; if you fall before the count (your pelvis lower than 0.5 m above the approach, or any part of you other than your feet on the approach or the floor); or after 40 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

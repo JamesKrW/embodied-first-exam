@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Task digests (PROTOCOL §2.8): every task carries the digest of its current files in `tasks/<benchmark>/<task>/DIGEST` (one line
-# `sha256:<hex>`, written last by scripts/task_conventions.py `normalize`, so every generator and
-# every normalize run refresh it). A digest left over from before a change makes the published dataset and
+# Task digests (PROTOCOL §1, H.8): every task carries the digest of its current files in `tasks/<benchmark>/<task>/DIGEST` (one line
+# `sha256:<hex>`, written last by scripts/task_conventions.py `normalize`, so every
+# normalize run refreshes it). A digest left over from before a change makes the published dataset and
 # the repository disagree, so it fails here: refresh with `python3 scripts/task_conventions.py tasks/<benchmark>/<task>` (umask 022).
 # The release manifest tasks/dataset.toml is generated from the DIGEST files (scripts/dataset_manifest.py) and is not
 # committed: pull requests that change different tasks share no file. This check fails when it is tracked again.

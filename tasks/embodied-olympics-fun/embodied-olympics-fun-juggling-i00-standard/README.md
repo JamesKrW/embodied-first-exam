@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-juggling-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `juggling` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the drop: the ball, held for real between the palms, taken to 0.35 m above the head; ten real head contacts, the ball sent up at 2.6 m/s each time); negatives: nop (the ball stays between the palms 30 s), arms opened (it drops to the ground), passive bouncing, rises too small, the real drop to the ground, a hand after the drop, the trunk, the head before the drop (only hands may hold), a carry, a fall. Nothing built in stands on one leg; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the drop: the ball, held for real between the palms, taken to 0.35 m above the head; ten real head contacts, the ball sent up at 2.6 m/s each time); negatives: nop (the ball stays between the palms 30 s), arms opened (it drops to the ground), passive bouncing, rises too small, the real drop to the ground, a hand after the drop, the trunk, the head before the drop (only hands may hold), a carry, a fall. Nothing built in stands on one leg; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,20 +25,19 @@ The sim sidecar's referee judges the live attempt, and that is the verdict (`fin
 no grading replay, owner 2026-10-17); the frozen start is checked on the live simulator (`instance_mismatch`:
 infrastructure), and the video is rendered from the recorded attempt afterwards. `/tests/grade.py` reads
 `/data/final.json`: pass iff the live attempt succeeded. The
-rules: A size-5 football (0.22 m across, 0.43 kg, in air) starts pressed between your two open palms; your hands have no fingers and no grip (the grip columns of the action rows do nothing in this task): only the squeeze of your arms and friction hold the ball, and it slips out when they press too little. Until the drop only your hands (the palm pads and the wrists) may touch the ball. The drop: the ball has touched no part of you for 0.03 s; it is the end of the ball's last contact with a hand. A hand or an arm may still be in contact with the ball for 0.15 s after the drop (the ball leaving the hand); after that a hand or an arm on the ball is a handball. From the drop on, a touch is a contact of the ball with a foot, a shin, a thigh or your head (contacts less than 0.05 s apart are one touch); it counts when the ball's centre has then risen at least 0.22 m above the height it had when the touch began, before anything touches it again, and, for every touch after the first, when the ball leaves the touch with at least 0.95 of the speed it had when the touch began (both taken at the height where the touch began; a ball that only bounces on a still limb leaves slower: such a touch is not counted, and is not a fault). You succeed at the moment the tenth touch counts. You fail if the ball touches the ground (before the drop too), if a part of you other than the hands touches it before the drop, if a hand or an arm touches it later than 0.15 s after the drop, if your trunk (chest, shoulders, pelvis) touches it, if one touch lasts longer than 0.15 s (the ball resting or balanced on you), if the ball is touched again before it has risen 0.22 m, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground; standing on one foot is not a fall), or after 30 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+rules: A size-5 football (0.22 m across, 0.43 kg, in air) starts pressed between your two open palms; your hands have no fingers and no grip (the grip columns of the action rows do nothing in this task): only the squeeze of your arms and friction hold the ball, and it slips out when they press too little. Until the drop only your hands (the palm pads and the wrists) may touch the ball. The drop: the ball has touched no part of you for 0.03 s; it is the end of the ball's last contact with a hand. A hand or an arm may still be in contact with the ball for 0.15 s after the drop (the ball leaving the hand); after that a hand or an arm on the ball is a handball. From the drop on, a touch is a contact of the ball with a foot, a shin, a thigh or your head (contacts less than 0.05 s apart are one touch); it counts when the ball's centre has then risen at least 0.22 m above the height it had when the touch began, before anything touches it again, and, for every touch after the first, when the ball leaves the touch with at least 0.95 of the speed it had when the touch began (both taken at the height where the touch began; a ball that only bounces on a still limb leaves slower: such a touch is not counted, and is not a fault). You succeed at the moment the tenth touch counts. You fail if the ball touches the ground (before the drop too), if a part of you other than the hands touches it before the drop, if a hand or an arm touches it later than 0.15 s after the drop, if your trunk (chest, shoulders, pelvis) touches it, if one touch lasts longer than 0.15 s (the ball resting or balanced on you), if the ball is touched again before it has risen 0.22 m, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground; standing on one foot is not a fall), or after 30 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

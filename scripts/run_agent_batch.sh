@@ -2,13 +2,13 @@
 # Run one Harbor-native agent over tasks in both modes (<base>-privileged and <base>-standard), unattended; meant to be
 # started in the background (inside `sg docker -c` if docker needs the group):
 #   scripts/run_agent_batch.sh <batch-name> <base> [<base> ...]      # <base> = a task name without its -privileged / -standard
-# Official runs use Harbor's native agents only (PROTOCOL D11): no adapter; the transparent usage gateway below only
+# Official runs use Harbor's native agents only (running.md "No tool outside the container"): no adapter; the transparent usage gateway below only
 # records and is off by default. Env (defaults):
 #   AGENT        codex | claude-code (codex)        MODEL   the -m model (openai/gpt-6-astra)
 #   EFFORT       reasoning effort, --ak reasoning_effort=<EFFORT> (xhigh); `default` passes none
 #   AK           more agent options, e.g. "--ak reasoning_summary=detailed"
 #   WEB_SEARCH   disabled (default) = the harness offers the model no web search: Codex --ak web_search=disabled,
-#                Claude Code --ak disallowed_tools=WebSearch,WebFetch (PROTOCOL D11; the search runs at the model
+#                Claude Code --ak disallowed_tools=WebSearch,WebFetch (running.md; the search runs at the model
 #                provider, past any egress allowlist), and Codex none of the other tools that run there (a ChatGPT
 #                login's connectors and apps, plugins, image generation: those features = false in a copy of
 #                AGENT_CONFIG, scripts/codex_tools_off.py); "allowed" = leave the harness default (not for official runs)
@@ -31,13 +31,13 @@
 #                N_S also for standard-realtime)
 #   WAIT_FOR     a file that must exist before a mode starts, e.g. "standard:<path>" (default: none)
 #   JOBS         <repo>/jobs/agents     LABEL  the run's title for the results README
-#   RUN_ID       the run id (PROTOCOL D4, docs/TAXONOMY.md): <harness>-<model>-<effort>, derived from AGENT / MODEL /
+#   RUN_ID       the run id (docs/TAXONOMY.md "Run ids"): <harness>-<model>-<effort>, derived from AGENT / MODEL /
 #                EFFORT, e.g. codex-gpt6_luna-xhigh. Provider, service tier and settings go in metadata, never in the id.
 #   RESULTS      a directory OUTSIDE the repository: after each job scripts/write_task_results.py writes the per-task results
-#                for the results site there, <RESULTS>/<batch>/<task>/<RUN_ID>/ (PROTOCOL D3: no results in the repository);
+#                for the results site there, <RESULTS>/<batch>/<task>/<RUN_ID>/ (PROTOCOL §1: no results in the repository);
 #                default <repo>/../rcb_results; "" = skip
 #   HOST_CPUS    the host's CPU count (`nproc`): a task's CPU cap above it ([environment] / [verifier.environment] cpus,
-#                a compose service's cpus) is clamped to it in the job's own copy of the task (below), as PROTOCOL §2.10
+#                a compose service's cpus) is clamped to it in the job's own copy of the task (below), as running.md "Resources"
 #                requires of a runner (docker refuses a larger cap); tasks/ keeps its values (scripts/clamp_cpus.py)
 #   Every job runs from its own copy of its tasks ($JOBS/.tasks/<job>/, removed afterwards), every file's mtime derived
 #   from its content (scripts/stamp_mtimes.py): Docker's BuildKit can otherwise build one task's image with another
@@ -96,8 +96,8 @@ JOBS="$(abspath "$JOBS")"; ENV_FILE="$(abspath "$ENV_FILE")"; AGENT_CONFIG="$(ab
 [ -n "${RESULTS:-}" ] && RESULTS="$(abspath "$RESULTS")"
 [ -n "${CODEX_AUTH_JSON_PATH:-}" ] && { CODEX_AUTH_JSON_PATH="$(abspath "$CODEX_AUTH_JSON_PATH")"; export CODEX_AUTH_JSON_PATH; }
 TOKEN_BUDGET_IN="${TOKEN_BUDGET_IN:-10000000000}"; TOKEN_BUDGET_OUT="${TOKEN_BUDGET_OUT:-10000000000}"
-case "$AGENT" in codex|claude-code) ;; *) echo "AGENT must be a Harbor native agent: codex or claude-code (PROTOCOL D11)" >&2; exit 2 ;; esac
-# Run id (D4): harness = the agent name with - -> _; model = MODEL's last path segment, lower case, gpt-<n> joined
+case "$AGENT" in codex|claude-code) ;; *) echo "AGENT must be a Harbor native agent: codex or claude-code (docs/protocol/running.md "No tool outside the container")" >&2; exit 2 ;; esac
+# Run id (docs/TAXONOMY.md "Run ids"): harness = the agent name with - -> _; model = MODEL's last path segment, lower case, gpt-<n> joined
 # (gpt-6-astra -> gpt6_astra), a leading claude- dropped (claude-fable-5-1 -> fable_5_1), every other
 # character outside [a-z0-9] -> _; effort as given ("default" when the harness sets none).
 if [ -z "${RUN_ID:-}" ]; then
@@ -109,7 +109,7 @@ fi
 [[ "$RUN_ID" =~ ^[a-z0-9_]+-[a-z0-9_]+-(none|minimal|low|medium|high|xhigh|max|default)$ ]] || { echo "run id $RUN_ID is not <harness>-<model>-<effort>" >&2; exit 2; }
 AGENT_ARGS=(-a "$AGENT" -m "$MODEL")
 [ "$EFFORT" != default ] && AGENT_ARGS+=(--ak "reasoning_effort=$EFFORT")
-# Codex's other provider-side tools go off with the web search (PROTOCOL D11). Under a ChatGPT login Codex hands the
+# Codex's other provider-side tools go off with the web search (running.md). Under a ChatGPT login Codex hands the
 # model the account's connectors and apps (mcp__codex_apps__*: GitHub fetch, a web search of their own, mail, drives),
 # plugin installs and an image generator; they run at OpenAI, reached through chatgpt.com, so neither
 # web_search=disabled nor an egress allowlist stops them. The run's config is a copy of AGENT_CONFIG (or an empty one)
@@ -125,7 +125,7 @@ fi
 [ -n "$AGENT_CONFIG" ] && AGENT_ARGS+=(--ak "config=$AGENT_CONFIG")
 # shellcheck disable=SC2206
 AGENT_ARGS+=($AK)
-# no harness web search unless asked for (PROTOCOL D11): it runs at the model provider, so no egress allowlist stops it
+# no harness web search unless asked for (running.md): it runs at the model provider, so no egress allowlist stops it
 case "$WEB_SEARCH" in
   disabled) if [ "$AGENT" = codex ]; then AGENT_ARGS+=(--ak web_search=disabled)
             else AGENT_ARGS+=(--ak disallowed_tools=WebSearch,WebFetch); fi ;;
@@ -226,7 +226,7 @@ u.build_opener(u.ProxyHandler({})).open(sys.argv[1], timeout=15).read()' "$GW/_g
     for i in "${!AGENT_ARGS[@]}"; do [ "${AGENT_ARGS[$i]}" = "config=$AGENT_CONFIG" ] && AGENT_ARGS[$i]="config=$cfg"; done
   fi
   # the egress allowlist must let the agent reach the gateway; with GATEWAY_EGRESS=gateway the list is the gateway's
-  # address and the package registries (PyPI and the apt archives: installing packages is allowed, PROTOCOL §2.11), and
+  # address and the package registries (PyPI and the apt archives: installing packages is allowed, PROTOCOL §5), and
   # no model API's own host
   # (run_job: the job's own copy of the task; Harbor's --allow-agent-host can add a host to a task's list, not remove one)
   AGENT_ARGS+=(--allow-agent-host "$GATEWAY_BIND")
@@ -283,7 +283,7 @@ wait_for() {  # <mode>: block until every WAIT_FOR file of this mode exists
   done
 }
 
-finish_job() {  # <job>: the raw logs compacted; no key in any saved file (+redact); the task results (D3)
+finish_job() {  # <job>: the raw logs compacted; no key in any saved file (+redact); the task results (outside the repository)
   [ -d "$JOBS/$1" ] || return 0
   [ "$GATEWAY" = 1 ] && [ "$GATEWAY_RAW" = 1 ] && python3 "$R/scripts/usage_gateway/rawlog.py" compact "$JOBS/$1" 2>&1 | sed "s/^/[$1] /" | tee -a "$LOG"
   python3 "$R/scripts/scan_secrets.py" "$JOBS/$1" "${SCAN[@]}" --redact 2>&1 | tail -3 | sed "s/^/[$1] /" | tee -a "$LOG"
@@ -314,7 +314,7 @@ for trial in jobs.glob(f"{batch}-*/*__*"):
     ae = r.get("agent_execution") or {}
     gw = wtr.load_json(trial / "gateway/totals.json")
     gw_cell = (f"{gw['input']} / {gw['output']}" + (" OVER BUDGET" if gw.get("over_token_budget") else "")) if gw else "-"
-    # requests the gateway refused because they were not model-API calls (PROTOCOL §2.11): attempts, for a look; they
+    # requests the gateway refused because they were not model-API calls (PROTOCOL H.6): attempts, for a look; they
     # do not void the trial, and the harness's own start-up probes are not among them
     left = sum(gw.get(k, 0) for k in ("refused_paths", "refused_server_tools", "refused_bodies", "refused_hosts"))
     gw_cell += f" REFUSED {left}" if left else ""
@@ -374,13 +374,13 @@ src_of() {  # <task dir name>: its directory in the repository (no such task: a 
   printf '%s' "$R/tasks/.none/$1"
 }
 
-gateway_copy() {  # <dir> <harbor -i args...>: <dir>/tasks/<task> = the task with the gateway and the package registries as its only egress (PROTOCOL §2.11)
+gateway_copy() {  # <dir> <harbor -i args...>: <dir>/tasks/<task> = the task with the gateway and the package registries as its only egress (PROTOCOL Appendix H.6)
   local dir="$1" a; shift
   rm -rf "$dir" && mkdir -p "$dir/tasks" || return 1
   while [ $# -gt 0 ]; do
     a="$1"; shift
     if [ "$a" = -i ] && [ $# -gt 0 ]; then
-      if [ "$(python3 "$R/scripts/set_agent_egress.py" network "$(src_of "$1")")" = open ]; then    # the task declares open egress (`[metadata] network = "open"`, PROTOCOL §2): the copy keeps it
+      if [ "$(python3 "$R/scripts/set_agent_egress.py" network "$(src_of "$1")")" = open ]; then    # the task declares open egress (`[agent] network_mode = "public"`, PROTOCOL §2): the copy keeps it
         cp -a "$(src_of "$1")" "$dir/tasks/$1" || return 1; shift; continue
       fi
       cp -a "$(src_of "$1")" "$dir/tasks/$1" && python3 "$R/scripts/set_agent_egress.py" only "$GATEWAY_ONLY" "$dir/tasks/$1" >/dev/null || return 1
@@ -412,7 +412,7 @@ run_job() {  # <job> <concurrency> <harbor -i args...>
   local envf=(); [ -n "$ENV_FILE" ] && envf=(--env-file "$ENV_FILE")
   local root="$R" f dirs=()
   mapfile -t dirs < <(task_dirs "$R" "$@")
-  # every job runs from its own copy of the task ($JOBS/.tasks/<job>/, removed afterwards), stamped (issue #258); PROTOCOL §2.10:
+  # every job runs from its own copy of the task ($JOBS/.tasks/<job>/, removed afterwards), stamped (issue #258); running.md "Resources":
   # a CPU cap above the host's CPU count is clamped to it in that copy (docker refuses such a container: "range of CPUs is
   # from 0.01 to 8.00"), never in tasks/
   local clamp=0; python3 "$R/scripts/clamp_cpus.py" --cpus "$HOST_CPUS" --needs "${dirs[@]}" >/dev/null && clamp=1
@@ -450,7 +450,7 @@ PY
   return 0
 }
 
-name() {  # <mode> <base> -> task dir name: <base>-privileged / <base>-standard / <base>-standard-realtime (PROTOCOL §2.2)
+name() {  # <mode> <base> -> task dir name: <base>-privileged / <base>-standard / <base>-standard-realtime (PROTOCOL §1)
   case "$1" in
     standard|limited) echo "$2-standard" ;;
     standard-realtime) echo "$2-standard-realtime" ;;

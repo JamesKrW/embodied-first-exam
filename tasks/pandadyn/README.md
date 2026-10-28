@@ -64,8 +64,8 @@ nominal instance of the bank whose rollout passes here, in `ghcr.io/mll-lab-nu/e
 3. the rollout's rows succeed through the tooling, and two `replay`s in fresh processes end in the same state hash.
 These rows, float64 as recorded, are the oracle of both twins.
 
-Seeds (PROTOCOL §2): every task allows its frozen instance's seed only (`[metadata.seeds]`: default = allowed = oracle =
-the instance's seed, written by `normalize`). The bank holds 19 more verified nominal seeds per task with their reference
+Seeds (PROTOCOL §2): every task allows its frozen instance's seed only (`instance_seed`, the instance's seed; no
+`[metadata.seeds]` table, so allowed = oracle = that seed). The bank holds 19 more verified nominal seeds per task with their reference
 rows, so `allowed` can grow by freezing them under `tests/seeds/<seed>/` (the same three checks); S01's designated channel,
 S03's designated rail and S08's selected branch are drawn per seed and named in the instruction, so those three need an
 instruction per seed first.
@@ -130,11 +130,11 @@ CPU PhysX with `enable_enhanced_determinism`, one simulated scene per process, o
   backend (`render_backend="cpu"`, below) and the cameras do not change the physics (same hashes);
 - across hosts (measured for pandadyn 0.1.0, 2026-10-17; not repeated for 0.2.0): S06's arm start comes from the IK fallback (scipy `least_squares`: Pinocchio's
   IK does not converge there, joint 4 ends on its bound), whose last bits follow the BLAS kernel OpenBLAS picks for the
-  CPU. Frozen under the AVX-512 kernel, its start never rebuilt on the pool's AVX2 hosts (AWS EPYC 7R13, cluster EPYC 7402,
-  cluster EPYC 7763; 4 joints differ in the last float32 bit: `instance_mismatch`). Its containers now pin the kernel
+  CPU. Frozen under the AVX-512 kernel, its start never rebuilt on AVX2 hosts (e.g. AMD EPYC 7R13, EPYC 7402,
+  EPYC 7763; 4 joints differ in the last float32 bit: `instance_mismatch`). Its containers now pin the kernel
   (`OPENBLAS_CORETYPE=Haswell`; frozen with it, in 0.2.0 too): the start and the oracle's final state are
   the same on a Ryzen 9 7950X and an EPYC 7R13. The other 24 starts come from Pinocchio's IK and rebuild on both
-  (all 25 checked on aws:rcb-gpu8), and every oracle succeeds on both; 6 oracles (D03, D08, D10, D13, S05, S07) end in
+  (all 25 checked on a cloud GPU host), and every oracle succeeds on both; 6 oracles (D03, D08, D10, D13, S05, S07) end in
   another state hash there than the README's (measured here): a trajectory and its grading replay always run on one
   host, so no verdict depends on it;
 - standard mode: the live episode equals a fresh-process replay of its rows (the video pass records the comparison,
@@ -231,7 +231,7 @@ them moves by itself) get a `-standard-realtime` twin, sharing the standard twin
   family runs at S = 1. Measured on an RTX 4090 workstation (32 cores, the service capped at 4 CPUs): the
   realtime service with its clock flat out (`RCB_SLOWDOWN=0.01`, the oracle's first 10 s planned from step 0; host load
   18-80) and the bare physics loop (`Session.step` over the oracle's first 8 s; load 39-47). S = ceil(1.5 / RTF) with
-  the lower of the two (PROTOCOL §2; a busy pool host is slower still: the same service ran 1.4-1.9 x faster at load
+  the lower of the two (PROTOCOL §2; a busy host is slower still: the same service ran 1.4-1.9 x faster at load
   20 than at load 45):
 
 | family | RTF (service, physics) | S | | family | RTF (service, physics) | S |
@@ -286,8 +286,7 @@ them moves by itself) get a `-standard-realtime` twin, sharing the standard twin
 ## Notes on the tasks' checks
 The instructions describe each check exactly as the task's code implements it (written from
 the code alone, never from the reference controllers). Writing them brought up properties of the benchmark's own checks
-that a reader of results should know. pandadyn 0.2.0 (a new source and new instances) tightened several of them (the
-tasks' Change Logs say what changed): D05's moving outlet must now move at 0.10 m/s or more, D07's gate must be held by its
+that a reader of results should know. pandadyn 0.2.0 (a new source and new instances) tightened several of them: D05's moving outlet must now move at 0.10 m/s or more, D07's gate must be held by its
 handle at every judged moment, D08's braking is a catch at 1 rad/s or more that takes 60 % of the energy out, and S12's
 gate opens and closes and must be passed through its doorway. What remains:
 - some phase conditions are looser than their names: D02's redirects need only a paddle touch after a free flight; D04's
@@ -308,16 +307,7 @@ gravity delivery, completes by itself once the stage before it is done, and is n
 torch 2.14.1 (CPU build), Ruckig 0.12.2 (`requirements.lock`, the versions of the benchmark's own lock file; torch is its
 CPU build, which reproduces the bank's physics bit for bit), and the environment package. Public (every component is
 redistributable). SAPIEN needs a Vulkan device to build a scene and render, so every container that builds one reserves
-an NVIDIA GPU (`gpu_class = "any"`); physics runs on one CPU core. Measured for 0.1.0 over the 50 oracle trials (rcb_monitor samples every 5 s, RTX 4090 host): privileged, the whole trial at most 0.79 GiB of memory and 0.05 GiB of GPU memory; standard, the sim service at most 0.94 GiB and 0.35 GiB (its cameras), the agent's container 0.03 GiB; about one core per container (p90). One filmed scene (`render_video`): 1.2-1.3 GiB RSS, 0.25 GiB of GPU memory. The limits (`scripts/task_resources.toml`) leave room for an agent that runs several scenes at once: privileged 16 GiB and 5 GiB of GPU memory for the trial, standard 8 GiB for the agent's container.
-
-## Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0` (the environment package as of 2026-10-22). Every
-  task changed in place (new DIGEST; its README's Change Log says what): stricter or redesigned checks in S03, S07, S08,
-  S10, S12, D01, D05, D06, D07, D08, D10, D11, D12 and D13 (S03 also has a designated rail per instance and a 35 s horizon);
-  the thin tools' adapters are now joined to the tools (S03, S06, S12, D03, D06, D07, D08, D09, D11, D13); unused
-  configuration parameters are gone from the instances; the instructions say that closing a tool arm's gripper touches its
-  adapter (`self_collision`). Re-frozen from the benchmark's re-verified bank by the same rule (Instances): S12 is now
-  seed 0 (was 1), and 16 instances have new reference rows (the other 9 keep theirs). Results from 0.1.0 are under the earlier digests.
+an NVIDIA GPU (any model; its memory is capped by `x-gpu-memory-gb`); physics runs on one CPU core. Measured for 0.1.0 over the 50 oracle trials (rcb_monitor samples every 5 s, RTX 4090 host): privileged, the whole trial at most 0.79 GiB of memory and 0.05 GiB of GPU memory; standard, the sim service at most 0.94 GiB and 0.35 GiB (its cameras), the agent's container 0.03 GiB; about one core per container (p90). One filmed scene (`render_video`): 1.2-1.3 GiB RSS, 0.25 GiB of GPU memory. The caps (`scripts/task_resources.toml`) leave room for an agent that runs several scenes at once: privileged `main` 20 GiB and 5 GiB of GPU memory, standard `main` 10 GiB and the sim 8 GiB and 4 GiB of GPU memory.
 
 ## Licences
 ManiSkill 3 (and its Panda model): Apache-2.0. SAPIEN: MIT. Ruckig (community version): MIT. PyTorch: BSD-3-Clause.

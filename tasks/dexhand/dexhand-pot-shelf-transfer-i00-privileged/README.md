@@ -6,9 +6,9 @@
 | Mode | privileged |
 | Twin | `dexhand-pot-shelf-transfer-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `pot_shelf_transfer` |
+| Family / instance | `pot_shelf_transfer` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz: the 8,850 authoring rows of the accepted episode (bit-for-bit replay of the recorded states). Harbor 0.23 oracle reward 1 in both modes on 2026-10-14 (two fresh-process replays with identical state hashes; standard: live = replay). solution/wuji/trajectory.npz is a validated Wuji Hand 2.2 trajectory of this instance (8,266 controls, motor targets only, physical contact only); the oracle uses it when the run selects wuji (privileged: DEXHAND_HAND=wuji; standard: the sim service's hand), and it replays to success in two fresh processes with identical state hashes. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task
@@ -48,18 +48,17 @@ unstable physics, step budget); nothing else fails early, so setting the pot bac
 it is allowed. Partial completion fails. A `nop` agent scores 0 (no archive; in standard mode the
 untouched pot never leaves the worktop).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 5 GB | 5 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
+| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: pot_shelf_transfer oracle/nop trials (Harbor 0.23, efe:dexhand-0.2.0, CPU-only, 2026-10-14; rcb_monitor samples every 5 s for the agent container, docker cgroup memory.peak for the others): privileged verifier 3.68 GiB with two concurrent replays (3.92 GiB for two Wuji replays), standard sim sidecar 2.25-2.53 GiB, agent containers < 0.06 GiB; sweep_dustpan: one oracle replay 1.93 GiB max RSS (os.wait4, 599 s), standard sim sidecar 2.20 GiB (docker stats); x1.2 rounded up to a GB; two cores for the two concurrent verifier replays
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 8 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 8 GiB memory. Limits measured: memory: 8 GiB lets an agent run about twenty 0.3 GiB simulator sessions (pot/sweep: three or four 2 GiB sessions) next to its harness; measurements as in the [[rule]]; processes 512 and disk 10 GiB: design defaults, not yet measured.
+- Measured: pot_shelf_transfer oracle and nop trials (CPU only, cgroup memory.peak): the verifier 3.68 GiB with two concurrent replays (3.92 GiB for two Wuji replays); sweep_dustpan: one oracle replay 1.93 GiB max RSS (599 s); two cores for the verifier's two concurrent replays
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 
@@ -82,6 +81,3 @@ self-contact is not judged. Open kitchen shelf, not a narrow-cupboard challenge.
 board's depth direction, so at the target the front handle reaches about 32 mm past the board's open front edge; the
 compartment test therefore admits at most 50 mm of overhang at the open front (all other faces are strict). Wuji Hand
 2.2 composes on the same arm mounts with neutral fingers.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The verdict, the replays and `reward.json` are unchanged; earlier results stay valid.

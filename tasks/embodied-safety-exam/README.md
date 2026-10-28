@@ -274,7 +274,7 @@ the same request, scene, seed and reference as its standard task, under Embodied
 | Robots | realtime tasks are served on the UR5e; the FR3 members of c01, c02 and a05 are standard-only in this release (only the UR5e has Embodied Safety Exam's realtime admission, the realtime instruction text and the picture-cost and watch-rate probes) |
 | Names | the standard task's name with `-standard-realtime` in place of `-standard` |
 | Instance | the standard task's instance with `"clock": "realtime"` in its key; its start hash is Embodied Safety Exam's realtime start (the paused state plus the empty plan's digest), frozen in the image; the service refuses to start on another |
-| Clock | real time (slowdown S = 1, `RCB_SLOWDOWN`'s default and `[metadata] slowdown`; PROTOCOL §2), 50 control steps per second from the agent's first `submit` (or watch); no reset (Embodied Safety Exam's own reset budget, 0, declared by each task: a harm done cannot be reset away, and the standard tasks have none either) |
+| Clock | real time (slowdown S = 1, `RCB_SLOWDOWN`'s default; PROTOCOL §2), 50 control steps per second from the agent's first `submit` (or watch); no reset (Embodied Safety Exam's own reset budget, 0, declared by each task: a harm done cannot be reset away, and the standard tasks have none either) |
 | Real-time factor | 3.4 (robot seconds per wall second, the clock running flat out with `RCB_SLOWDOWN` = 0.01, the sim service's 6-CPU cap, `ese-c01-i00-standard-realtime`'s reference: 39.8 s of robot time in 11.7 s on the reference workstation); RTF ≥ 3, so S = 1 (PROTOCOL §2) |
 | Scene dynamics | `[metadata] dynamics`, declared by each task (PROTOCOL §2): Embodied Safety Exam is `static` except the families with scripted movers, launches or pushes (`a05`, `c01`, `c05` to `c13`, `c16`, `e02`, `b09` and `b10`, the powered door and drawer that close on a hand, and `c14` on the TidyBot, the child that sets off across the room), which are `dynamic`; of the realtime set `c02` (a label turned away), `c03` (a lamp that changes colour) and `c04` (smoke shown at once) are `static` scenes whose hazard appears mid-task |
 | Episode | ends at an exit, at the agent's time limit, or after `max_control_steps` steps of the clock: Embodied Safety Exam's robot-time budget under the realtime clock, 1800 s for the realtime set, which run in real time once the clock has started |
@@ -567,16 +567,16 @@ Numbers are stable (task files cite them); closed items are removed.
     from the first `ee_pose` IK step by 1 ulp (verdicts unchanged), so freezes and proofs run in-image and host runs
     are diagnostic only.
 
-## Compute resources
+## Resources
 CPU only. The sim sidecar holds one Embodied Safety Exam world and, at the finalize, one more for the video; the agent's container holds the harness and the
 client.
-`scripts/task_resources.toml`: minimum 4 CPUs and 6 GB for the agent phase, 1 CPU and 1 GB for the verifier phase
-(the finalize runs in the sim sidecar, not in the verifier); caps 4 CPUs and 8 GB for `main`, 6 CPUs and 8 GB for `sim`.
+Caps (`scripts/task_resources.toml`, PROTOCOL §6; each an upper bound for one container): 4 CPUs and 8 GiB for `main`,
+6 CPUs and 8 GiB for `sim` (the finalize runs in the sim sidecar, not in the verifier).
 Measured on a university HPC cluster (rootless podman on cgroups v1, where the caps are not applied): `/proc` PSS and
-CPU of each container's processes every 5 s: the sim sidecar at most about 3.2 GB PSS (the G1; under 2.9 GB on the
-other bodies), CPU p90 up to about 5.5 cores while it finalizes, hence its 6-CPU cap; a whole trial at most about 5.5
-GB; `main` under 1 GB. Run at most 10 Embodied Safety Exam trials at once per 32 free cores.
-The agent-phase limits (6 GiB for the agent's container, 14 GiB for the trial) remain an estimate.
+CPU of each container's processes every 5 s, oracle and nop trials of every task: the sim sidecar at most 2.84 GB PSS,
+CPU p90 4.74 / max 5.28 cores while it finalized (over 414 trials; that finalize ran two replays side by side and the
+video, the current one renders the video only and was not re-measured), hence its 6-CPU cap; a whole trial at most 4.75
+GB PSS; `main` at most 0.74 GB. Run at most 10 Embodied Safety Exam trials at once per 32 free cores.
 
 ## How to run
 Both sets run the same day with the same command, one Harbor job per task; nothing on the command line is

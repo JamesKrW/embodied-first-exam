@@ -8,7 +8,7 @@
 | Simulator / robot | `roboarc` / `aloha-2` |
 | Family / instance | `blanket_flatten` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 10800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` |
 
 ## Task
@@ -34,18 +34,18 @@ A trajectory may have at most 27000 rows (`RCB_MAX_STEPS`: two replays must fit 
 
 `nop`: no record yet on this base (`harbor run -p tasks/roboarc-blanket-flatten-07-i01-privileged -a nop`).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 4 | 2 |
-| Memory | 10 GB | 5 GB |
-| GPU memory | 2 GB | 2 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 30 GiB | 8192 | 20 GiB | 10 GiB |
+| verifier | no cap | no cap | no cap | 20 GiB | no cap |
 
-- GPU: required, any NVIDIA GPU; recommended: L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer).
-- Measured: partial MuJoCo measurements of 2026-10-13 (rendering off) with the protocol's margin; calibration pending; GPU 2 GB: owner 10-17 (evaluation-pool trial peak 1.1 GB on 24 GB cards)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 20 GiB GPU memory, 24 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 20 GiB GPU memory, 24 GiB memory. Limits measured: partial MuJoCo measurements of 2026-10-13 (rendering off) with the protocol's margin; calibration pending.
+- GPU: any NVIDIA GPU, held by `main`.
+- Recommended GPU: L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer).
+- Measured: MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards
+- Measured (caps): GPU memory: a per-trial peak of 1.1 GiB on 24 GB cards, measured with rendering off; the cap leaves room for rendering: 20 GiB
 
 ## Details
 | | |
@@ -82,7 +82,3 @@ Unfold and spread the blanket flat on the table without overlaps or excessive st
 - Frozen instance files (`instance.json`, `instance_assets/`): not in this directory. The public image carries them in `/opt/robotangle/instances/blanket-flatten-07-i01/` (`images/roboarc/assets.json` pins each file's sha256), and `/opt/robotangle/stage_instance.py` copies this task's instance next to its `runtime_binding.json`, which names the instance's canonical sha256 and every asset's sha256. The tooling checks them again at every session start.
 - Release: dev/robotangle_mujoco `7947eaa7b`, image `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` (images/roboarc/).
 - Name: RoboARC is the published name of this benchmark (2026-10-13). Code identifiers keep the simulator's name: the simulator package `topogym`, the tooling `rcb_topogym.py`, `TOPOGYM_*` variables.
-
-### Change Log
-- 2026-10-17: new task of roboarc (RoboARC on MuJoCo 3.14.0, tasks/roboarc/README.md): the scene, goal and rules of the Genesis 1.2.1 task `blanket-flatten-easy-i00` (privileged mode), ported to MuJoCo: its own frozen instance and reference, the numpy / OpenBLAS SIMD masking in every container that runs a Session, and the render bridge next to the tooling (Nyx frames).
-- 2026-10-14: the grading rule (tests/grade.py; failure analysis 2026-10-14, item 12). Success needs both replays to succeed AND at least one of them to reach the goal with the instance's own thresholds within the trajectory's rows (`strict_replay_required` 1; `success_in_hold_only` 1 marks a trajectory whose replays succeeded only in the hold, not credited). From 2026-10-05 (R-hold) to this change a replay could also confirm within the hold, with its relaxed thresholds, and no strict goal was required: privileged mode has no graded live run, so the hold's thresholds were the effective goal. The frozen instance, the reference and the replay are unchanged; results graded before this change are re-graded from their recorded trajectories, nothing is re-run. Runs: tasks/roboarc/README.md (Grading replays).

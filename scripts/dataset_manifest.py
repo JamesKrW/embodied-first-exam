@@ -55,10 +55,23 @@ def render() -> str:
     return "\n".join(out)
 
 
+def resources_row(t: Path) -> dict:
+    """The task's caps per container (PROTOCOL §6): {"gpu_types": [...] or None, "containers": {service: caps}}, main's
+    CPU / memory / disk from [environment], the rest from the compose file (GPU memory: x-gpu-memory-gb); a compose file
+    the caps cannot be read from: "containers" None and the "error"."""
+    gt = (tc.task_toml(t).get("environment") or {}).get("gpu_types")
+    try:
+        caps = tc.task_caps(t)
+    except ValueError as e:   # a compose file the caps cannot be read from (ci_checks/check-resources.py fails it)
+        return {"gpu_types": gt, "containers": None, "error": f"environment/docker-compose.yaml: {e}"}
+    return {"gpu_types": gt,
+            "containers": {n: {k: c[k] for k in ("cpus", "memory_gb", "pids", "gpu_memory_gb", "disk_gb") if c.get(k) is not None}
+                           for n, c in caps.items()}}
+
+
 def entry(t: Path) -> dict:
     """One task's row of the list: what its own files say."""
     md = tomllib.loads((t / "task.toml").read_text()).get("metadata", {})
-    r = md.get("resources") or {}
     # the settings results are grouped by (PROTOCOL v2.1 §2, docs/protocol/running.md "Results"): rankings compare only tasks
     # and results of one configuration; `validated` is a marker, ranked together. The same fields a result records.
     cfg = tc.effective_config(t)
@@ -68,7 +81,7 @@ def entry(t: Path) -> dict:
             "robot": md.get("robot", ""),
             "reset_budget": cfg["reset_budget"], "slowdown": cfg["slowdown"], "network": cfg["network"],
             "validated": cfg["validated"], "set": cfg["set"], "protocol_version": cfg["protocol_version"],
-            "resources": {k: r[k] for k in ("min_cpus", "min_memory_gb", "min_gpu_memory_gb", "gpu_class") if k in r},
+            "resources": resources_row(t),
             "digest": cfg["digest"]}
 
 

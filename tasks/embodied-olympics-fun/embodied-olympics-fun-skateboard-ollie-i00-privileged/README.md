@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-skateboard-ollie-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `skateboard_ollie` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (a real ankle and hip balance controller holds the robot on the resting board, and at t = 1.2 s one upward velocity of 1.25 m/s is written to the robot's floating base and to the board's; the 6.2 cm clearance, the landing and the 1 s stand are physics under the same controller), for a stationary ollie (the board at rest; clear 5 cm, land on four wheels with both feet, stand still 1 s). No real ollie: 5291 scripted stationary ollies (IK pop, drag, level and land; parameter searches) cleared 5 cm in 565 runs (the board up to about 0.9 m), but only 6 landed and none stood 1 s; of 4810 rolling attempts none rode away; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (a real ankle and hip balance controller holds the robot on the resting board, and at t = 1.2 s one upward velocity of 1.25 m/s is written to the robot's floating base and to the board's; the 6.2 cm clearance, the landing and the 1 s stand are physics under the same controller), for a stationary ollie (the board at rest; clear 5 cm, land on four wheels with both feet, stand still 1 s). No real ollie: 5291 scripted stationary ollies (IK pop, drag, level and land; parameter searches) cleared 5 cm in 565 runs (the board up to about 0.9 m), but only 6 landed and none stood 1 s; of 4810 rolling attempts none rode away; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -23,20 +23,19 @@ None. No reference controller exists for this family yet: positive by injection 
 ## Verification
 `/tests/grade.py` replays `/app/output/trajectory.npz` from the frozen start in two fresh processes (`rcb_rfo.py replay`:
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
-and both end in the same state. The rules: The skateboard: a 0.8 m deck, 0.19 m wide, with a kicktail and a nose turned up 18.0 degrees, on two trucks 0.356 m apart with four 0.026 m-radius wheels; the trucks steer when the deck tilts (pivot axis 63.0 degrees, 100.0 N m/rad of bushing stiffness, a stop at 12.0 degrees of tilt). Nothing holds your feet to it: grip tape (friction 1.0) only. The attempt, in this order: (1) pop: the board leaves the ground (no part of it touching anything but you) with a foot on its deck as it leaves; (2) clear: in the same flight of the board, every part of it (deck, trucks, wheels) is at least 0.05 m above the ground; (3) landed: then all four wheels on the ground (each within 0.005 m of it) with both feet on the deck; (4) stand: for 1.0 s without a break, both feet on the deck (contact breaks of at most 0.05 s), all four wheels on the ground, your torso within about 37 degrees of upright (the cosine of its tilt at least 0.8) and your pelvis slower than 0.35 m/s. You succeed at (4). A pop that does not clear may be followed by another. You fail if any part of you other than the feet and shins touches the board (an ollie is done without hands), if any part of you, a foot included, touches the ground or your pelvis drops below 0.3 m (a bail), if the board touches the ground upside down, after the landing if a foot stays off the deck for more than 0.2 s or your torso tilts beyond that limit, and at 8 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+and both end in the same state. The rules: The skateboard: a 0.8 m deck, 0.19 m wide, with a kicktail and a nose turned up 18.0 degrees, on two trucks 0.356 m apart with four 0.026 m-radius wheels; the trucks steer when the deck tilts (pivot axis 63.0 degrees, 100.0 N m/rad of bushing stiffness, a stop at 12.0 degrees of tilt). Nothing holds your feet to it: grip tape (friction 1.0) only. The attempt, in this order: (1) pop: the board leaves the ground (no part of it touching anything but you) with a foot on its deck as it leaves; (2) clear: in the same flight of the board, every part of it (deck, trucks, wheels) is at least 0.05 m above the ground; (3) landed: then all four wheels on the ground (each within 0.005 m of it) with both feet on the deck; (4) stand: for 1.0 s without a break, both feet on the deck (contact breaks of at most 0.05 s), all four wheels on the ground, your torso within about 37 degrees of upright (the cosine of its tilt at least 0.8) and your pelvis slower than 0.35 m/s. You succeed at (4). A pop that does not clear may be followed by another. You fail if any part of you other than the feet and shins touches the board (an ollie is done without hands), if any part of you, a foot included, touches the ground or your pelvis drops below 0.3 m (a bail), if the board touches the ground upside down, after the landing if a foot stays off the deck for more than 0.2 s or your torso tilts beyond that limit, and at 8 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

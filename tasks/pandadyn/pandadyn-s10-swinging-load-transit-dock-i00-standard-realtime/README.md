@@ -8,8 +8,8 @@
 | Simulator / robot | `maniskill` / `franka-panda` |
 | Family / instance | `s10_swinging_load_transit_dock` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 2 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 3 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
+| Real time | slowdown S = 2 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 3 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0` |
 
 ## Task
@@ -43,18 +43,19 @@ episode begins (the state hash against the instance's `initial_sha`; a mismatch 
 failure). The clock's record (`stalls`, `max_lag_s`, `late_steps`, ...) is copied into `reward.json`
 and decides nothing. `nop`: the episode never starts (its clock starts at the first submit), reward 0.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 1 GB | 1 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
+| verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 10 GiB |
 
-- GPU: required, any NVIDIA GPU; recommended: any 8 GB+ NVIDIA GPU with Vulkan (RTX 4090 / L4).
-- Measured: 50 oracle trials, 25 per mode (rcb_monitor samples every 5 s, efe:pandadyn-0.1.0, RTX 4090, 2026-10-13): privileged trial peak 0.79 GiB (anon + shmem), GPU 0.05 GiB; standard sim service peak 0.94 GiB, GPU 0.35 GiB, agent container 0.03 GiB; CPU p90 about 1 core per container; one filmed scene (render_video, S12 and D07): RSS 1.2-1.3 GiB, GPU 0.25 GiB; the sim service is one scene, the graded episode is replayed in one fresh process while the live scene is still up (two scenes at once), then filmed by the live scene; CPU: one core per scene + one for the agent
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 4 GiB GPU memory, 14 GiB memory. Limits measured: memory: the agent container holds only Python and the client (0.03 GiB in the oracle trials): max(1.5 x peak, peak + 4, 8) -> 8 GiB; whole trial: + the sim service's 6 GiB (one scene, 1.3 GiB, with its frames and the video pass's scene); GPU 0.25 GiB in the sim service (50 oracle trials, 25 per mode (rcb_monitor samples every 5 s, efe:pandadyn-0.1.0, RTX 4090, 2026-10-13): privileged trial peak 0.79 GiB (anon + shmem), GPU 0.05 GiB; standard sim service peak 0.94 GiB, GPU 0.35 GiB, agent container 0.03 GiB; CPU p90 about 1 core per container; one filmed scene (render_video, S12 and D07): RSS 1.2-1.3 GiB, GPU 0.25 GiB); processes 512 and disk 10 GiB: design defaults, not yet measured.
+- GPU: any NVIDIA GPU, held by `sim`.
+- Recommended GPU: any 8 GB+ NVIDIA GPU with Vulkan (RTX 4090 / L4).
+- Measured: 50 oracle trials, 25 per mode (the trial's resource monitor every 5 s, RTX 4090): the sim service's peak 0.94 GiB, GPU memory 0.35 GiB, the agent's container 0.03 GiB; CPU p90 about 1 core per container; one filmed scene (render_video, S12 and D07): RSS 1.2-1.3 GiB, GPU memory 0.25 GiB; the sim service is one scene; the graded episode is replayed in one fresh process while the live scene is still up (two scenes at once), then filmed by the live scene; CPU: one core per scene plus one for the agent
+- Measured (caps): GPU memory (the sim service): at most 0.35 GiB; capped at 4 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -65,19 +66,3 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Images | the `sim` sidecar runs efe:pandadyn (`images/pandadyn/`); the agent container and the verifier run the shared client image with its pip pins (`embodied_first_exam/standard/client.env`) |
 | Crash recovery | the shared realtime layer's: a checkpoint every second of robot time, `restart: on-failure:6`, the service resumes the same episode, paused |
 | Benchmark notes | tasks/pandadyn/README.md |
-
-### Change Log
-- 2026-10-14 (owner): added. The family's scene is dynamic (PROTOCOL §2.14), so it gets a standard-realtime
-  twin with S = 2 and 10 resets.
-- 2026-10-17: reset budget 10 -> 3. Every reset restores the same frozen start, so the budget is the number of
-  times an agent can rerun and tune a plan on a deterministic scene; with 10, realtime trials succeeded far more often
-  than standard ones (no reset), mostly on a late episode (tasks/pandadyn/README.md, "Reset budget"). Instance,
-  scene, success check and S are unchanged; results under 10 resets are ranked separately.
-- 2026-10-17 (owner): graded by the live episode; no grading replay (until then: one fresh-process
-  replay, success = live ∧ replay ∧ deterministic); the frozen start is checked when the first episode begins; the video
-  is rendered from the graded episode's rows after the verdict. Instance, scene, success check, S and resets are unchanged.
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Stricter checks: the carrier must brake to rest
-  at the second waypoint (below 0.025 m/s for 0.2 s), and the ball must enter the dock slowly (0.05 m/s at most).
-  Unused parameters are gone. Frozen instance: seed 0, `initial_sha` be10a4a14935d0d0; reference rows: 1456 control
-  steps (the same start; new reference rows). Results from before are under the earlier digest and are not ranked with
-  these.

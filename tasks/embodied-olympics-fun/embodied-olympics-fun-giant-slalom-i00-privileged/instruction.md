@@ -170,8 +170,8 @@ What the platform does and does not do for you:
 ## External material
 The network is open. You may install packages (pip, apt), and you may search for, download and use public tools, robot models and pretrained controllers (for example a published Unitree G1 walking, jumping or whole-body policy): finding existing work and adapting it to this robot is encouraged. Say in your notes what you used. You may read anything installed in your container, this benchmark's own source code included. The one thing not to look up is a ready-made solution to this exact task, such as this benchmark's reference solutions. This is an honour rule; trials are reviewed.
 
-## Resource limits
-Limits for the whole trial, all its processes together (every simulator you start included): at most **13 GiB of memory**, **512 processes** and **20 GiB** of new files under `/app`, `/tmp` and `/root`; the task has no GPU. These limits may be enforced (from protocol v1.2 on): when enforcement is on, exceeding one for 60 s within any 2 minutes, or a process killed for lack of memory, ends the trial as a failure (reward 0), whatever the deliverable. A monitor outside your container measures every few seconds; the current values are in `/run/rcb-limits/usage.json`. CPU is capped at 8 cores for your container; the cap only slows you down.
+## Resources
+Your container: **8 CPUs** (a cap: more work only runs slower), **16 GiB of memory** (the kernel kills a process that goes over), **8192 processes and threads** and **20 GiB** of disk (new files under `/app`, `/tmp` and `/root`). Your container has no GPU. These caps may be enforced: when enforcement is on, going over the disk cap at two readings in a row (one a minute) or a process killed at your memory cap ends the trial as a failure (reward 0), whatever the deliverable. A monitor outside your container measures every few seconds; your current use and these caps are in `/run/rcb-limits/usage.json`.
 
 ## Time limit
 You have 7200 seconds to complete this task. Do not cheat by using online solutions or hints specific to this task.

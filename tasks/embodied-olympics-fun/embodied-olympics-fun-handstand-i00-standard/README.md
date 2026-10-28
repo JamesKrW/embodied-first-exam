@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-handstand-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `handstand` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection of the way up (the tuck placed by a state write at 0.2 s) and of the way down (the robot put standing); the unfold, the 2 s hold and the fold are the robot's own lowcmd control: an LQR (finite-difference linearisation of the 10 ms step, 29 joint-target inputs) about 7 IK equilibria on the fists, scheduled tuck to straight, holds the straight handstand at least 2 s and folds back (it survives 1.5 rad/s pushes in the tuck); negatives: nop, a tuck balance, a 1.5 s hold, a fall after the hold, a headstand, outside the area. A searched tuck jump from the crouch reached a 2 s LQR-held tuck once in 448 trials but did not reproduce; snap-down exits landed in a pike or crouch, but the rise to standing was a knife edge; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection of the way up (the tuck placed by a state write at 0.2 s) and of the way down (the robot put standing); the unfold, the 2 s hold and the fold are the robot's own lowcmd control: an LQR (finite-difference linearisation of the 10 ms step, 29 joint-target inputs) about 7 IK equilibria on the fists, scheduled tuck to straight, holds the straight handstand at least 2 s and folds back (it survives 1.5 rad/s pushes in the tuck); negatives: nop, a tuck balance, a 1.5 s hold, a fall after the hold, a headstand, outside the area. A searched tuck jump from the crouch reached a 2 s LQR-held tuck once in 448 trials but did not reproduce; snap-down exits landed in a pike or crouch, but the rise to standing was a knife edge; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,20 +25,19 @@ The sim sidecar's referee judges the live attempt, and that is the verdict (`fin
 no grading replay, owner 2026-10-17); the frozen start is checked on the live simulator (`instance_mismatch`:
 infrastructure), and the video is rendered from the recorded attempt afterwards. `/tests/grade.py` reads
 `/data/final.json`: pass iff the live attempt succeeded. The
-rules: A handstand is: only your hands on the floor (nothing else of you touches it), your pelvis above your hands and your ankles above your pelvis, and both lines of your body, from the middle of where your hands touch the floor to your pelvis and from your pelvis to the middle of your ankles, within 45.0 degrees of vertical (the Code of Points does not recognise a handstand that deviates more), and your body extended: your knees bent at most 20.0 degrees (the knee joints' angle, 0 is straight) and your hips bent at most 25.0 degrees (the angle, towards your front, between the line from the middle of your shoulder joints to the middle of your hip joints and the line from each hip joint to its knee joint); a tucked or piked balance is not a handstand. Any part of your hand counts as the hand (you have fists, not fingers). The handstand is held while you stay in it with your pelvis slower than 0.15 m/s (a complete stop); it counts once it has been held without a break for 2.0 s. After that you come back down so that only your feet touch the floor (your hands off it), and then you stand for 1.0 s without a break: only your feet on the floor, your torso within 20.0 degrees of vertical, your pelvis slower than 0.35 m/s. You fail if any part of you other than your hands and feet touches the floor, or your pelvis is lower than 0.25 m (a fall); if any part of you touches the floor outside the 12.0 m x 12.0 m floor area (its lines are inside); or after 30 s. Your feet may leave the floor in a jump; nothing limits how you get onto your hands or back to your feet. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+rules: A handstand is: only your hands on the floor (nothing else of you touches it), your pelvis above your hands and your ankles above your pelvis, and both lines of your body, from the middle of where your hands touch the floor to your pelvis and from your pelvis to the middle of your ankles, within 45.0 degrees of vertical (the Code of Points does not recognise a handstand that deviates more), and your body extended: your knees bent at most 20.0 degrees (the knee joints' angle, 0 is straight) and your hips bent at most 25.0 degrees (the angle, towards your front, between the line from the middle of your shoulder joints to the middle of your hip joints and the line from each hip joint to its knee joint); a tucked or piked balance is not a handstand. Any part of your hand counts as the hand (you have fists, not fingers). The handstand is held while you stay in it with your pelvis slower than 0.15 m/s (a complete stop); it counts once it has been held without a break for 2.0 s. After that you come back down so that only your feet touch the floor (your hands off it), and then you stand for 1.0 s without a break: only your feet on the floor, your torso within 20.0 degrees of vertical, your pelvis slower than 0.35 m/s. You fail if any part of you other than your hands and feet touches the floor, or your pelvis is lower than 0.25 m (a fall); if any part of you touches the floor outside the 12.0 m x 12.0 m floor area (its lines are inside); or after 30 s. Your feet may leave the floor in a jump; nothing limits how you get onto your hands or back to your feet. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

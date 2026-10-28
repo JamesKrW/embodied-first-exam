@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Clamp the CPU caps of task copies to the host's CPU count (PROTOCOL §2.10: a runner MUST clamp every CPU cap to the
-host's count in the copy of the task it runs; the task's files keep their values).
+"""Clamp the CPU caps of task copies to the host's CPU count (docs/protocol/running.md
+"Resources": a runner clamps every CPU cap to the host's count in the copy of the task it runs; the task's files keep
+their values).
 
     python3 scripts/clamp_cpus.py [--cpus N] <task dir> ...           # rewrite the copies in place
     python3 scripts/clamp_cpus.py [--cpus N] --needs <task dir> ...   # write nothing; exit 0 if a cap is above N, else 1
@@ -81,7 +82,7 @@ def main(argv: list[str]) -> int:
         if not (t / "task.toml").is_file():
             sys.exit(f"{a}: not a task directory (no task.toml)")
         if not needs and repo_tasks in t.resolve().parents:
-            sys.exit(f"{a}: a task of the repository itself; clamp a copy (PROTOCOL §2.10: the task's files keep their values)")
+            sys.exit(f"{a}: a task of the repository itself; clamp a copy (the task's files keep their values)")
         found += clamp(t, n, write=not needs)
     for line in found:
         print(line)

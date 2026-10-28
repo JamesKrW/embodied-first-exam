@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-kick-target-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `kick_target` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (a stiff posed leg and the whole robot given 1.0 m/s: 26.7 N s in 0.054 s; then put back on its feet); negatives: a slower kick, a touch over the bound, the other leg, below the band, walking in, the bag swinging back onto the robot. Leg swings on servo-held joints gave 2 to 8 N s; there is no balance on one leg; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (a stiff posed leg and the whole robot given 1.0 m/s: 26.7 N s in 0.054 s; then put back on its feet); negatives: a slower kick, a touch over the bound, the other leg, below the band, walking in, the bag swinging back onto the robot. Leg swings on servo-held joints gave 2 to 8 N s; there is no balance on one leg; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -23,20 +23,19 @@ None. No reference controller exists for this family yet: positive by injection 
 ## Verification
 `/tests/grade.py` replays `/app/output/trajectory.npz` from the frozen start in two fresh processes (`rcb_rfo.py replay`:
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
-and both end in the same state. The rules: A heavy bag (30.0 kg, 1.2 m long, 0.35 m across) hangs by a 0.5 m chain from a hook, free to swing in every direction; its top is 1.75 m above the floor and its axis 0.8 m in front of you. The marked band runs round the bag from 0.95 m to 1.25 m above the floor. Your first touch of the bag is your kick. It must be made with your right foot or right shin alone and must first meet the bag inside the band. It is a blow, not a push: the touch lasts at most 0.15 s (it ends when leg and bag have been apart for 0.03 s), and during it the bag must receive an impulse of at least 20.0 N s, measured as the change of the bag's angular momentum about its hook divided by the depth below the hook of the lowest point the blow touched. You succeed when, after the kick, you stand for 2.0 s without a break: both feet and nothing else on the floor, the torso within about 20 degrees of upright, the pelvis slower than 0.35 m/s. You fail if anything other than the right foot or shin touches the bag at any time; if the kick lands outside the band, is too weak or is a push; if anything touches the bag again after the kick; if you fall (your pelvis lower than 0.5 m above the floor, or any part of you other than your feet on the floor); or after 15 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+and both end in the same state. The rules: A heavy bag (30.0 kg, 1.2 m long, 0.35 m across) hangs by a 0.5 m chain from a hook, free to swing in every direction; its top is 1.75 m above the floor and its axis 0.8 m in front of you. The marked band runs round the bag from 0.95 m to 1.25 m above the floor. Your first touch of the bag is your kick. It must be made with your right foot or right shin alone and must first meet the bag inside the band. It is a blow, not a push: the touch lasts at most 0.15 s (it ends when leg and bag have been apart for 0.03 s), and during it the bag must receive an impulse of at least 20.0 N s, measured as the change of the bag's angular momentum about its hook divided by the depth below the hook of the lowest point the blow touched. You succeed when, after the kick, you stand for 2.0 s without a break: both feet and nothing else on the floor, the torso within about 20 degrees of upright, the pelvis slower than 0.35 m/s. You fail if anything other than the right foot or shin touches the bag at any time; if the kick lands outside the band, is too weak or is a push; if anything touches the bag again after the kick; if you fall (your pelvis lower than 0.5 m above the floor, or any part of you other than your feet on the floor); or after 15 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

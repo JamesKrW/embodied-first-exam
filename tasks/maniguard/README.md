@@ -130,6 +130,13 @@ never copied into the task and not replayed here.
   verified 580.x and saw startup segfaults with newer ones). Blackwell needs a torch 2.7 / cu128 build of the image: not done.
 - One Isaac simulator per 32 GB of host RAM; the compose files cap torch / OpenMP pools at 8 threads.
 
+## GPU memory
+The GPU-memory cap of the container that runs the simulator (`main` in privileged mode, `sim` in standard mode) is
+18 GiB in both modes, the benchmark's choice. It is below the peaks measured in trials, 18.1 GiB on a 24 GB card and
+19.4 GiB on a 48 GB card (the tooling sets no texture budget), so an honest trial, the oracle's included, can go over
+it: the monitor records that, and it fails the trial only in a run that enforces the caps (`RCB_LIMITS_ENFORCE=1`,
+docs/protocol/running.md "Resources"). This is the one exception to "the oracle stays inside the caps" in ManiGuard.
+
 ## Tasks
 - Every task dir (both modes) carries the tooling (`environment/rcb_maniguard.py`), the task's instance files in
   `environment/instance/` (ManiGuard-Bench's `scene_ep1.json` + `diagnostics.jsonl` at revision `af09438ceb`, unchanged,
@@ -183,7 +190,7 @@ touches a task object. Here:
 `first_divergence_step`, `instance_ok`, `instance_exact` and the cost fields.
 
 Upstream's horizon (1.5 × its longest scripted demo, e.g. 2000 steps for jar) is reported (`within_upstream_horizon`), not
-enforced: time is the budget, as for BEHAVIOR-1K. A technical cap (PROTOCOL §4.5): the tooling ends an episode after
+enforced: time is the budget, as for BEHAVIOR-1K. A technical cap (docs/protocol/standard_mode.md): the tooling ends an episode after
 `MAX_STEPS` = 50,000 control steps (41.7 min of simulated time; `reason` = `runaway_guard`, a failure unless the goal held
 before), so a trajectory holds at most 50,000 rows (a longer file is `bad_trajectory` + `too_long`). Both instructions
 state it, and the standard service's `/spec` (`max_control_steps`, `episode`); `budget.steps` stays null.

@@ -5,7 +5,7 @@
 # task.toml: [verifier].environment_mode = "separate"; tests/Dockerfile exists and ships /tests/test.sh (image pins:
 # ci_checks/check-dockerfile.sh, advisory). Agent egress (H.6): a task is on the allowlist, whose hosts are those of
 # scripts/set_agent_egress.py (one list for every task; an empty one breaks the agent's model API), unless its author
-# declares open egress, `[metadata] network = "open"` (then [agent] sets no network policy, or `public`).
+# declares open egress, `[agent] network_mode = "public"` (and no allowed_hosts).
 # Appendix H.1 adds two rules, because Harbor mounts /logs/verifier read-write into the agent's container and some
 # simulators keep a cache of generated code:
 # - tests/test.sh empties /logs/verifier before anything else (a planted reward.json must not survive a grader crash):
@@ -30,7 +30,7 @@
 # - the file's top level holds `services:` and `volumes:` only, and a top-level volume is a bare name: `name:`,
 #   `external:` and `driver_opts:` alias one volume under two names or bind a path, `secrets:` / `configs:` /
 #   `include:` hand a container files of the task;
-# - H.6 for the verifier (owner 10-17): [verifier] network_mode = "no-network" on every task, no other policy in
+# - H.6 for the verifier: [verifier] network_mode = "no-network" on every task, no other policy in
 #   [verifier.environment], and no service of tests/docker-compose.yaml with `networks` or a `network_mode` other than none;
 # - a service takes no `secrets`, `configs` or `env_file` (the same files by another road); `build` only as BUILD_KEYS
 #   allows (main: `cache_from`; a sidecar: a Dockerfile of environment/ and `cache_from`), none in tests/.
@@ -42,15 +42,16 @@ def fail(m):
 d = tomllib.load(open(t / "task.toml", "rb"))
 if (d.get("verifier") or {}).get("environment_mode") != "separate": fail('[verifier].environment_mode must be "separate"')
 ag = d.get("agent") or {}
-# Appendix H.6: the default is the allowlist; open egress is the task author's own declaration, never a list kept here
-net = (d.get("metadata") or {}).get("network", "allowlist")
-if net not in ("allowlist", "open"):
-    fail(f'[metadata] network = {net!r}: "allowlist" (the default) or "open"')
-if net == "open":
-    if ag.get("network_mode", "public") != "public" or "allowed_hosts" in ag:
-        fail('[metadata] network = "open", but [agent] sets another network policy: leave network_mode / allowed_hosts out (or network_mode = "public"), or drop the declaration')
+# Appendix H.6: the default is the allowlist; open egress is the task author's own declaration in Harbor's own field,
+# `[agent] network_mode = "public"` (task_conventions.network_of), never a list kept here
+md = d.get("metadata") or {}
+if "network" in md:
+    fail(f'[metadata] network = {md["network"]!r}: the egress is declared by [agent] network_mode alone ("allowlist", or "public" for open egress; scripts/task_conventions.py normalize moves it)')
+if ag.get("network_mode") == "public":
+    if "allowed_hosts" in ag:
+        fail('[agent] network_mode = "public" (open egress) with allowed_hosts: drop the list, or put the task on the allowlist')
 elif ag.get("network_mode") != "allowlist":
-    fail('[agent].network_mode must be "allowlist" (PROTOCOL Appendix H.6: the model APIs and the package registries, unless the task declares `[metadata] network = "open"`; the generator writes it, scripts/set_agent_egress.py allowlist)')
+    fail('[agent].network_mode must be "allowlist" (PROTOCOL Appendix H.6: the model APIs and the package registries; the generator writes it, scripts/set_agent_egress.py allowlist), or "public" where the task\'s author chose open egress')
 elif not ag.get("allowed_hosts"):
     fail('[agent] allowlist without allowed_hosts (the agent could not reach its model API)')
 else:
@@ -229,14 +230,14 @@ def named_volumes(services: dict) -> dict:
 
 
 env_c, test_c = t / "environment/docker-compose.yaml", t / "tests/docker-compose.yaml"
-# The resource monitor's beacons (PROTOCOL §2.10): written only by the trusted rcb_monitor service, mounted read-only in
+# The resource monitor's beacons (PROTOCOL §6): written only by the trusted rcb_monitor service, mounted read-only in
 # the services it watches (ci_checks/check-monitor.py checks the read-only mounts); no write crosses the boundary.
 BEACONS = {"rcb_limits", "rcb_observe"}
 # Nothing that widens a container beyond its own namespaces and file system (the generated rcb_monitor service has
 # its own rules: ci_checks/check-monitor.py). Sidecars publish no port: the agent reaches the service on localhost only.
 WIDEN = ("privileged", "cap_add", "security_opt", "devices", "device_cgroup_rules", "volumes_from", "pid", "ipc", "uts",
          "cgroup", "cgroup_parent", "userns_mode", "extends", "<<",
-         "oom_kill_disable", "oom_score_adj", "memswap_limit", "sysctls", "runtime")   # around the declared caps (§2.10)
+         "oom_kill_disable", "oom_score_adj", "memswap_limit", "sysctls", "runtime")   # around the declared caps (§6)
 # A service with its own network setting is not routed through Harbor's egress control: the task's allowlist would not
 # apply to it (harbor 0.23, docker.py _egress_controlled_service_names).
 OWN_NETWORK = ("network_mode", "networks")
@@ -268,7 +269,7 @@ def build_problems(svc: str, build: dict) -> list[str]:
             if not IMAGE_REF.match(r):
                 out.append(f"service {svc}: `build` cache_from `{r}` is not a registry image reference (no type=, no host path, no variable)")
     return out
-# the mode registry (PROTOCOL §2.16): RCB_MODES_TABLE from run_all.sh, "<mode> <sidecar 0|1> <twin>" longest first
+# the mode registry (PROTOCOL §3): RCB_MODES_TABLE from run_all.sh, "<mode> <sidecar 0|1> <twin>" longest first
 import os
 _table = os.environ.get("RCB_MODES_TABLE", "")
 if not _table:
@@ -284,14 +285,14 @@ if env_c.is_file():
         for k in WIDEN:
             if k in info["keys"]: fail(f"service {svc}: `{k}` is not allowed (it widens the container beyond its own namespaces and files)")
         for k in OWN_NETWORK:
-            if k in info["keys"]: fail(f"service {svc}: `{k}` is not allowed (Harbor's egress control skips a service with its own network setting: the allowlist would not apply; a sidecar is reached on localhost only, PROTOCOL §4.1)")
+            if k in info["keys"]: fail(f"service {svc}: `{k}` is not allowed (Harbor's egress control skips a service with its own network setting: the allowlist would not apply; a sidecar is reached on localhost only, PROTOCOL §3)")
         for k in HANDS_FILES:
             if k in info["keys"]: fail(f"service {svc}: `{k}` is not allowed (it hands the container files of the task or the host outside `volumes:`)")
         if "build" in info["keys"]:
             for b in build_problems(svc, info["build"]): fail(b)
         if svc != "main":
             for k in ("ports", "expose"):
-                if k in info["keys"]: fail(f"sidecar {svc}: `{k}` is not allowed (the agent reaches a sidecar on localhost only, PROTOCOL §4.1)")
+                if k in info["keys"]: fail(f"sidecar {svc}: `{k}` is not allowed (the agent reaches a sidecar on localhost only, PROTOCOL §3)")
         for kind, src, rest in info["mounts"]:
             if kind == "bind":
                 if svc == "main" and not src.startswith("$"):

@@ -2,6 +2,7 @@
 # create render materials even with rendering off), and the replay video renders the camera views: the verifier gets the GPU.
 services:
   main:
+    x-gpu-memory-gb: 5   # GiB of GPU memory (docs/protocol/README.md §6)   # rcb-monitor
     deploy:
       resources:
         reservations:

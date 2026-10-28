@@ -6,9 +6,9 @@
 | Mode | privileged |
 | Twin | `robocasa365-plate-steak-meal-i00-standard` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa365/PlateSteakMeal` |
+| Family / instance | `robocasa365/PlateSteakMeal` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0` |
 
 ## Task
@@ -23,18 +23,17 @@ Retargeted by PR #4 from official demonstration episode 2 (`demo_0`, 441 recorde
 ## Verification
 `tests/grade.py` in a separate sandbox without network: two replays in fresh processes from the verifier's own copy of the instance; `success = deterministic ∧ success on the final state ∧ not solved at the start`. Reference: two fresh-process replays end in the live run's state (hash `90fded2ef5e7…`) and succeed. `nop`: no trajectory, reward 0; the instance is not solved at the start.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 9 GB | 7 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 20 GiB | 8192 | no GPU | 10 GiB |
+| verifier | 4 | 16 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: sim p90 5.6 GB, privileged container p90 7.2 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU-only (OSMesa cameras); CPU author estimate
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 16 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: memory: the [environment] cap 16 GiB, which every past trial ran under (docker peak 7.8 GiB over 7 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 10 GiB: design defaults, not yet measured.
+- Measured: memory: privileged container p90 7.2 GB (a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

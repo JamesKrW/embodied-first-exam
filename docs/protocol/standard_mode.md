@@ -478,11 +478,11 @@ for `include_depth` and ignore the new parts and keys).
 ## Part 3 — Standard-realtime mode: `eai-standard/2.3`
 
 Time does not stop. The wire protocol of the standard-realtime mode, served by
-standard-realtime tasks only (`mode = "standard-realtime"`, `protocol = "eai-standard/2.3"`); the shared implementation
+standard-realtime tasks only (directories ending in `-standard-realtime`, `protocol = "eai-standard/2.3"`); the shared implementation
 is `embodied_first_exam/standard/realtime/rcb_realtime.py`, which other benchmarks' realtime services use unchanged. 2.3
 is 2.2 plus the realtime capability below; every 2.2 addition stays optional, so a 2.1 service with this capability is a
 2.3 service. Same endpoints, RCB1 frames and grading as 2.1. `/spec.timing` declares it: `realtime: true`, `slowdown` S
-(`RCB_SLOWDOWN`; each task declares its default, `[metadata] slowdown`), `control_dt`, `wall_s_per_control_step`,
+(`RCB_SLOWDOWN`; each task declares its default in its `sim` service), `control_dt`, `wall_s_per_control_step`,
 `max_ahead_steps`. Each task declares its reset budget (Part 1, "Optional reset capability"). S and the reset budget
 are part of a result's configuration (running.md).
 - **Clock.** An episode starts paused at its starting state. Its clock starts at its first `/submit` or `/observe`

@@ -8,7 +8,7 @@
 | Simulator / robot | `ambench` / `ambench-fahexa` |
 | Family / instance | `lemon_harvesting_fahexa` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:ambench-0.3.1` |
 
 ## Task
@@ -38,18 +38,18 @@ by the `film` CLI, the same rows drawn by the render worker, an illustration onl
 `a0426217ca460de2`; a rare race can change the last bits of one, never measured to change the outcome). `nop`: no
 trajectory, reward 0.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 8 | 4 |
-| Memory | 16 GB | 16 GB |
-| GPU memory | 8 GB | 8 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 34 GiB | 16384 | 16 GiB | 20 GiB |
+| verifier | 8 | 24 GiB | no cap | 16 GiB | no cap |
 
-- GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: freezing the instances, oracle trials and replays (RTX 4090, 2026-10-13/14, docker stats and nvidia-smi every 2-10 s, rcb_monitor): with one environment's PhysX buffers (the tooling's), a camera-free Isaac process (the default Session, the grader's replays) peaks at 2.0 GiB of memory and 1.2 GiB of GPU memory (Isaac Lab's default buffers: 2.9 / 3.2); the render worker that draws the cameras (Session(cameras=True), the verifier's filmed illustration) adds 11.9 GiB and 3.4 GiB (3.3-3.6 under every RTX preset tried); 6-10 cores while Isaac starts, about 1.5 after; the verifier runs one process at a time. The minimums cover one camera-on Session
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 16 GiB GPU memory, 28 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 16 GiB GPU memory, 28 GiB memory. Limits measured: a Session with cameras peaks at 14 GiB of memory and 4.6 GiB of GPU memory (its render worker included), a camera-free one at 2.0 / 1.2 (the rule's measurement); the agent may run two Sessions with cameras at once: at most 28 GiB, 9.2 GiB -> memory 28 GiB (the container's cap 34 GiB: 34 / 1.2 >= 28), GPU 16 GiB (at least 16 for Isaac Sim); processes 512 and disk 20 GiB: design defaults, not yet measured.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, RTX PRO 6000 Blackwell, held by `main`.
+- Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
+- Measured: freezing the instances, oracle trials and replays on an RTX 4090 (docker stats and nvidia-smi every 2-10 s, the trial's resource monitor): with one environment's PhysX buffers (the tooling's), a camera-free Isaac process (the default Session, the grader's replays) peaks at 2.0 GiB of memory and 1.2 GiB of GPU memory (Isaac Lab's default buffers: 2.9 / 3.2); the render worker that draws the cameras (Session(cameras=True), the verifier's filmed illustration) adds 11.9 GiB and 3.4 GiB (3.3-3.6 under every RTX preset tried); 6-10 cores while Isaac starts, about 1.5 after; the verifier runs one process at a time
+- Measured (caps): GPU memory: a Session with cameras peaks at 4.6 GiB (its render worker included), a camera-free one at 1.2 GiB; an agent may run two Sessions with cameras at once (9.2 GiB) -> at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

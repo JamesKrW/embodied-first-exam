@@ -151,7 +151,7 @@ success rate), load rotor 14.7 / 1.0.
   (`insert_centrifuge_5430`, 600 control steps/s); a verdict replay may take 2400 s and is killed at that limit.
   `[verifier] timeout_sec` 5400 = 2 x 2400 + the video replay (what is left, at most 1800 s; skipped under 120 s) +
   300 s, so `tests/grade.py` always writes a reward before Harbor's timeout.
-- **What is not the agent's 0** (`infra_error = 1` in `reward.json`, PROTOCOL §2.6). Standard: `final.json` missing
+- **What is not the agent's 0** (`infra_error = 1` in `reward.json`, PROTOCOL §4). Standard: `final.json` missing
   (the service writes it as soon as its scene is up), unreadable, or not finalized (the collect hook was killed before
   it wrote the verdict); the service never ending its episode for the hook; a give-up after crashes between calls or a
   failed resume; a live episode that did not start in the instance's recorded state (`instance_mismatch`); no

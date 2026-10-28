@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-vertical-jump-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `vertical_jump` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the arm raised by the robot's own motors, then 2.8 m/s up: the hand touches the vane 0.30 m above its standing reach, lands and stands); negatives: no touch, lifted without a jump, a step before the take-off, the stand touched, the vane touched without a jump or with another part. A balanced open-loop jump of ours raises the pelvis 0.23 m of the 0.31 m needed; an unbalanced one reaches the vane and falls; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the arm raised by the robot's own motors, then 2.8 m/s up: the hand touches the vane 0.30 m above its standing reach, lands and stands); negatives: no touch, lifted without a jump, a step before the take-off, the stand touched, the vane touched without a jump or with another part. A balanced open-loop jump of ours raises the pelvis 0.23 m of the 0.31 m needed; an unbalanced one reaches the vane and falls; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,20 +25,19 @@ The sim sidecar's referee judges the live attempt, and that is the verdict (`fin
 no grading replay, owner 2026-10-17); the frozen start is checked on the live simulator (`instance_mismatch`:
 infrastructure), and the video is rendered from the recorded attempt afterwards. `/tests/grade.py` reads
 `/data/final.json`: pass iff the live attempt succeeded. The
-rules: Your standing reach (the top of a hand, flat-footed, legs straight, arm stretched up) is 1.66 m. A vane hangs over you with its underside 0.3 m above that: a light plate (0.05 kg) 0.9 m long from your left to your right and 0.08 m wide, on a hinge at its left end, so that it swings away when it is touched. Your jump is your first flight (nothing of you touches the ground or the stand) of at least 0.1 s. Until then: no step and no run-up: every point where a foot touches the ground must lie within 0.03 m of the place where that foot's sole stood at t = 0, and neither foot may be off the ground for more than 0.05 s while the other is on it (so both feet leave the ground within 0.05 s of each other: a two-foot take-off). Rising on the toes is allowed. The flight must be a jump: your pelvis has to rise at least 0.05 m above its height at lift-off. The touch: during that flight a hand (the fist or the wrist beyond the forearm) touches the vane. The first contact after the flight must be with your feet only. After the landing you may step; you succeed once you stand for 1.0 s without a break: only your feet on the ground, your torso within about 20 degrees of vertical, your pelvis slower than 0.35 m/s. A fall fails the attempt at any time: your pelvis lower than 0.35 m, or any part of you other than your feet on the ground. You fail on a step or shuffle before the take-off, a foot that leaves the ground before the other, a touch of the vane that is not in the jump's flight or not with a hand, any touch of the stand (its post or its base plate on the floor, also after the landing), a jump that lands without having touched the vane, a flight that is not a jump, a landing that is not on the feet, a fall, or after 20 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+rules: Your standing reach (the top of a hand, flat-footed, legs straight, arm stretched up) is 1.66 m. A vane hangs over you with its underside 0.3 m above that: a light plate (0.05 kg) 0.9 m long from your left to your right and 0.08 m wide, on a hinge at its left end, so that it swings away when it is touched. Your jump is your first flight (nothing of you touches the ground or the stand) of at least 0.1 s. Until then: no step and no run-up: every point where a foot touches the ground must lie within 0.03 m of the place where that foot's sole stood at t = 0, and neither foot may be off the ground for more than 0.05 s while the other is on it (so both feet leave the ground within 0.05 s of each other: a two-foot take-off). Rising on the toes is allowed. The flight must be a jump: your pelvis has to rise at least 0.05 m above its height at lift-off. The touch: during that flight a hand (the fist or the wrist beyond the forearm) touches the vane. The first contact after the flight must be with your feet only. After the landing you may step; you succeed once you stand for 1.0 s without a break: only your feet on the ground, your torso within about 20 degrees of vertical, your pelvis slower than 0.35 m/s. A fall fails the attempt at any time: your pelvis lower than 0.35 m, or any part of you other than your feet on the ground. You fail on a step or shuffle before the take-off, a foot that leaves the ground before the other, a touch of the vane that is not in the jump's flight or not with a hand, any touch of the stand (its post or its base plate on the floor, also after the landing), a jump that lands without having touched the vane, a flight that is not a jump, a landing that is not on the feet, a fall, or after 20 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

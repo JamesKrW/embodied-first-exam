@@ -4,11 +4,11 @@
 |---|---|
 | Benchmark | Embodied Olympics - Match |
 | Mode | standard (`eai-standard-turn/1.0`) |
-| Twin | — (none: a task Embodied Olympics exports with its own service, PROTOCOL §4c; a turn-based match has no trajectory deliverable) |
+| Twin | — (none: a task Embodied Olympics exports with its own service, PROTOCOL §3; a turn-based match has no trajectory deliverable) |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `fencing_bout` / seed 39 |
 | Oracle | `full` — in process (fencing-7): the oracle beats level 1 on this seed 15:11; over 40 player seeds the reference wins this instance 62.5 %, the equilibrium mix 47.5 % (fresh-seed means 61.5 %, 53.5 %); none of the nine constant intentions nor a random player wins it; live on vanilla Harbor 0.23.0 (2026-10-15, the exported task) the oracle won 15:11 in 25 phrases, replay identical (the world is deterministic) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0` |
 
 ## Task
@@ -30,18 +30,17 @@ the validity rule
 valid, finished match that the agent won. `tests/fexam_reward.py` adds the hub's fields (`infra_error`, `realtime`,
 `slowdown`, `opponent_level`; `realtime` = 0 for a turn-based match).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 2 | 6 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 256 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: vanilla Harbor 0.23.0 on an RTX 4090 workstation (32 cores), 2026-10-15, oracle and nop of both tasks, docker stats every 5 s: the sim peaks at 4.0 CPUs (its cap) and 0.71 GiB (the replay in a fresh process and the video after the bout; a bout is about 20 s of service time), the oracle's container under 0.1 GiB (a model's harness needs more: Embodied Olympics' agent default); turn-based, so fewer CPUs only slow it down; CPU only
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 4 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 12 GiB memory. Limits measured: design defaults of Embodied Olympics' exported matches (the agent 4 GiB under its 6 GiB cap; whole trial: + the sim's 8 GiB cap); measured peaks 2026-10-15: sim 0.71 GiB, oracle container under 0.1 GiB.
+- Measured: Harbor oracle and nop trials of both tasks on a 32-core RTX 4090 workstation, docker stats every 5 s: the sim peaks at 4.0 CPUs (its cap) and 0.71 GiB (the replay in a fresh process and the video after the bout; a bout is about 20 s of service time), the oracle's container under 0.1 GiB (a model's harness needs more); turn-based, so fewer CPUs only slow it down; CPU only
 
 ## Details
 

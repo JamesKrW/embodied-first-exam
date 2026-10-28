@@ -3,7 +3,7 @@
 its live episode (docs/protocol/README.md H.4; no grading replay): success = the live episode's success, no
 infrastructure failure and no simulator error. Numeric-only reward.json; a reward is always written.
 
-infra_error = 1 (no verdict on the agent, PROTOCOL §2.6) when final.json is missing (the service writes it as soon as
+infra_error = 1 (no verdict on the agent, PROTOCOL §4) when final.json is missing (the service writes it as soon as
 its scene is up, so the agent cannot make it disappear), unreadable, or not finalized (the collect hook did not
 finish); or the service or the hook reported one: a give-up after crashes between calls, a failed resume, the live
 episode not started in the instance's recorded state (`instance_mismatch`), the episode never ended for the hook, no
@@ -53,7 +53,7 @@ def grade(d: dict) -> tuple[bool, dict]:
         "timeout": int(reason == "timeout"),
         "instance_mismatch": int(bool(d.get("instance_mismatch"))),
         "grader_error": 0,
-        # an infrastructure failure, not the agent's (PROTOCOL §2.6): see the module docstring
+        # an infrastructure failure, not the agent's (PROTOCOL §4): see the module docstring
         "infra_error": int(infra),
         "gave_up": int(bool(d.get("gave_up"))),
         "sim_crashed_on_call": int(reason == "sim_crashed_on_call"),

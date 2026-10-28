@@ -3,7 +3,7 @@
 credits, rate-limited, logged out, a missing key), so that every further job of the lane would fail within minutes?
 run_agent_batch.sh stops the lane on exit 4 (a runner-side tool, not task code).
 
-Structured evidence only, from what Harbor's native agents write (2026-09-28: a grep of codex.txt once stopped a lane on
+Structured evidence only, from what Harbor's native agents write (a grep of codex.txt would stop a run on
 Codex's "Reconnecting... 1/5" notice after a transient server error, whose request ID happened to contain "429", in a trial
 whose model calls had all answered 200 and that ended at its time budget):
   quota    Codex's own rate_limits (payload.rate_limits in the last session rollout, parsed): rate_limit_reached_type set,
@@ -120,7 +120,7 @@ def selftest() -> int:
 
     ok_rl = {"primary": {"used_percent": 19.0, "window_minutes": 10080}, "secondary": None}
     done = [{"type": "turn.completed"}]
-    # the false positive of 2026-09-28: Codex's reconnect notice after a transient 500, its request ID containing "429",
+    # a false positive of a text search: Codex's reconnect notice after a transient 500, its request ID containing "429",
     # then the run went on (every other call 200); and "429" / usage limit inside a tool result
     fp = [{"type": "error", "message": "Reconnecting... 1/5 (The server had an error while processing your request. Please "
            "include the request ID 7c1e0429f3ab in your message.)"}, {"type": "item.completed", "item": {

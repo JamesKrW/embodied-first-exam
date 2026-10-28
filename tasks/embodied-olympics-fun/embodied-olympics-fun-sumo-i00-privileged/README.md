@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `sumo` / seed 0 |
 | Oracle | `full` — Reference: FALCON walking-policy rows with privileged poses: it pushes with the forearms low, steering 1 m beyond the opponent outwards, and wins at 11.6 s (the opponent down); 8 of 10 perturbed starts and 29 of 40 with its own numbers +-3 % succeed, below the 9 of 10 bar (chaotic shoving of two walking policies). Measured: success after 14.8 s of the 30 s limit, live and in a fresh replay, ending in the same state. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,18 +25,17 @@ The opponent is as heavy and as strong as you and walks into you on a balance po
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
 and both end in the same state. The rules: The bout is on a dohyo: a clay mound 0.55 m high, 6.7 m square, with a ring of straw bales whose inside edge is a circle 4.55 m across (the bales stand 0.05 m proud of the clay). You stand facing the opponent behind your starting line (the white lines are 0.7 m apart, across the middle of the ring); the opponent, another Unitree G1, stands behind its line facing you. The bout starts at t = 0; the opponent charges at t = 0.5 s and keeps walking into you, arms forward, turning to face you. You win at the first moment the opponent touches the ground outside the ring (the mound beyond the bales, or the floor below the mound) with any part of its body, or touches the clay or the bales inside with any part other than its feet, provided you have not done the same before. You lose (the attempt fails) if that happens to you first: any part of you on the ground outside the ring, any part other than your feet on the clay or the bales, or your pelvis lower than 0.35 m above the clay. Both in the same instant is no decision and fails. Kicking the opponent's trunk (its pelvis or torso) with a foot is forbidden and fails. If there is no decision after 30 s, you fail.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

@@ -11,7 +11,7 @@ scripts/set_agent_egress.py allows), so the gateway can never carry an agent pas
 /h/<host>:<port>/<path> -> http://<host>:<port>/<path>, only for an exact <host>:<port> the runner named with --http-host
 (a self-hosted model server without TLS, e.g. sglang's Anthropic-compatible API): the agent's own configured base URL.
 
-Model-API paths only (PROTOCOL §2.11; owner 2026-10-10): on such a host the gateway forwards only the requests listed in
+Model-API paths only (docs/protocol/running.md "Usage gateway"): on such a host the gateway forwards only the requests listed in
 api_paths.json for the host's provider (the model calls: responses, chat completions, messages, token counting, the
 model list) and answers everything else 403 without forwarding it: account connectors and apps, plugins, files,
 conversations, web search. A provider's hosts are on the task's egress allowlist only so that the model can be called;
@@ -54,13 +54,13 @@ own agent/ and verifier/ (not inside agent/, which the agent's container mounts 
                        is the request's n there. `rawlog.py compact` (run_agent_batch.sh, after each job) turns it into
                        raw.jsonl.xz; `rawlog.py cat` prints the requests in full
 
-Token budget (PROTOCOL §5, D10; on by default when the gateway runs): once a trial's totals reach --budget-input input
+Token budget (docs/protocol/running.md "Official runs"; on by default when the gateway runs): once a trial's totals reach --budget-input input
 or --budget-output output tokens, totals.json gets over_token_budget = 1 and every further model request of that trial
 is refused with HTTP 400 and a "token budget exceeded" error in the provider's format, without being forwarded, so the
 agent stops; the request in flight when the budget is crossed completes. The first refusal writes totals.json
 "budget_stop" (limit input|output, first/last_refused_at, the counts at the stop, refused): the structured stop record
-the runner maps to TokenBudgetExceeded (issue #229). 0 disables a limit. Defaults 10B / 10B (owner 2026-10-17, board
-0150): cached input counts in full, and the limit almost never binds. The refusal avoids 429 and
+the runner maps to TokenBudgetExceeded (issue #229). 0 disables a limit. Defaults 10B / 10B: cached input counts in
+full, and the limit almost never binds. The refusal avoids 429 and
 "usage limit" wording on purpose: scripts/account_failure_check.py would read those as an account failure.
 
 Token counts are normalized the way Harbor counts them: input = everything the model read (Anthropic: input +
@@ -543,7 +543,7 @@ def api_error(host: str, path: str, msg: str, code: str) -> dict:
 
 def budget_error(host: str, path: str, tot: dict) -> dict:
     msg = (f"token budget exceeded for this trial: input {tot.get('input', 0)} / {ARGS.budget_input}, output "
-           f"{tot.get('output', 0)} / {ARGS.budget_output} (PROTOCOL §5); the run is over")
+           f"{tot.get('output', 0)} / {ARGS.budget_output} (docs/protocol/running.md, Official runs); the run is over")
     return api_error(host, path, msg, "token_budget_exceeded")
 
 
@@ -779,8 +779,8 @@ def main() -> int:
                    help="the model-API requests to forward, per provider (default: api_paths.json next to this file)")
     p.add_argument("--server-tools", choices=("refuse", "record"), default="refuse",
                    help="a model request that asks the provider to run a tool (api_paths.json): refuse it (default) or only record it")
-    p.add_argument("--budget-input", type=int, default=10_000_000_000, help="per-trial input tokens, cached included; 0 = no limit (D10)")
-    p.add_argument("--budget-output", type=int, default=10_000_000_000, help="per-trial output tokens; 0 = no limit (D10)")
+    p.add_argument("--budget-input", type=int, default=10_000_000_000, help="per-trial input tokens, cached included; 0 = no limit")
+    p.add_argument("--budget-output", type=int, default=10_000_000_000, help="per-trial output tokens; 0 = no limit")
     ARGS = p.parse_args()
     ARGS.jobs = ARGS.jobs.resolve()
     MODEL_HOSTS.extend(h.lower() for h in ARGS.extra_host)

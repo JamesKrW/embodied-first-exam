@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `golf_putt` / seed 0 |
 | Oracle | `full` — Reference for the G1's own Dex3-1 right hand at the device's torques (the putter's grip across the palm, held by the closed fingers and thumb; no weld): a one-armed pendulum putt by the wrist's roll joint with the wrist's yaw held at zero, the arm's kinematics reading where the club is in the hand; holed at 18.0 s of the 30 s limit (one hand: with the club soled behind the ball, inverse kinematics from 40 starts finds no collision-free posture with both hands on the grip, the misses 5 cm and more or the arms through the trunk), one 12 ms contact of the head; the same state hash twice; holed again with the swing 2 % faster and with the ball 2 mm towards the heel or the toe (3 of 5 perturbations; a face closed 0.5 degree more or a take-back 0.02 rad longer stops 6-10 cm short). At the start the hanging club turns 0.7 degree in the hand in 3 s. Negatives: nop (time), the hand opened (the putter left the hand), injected rolls too soft, too hard, over the edge, past the hole, at rest on the lip, off the green, a push, a double hit then a second stroke, a ball thrown at the shaft, a kick, astride the line, a fall; stimp 10 measured. Stress: random arm targets with the club in the hand end on the anchoring rule at 0.34 s, the club at most 7.4 mm into anything. The privileged twin's reference rows (1799 control steps, success after 17.99 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -27,18 +27,17 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 `/data/final.json`: pass iff the live attempt succeeded. The
 rules: The ball (42.67 mm, 45.9 g) lies at rest on a flat green of stimp 10 (a ball that starts rolling at 1.83 m/s stops after 3.05 m). The hole is cut into the green 3.0 m from the ball: 0.108 m across and 0.1016 m deep, with no flagstick in it. A putter (0.86 m long, 0.5 kg, 3.0 degrees of loft, a round grip 0.024 m thick and 0.26 m long) is a separate body; at the start its grip lies across the palm of your right hand (a three-finger hand: a thumb, an index and a middle finger), the fingers closed round it, which holds it by contact and friction only: it can slip, turn in the hand and fall. The putter is in your hand while its grip touches the hand's index or middle finger and its thumb or palm; it has left your hand when for more than 0.05 s it has not. Your left hand may hold the grip too; the putter may touch nothing of you but your two hands. You succeed when the ball is holed with one stroke: after the stroke it comes to rest (its centre moves less than 0.001 m in 1.0 s) inside the hole with the whole ball below the surface of the green. A stroke is a fair strike of the ball with the putter's head (any side of the head): the first contact of the head with the ball starts it, every further contact must come within 0.2 s of the first (an accidental double hit is still one stroke), and all the contacts together may last at most 0.03 s. You fail if the putter leaves your right hand at any time (dropped, thrown or slipped out of the hand); if the putter touches any part of you other than your hands; if the contacts last longer (the ball was pushed, scraped or scooped), if the head touches the ball again later (a second stroke), if anything else of you ever touches the ball (the putter's shaft or grip, a foot, a leg, a hand), if at the moment of the stroke your feet touch the green on both sides of the line of play (the straight line through the ball's spot and the hole's centre, extended behind the ball) or on that line, if the ball comes to rest anywhere but in the hole (on the lip and on the green beyond the hole included), if the ball leaves the green, if you fall (your pelvis lower than 0.35 m above the green, or any part of you other than your feet touching the ground; the putter may touch the green as long as it stays in your hand), or after 30 s.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

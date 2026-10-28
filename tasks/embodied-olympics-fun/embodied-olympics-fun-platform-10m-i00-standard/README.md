@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `platform_10m` / seed 0 |
 | Oracle | `full` — Reference: a scripted G1 dive (stand with the arms overhead, a balanced crouch, a 0.37 s lean with soft ankles, a lowcmd push with the hips opened, a straight entry shape), the lean time found by bisection: a half somersault of 167 deg at the first touch, the body line 8.5 deg off vertical when the hips reach the surface, entry 2.29 m out. Referee test: 12 negatives, incl. over- and under-rotation, a topple, a scrape, arms down, legs apart, toes, a twist and a side entry (injected kicks), too far, a step, a hop (double jump). The privileged twin's reference rows (632 control steps, success after 6.32 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -27,18 +27,17 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 `/data/final.json`: pass iff the live attempt succeeded. The
 rules: You stand on the 10 m platform's front end facing the water (+x). The dive: take off from the platform (both feet stay on it until the take-off: a foot off it for more than 0.1 s while the other is on it, or any flight of 0.03 s or more that lands on the platform again, fails; the take-off counts when you are in the air and your centre of mass has risen at least 0.1 m above its height at the start), turn forwards through half a somersault (180.0 degrees, within 45.0, counted from your upright start) and enter the water head first. From the moment your body line (from the middle of your ankles to the middle of your shoulders) passes the horizontal until the dive is complete you must be in the straight position: hips and knees each bent less than 20.0 degrees from straight, the ankles at most 0.12 m apart, the toes pointed (each ankle pitched at least 0.3 rad towards the toes). The entry starts when the first part of you reaches the water surface (z = 0) and the dive is complete when the whole of you is under it; that first part must be a hand or the head (feet first fails); when your pelvis reaches the surface your body line must be within 15.0 degrees of vertical, head down; through the entry: not twisted (your shoulders' axis within 20.0 degrees of the platform's width direction); both palms at least 0.15 m beyond the centre of your head along the body line, at most 0.2 m apart and each within 0.15 m of the body line; and the straight position. The entry point (the middle of your palms when the first part of you touches the water) must be between 0.5 m and 3.0 m in front of the platform's front edge (closer is unsafely close) and within 0.5 m to either side of the line you face at the start. You fail if, after the take-off, any part of you touches the platform or its railings. Before the take-off any part other than the feet on the platform, or anything on the railings, fails. The water is not simulated: nothing after the dive is complete is judged. Success: a complete dive that keeps all of these. The attempt ends after 20 s.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

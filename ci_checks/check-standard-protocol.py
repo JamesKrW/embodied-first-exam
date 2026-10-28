@@ -32,7 +32,7 @@ SPEC_KEYS_REQ = {"protocol", "protocol_compat", "simulator", "robot", "task_text
                  "cameras", "default_cameras", "action_types", "proprio_layout", "proprio_groups", "static", "world", "budget",
                  "robot_spec", "kinematics", "depth"}
 SPEC_KEYS_OK = SPEC_KEYS_REQ | {"physics_substeps", "physics_hz", "on_service_error", "max_call_wall_s",   # + crash recovery
-                                "episode", "max_control_steps",                                           # PROTOCOL §4.7, §4.5
+                                "episode", "max_control_steps",                                           # standard_mode.md, PROTOCOL §2
                                 "max_frames_per_call"}   # standard_mode.md §12: where the adapter states one
 CAM_KEYS_REQ = {"rgb", "depth", "mounted", "resolution", "intrinsic_cv", "mount"}
 CAM_KEYS_OK = CAM_KEYS_REQ | {"calibration_in_obs", "depth_range_m"}
@@ -182,7 +182,7 @@ def ext_to_T_world_cam(E) -> np.ndarray:
 
 # ---------------------------------------------------------------- the checks
 def check_spec(rep: Report, spec: dict, task: Path | None) -> None:
-    if spec.get("protocol") == "rcb-limited/2.2":          # the pre-v1.0 spelling of the same protocol
+    if spec.get("protocol") == "rcb-limited/2.2":          # another name of the same protocol, which the shared layer accepts
         rep.add("WARN", "spec.protocol", "legacy name rcb-limited/2.2 (use eai-standard/2.2)")
     else:
         rep.ok(spec.get("protocol") == "eai-standard/2.2", "spec.protocol", str(spec.get("protocol")))
@@ -388,7 +388,7 @@ def check_live(rep: Report, url: str, task: Path | None, client_dir: Path, out: 
     # /status and the 404 surface
     st0 = r.status()
     rep.ok({"step", "calls", "done", "reason"} <= set(st0), "status.keys", json.dumps(st0))
-    resets = int((spec.get("budget") or {}).get("reset") or 0)   # POST /reset exists only with a reset budget (PROTOCOL §4.5)
+    resets = int((spec.get("budget") or {}).get("reset") or 0)   # POST /reset exists only with a reset budget (PROTOCOL §2)
     for m, p in (("GET", "/reset"), ("GET", "/state"), ("GET", "/success"), ("POST", "/reset"), ("GET", "/kinematics"), ("POST", "/step")):
         if (m, p) == ("POST", "/reset") and resets:
             continue                                            # never probed live: it would start a new episode

@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-inline-slalom-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `inline_slalom` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the floating base written every control step along a weaving path, one skate rolling, the other lifted; cones, skates and wheels are physics); the real run-up only: a scripted swizzle (IK) skates from the start box over the 12 m run-up in 12.3 s on two feet, which the referee voids at the second cone (7.4.2.2). No one-foot controller exists for the G1: one-skate glides steered by capture point last at most 2.2 s at 2 m/s; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the floating base written every control step along a weaving path, one skate rolling, the other lifted; cones, skates and wheels are physics); the real run-up only: a scripted swizzle (IK) skates from the start box over the 12 m run-up in 12.3 s on two feet, which the referee voids at the second cone (7.4.2.2). No one-foot controller exists for the G1: one-skate glides steered by capture point last at most 2.2 s at 2 m/s; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -23,20 +23,19 @@ None. No reference controller exists for this family yet: positive by injection 
 ## Verification
 `/tests/grade.py` replays `/app/output/trajectory.npz` from the frozen start in two fresh processes (`rcb_rfo.py replay`:
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
-and both end in the same state. The rules: You wear inline skates (rigid boots on your feet, four wheels in a line on each, the outer ones 0.064 m and the inner ones 0.062 m in diameter, 0.064 m apart). The course runs along +x on a level sports floor: the start line at x = 0 and a second line 0.4 m behind it (the start box), 20 cones on the line y = 0 every 0.8 m from x = 12.0 m, the end line 0.8 m beyond the last cone. The cones are free plastic cups 0.078 m high, 0.074 m across the base, 0.02 kg, standing on marking stickers. Time starts when any part of your body crosses the start line at the gate beam's height, 0.4 m above the ground; you must do that within 5.0 s of t = 0. The cone line begins at the front edge of the first cone: enter it on one foot (one skate's wheels on the ground, the other skate in the air), or the first cone counts as missed (a penalty); not being on one foot when your skate passes the second cone voids the run. From then on the free skate must not touch the ground until the end line (that voids the run; so does changing feet). Pass the cones alternately on the left and the right with the supporting skate: two consecutive cones on the same side are a missed interval. A cone whose marking centre is uncovered at the finish (its base centre moved more than 0.0335 m (the base's radius less the centre point's), or tilted more than 30.0 degrees) is kicked. Each kicked cone or missed interval adds 0.2 s; more than 4 penalties void the run. The run ends when the front wheel of your supporting skate crosses the end line with a wheel of that skate on the ground (crossing first with the free skate, or in the air, voids it); every cone must have been passed. Your time is the time from the beam to the end line plus the penalties. You succeed with a valid run that ends within 60 s of t = 0. You also fail if any part of you touches the ground (the skates' wheels and frames may) or your pelvis drops below 0.45 m (a fall). No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+and both end in the same state. The rules: You wear inline skates (rigid boots on your feet, four wheels in a line on each, the outer ones 0.064 m and the inner ones 0.062 m in diameter, 0.064 m apart). The course runs along +x on a level sports floor: the start line at x = 0 and a second line 0.4 m behind it (the start box), 20 cones on the line y = 0 every 0.8 m from x = 12.0 m, the end line 0.8 m beyond the last cone. The cones are free plastic cups 0.078 m high, 0.074 m across the base, 0.02 kg, standing on marking stickers. Time starts when any part of your body crosses the start line at the gate beam's height, 0.4 m above the ground; you must do that within 5.0 s of t = 0. The cone line begins at the front edge of the first cone: enter it on one foot (one skate's wheels on the ground, the other skate in the air), or the first cone counts as missed (a penalty); not being on one foot when your skate passes the second cone voids the run. From then on the free skate must not touch the ground until the end line (that voids the run; so does changing feet). Pass the cones alternately on the left and the right with the supporting skate: two consecutive cones on the same side are a missed interval. A cone whose marking centre is uncovered at the finish (its base centre moved more than 0.0335 m (the base's radius less the centre point's), or tilted more than 30.0 degrees) is kicked. Each kicked cone or missed interval adds 0.2 s; more than 4 penalties void the run. The run ends when the front wheel of your supporting skate crosses the end line with a wheel of that skate on the ground (crossing first with the free skate, or in the air, voids it); every cone must have been passed. Your time is the time from the beam to the end line plus the penalties. You succeed with a valid run that ends within 60 s of t = 0. You also fail if any part of you touches the ground (the skates' wheels and frames may) or your pelvis drops below 0.45 m (a fall). No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

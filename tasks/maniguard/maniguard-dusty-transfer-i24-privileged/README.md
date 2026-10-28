@@ -8,7 +8,7 @@
 | Simulator / robot | `maniguard` / `franka-panda-longfinger` |
 | Family / instance | `dusty_transfer` / seed 24 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:maniguard-0.2.1` |
 
 ## Task
@@ -49,18 +49,18 @@ outcome classes, and `/logs/verifier/replay.mp4`. A file that is not a trajector
 more than 50,000 rows) is `bad_trajectory`; `grader_error = 1` (with `infra_error = 1`) means no verdict on the agent (a replay process that died
 or ran out of time, a frozen instance this host did not rebuild).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 6 | 6 |
-| Memory | 23 GB | 21 GB |
-| GPU memory | 10.5 GB | 10.5 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 30 GiB | 16384 | 18 GiB | 20 GiB |
+| verifier | no cap | no cap | no cap | 18 GiB | no cap |
 
-- GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: one standard trial: sim anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU 3.6 GB 15 min in, live sampler (docker stats + cgroup anon + nvidia-smi every 30 s, 13 cloud GPU hosts + an RTX 4090 workstation, 10-10); GPU memory and CPU from BEHAVIOR-1K (same OmniGibson / Isaac Sim stack) until more trials are measured; verifier 15.8 GB docker memory, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 30 GiB GPU memory, 25 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 30 GiB GPU memory, 25 GiB memory. Limits measured: GPU: 19.4 GiB on a 48 GB card, 18.1 on 24 GB (the evaluation pool's GPU profile (per-trial GPU peaks by card, 10-03..10); no texture budget in its tooling) -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: the [environment] cap 24 GiB, which every past trial ran under (no samples); processes 512 and disk 20 GiB: design defaults, not yet measured.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
+- Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
+- Measured: GPU memory and CPU from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack); the verifier 15.8 GB (a per-container memory sampler); the standard twin's sim service, the same simulator, in one trial: anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s)
+- Measured (caps): GPU memory: cap 18 GiB, the benchmark's choice, below the measured peaks of 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling): a trial over it is recorded and fails only when a run sets RCB_LIMITS_ENFORCE=1 (tasks/maniguard/README.md "GPU memory"); processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -70,7 +70,3 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Constraint class / skill / grasping | `spatial` / `long_horizon` / `sticky` (ManiGuard's evaluator for this family) |
 | Data | the licensed BEHAVIOR-1K 3.7.2 data root, mounted read-only from `$RCB_MANIGUARD_DATA` (a precondition), never baked in |
 | GPU | an RTX-class NVIDIA GPU (`environment/docker-compose.yaml`, `count: 1`); physics on the CPU |
-
-### Change Log
-- 2026-10-10: how a trajectory that could not be graded is recorded, and the row cap is stated; the scene, the frozen instance, the goal, the safety rules and the pass rule are unchanged, so the task keeps its name. `tests/grade.py`: a file that is not a trajectory of this task (not an npz, no `task` or `actions` entry, a pickled array) is `bad_trajectory = 1` (was `grader_error = 1`; 0 either way); a replay may take `max(3600, 900 + 0.2 × rows)` s and the verifier's `timeout_sec` is 23400 s (was 3600 s per replay in 7200 s, which a long trajectory outran: Harbor ended the verifier without a reward), a replay still over its limit is `grader_error = 1` with `replay_timed_out = 1`; a frozen instance the replays did not rebuild is `grader_error = 1` (was a plain 0). `rcb_maniguard.py`: filming the second replay can no longer void it (a video that cannot be written is only `video_rendered` 0; a video is thinned to at most 3000 frames), and an extra pickled entry in the file no longer stops the replay. The cap of 50,000 rows (an episode ends after 50,000 control steps), which the grader always had, is now in the instruction. A pass before this change is a pass after it.
-- 2026-10-10 (review round 2): `tests/grade.py` writes `infra_error` = 1 next to every `grader_error` = 1 (a replay process that died or ran out of time, a frozen instance the host did not rebuild, an exception in the grader), as the other benchmarks do: a reader of `infra_error` alone (PROTOCOL §2.6) took these for the agent's 0. The reward is 0 in these cases, as before; the pass rule is unchanged, so the task keeps its name.

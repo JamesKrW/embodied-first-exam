@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `boxing` / seed 0 |
 | Oracle | `full` — Reference: a straight punch from a guard with the upper arm raised 0.04 rad, the trunk's turn behind it and the wrist pitched +0.31 rad so that the knuckle part leads, then the walking policy at zero command; its parameters come from a random search over the guard, the trunk's wind and turn, the wrist, the punch's end pose and its duration (96 tries, 10 scoring). The bag receives 15.9 N s (12 required) at 1.25 m in a 0.030 s touch; the fist is back at the guard at 4.0 s; no arm into the robot's own body; live, replay and the state hash agree. 3 of 4 neighbours succeed (servo gains x0.97 / x1.03 and the bag 1.5 cm farther pass; with the bag 1.5 cm nearer the blow lands early in the stroke: 10.7 N s, too weak). The privileged twin's reference rows (401 control steps, success after 4.01 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -27,18 +27,17 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 `/data/final.json`: pass iff the live attempt succeeded. The
 rules: A heavy bag (30.0 kg, 1.2 m long, 0.35 m across) hangs by a 0.5 m chain from a hook, free to swing in every direction; its top is 1.75 m above the floor and its axis 0.75 m in front of you. The marked band runs round the bag from 1.2 m to 1.6 m above the floor. Your first touch of the bag is your punch. It must be made with the knuckle part of your right fist alone (the far 0.03 m of the hand's pad, the end that points along the forearm) and must first meet the bag inside the band. It is a blow, not a push: the touch lasts at most 0.1 s (it ends when fist and bag have been apart for 0.03 s), and during it the bag must receive an impulse of at least 12.0 N s, measured as the change of the bag's angular momentum about its hook divided by the depth below the hook of the lowest point the blow touched. After the blow, bring the fist back: you succeed when your right palm has been within 0.35 m of your right shoulder joint for 2.0 s without a break while you stand (only your feet on the ground, the torso within about 20 degrees of upright, the pelvis slower than 0.35 m/s). You fail if anything other than the knuckle part of the right fist touches the bag at any time; if the punch lands outside the band, is too weak or is a push; if anything touches the bag again after the punch; if you fall (your pelvis lower than 0.5 m above the floor, or any part of you other than your feet on the floor); or after 15 s.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

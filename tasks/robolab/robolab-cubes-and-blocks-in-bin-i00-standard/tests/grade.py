@@ -4,7 +4,7 @@ live episode (owner 2026-10-17; no grading replay): success = the live episode's
 success term held at a control step of the episode the agent ran, the hold of the last command after the agent's phase
 included) and no infrastructure failure. Numeric-only reward.json; a reward is written whatever final.json holds.
 
-infra_error = 1 (no verdict on the agent, PROTOCOL §2.6): final.json is missing (the service never came up, or its
+infra_error = 1 (no verdict on the agent, PROTOCOL §4): final.json is missing (the service never came up, or its
 container was gone when the collect hook ran), unreadable, or not finalized (the collect hook did not finish); or the
 service or the hook reported one: a give-up after crashes between calls (`sim_crashed`), a failed resume, the frozen
 instance not rebuilt at the episode's start (`instance_mismatch`, before the agent was served), the episode never ended
@@ -44,7 +44,7 @@ write(ok, {"success": int(ok), "live_success": int(bool(d.get("success"))), "gra
            "sim_error": int(d.get("reason") == "error"),   # a simulator error during the agent's calls: the agent's 0
            "instance_mismatch": int(bool(d.get("instance_mismatch"))), "instance_exact": int(bool(d.get("instance_exact"))),
            "grader_error": 0,
-           # an infrastructure failure, not the agent's (PROTOCOL §2.6): see the module docstring
+           # an infrastructure failure, not the agent's (PROTOCOL §4): see the module docstring
            "infra_error": int(infra), "gave_up": int(bool(d.get("gave_up"))),
            "sim_crashed_on_call": int(d.get("reason") == "sim_crashed_on_call"),
            "sim_startups": int(num("sim_startups")), "resumes": int(num("resumes")),

@@ -34,7 +34,7 @@ if [ "${1:-}" != "--changed" ]; then   # task dirs given relative to the caller'
 fi
 cd "$root" || exit 1
 q() { printf %q "$1"; }
-# the mode registry (PROTOCOL §2.16, scripts/task_conventions.py MODE_REGISTRY), read once for the per-task shell checks
+# the mode registry (PROTOCOL §3, scripts/task_conventions.py MODE_REGISTRY), read once for the per-task shell checks
 RCB_MODES_TABLE="$(python3 "$root/scripts/task_conventions.py" modes)" || { echo "FAIL scripts/task_conventions.py modes"; exit 1; }
 export RCB_MODES_TABLE
 
@@ -88,17 +88,17 @@ if [ ${#tasks[@]} -gt 0 ]; then
 fi
 # repo-level, cheap: always on everything, or on the given task dirs as before
 pargs=""; [ $explicit -eq 1 ] && pargs="$targs"
-add bash ci_checks/check-tooling-identity.sh                # D9 shared sources; the eai-standard/2.2 layer = embodied_first_exam/standard/
+add bash ci_checks/check-tooling-identity.sh                # shared sources (PROTOCOL §1); the eai-standard/2.2 layer = embodied_first_exam/standard/
 add bash ci_checks/check-standard-client.sh                 # standard agent + verifier images: the pinned client base and pins
-# PROTOCOL §2.9 (v1.1.4): [metadata.resources] (minimum compute) in every task.toml, consistent with the GPU reservations and
-# caps, and the README's Compute resources section rendered from it
+# PROTOCOL §6: the caps of every container ([environment], the compose files, x-gpu-memory-gb), the rules of
+# scripts/task_resources.toml applied, and the instruction's and README's `## Resources` rendered from them
 add python3 ci_checks/check-resources.py"$pargs"
 # PROTOCOL §2: the agent's time cutoff, each task's own `[agent] timeout_sec` (no table): at most 14400 s, the closing
 # `## Time limit` section of instruction.md, the README row and the standard modes' sim service say it, nothing else states
 # the limit (the twins' equal number is an invariant: check-twins.py). Per task: a scoped run checks its benchmarks' tasks only
 add python3 ci_checks/check-cutoffs.py"$targs"
 add python3 ci_checks/check-seeds.py"$pargs"
-# PROTOCOL §4b: a standard-realtime task states its slowdown S ([metadata] slowdown, the instruction) and allows resets
+# PROTOCOL §2: a standard-realtime task states its slowdown S (its sim service's default, the instruction) and allows resets
 add python3 ci_checks/check-realtime.py"$pargs"
 # PROTOCOL §4: every task renders a video and the runner can collect it; a declared video time bound is not
 # shorter than the verdict replay's (privileged)
@@ -114,10 +114,14 @@ add python3 ci_checks/check-monitor.py --tier advisory"$pargs"
 add python3 ci_checks/check-build-stamps.py
 # PROTOCOL §4: the core set (docs/core_set.toml) names existing task dirs, with their base, benchmark label and mode
 add python3 scripts/task_conventions.py core-set --check
-# every task dir has its benchmark label and sits in its benchmark's folder, tasks/<folder>/<task>/ (BENCHMARK_DIRS)
+# every task dir has its benchmark label and sits in its benchmark's folder, tasks/<folder>/<task>/ (BENCHMARK_TABLE)
 add python3 scripts/task_conventions.py benchmarks --check
+# the CI scope's table (ci_checks/ci_scope.py UNITS) names the benchmarks of BENCHMARK_TABLE and owns every images/ directory
+add python3 ci_checks/ci_scope.py --check
 # README.md's quick start is the one task_conventions.readme_quick_start() renders
 add python3 scripts/task_conventions.py readme --check
+# docs/TAXONOMY.md's protocol row is the one task_conventions.taxonomy_protocol_row() renders from the tasks
+add python3 scripts/task_conventions.py taxonomy --check
 # every files-only image's sources still hash to its FILES.json (the checks read the sources for what the pinned image holds)
 add python3 scripts/files_image.py check
 

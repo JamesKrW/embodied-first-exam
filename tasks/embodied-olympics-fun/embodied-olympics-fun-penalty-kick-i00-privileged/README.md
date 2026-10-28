@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-penalty-kick-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `penalty_kick` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (a real walk-up and foot contact, the ball's velocity set at the contact to 20 m/s into the corner; also a chip over the keeper); the keeper is a board on a rail driven by a force-limited servo (at most 800 N, 3 m/s), never moved by state writes, and a 15 m/s ball pushes it 3 mm; negatives: an 8 m/s corner shot saved by the keeper, a weak kick, wide, over the bar, a second touch, in without a kick, a body contact. Beating the keeper takes about 12 m/s to a corner; a G1 foot running into the ball at 4 m/s gives 3 to 5 m/s; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (a real walk-up and foot contact, the ball's velocity set at the contact to 20 m/s into the corner; also a chip over the keeper); the keeper is a board on a rail driven by a force-limited servo (at most 800 N, 3 m/s), never moved by state writes, and a 15 m/s ball pushes it 3 mm; negatives: an 8 m/s corner shot saved by the keeper, a weak kick, wide, over the bar, a second touch, in without a kick, a body contact. Beating the keeper takes about 12 m/s to a corner; a G1 foot running into the ball at 4 m/s gives 3 to 5 m/s; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -23,20 +23,19 @@ None. No reference controller exists for this family yet: positive by injection 
 ## Verification
 `/tests/grade.py` replays `/app/output/trajectory.npz` from the frozen start in two fresh processes (`rcb_rfo.py replay`:
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
-and both end in the same state. The rules: A size-5 football (0.22 m across, 0.43 kg, in air) lies at rest on the penalty mark, 3.0 m straight ahead of you; the goal line is 11.0 m beyond the mark. The goal is 7.32 m wide between the posts and 2.44 m high under the crossbar (posts and bar 0.12 m thick), centred on the line through you and the mark. A goalkeeper dummy, a board 1.9 m high, 0.6 m wide, 0.3 m thick and 80.0 kg, stands on the goal line at the centre of the goal on a carriage that runs on a rail along the line, driven by a motor of at most 800.0 N; from 0.25 s after your kick the motor drives it at up to 3.0 m/s towards the point where the ball, going on as it moves at that moment, would cross the line, and it blocks the ball (a hit pushes it along the rail). The kick is a contact of a foot or an ankle of yours with the ball (the parts below the shin); every such contact within 0.15 s of the first belongs to the one kick. You succeed at the moment the whole ball is over the goal line between the posts and under the bar; it may touch the posts, the bar, the dummy and the ground on the way. You fail if any other part of you touches the ball at any time, if a foot touches the ball again later than 0.15 s after the first contact (a second touch), if the ball is not moving towards the goal line at the end of the kick, if the whole ball crosses the goal line outside the goal, if after the kick the ball has been slower than 0.1 m/s for 1.0 s, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 15 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+and both end in the same state. The rules: A size-5 football (0.22 m across, 0.43 kg, in air) lies at rest on the penalty mark, 3.0 m straight ahead of you; the goal line is 11.0 m beyond the mark. The goal is 7.32 m wide between the posts and 2.44 m high under the crossbar (posts and bar 0.12 m thick), centred on the line through you and the mark. A goalkeeper dummy, a board 1.9 m high, 0.6 m wide, 0.3 m thick and 80.0 kg, stands on the goal line at the centre of the goal on a carriage that runs on a rail along the line, driven by a motor of at most 800.0 N; from 0.25 s after your kick the motor drives it at up to 3.0 m/s towards the point where the ball, going on as it moves at that moment, would cross the line, and it blocks the ball (a hit pushes it along the rail). The kick is a contact of a foot or an ankle of yours with the ball (the parts below the shin); every such contact within 0.15 s of the first belongs to the one kick. You succeed at the moment the whole ball is over the goal line between the posts and under the bar; it may touch the posts, the bar, the dummy and the ground on the way. You fail if any other part of you touches the ball at any time, if a foot touches the ball again later than 0.15 s after the first contact (a second touch), if the ball is not moving towards the goal line at the end of the kick, if the whole ball crosses the goal line outside the goal, if after the kick the ball has been slower than 0.1 m/s for 1.0 s, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 15 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-breaking-windmill-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `breaking_windmill` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the pelvis pose and velocity written each control step along a windmill path, 1.25 rev/s, the torso's axis 26 degrees head-down, heading and roll together, the upper back 4 mm into the floor; the joints on the robot's own PD, legs in a V, hips following the roll; the contacts are the simulator's). Turning and rolling are counted only while the body lies on the floor (the torso's axis within 30 degrees of horizontal, the pelvis at most 0.45 m up), and the torso or an upper arm (not the head) must touch the floor in each half revolution. Negatives: nop, a backspin (no roll), a log roll (no spin), a reversed roll, hips on the floor, in the air, the same turning upside down on the head and shoulders, 2 + hips down + 2 (not consecutive), outside the field of play. Wobbles in a headstand (the heading of a near-vertical axis turning) count no windmill; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the pelvis pose and velocity written each control step along a windmill path, 1.25 rev/s, the torso's axis 26 degrees head-down, heading and roll together, the upper back 4 mm into the floor; the joints on the robot's own PD, legs in a V, hips following the roll; the contacts are the simulator's). Turning and rolling are counted only while the body lies on the floor (the torso's axis within 30 degrees of horizontal, the pelvis at most 0.45 m up), and the torso or an upper arm (not the head) must touch the floor in each half revolution. Negatives: nop, a backspin (no roll), a log roll (no spin), a reversed roll, hips on the floor, in the air, the same turning upside down on the head and shoulders, 2 + hips down + 2 (not consecutive), outside the field of play. Wobbles in a headstand (the heading of a near-vertical axis turning) count no windmill; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,20 +25,19 @@ The sim sidecar's referee judges the live attempt, and that is the verdict (`fin
 no grading replay, owner 2026-10-17); the frozen start is checked on the live simulator (`instance_mismatch`:
 infrastructure), and the video is rendered from the recorded attempt afterwards. `/tests/grade.py` reads
 `/data/final.json`: pass iff the live attempt succeeded. The
-rules: A windmill revolution is counted on your torso. Its long axis (from your pelvis up to your neck) must turn once round the vertical (360 degrees of heading) and in the same time your torso must roll once about that axis (back, shoulder, chest, shoulder, back towards the floor: at least 0.85 of a full roll per revolution), both the same way round. The turning and the rolling are counted only while you lie on the floor: your torso's long axis within 30.0 degrees of horizontal and your pelvis at most 0.45 m above the floor (on your head or your hands, upside down, nothing is counted). Your back, chest or shoulders (your torso or upper arms; your head does not count for this) must touch the floor in each half of each revolution. While you are doing windmills only your torso (back, chest, shoulders; your head, which is fixed to it, counts with it), your upper arms, forearms and hands may touch the floor: your hips and your legs (thighs, shins, feet) may not. The count starts when you are down (your back, chest or shoulders touching the floor with no foot on it) and goes back to zero whenever your hips or a leg touch the floor or the rotation reverses. You succeed when 3 revolutions are counted without such a reset. How you get down from standing is free (any part may touch the floor then). You fail if any part of you touches the floor outside the 8.0 m x 8.0 m field of play, or after 30 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+rules: A windmill revolution is counted on your torso. Its long axis (from your pelvis up to your neck) must turn once round the vertical (360 degrees of heading) and in the same time your torso must roll once about that axis (back, shoulder, chest, shoulder, back towards the floor: at least 0.85 of a full roll per revolution), both the same way round. The turning and the rolling are counted only while you lie on the floor: your torso's long axis within 30.0 degrees of horizontal and your pelvis at most 0.45 m above the floor (on your head or your hands, upside down, nothing is counted). Your back, chest or shoulders (your torso or upper arms; your head does not count for this) must touch the floor in each half of each revolution. While you are doing windmills only your torso (back, chest, shoulders; your head, which is fixed to it, counts with it), your upper arms, forearms and hands may touch the floor: your hips and your legs (thighs, shins, feet) may not. The count starts when you are down (your back, chest or shoulders touching the floor with no foot on it) and goes back to zero whenever your hips or a leg touch the floor or the rotation reverses. You succeed when 3 revolutions are counted without such a reset. How you get down from standing is free (any part may touch the floor then). You fail if any part of you touches the floor outside the 8.0 m x 8.0 m field of play, or after 30 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

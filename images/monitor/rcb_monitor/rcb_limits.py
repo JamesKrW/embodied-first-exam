@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
-"""Resource limits (docs/protocol/README.md §2.10): the sustained-violation rule, shared by the monitor sidecar (monitor.py) and
-the verifier step, and the verifier step itself.
+"""Resources (docs/protocol/README.md §6): the violation rules, shared by the monitor sidecar (monitor.py) and the verifier
+step, and the verifier step itself.
+
+Every resource number of a task is an upper bound for one container. Docker enforces CPU (a throttle), memory (the
+kernel's OOM killer at the container's own cap) and processes. GPU memory (`x-gpu-memory-gb` of the service that holds
+the GPU) and disk (`[environment].storage_mb`): Docker caps neither on a local host (a cloud backend may apply
+storage_mb); the monitor measures both and, only when the run sets RCB_LIMITS_ENFORCE=1 (off by default), a use above
+either cap is a violation. A scope without a GPU has no GPU-memory cap (the key is absent from limits.json): GPU memory
+seen there anyway is recorded, never a violation. The rules are the protocol's, the same for every task:
+GPU memory above its cap for SUSTAIN_SEC within any WINDOW_SEC, disk (the growth of the files under DISK_PATHS in the
+agent's container) above its cap at two measurements in a row, or a kernel OOM kill in the scope at the container's own
+memory cap. The caps come from the task's limits.json (format rcb-limits/2, written by inject.py; any other format is
+an unusable record, and with enforcement on not a result).
 
 The pinned monitor image carries it at /opt/rcb_monitor/ (inject.py IMAGE and CONTENTS), and every task's tests/Dockerfile
 copies it from there to /tests/ (ci_checks/check-monitor.py). Python 3.8+, standard library only: it runs inside
@@ -15,7 +26,7 @@ was written (removed, truncated, rewritten), gives the grader the copy instead (
 session_log_tampered (0/1) and session_log_from_monitor (0/1) to reward.json. Only the graders' cost fields read the log.
 
 The verifier step reads the monitor's sealed record (/var/rcb-monitor/, collected from the rcb_monitor sidecar, a
-channel the agent cannot write), recomputes every violation from the raw samples with its own copy of the limits
+channel the agent cannot write), recomputes every violation from the raw samples with its own copy of the caps
 (/tests/rcb_limits.json), and adds to /logs/verifier/reward.json:
   always:   resource_enforced, limits_violation_observed, resource_monitor_missing, peak_gpu_memory_gb, peak_memory_gb,
             peak_processes, peak_disk_gb, resource_emergency_kills; over_<metric>=1 for every violation; the kernel's
@@ -31,15 +42,15 @@ channel the agent cannot write), recomputes every violation from the raw samples
             infra_error=1, resource_host_oom=1 (not a result: another trial's or the host's doing, never the agent's)
   RCB_LIMITS_ENFORCE neither 0/1/true/false: infra_error=1, resource_switch_error=1 (nobody knows what was asked for)
   in both modes: the kernel OOM-killed a benchmark-owned service and the grader's verdict is not a success:
-            infra_error=1, resource_service_oom=1 (PROTOCOL §2.10: such a service is recorded, never a failure; an
+            infra_error=1, resource_service_oom=1 (PROTOCOL §6: such a service is recorded, never a failure; an
             episode that ended without success after its simulator was killed for memory is not the agent's 0). A
             success stands: the service recovered and the grader accepted the episode.
 Wherever this step says "not a result" (infra_error=1) it also sets success=0 and reward.txt 0 and keeps the grader's
 verdict in success_before_limits, so that no reader sees a success next to an infrastructure error.
 With the default (not enforced, a readable switch) the step changes nothing of the grader's verdict (reward.txt,
 success, reward) and sets infra_error only in the one case above (a benchmark-owned service OOM-killed, no success).
-A violation is a limit exceeded for sustain_sec within window_sec (disk: two measurements in a row), or a kernel OOM kill
-in the scope at the container's own memory cap (the monitor's `oom` event with cause "cap"). The monitor's emergency
+A violation is the GPU-memory cap exceeded for SUSTAIN_SEC within WINDOW_SEC, the disk cap at two measurements in a row,
+or a kernel OOM kill in the scope at the container's own memory cap (the monitor's `oom` event with cause "cap"). The monitor's emergency
 kills (host protection) are counted, never violations by themselves.
 The reasons, in words, go to /logs/verifier/resource_limits.json. If this step itself fails, it says so in reward.json
 (resource_step_error=1, resource_monitor_missing=1; infra_error=1 when the switch asks for enforcement).
@@ -50,10 +61,12 @@ import stat
 import sys
 
 FORMAT = "rcb-monitor/1"
+LIMITS_FORMAT = "rcb-limits/2"   # limits.json / rcb_limits.json (inject.py FORMAT)
 RECORD = os.environ.get("RCB_MONITOR_RECORD", "/var/rcb-monitor")
-METRICS = ("gpu_memory_gb", "memory_gb", "processes", "disk_gb")
-LIMIT_KEY = {"gpu_memory_gb": "max_gpu_memory_gb", "memory_gb": "max_memory_gb", "processes": "max_processes",
-             "disk_gb": "max_disk_gb"}
+METRICS = ("gpu_memory_gb", "memory_gb", "processes", "disk_gb")     # recorded (peaks); memory and processes: docker's
+LIMIT_KEY = {"gpu_memory_gb": "gpu_memory_gb", "disk_gb": "disk_gb"}   # the caps the monitor enforces (limits.json keys)
+SUSTAIN_SEC, WINDOW_SEC = 60.0, 120.0   # the protocol's rule for GPU memory (docs/protocol/running.md "Resources")
+DISK_PATHS, DISK_EXCLUDE = ("/app", "/tmp", "/root"), ()   # what disk counts in the agent's container: new files here
 MAX_GAP_FRACTION = 0.10      # more of the agent phase than this unobserved: the record is not usable
 
 
@@ -132,15 +145,15 @@ def consecutive(series, limit, n=2):
 
 def violations(samples, limits, events=()):
     """Every violation in a record: [{metric, limit, at, peak}] (empty: none). samples: the record's sample dicts.
-    A limit exceeded for sustain_sec within window_sec (disk: two measurements in a row), or a kernel OOM kill in the
+    The GPU-memory cap exceeded for SUSTAIN_SEC within WINDOW_SEC, the disk cap at two measurements in a row, or a kernel OOM kill in the
     scope at the container's own memory cap (cause "cap": the cgroup's own `oom` counter rose with the kill). A kill
     by the host's OOM killer (any other cause) is not the trial's doing and never a violation: oom_kills() counts it.
-    The monitor's own `emergency_kill` events protect the host and are not violations (PROTOCOL §2.10)."""
+    The monitor's own `emergency_kill` events protect the host and are not violations (PROTOCOL §6)."""
     tick = float(limits.get("tick_sec", 5))
-    sustain = float(limits.get("sustain_sec", 60))
-    window = float(limits.get("window_sec", 2 * sustain))
+    sustain = float(limits.get("sustain_sec", SUSTAIN_SEC))      # the protocol's (a test may pass another)
+    window = float(limits.get("window_sec", WINDOW_SEC))
     out = []
-    for m in METRICS:
+    for m in LIMIT_KEY:
         lim = limits.get(LIMIT_KEY[m])
         if lim is None:
             continue
@@ -218,6 +231,8 @@ def record_problems(summary, samples, events, limits):
         why.append("no sealed record (/var/rcb-monitor/summary.json missing: the monitor did not run, crashed, or was not collected)")
     elif summary.get("format") != FORMAT:
         why.append(f"record format {summary.get('format')!r}, expected {FORMAT}")
+    if (limits or {}).get("format") != LIMITS_FORMAT:
+        why.append(f"limits format {(limits or {}).get('format')!r}, expected {LIMITS_FORMAT}: the caps cannot be read")
     if not samples:
         why.append("no samples")
     fatal = [e for e in events if e.get("event") == "fatal"]
@@ -225,11 +240,11 @@ def record_problems(summary, samples, events, limits):
         why.append("monitor fatal: " + "; ".join(str(e.get("why")) for e in fatal)[:300])
     if samples and summary and not summary.get("scope_seen"):
         why.append("the monitor never found the containers it watches (no beacon seen)")
-    if float(limits.get("max_gpu_memory_gb") or 0) > 0 and samples:
+    if float(limits.get("gpu_memory_gb") or 0) > 0 and samples:
         blind = sum(1 for s in samples if (s.get("scope") or {}).get("gpu_unmeasured"))
         if blind / len(samples) > MAX_GAP_FRACTION:
             why.append(f"NVML did not tell the GPU memory of processes in scope in {blind} of {len(samples)} samples "
-                       "(MIG / vGPU?): the GPU-memory limit was not measured")
+                       "(MIG / vGPU?): the GPU-memory cap was not measured")
     if len(samples) >= 2:
         tick = float(limits.get("tick_sec", 5))
         span = samples[-1]["t"] - samples[0]["t"]
@@ -272,7 +287,7 @@ def verify(argv=()):
     reward = reward if have_grade else {}
     problems = record_problems(summary, samples, events, limits)
     if limits_file is None:
-        problems.append("the verifier's copy of the limits (tests/rcb_limits.json) is missing or unreadable")
+        problems.append("the verifier's copy of the caps (tests/rcb_limits.json) is missing or unreadable")
     if switch_error and not any(switch_error in p for p in problems):
         problems.append(switch_error)
     viol = violations(samples, limits, events) if samples else []
@@ -328,7 +343,7 @@ def verify(argv=()):
                              f"killed {oom['host']} process(es) of the trial")
     elif oom["service"] and have_grade and not reward.get("success"):
         # in both modes: the kernel killed a benchmark-owned service (the simulator sidecar, a scorer) for memory and
-        # the episode did not end in a success. Such a service is recorded, never a failure (PROTOCOL §2.10): whatever
+        # the episode did not end in a success. Such a service is recorded, never a failure (PROTOCOL §6): whatever
         # the grader made of the crash, this is not the agent's 0.
         add["resource_service_oom"] = 1
         add["infra_error"] = 1

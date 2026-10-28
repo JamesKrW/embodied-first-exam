@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `sweeper_jump` / seed 0 |
 | Oracle | `full` — Reference: walk, joint and lowcmd rows with the boom angle read privileged: it faces the boom, makes three tuck jumps with the soles 4-8 cm over the 0.30 m boom and stands 2 s, success at 21.1 s; 9 of 11 perturbed starts and 15 of 20 with its own gains +-3 % succeed, below the 9 of 10 bar (landings on the 0.9 m podium). Measured: success after 21.1 s of the 30 s limit, live and in a fresh replay, ending in the same state. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,18 +25,17 @@ Neither built-in gait can jump: the robot must jump with its feet above a boom a
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
 and both end in the same state. The rules: You stand on a round podium, 0.9 m across and 0.4 m high, whose centre is 3.2 m from the axis of the motion base, facing the base. A foam boom 0.2 m thick, its axis 0.2 m above the podium's top, turns round the base counter-clockwise (seen from above) at 8.0 revolutions per minute, driven by a motor of at most 450.0 N m; it reaches 4.0 m from the axis, over the whole podium, and comes round once every 7.5 s. It is already turning at the start. A jump counts when the boom passes under both your feet while nothing of you touches anything (at the moment it passes each foot). You succeed when, after 3 counted jumps, your first contact is your feet on the podium and you then stand still for 1.0 s (only your feet on the podium, your torso within about 20 degrees of vertical, your pelvis slower than 0.35 m/s), before the boom comes round again. You fail at once if the boom touches any part of you (a hit; grabbing or holding it is a hit too), if any part of you touches the bed (the floor round the podium) or the motion base, if the boom passes through a foot that is not above it, on a fall (your pelvis less than 0.35 m above the podium's top, or any part of you other than your feet on the podium), on a landing after the last jump that is not on the feet, or after 30 s.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

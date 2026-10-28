@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-shuttle-run-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `shuttle_run` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (real running on all four legs, the three about-turns set by hand: 23.0 s); negatives: turning short, a foot only on the line, two legs only, arms over the finish without the torso, down, walking. With the built-in gaits a leg takes about 6 s and an about-turn on the walking policy 3.4 s: about 33 s against the 30 s limit. A turn counts only with the foot beyond the line between its cones (every ground contact point at |y| <= 3 m), the finish only where the torso's leading point crosses the start line between its cones, and the pelvis may not leave the court (|y| > 4 m or more than 10 m beyond a line fails). Positive by injection (the standing robot moved by hand beyond each line in turn, then through the start line: real foot contacts and an interpolated torso crossing); negatives: nop, a turn touch past the cones, out of the court, a finish past the cones. A model run's oval loop round the court (turns and finish on the lines' extensions, up to 8.3 m wide) fails: 'left the court' at 4.99 s. Every rule above is judged in the family's own 1 ms substep hook.; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (real running on all four legs, the three about-turns set by hand: 23.0 s); negatives: turning short, a foot only on the line, two legs only, arms over the finish without the torso, down, walking. With the built-in gaits a leg takes about 6 s and an about-turn on the walking policy 3.4 s: about 33 s against the 30 s limit. A turn counts only with the foot beyond the line between its cones (every ground contact point at |y| <= 3 m), the finish only where the torso's leading point crosses the start line between its cones, and the pelvis may not leave the court (|y| > 4 m or more than 10 m beyond a line fails). Positive by injection (the standing robot moved by hand beyond each line in turn, then through the start line: real foot contacts and an interpolated torso crossing); negatives: nop, a turn touch past the cones, out of the court, a finish past the cones. A model run's oval loop round the court (turns and finish on the lines' extensions, up to 8.3 m wide) fails: 'left the court' at 4.99 s. Every rule above is judged in the family's own 1 ms substep hook.; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -23,20 +23,19 @@ None. No reference controller exists for this family yet: positive by injection 
 ## Verification
 `/tests/grade.py` replays `/app/output/trajectory.npz` from the frozen start in two fresh processes (`rcb_rfo.py replay`:
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
-and both end in the same state. The rules: Two lines cross the floor: the start line x = 0 and the far line x = 10.0 m (the planes meant are the edges of the painted lines that face each other). The clock starts at t = 0. You run four legs: to the far line, back to the start line, to the far line, back to the start line. At each of the three turns you must put a foot on the ground wholly beyond the line: every part of that foot at x > 10.0 m at the far line (turns 1 and 3), at x < 0 at the start line (turn 2); a foot on the line does not count, and the foot must be between the cones at the line's ends (every point where it touches the ground at |y| <= 3.0 m). The turns count in this order only. After the third turn you finish at the moment the leading point of your torso (not the head, arms, legs or feet) reaches the start line between its cones (|y| <= 3.0 m at that point). Which way you face and how you turn is up to you. You succeed when you finish within 30 s of robot time. A fall does not end the attempt: you are down while your pelvis is below 0.4 m, you may get up and go on, but 10.0 s down in a row end it. You fail when down for 10.0 s, when your pelvis leaves the court (more than 4.0 m to either side of the centre line y = 0, or more than 10 m beyond either line), or after 30 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+and both end in the same state. The rules: Two lines cross the floor: the start line x = 0 and the far line x = 10.0 m (the planes meant are the edges of the painted lines that face each other). The clock starts at t = 0. You run four legs: to the far line, back to the start line, to the far line, back to the start line. At each of the three turns you must put a foot on the ground wholly beyond the line: every part of that foot at x > 10.0 m at the far line (turns 1 and 3), at x < 0 at the start line (turn 2); a foot on the line does not count, and the foot must be between the cones at the line's ends (every point where it touches the ground at |y| <= 3.0 m). The turns count in this order only. After the third turn you finish at the moment the leading point of your torso (not the head, arms, legs or feet) reaches the start line between its cones (|y| <= 3.0 m at that point). Which way you face and how you turn is up to you. You succeed when you finish within 30 s of robot time. A fall does not end the attempt: you are down while your pelvis is below 0.4 m, you may get up and go on, but 10.0 s down in a row end it. You fail when down for 10.0 s, when your pelvis leaves the court (more than 4.0 m to either side of the centre line y = 0, or more than 10 m beyond either line), or after 30 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

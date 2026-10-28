@@ -6,9 +6,9 @@
 | Mode | privileged |
 | Twin | `dexhand-paper-half-fold-i00-standard` |
 | Simulator / robot | `mujoco` / `sharpa-wave-floating` |
-| Family / instance | `paper_half_fold` |
+| Family / instance | `paper_half_fold` / seed 0 |
 | Oracle | `full` — solution/wuji/trajectory.npz is a validated Wuji Hand 2.2 trajectory of this instance (620 controls, motor targets only, physical contact only); the oracle uses it when the run selects wuji (privileged: DEXHAND_HAND=wuji; standard: the sim service's hand), and it replays to success in two fresh processes with identical state hashes. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task
@@ -50,18 +50,17 @@ no-op, a fold without the crease press, an early stop before the 2 s hold and a 
 all score 0. Wuji Hand 2.2 composes on the same wrist stage and is graded the same way.
 Release status is provisional pending human review.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 2 GB | 2 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
+| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: 30 Harbor 0.23 trials of the six essential families (12 oracle, 12 nop, 6 Wuji smoke; rcb_monitor samples every 5 s, efe:dexhand-0.2.0, CPU-only, 2026-10-14) plus the hamburger and paper oracle/nop trials: agent container peak <= 0.03 GiB; one fresh replay process 0.25-0.32 GiB max RSS (os.wait4; paper 0.31 GiB, hamburger 0.28 GiB), the privileged verifier runs two at once (<= 0.65 GiB); standard sim service peak 0.65 GiB (VmHWM, held_joystick oracle episode), paper 0.51 GiB; one core per replay process; x1.2 rounded up to a GB, raised to the 2 CPU / 2 GB design minimum (an agent's own simulator sessions take about 0.3 GiB each)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 8 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 8 GiB memory. Limits measured: memory: 8 GiB lets an agent run about twenty 0.3 GiB simulator sessions (pot/sweep: three or four 2 GiB sessions) next to its harness; measurements as in the [[rule]]; processes 512 and disk 10 GiB: design defaults, not yet measured.
+- Measured: 30 Harbor trials of both modes of the six essential families (12 oracle, 12 nop, 6 Wuji) plus the hamburger and paper oracle and nop trials, CPU only, the trial's resource monitor every 5 s: one fresh replay process 0.25-0.32 GiB max RSS (paper 0.31, hamburger 0.28), and the verifier runs two at once (at most 0.65 GiB); the agent's container at most 0.03 GiB without an agent; one core per replay process; an agent's own simulator sessions take about 0.3 GiB each
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 
@@ -81,6 +80,3 @@ Modelling scope: a 9 x 5 triangular MuJoCo flex shell (160 x 100 mm, 1.28 g) wit
 bending-memory law; uncalibrated material coefficients; the left half is adhered to a visible backing (pinned
 vertices); effective 0.7 mm contact thickness; finite contact compliance. This is a reduced passive-paper model, not a
 fibre or adhesive-peel model.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The verdict, the replays and `reward.json` are unchanged; earlier results stay valid.

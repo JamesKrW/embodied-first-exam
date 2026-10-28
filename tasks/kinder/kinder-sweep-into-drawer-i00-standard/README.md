@@ -8,7 +8,7 @@
 | Simulator / robot | `kinder` / `tidybot-plus-plus` |
 | Family / instance | `sweep-into-drawer` / seed 0 |
 | Oracle | `none` — GPT-6 Luna's privileged-mode trajectory of 2026-10-04, run `codex-gpt6_luna-medium` on the results site, which today's privileged verifier scores 1 (it moves the base diagonally by up to 0.13 m a step, beyond standard mode's 0.1 m disc, so it is no standard-mode example); in standard mode, the graded episode of run `codex-gpt6_1_sol-high` of 2026-10-03 (960 control steps, no reset), which the standard service scored 1 (live, fresh replay, deterministic); human review in PR #8 |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:kinder-0.1.6` |
 
 ## Task
@@ -23,7 +23,7 @@ Task: get the five small dark-red cubes on top of the kitchen island into the mi
 Nonprehensile, tool use, dynamics: open a closed drawer, then sweep five small cubes off the counter into it with a wiper. KinDER's paper reports at most 0.14 success for its best method on this variant and 0.00 for sampling MPC on the true simulator.
 
 ## Reference solution
-None. Solvability rests on the positive example in `oracle_evidence` (task.toml), checked by a human reviewer (docs/protocol/README.md §2.7).
+None. Solvability rests on the positive example in `oracle_evidence` (task.toml), checked by a human reviewer (docs/protocol/README.md §4).
 
 ## Verification
 The sidecar judges the episode as it runs (KinDER's goal check at every control step; the episode ends there) and,
@@ -36,22 +36,16 @@ No oracle; human review in PR #8. `nop` scores 0.
 
 Benchmark notes: `tasks/kinder/README.md`.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 2 GB | 2 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | 6 GiB | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
-- GPU: required, any NVIDIA GPU; recommended: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
-- Measured: GPU 1.2-1.3 GB (oracle 1.2 GB on RTX 4090), evaluation-pool GPU profile (per-trial GPU peaks, 10-03..10); memory: privileged container p90 2.8 GB, sim 1.1 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU author estimate
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 6 GiB GPU memory, 14 GiB memory. Limits measured: GPU: 1.3 GiB (the evaluation pool's GPU profile (per-trial GPU peaks by card, 10-03..10)) -> max(1.5 x peak, peak + 4); memory: agent container docker peak 2.8 GiB over 11 samples (mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)) -> max(1.5 x peak, peak + 4, 8), at most the 16 GiB cap; whole trial: + the sim service's 6 GiB (docker peak 1.1 GiB, 1 samples); processes 512 and disk 20 GiB: design defaults, not yet measured.
-
-## Details
-
-### Change Log
-- 2026-10-11: `RCB_RESET_BUDGET`'s default 0 -> 10 (owner decision; PROTOCOL §4.5, tasks/kinder/README.md); the service already had `POST /reset`. The scene, instance, pass rule and verifier are unchanged, so the task keeps its name; runs recorded before this date had no reset and are reported separately.
-- 2026-10-16: agent time limit 3600 s -> 1800 s (`[agent] timeout_sec`, both twins; author decision, tasks/kinder/README.md), and `RCB_RESET_BUDGET`'s default 10 -> 0 (author decision): one episode, which the practice and the graded attempt share. The scene, instance, pass rule and verifier logic are unchanged (`tests/rcb_limits.json` carries the new cutoff), so the task keeps its name; runs recorded before this date are reported separately.
-- 2026-10-17 (owner): graded by the live episode: `success` = KinDER's goal check reached during the episode the sim service ran (the same rule, judged as it ran), and no grading replay runs (no `replay_success` / `deterministic` any more; `final.json` has `graded_by = "live"`, `replays = 0`, `reward.json` `graded_by_live = 1`). The video is one render pass over the trajectory after the verdict, as before. The scene's start is checked when the episode begins: a scene that does not build to the frozen instance's recorded state (`scene_sha`) gives up as infrastructure (`instance_mismatch`). The scene, instance, pass rule and the agent's interface are unchanged, so the task keeps its name; every archived verdict is the same under the live rule.
+- GPU: any NVIDIA GPU, held by `sim`.
+- Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
+- Measured: GPU memory 1.2-1.3 GB (the oracle 1.2 GB on an RTX 4090; per-trial peaks of past trials); memory: sim 1.1 GB (a per-container memory sampler); CPU: an estimate
+- Measured (caps): GPU memory (the sim service): a per-trial peak of 1.3 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB; processes and disk: defaults, not measured

@@ -8,7 +8,7 @@
 | Simulator / robot | `humanoidbench` / `unitree-h1hand` |
 | Family / instance | `window` / seed 0 |
 | Oracle | `none` — none known: no run has passed it, and published RL reaches 94% of the bar (paper 227, FastTD3 613, bar 650); human review in PR #9 |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:humanoidbench-0.2.0` |
 
 ## Task
@@ -44,7 +44,7 @@ works from the task statement and the physical state alone.
 
 ## Reference solution
 None. Requiring one would cap the benchmark at what we can already solve, which systematically
-removes the interesting tasks. What replaces it (docs/protocol/README.md §2.7): the floor above
+removes the interesting tasks. What replaces it (docs/protocol/README.md §4): the floor above
 (doing nothing cannot pass), the evidence that the task has a solution (`oracle_evidence` in
 task.toml), and a human reviewer.
 
@@ -57,18 +57,17 @@ writes `/logs/verifier/replay.mp4` and, because Harbor promotes every `reward.js
 leaderboard metric, keeps the per-task numbers (`episode_return`, `success_bar`) in
 `/logs/verifier/diagnostics.json`. No oracle; human review in PR #9. `nop` scores 0.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 16 | 20 GiB | 8192 | no GPU | 10 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: GPU 1.1-2.3 GB, evaluation-pool GPU profile (per-trial GPU peaks, 10-03..10); memory: privileged container median 2.2 GB (p90 11 GB when agents run parallel rollouts), sim 0.7 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU author estimate
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 16 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: memory: the [environment] cap 16 GiB, which every past trial ran under (docker peak 13.4 GiB over 27 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 10 GiB: design defaults, not yet measured.
+- Measured: memory: privileged container median 2.2 GB (p90 11 GB when agents run parallel rollouts) (a per-container memory sampler); CPU only; CPU: an estimate
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -86,7 +85,3 @@ stops the container from starting.
 
 ### Provenance
 The instance (`environment/instance.npz` and its byte copy `tests/instance.npz`) is seed 0 (sha `260f3f1c4cff`).
-
-### Change Log
-- 2026-10-08: base image 0.1.6 -> 0.2.0: MuJoCo 3.3.7 instead of upstream's 3.1.6 (tasks/humanoidbench/README.md, Physics). The pass rule and verifier are unchanged, so the task keeps its name; results recorded on 0.1.6 are other physics and are reported separately.
-- 2026-10-10: `reward.json` carries `deterministic` in every branch (0 where no replay ran; PROTOCOL §2.6). The verdict is unchanged.

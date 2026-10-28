@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `sprint` / seed 0 |
 | Oracle | `full` — Reference: stand through the start procedure, react to the gun, then the running policy at 3.5 m/s steered to the lane's centre; 9 of 10 perturbed runs at 2.5 to 4.0 m/s finished. Measured: success after 19.54 s of the 34.2 s limit, live and in a fresh replay, ending in the same state. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,18 +25,17 @@ The gun has to be seen, not guessed: moving early disqualifies and waiting costs
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
 and both end in the same state. The rules: World Athletics rules for the straight sprint. The lane runs along +x, 1.22 m wide, centred on y = 0. The start line is 0.05 m wide; its far edge is x = 0 and the finish line's near edge is x = 50.0 m. The start: "on your marks" at t = 0, "set" 2.0 s later, the gun between 1.2 and 2.2 s after "set" (fixed for this task, not announced). Your start movement is the first moment your pelvis is more than 0.05 m from where it was at "set", or the front end of a foot reaches the start line (x > -0.05 m, on the ground or in the air). A start movement before the gun, or earlier than 0.1 s after it, is a false start; so is a foot reaching the start line before "set". From the gun on you must keep your lane: your pelvis may not be more than half the lane's width from y = 0. You finish at the moment the leading point of your torso (not the head, arms, legs or feet) reaches the finish line; the time counts from the gun. You succeed with a valid finish within 30.0 s of robot time after the gun. A fall does not end the race: you are down while your pelvis is below 0.4 m, you may get up and run on, but 10.0 s down in a row end it. You fail on a false start, on leaving the lane, when down for 10.0 s, or when 30.0 s after the gun have passed.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

@@ -8,7 +8,7 @@
 | Simulator / robot | `vlabench` / `franka-panda` |
 | Family / instance | `vlabench/select_mahjong` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:vlabench-0.2.0` |
 
 ## Task
@@ -35,28 +35,23 @@ initial state and compiled model hashes) when it is built, and its start state w
 `success = live_success`. The video (`replay.mp4`) is rendered from `trajectory.npz` in one pass after the verdict and
 never changes it.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 11 GB | 10 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 15 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: sim p90 6.9 GB, privileged container p90 8.1 GB, verifier 4.7 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU-only; CPU author estimate
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 20 GiB memory. Limits measured: memory: agent container docker peak 2.2 GiB over 6 samples (mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)) -> max(1.5 x peak, peak + 4, 8), at most the 16 GiB cap; whole trial: + the sim service's 12 GiB (docker peak 7.2 GiB, 16 samples); processes 512 and disk 20 GiB: design defaults, not yet measured.
+- Measured: memory: sim p90 6.9 GB (a per-container memory sampler); CPU only; CPU: an estimate
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |
 |---|---|
 | Actions | `joint_position` (9, float64): absolute targets for the 7 arm joints (rad) and the 2 fingers (m), 0.1 s per control step |
-| Episode cap | 9000 control steps (900 s of robot time; `spec.max_control_steps`, PROTOCOL §4.5 MAY) |
+| Episode cap | 9000 control steps (900 s of robot time; `spec.max_control_steps`, docs/protocol/standard_mode.md) |
 | Resources | 4 CPUs, no GPU (CPU physics, OSMesa rendering) |
 | Instruction | restated; VLABench's own: "Pick up the mahjong of 6 sou" (graded: the tile inside the placemat (contain); upstream says "pick up") |
-
-### Change Log
-- 2026-10-16: the sim collect hook waits for the replay video until 2880 s after the episode ends (was 1470 s; `timeout_sec` 1500 -> 2910); the verdict keeps its 1440 s bound. The video replays the graded episode once more after the verdict, so a slow verdict left it no time. Video only: the verdict, the physics and the pass rule are unchanged, so results from before this date stay valid.
-- 2026-10-17 (owner): graded by the live episode: `success` = VLABench's own success check reached in the episode the sim service ran (the same rule, judged as it ran), and no grading replay runs (no `replay_success` / `deterministic` any more; `final.json` has `graded_by = "live"`, `replays = 0`, `reward.json` `graded_by_live = 1`). The video is one render pass over the trajectory after the verdict, as before. The scene's start is checked when the episode begins: a scene that does not rebuild the frozen instance gives up as infrastructure (`instance_mismatch`). The scene, instance, pass rule, step cap and the agent's interface are unchanged, so the task keeps its name; archived verdicts are the same under the live rule, except 5 trials whose old video render ran out of time (recorded `infra_error`), which the live rule grades (all 0).
-- 2026-10-19 (in place: a new DIGEST, PROTOCOL H.8): the VLABench image is built by the task itself when the runner cannot pull it. The sim service's Dockerfile (`environment/sim/Dockerfile`) start with its recipe (`images/vlabench/Dockerfile`, stage `vlabench-base`) and compose `build.cache_from` names `ghcr.io/mll-lab-nu/efe-private:vlabench-0.2.0`, the same recipe prebuilt (Debian packages from a dated snapshot, the same package versions as before); the environment's build time limit is 3600 s (was 1800 s). The scene, the frozen instance, VLABench's code and assets, the grading and the time limit are unchanged.

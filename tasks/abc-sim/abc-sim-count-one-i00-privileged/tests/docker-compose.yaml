@@ -1,6 +1,7 @@
 # The filmed replay renders over EGL on the GPU (the verdict's replays need none).
 services:
   main:
+    x-gpu-memory-gb: 5   # GiB of GPU memory (docs/protocol/README.md §6)   # rcb-monitor
     deploy:
       resources:
         reservations:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A pull request's overview: what it changes, for the sticky comment and the labels (the job `advisories` of .github/workflows/static-checks.yml).
 
-As Terminal-Bench's task-pr-overview: the changed tasks with their mode, oracle, cutoff and minimum compute, a table of
+As Terminal-Bench's task-pr-overview: the changed tasks with their mode, oracle, cutoff and main's caps, a table of
 the cutoffs it changes (old -> new; PROTOCOL §2: the task author's decision, stated in the pull request), the cutoffs per benchmark and mode after it
 (several numbers in one benchmark and mode are marked: a pull request says why), twins whose cutoffs differ, and the
 scope its static checks run on (ci_checks/ci_scope.py), and the advisory checks' findings ("Advisories (not blocking)",
@@ -87,15 +87,21 @@ def main(argv: list[str]) -> int:
     # the tasks it adds or changes
     shown = added + changed
     if shown:
-        out += ["", "### Tasks", "", "| Task | Status | Mode | Oracle | Cutoff | Minimum compute (CPU / GB / GPU GB, class) |",
+        out += ["", "### Tasks", "", "| Task | Status | Mode | Oracle | Cutoff | Caps of main (CPUs / GiB / GPU GiB; GPU types) |",
                 "|---|---|---|---|---|---|"]
         for n in shown[:60]:
             t = tc.task_dir(n)
             d = tomllib.loads((t / "task.toml").read_text())
             md = d.get("metadata", {})
-            r = md.get("resources") or {}
-            res = (f"{r.get('min_cpus', '?')} / {r.get('min_memory_gb', '?')} / {r.get('min_gpu_memory_gb', '?')}, "
-                   f"{r.get('gpu_class', '?')}") if r else "—"
+            try:
+                m = tc.task_caps(t)["main"]
+            except ValueError as e:   # a compose file the caps cannot be read from: report it, check-resources fails it
+                m = None
+                res = f"unreadable compose file ({e})"
+            if m is not None:
+                gpu = f"{float(m['gpu_memory_gb']):g}" if m.get("gpu") and m.get("gpu_memory_gb") else "no GPU"
+                res = (f"{m.get('cpus') or '?'} / {m.get('memory_gb') or '?'} / {gpu}"
+                       f"{'; ' + ', '.join(d.get('environment', {}).get('gpu_types') or []) if d.get('environment', {}).get('gpu_types') else ''}")
             out.append(f"| `{n}` | {'added' if n in added else 'changed'} | {tc.mode_of(t)} | {md.get('oracle', '—')} | "
                        f"{cutoff(d)} s | {res} |")
         if len(shown) > 60:

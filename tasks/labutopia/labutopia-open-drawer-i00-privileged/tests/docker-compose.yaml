@@ -2,6 +2,7 @@
 # container cached (Kit keeps generated Python there) reaches the grader.
 services:
   main:
+    x-gpu-memory-gb: 16   # GiB of GPU memory (docs/protocol/README.md §6)   # rcb-monitor
     shm_size: "8gb"
     deploy:
       resources:

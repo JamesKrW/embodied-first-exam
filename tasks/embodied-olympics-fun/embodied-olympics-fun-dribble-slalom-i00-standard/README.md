@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-dribble-slalom-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `dribble_slalom` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the robot really walks the whole course in 54 s, the ball escorted 0.45 m ahead of it); negatives: the ball or the robot on the wrong side, straight back instead of weaving, the ball more than 2 m away, a cone touched, a handball. A walking kick gives the ball about 2 m/s: kick-and-chase inside the 2 m limit was not attempted; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the robot really walks the whole course in 54 s, the ball escorted 0.45 m ahead of it); negatives: the ball or the robot on the wrong side, straight back instead of weaving, the ball more than 2 m away, a cone touched, a handball. A walking kick gives the ball about 2 m/s: kick-and-chase inside the 2 m limit was not attempted; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,20 +25,19 @@ The sim sidecar's referee judges the live attempt, and that is the verdict (`fin
 no grading replay, owner 2026-10-17); the frozen start is checked on the live simulator (`instance_mismatch`:
 infrastructure), and the video is rendered from the recorded attempt afterwards. `/tests/grade.py` reads
 `/data/final.json`: pass iff the live attempt succeeded. The
-rules: A size-5 football (0.22 m across, 0.43 kg) lies 0.5 m ahead of you, behind the start line, which is 1.0 m ahead of you and square to the way you face. Six cones (0.3 m high, base radius 0.11 m, free-standing) stand on the line you face along, the first 2.0 m beyond the start line and then every 2.0 m. Each cone has a plane through it, square to the course. On the way out the ball's centre and your pelvis must each cross the plane of cone 1 to its left (your left at the start), of cone 2 to its right, and so on in turn, cone 6 to its right; then round cone 6 and back: the plane of cone 6 to its other side (the left as seen from the start), of cone 5 to the right as seen from the start, and so on in turn, cone 1 to the right as seen from the start; and finally back over the start line, the whole ball and your pelvis. For each plane the first crossing in the direction of travel after the plane before it decides, for the ball and for you separately. You succeed when the whole ball and your pelvis are back over the start line after all twelve planes. You fail if the ball or you cross a plane on the wrong side, if the ball's centre is ever more than 2.0 m from your pelvis (measured along the ground), if you or the ball touch a cone, if a hand or an arm touches the ball (handball; any other part of you may play it), if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 90 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+rules: A size-5 football (0.22 m across, 0.43 kg) lies 0.5 m ahead of you, behind the start line, which is 1.0 m ahead of you and square to the way you face. Six cones (0.3 m high, base radius 0.11 m, free-standing) stand on the line you face along, the first 2.0 m beyond the start line and then every 2.0 m. Each cone has a plane through it, square to the course. On the way out the ball's centre and your pelvis must each cross the plane of cone 1 to its left (your left at the start), of cone 2 to its right, and so on in turn, cone 6 to its right; then round cone 6 and back: the plane of cone 6 to its other side (the left as seen from the start), of cone 5 to the right as seen from the start, and so on in turn, cone 1 to the right as seen from the start; and finally back over the start line, the whole ball and your pelvis. For each plane the first crossing in the direction of travel after the plane before it decides, for the ball and for you separately. You succeed when the whole ball and your pelvis are back over the start line after all twelve planes. You fail if the ball or you cross a plane on the wrong side, if the ball's centre is ever more than 2.0 m from your pelvis (measured along the ground), if you or the ball touch a cone, if a hand or an arm touches the ball (handball; any other part of you may play it), if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 90 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

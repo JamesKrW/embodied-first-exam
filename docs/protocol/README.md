@@ -19,8 +19,6 @@ benchmark document can override them, and the required CI job `invariants` fails
 the runner refuses a run that would. The only setting Appendix H leaves to the task's author is the agent's network:
 the allowlist unless the task declares open egress (H.6).
 
-Tasks and code that cite v1 section numbers (§2.10): the table at the end maps them.
-
 ## 1. What a task is
 
 A task is a self-contained Harbor task directory under `tasks/<benchmark>/` (one folder per benchmark); the benchmark adds as little as possible on top of
@@ -30,13 +28,13 @@ verifier decides internally) is the task's own business.
 | Recommended | Notes |
 |---|---|
 | `task.toml`, `instruction.md`, `README.md`, `environment/Dockerfile`, `tests/test.sh` (executable), `tests/Dockerfile`; `solution/solve.sh` when `oracle` is `full` or `partial` | `ci_checks/check-task-structure.sh` |
-| `[task].name = "embodied-first-exam/<folder>"`; `[metadata]` `author_name`, `task_type` (`trajectory` / `policy`), `simulator`, `robot` ([`TAXONOMY.md`](../TAXONOMY.md)), `family`, `mode`, `expert_time_estimate_hours`, `oracle` (+ `oracle_evidence`), `protocol` (sidecar modes), the settings of §2 | `check-task-fields.sh`, `check-protocol.py` |
+| `[task].name = "embodied-first-exam/<folder>"`; `[metadata]` `task_type` (`trajectory` / `policy`), `simulator`, `robot` ([`TAXONOMY.md`](../TAXONOMY.md)), `family`, `instance_seed`, `expert_time_estimate_hours`, `oracle` (+ `oracle_evidence`), `protocol` (sidecar modes), the settings of §2 | `check-task-fields.sh`, `check-protocol.py` |
 | The directory name `<base>-<mode>`, `<base>` = `<benchmark>-<family>-i<NN>` or the upstream name; no versions or durations in names | the mode is the whole suffix |
 | All task code in the directory, or in a pinned image its Dockerfiles take it from (the benchmark's base image; a files-only image built from `embodied_first_exam/benchmarks/<benchmark>/`, `COPY --from=<image@digest>`); base images hold the simulator and its assets; nothing imports repository code at run time | a task's identity is its directory (H.8) |
 | Every task is in the normal form `scripts/task_conventions.py` `normalize` writes (README layout, rendered sections, `DIGEST`) | `task_conventions.py --check` |
 | Base images `ghcr.io/mll-lab-nu/efe:<name>-<images/<name>/VERSION>` (one public package, a tag per image), or `efe-private:<name>-<VERSION>` when `images/<name>/BUILD_ONLY` (one private package); every `FROM` / `image:` pinned to a tag or digest | `check-dockerfile.sh` |
-| README in the standard layout (`# <dir>`, key table, Task, Difficulty, Reference solution, Verification, Compute resources, Details); no `results/` | rendered by `normalize` |
-| A change to a published task, its scene included, is made in place: same name, a new DIGEST, a README Change Log entry | H.8 |
+| README in the standard layout (`# <dir>`, key table, Task, Difficulty, Reference solution, Verification, Resources, Details); no `results/` | rendered by `normalize` |
+| A change to a published task, its scene included, is made in place: same name, a new DIGEST; the pull request says what changed and why (the README describes the current task, no history) | H.8 |
 
 **What a contribution delivers.** Tasks only: task directories under `tasks/<benchmark>/`. No task-generation code
 goes into the repository (generators, oracle searches, instance freezers, release builders stay with their authors), and
@@ -48,7 +46,7 @@ own choices are documented in `tasks/<benchmark>/README.md`.
 
 ## 2. Task-declared settings
 
-Each task (or its benchmark's generator) chooses these and declares them; CI checks that the declarations agree with
+Each task chooses these and declares them; CI checks that the declarations agree with
 each other, not that they take a particular value. The defaults are what templates write when a task says nothing.
 Every trial records its **effective configuration** (protocol version, mode, cutoff, reset budget, S, seed, network,
 validated; `scripts/task_conventions.py` `effective_config`), and results are ranked only among trials with the same
@@ -58,12 +56,12 @@ configuration (`config_key`; running.md "Results").
 |---|---|---|
 | Modes offered (§3): any subset; a task without its privileged twin says why in its README Twin row | the task directories it ships | — |
 | Cutoff: the agent's wall-clock time, decided by the task's author | `[agent] timeout_sec` (a whole number of seconds) | 3600 s; at most 14400 s; equal in a task's privileged and standard versions (H.7) |
-| Reset budget N (standard modes) | the `sim` service's `RCB_RESET_BUDGET` default (`/spec.budget.reset`), the instruction, `[metadata] reset_budget` | standard 0; standard-realtime 10 |
-| Slowdown S (standard-realtime) | `RCB_SLOWDOWN` default, `[metadata] slowdown`, the instruction (`S = <S>`) | S = 1 when the service's real-time factor is ≥ 3, else ⌈1.5 / RTF⌉ |
+| Reset budget N (standard modes) | the `sim` service's `RCB_RESET_BUDGET` default (`/spec.budget.reset`), the instruction | standard 0; standard-realtime 10 |
+| Slowdown S (standard-realtime) | the `sim` service's `RCB_SLOWDOWN` default (`/spec.timing.slowdown`), the instruction (`S = <S>`) | S = 1 when the service's real-time factor is ≥ 3, else ⌈1.5 / RTF⌉ |
 | Observation and action extensions | `/spec`, the instruction, the benchmark doc | the `eai-standard` core |
 | Grading kind | the instruction, the frozen instance, `reward.json` (`replays`, `graded_by_live`) | privileged: two fresh replays, or one by the task's choice; standard modes: the live episode (H.4) |
-| Seeds | `[metadata.seeds]` `default`, `allowed` (list, `{from, to}`, `"any"`), `oracle`, `build` | the default seed only |
-| Network | `[metadata] network` | `"allowlist"`; `"open"` by the author's choice (H.6) |
+| Seeds | `[metadata] instance_seed` (the default seed); `[metadata.seeds]` `allowed` (list, `{from, to}`, `"any"`), `oracle`, `build`, only where they differ from the defaults | the default seed only (`allowed` = `oracle` = [the default seed], `oracle` = [] without a reference solution; `build = "frozen"`) |
+| Network | `[agent] network_mode` | `"allowlist"`; `"public"` (open) by the author's choice (H.6) |
 | Scene dynamics | `[metadata] dynamics` (`dynamic`: something other than the robot does work by a force other than the robot's and gravity; TAXONOMY.md "Dynamics") | none: declared by every task |
 | Validated | `[metadata] validated`, else `oracle = "full"` | a recorded marker, not part of the configuration: validated and unvalidated tasks are ranked together |
 | Stricter honour rules | `[metadata.honour] stricter` | none (never looser rules) |
@@ -108,18 +106,49 @@ infrastructure, a reference implementation, one benchmark using it, CI support t
 | The instruction names the deliverable under `/app/output/` and never mentions `/tests/` | `check-instruction.sh` |
 | It states every convention the agent cannot infer: frames, quaternion order, units, action layout, client usage, the reset budget and S; world-frame quantities are decided per benchmark and consistent within it | benchmark hooks `ci_checks/benchmarks/<bench>/advisory-*` |
 | The success condition is written in terms the agent can observe in that mode: each object is named by its appearance and/or its starting place; an object's axis or point is described physically ("the keyboard's short edge", "the key's teeth end"), saying whether the condition already holds at the start; upstream identifiers (labels, function names, indices, asset metadata) may follow, only in brackets; thresholds stay exact and equal to the grader's. No benchmark is exempt | `check-instruction.sh` (standard modes: code-like terms with no physical description next to them) |
-| It ends with three sections `normalize` renders: `## External material` (the honour rule: install packages and read what is installed, do not fetch a ready-made solution; the open-network paragraph for an open task), `## Resource limits`, `## Time limit` (the cutoff and what it means in the mode: running.md "The agent's time"); no second statement of the limit | `check-cutoffs.py`, `check-resources.py` |
+| It ends with three sections `normalize` renders: `## External material` (the honour rule: install packages and read what is installed, do not fetch a ready-made solution; the open-network paragraph for an open task), `## Resources` (the caps of the agent's own container, §6), `## Time limit` (the cutoff and what it means in the mode: running.md "The agent's time"); no second statement of the limit | `check-cutoffs.py`, `check-resources.py` |
 | Everything a task needs at run time is in its image or directory; nothing tells the agent to download something | |
-| A trial that fetched a solution is flagged and judged case by case by the owner; installing a general-purpose package never is | running.md |
+| A trial that fetched a solution is flagged and judged case by case by the maintainers; installing a general-purpose package never is | running.md |
 
 ## 6. Resources
 
-Each task states the smallest allocation it runs on (`[metadata.resources]`: `min_cpus`, `min_memory_gb`,
-`min_gpu_memory_gb`, `gpu_required`, `gpu_class`, the verifier's minimums, `measured`) and the most its agent phase may
-use (`[metadata.resources.limits]`, shown in `## Resource limits`), with the docker caps every compose service applies
-(`[metadata.resources.caps]`). Values come from measured peaks with a margin (`scripts/task_resources.toml`, written by
-`normalize`). A monitor sidecar records usage; whether a limit is enforced is the runner's switch (`RCB_LIMITS_ENFORCE`,
-off by default). Derivation, enforcement and the reward fields: running.md "Resources".
+Every resource number of a task is an upper bound (a cap) for **one container**; there are no minimums and no soft
+limits. Each cap is written where Harbor or docker reads it:
+
+| Container | Where | Keys |
+|---|---|---|
+| `main` (the agent's) | `task.toml` `[environment]` | `cpus` (a whole number), `memory_mb`, `storage_mb` (disk); `gpu_types` (RTX-class models) only for a task that needs ray-tracing cores; never `gpus` (Harbor's local docker refuses it) |
+| `main`'s processes, and every other service | `environment/docker-compose.yaml` | `pids_limit` (main; it counts processes and threads); `cpus`, `mem_limit`, `pids_limit` (every other service); never `deploy.resources.limits` (docker refuses it beside `cpus` / `mem_limit`) |
+| a service that holds a GPU | its compose service | the device reservation (`deploy.resources.reservations.devices`, `driver: nvidia`, `capabilities: [gpu]`, written by hand; a device whose capabilities name `gpu` counts as a GPU with or without the driver line; never `gpus:` or `runtime: nvidia`) and `x-gpu-memory-gb`, its GPU-memory cap in GiB, the one field of our own |
+| the separate verifier | `task.toml` `[verifier.environment]`; `tests/docker-compose.yaml` | `cpus`, `memory_mb` (and `storage_mb`), set by hand. Harbor uses this table alone when it exists: a key it lacks is **no cap**. Without the table the verifier gets a copy of `[environment]` (`storage_mb` included). Its processes: `pids_limit` of `main` in `tests/docker-compose.yaml`, set by hand. A GPU service there gets `x-gpu-memory-gb` = main's value when main holds a GPU; otherwise the task writes that line itself (normalize keeps it) |
+
+Other compose keys the task writes itself are settings, not caps from the rules: `shm_size` (the size of `/dev/shm`; docker
+applies it, and what is stored there also counts against the container's memory cap), devices, volumes.
+
+The values come from the rules in `scripts/task_resources.toml`; `python3 scripts/task_conventions.py <task dirs>`
+(`normalize`, which creates `[environment]` when the task has none) writes them, and `ci_checks/check-resources.py`
+checks that the declared caps are the applied ones: a cap the compose file sets itself (normalize keeps it) must equal
+the rule's. A task no rule matches keeps the caps its own `[environment]` and compose file set; CI accepts them as long
+as every container has its caps. A rule is a `[[cap]]` table:
+
+- `match`: a regular expression searched in the task directory's name; the **last** rule that matches a task applies,
+  whole (rules are never merged).
+- one inline table per compose service, keyed by its name; the services must be exactly the task's compose services
+  (`rcb_monitor` aside). `main` = { `cpus` (whole), `memory_gb`, `pids`, `disk_gb` }; every other service = { `cpus`,
+  `memory_gb`, `pids` }; `gpu_memory_gb` on, and only on, a service that reserves a GPU. Memory, disk and GPU memory are
+  in GiB; memory and disk a whole number of MiB (a multiple of 1/1024 GiB), since they are written in MiB.
+- optional: `gpu_types` (written to `[environment]`), `recommended_gpu`, `measured` (what the task was measured to use)
+  and `caps_measured` (where the GPU-memory and disk caps come from), each shown in the task README's `## Resources`
+  (`gpu_types` as its `GPU:` line).
+
+Docker enforces CPU (a throttle), memory (the kernel's OOM killer) and processes. Docker caps neither GPU memory nor disk
+on a local host (a cloud backend may apply `storage_mb`): the resource monitor measures both and enforces them only when
+the run sets `RCB_LIMITS_ENFORCE=1` (off by default). The GPU-memory cap it enforces is that of the one GPU service in
+its scope (main, and in privileged mode the services the agent drives; at most one of them holds a GPU); a scope without
+a GPU has no GPU-memory cap, and GPU memory seen there anyway is only recorded. The `x-gpu-memory-gb` of a recorded
+service (a standard mode's simulator sidecar, RoboPaint's scorer) and of the verifier is a cap stated for the reader:
+nothing measures it against that cap. The agent reads its own container's caps in `## Resources` (§5) and in
+`/run/rcb-limits/usage.json`. Placing trials, enforcement and the reward fields: running.md "Resources".
 
 ## 7. Versions
 
@@ -131,6 +160,10 @@ by (`CONFIG_KEYS`, running.md "Results"). The wire protocol's versions:
 bounds; shared layer `embodied_first_exam/standard/`), 2.3 (2.2 + realtime), 2.4 (2.3 + operation ids and deadlines; layer
 `embodied_first_exam/standard/v2_4/`). Minor versions only add; `/spec.protocol` equals `metadata.protocol`. A protocol change is
 an issue, then one pull request updating standard_mode.md, the reference implementation and an example task.
+In this version a task declares its open egress only as `[agent] network_mode = "public"`, its reset budget and S only
+in its `sim` service, and its default seed as `[metadata] instance_seed`; CI fails a task.toml with `[metadata] network`
+(H.6), and a standard-realtime task's with `[metadata]` `reset_budget` or `slowdown`, and warns on these and `mode`
+elsewhere; `normalize` rewrites such a task into this form.
 
 ## Appendix H. Invariants (binding)
 
@@ -148,7 +181,7 @@ verifier, a sidecar) is `*_trusted` and never mounted by the agent's container; 
 file, host path or socket (only a directory the runner names as a whole `${RCB_*}` variable); no service widens its
 container (`privileged`, `cap_add`, `devices`, host namespaces, `volumes_from`, OOM settings), takes files by another road
 (`secrets`, `configs`, `env_file`, `build`, `include`) or sets its own network; sidecars publish no port. The resource
-monitor, the one service exempt from these, has no network, runs its code from a pinned image and mounts its limits read-only, is the only writer of the
+monitor, the one service exempt from these, has no network, runs its code from a pinned image and mounts its caps (`limits.json`) read-only, is the only writer of the
 beacons (read-only everywhere else) and seals its record in the first sidecar collect hook. Code a verifier runs for
 the agent (a `policy` deliverable) runs as an unprivileged user in its own process, without network, unable to read the
 simulator, the evaluator or the requests, under a process limit; every process it started ends before anything is
@@ -198,35 +231,17 @@ voided attempt is moved aside and never counted. The rule is the runner's: `scri
 **H.6 Egress.** During the agent phase the agent's container, and every service in its network namespace, reaches only
 the allowlist `scripts/set_agent_egress.py` `HOSTS` (the model APIs and the package registries; `[agent] network_mode =
 "allowlist"` with exactly those hosts, no step with a policy of its own; an official run narrows it further to the usage
-gateway and the registries), unless the task's author declares open egress, `[metadata] network = "open"` (then
-`[agent]` sets no other policy). The runner applies what the task declares; open-network results are ranked apart.
+gateway and the registries), unless the task's author declares open egress, `[agent] network_mode = "public"` (with no
+host list). The runner applies what the task declares; open-network results are ranked apart.
 The verifier has no network (`[verifier] network_mode = "no-network"` in every task, written by `normalize`; no service
 of `tests/docker-compose.yaml` with a network setting other than `none`). *CI:* `check-verifier-isolation.sh`.
 
 **H.7 Comparable twins.** Where a task ships both a privileged and a standard (or standard-realtime) version, they
-share one frozen instance (byte-identical copies), one success rule and the same seeds (`default`, `allowed`,
-`build`), and the privileged and standard versions have the same cutoff (`same_cutoff_as` in the mode registry).
+share one frozen instance (byte-identical copies), one success rule and the same seeds (`instance_seed`, and
+`[metadata.seeds]` `allowed` and `build`), and the privileged and standard versions have the same cutoff (`same_cutoff_as` in the mode registry).
 *CI:* `check-twins.py`, `check-instance-copies.sh`.
 
 **H.8 DIGEST.** `tasks/<benchmark>/<task>/DIGEST` is the digest Harbor publishes the task under (`sha256:<hex>` over the relative
 path and content hash of `task.toml`, `instruction.md`, `README.md` and every file under `environment/`, `tests/`,
 `solution/`), written last by `normalize` and equal to the digest of the task's current files. Results are attributed
 to a task by its digest; a changed file is a changed task. *CI:* `check-dataset-manifest.sh`.
-
-## v1 section numbers (cited by older tasks and code)
-
-| v1 | Now |
-|---|---|
-| §0, D1–D12 | §2 (settings), §3 (modes), §7; D3/D4 §4; D5 §1; D8 §2, H.7; D10/D11 running.md |
-| §1 checklist, §2.1–2.5 | §1, §5 |
-| §2.6 verifier | H.1 (isolation), §4 (fields) |
-| §2.7 solutions, oracle, nop | H.2, §4 |
-| §2.8 identity | H.8, §1 |
-| §2.9, §2.10 resources and limits | §6, running.md "Resources" |
-| §2.11 external material, network | §5, H.6, running.md "Network" |
-| §2.12 cutoff | §2, §5, running.md "The agent's time" |
-| §2.13 seeds | §2, running.md "Seeds" |
-| §2.14 dynamics, §2.15 modes shipped, §2.16 adding a mode | §2 (TAXONOMY.md "Dynamics"), §3, H.7 |
-| §3 privileged; §4, §4.1–4.9 standard; §4b realtime; §4c exported | §3, H.3, H.4, §4; wire details standard_mode.md |
-| §4.7 crash recovery | H.5 (retry); in-trial resume is an implementation detail of the shared layers (standard_mode.md) |
-| §5 results, token budget; §6 versioning; §7 migration | §4, running.md; §7; the migration is complete (no rule) |

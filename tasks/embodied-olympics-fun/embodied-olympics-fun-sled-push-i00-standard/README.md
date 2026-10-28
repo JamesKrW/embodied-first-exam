@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-sled-push-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `sled_push` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by a declared injection on top of a real controller (the walking policy pushing with inverse-kinematics palm pads on the 1.04 m poles, plus an external force on the sled along its heading at the two handles, only while both palm pads are on their handles, topping its speed up towards 0.35 m/s, at most 30 N): the sled is wholly over the line at 58.0 s of 60 with 264 N s injected over 22.7 s (11.7 N on average); it is marginal (0.30 or 0.45 m/s, or a 50 N cap, fail: the sled leaves the lane or touches the body); negatives: nop, a body push, a palm on the deck, out of the lane, a fall. The controller alone moves the 5 kg sled (about 22 N to start on turf at friction 0.45) at most 9.8 m of the 12.5 m in 60 s: the palms press the poles partly downwards (about 15 N), which adds turf friction, and the sled drifts out of the lane in most of the 25 settings tried; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by a declared injection on top of a real controller (the walking policy pushing with inverse-kinematics palm pads on the 1.04 m poles, plus an external force on the sled along its heading at the two handles, only while both palm pads are on their handles, topping its speed up towards 0.35 m/s, at most 30 N): the sled is wholly over the line at 58.0 s of 60 with 264 N s injected over 22.7 s (11.7 N on average); it is marginal (0.30 or 0.45 m/s, or a 50 N cap, fail: the sled leaves the lane or touches the body); negatives: nop, a body push, a palm on the deck, out of the lane, a fall. The controller alone moves the 5 kg sled (about 22 N to start on turf at friction 0.45) at most 9.8 m of the 12.5 m in 60 s: the palms press the poles partly downwards (about 15 N), which adds turf friction, and the sled drifts out of the lane in most of the 25 settings tried; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,20 +25,19 @@ The sim sidecar's referee judges the live attempt, and that is the verdict (`fin
 no grading replay, owner 2026-10-17); the frozen start is checked on the live simulator (`instance_mismatch`:
 infrastructure), and the video is rendered from the recorded attempt afterwards. `/tests/grade.py` reads
 `/data/final.json`: pass iff the live attempt succeeded. The
-rules: A prowler-type push sled stands on the turf in front of you, its two upright handles towards you: two steel runners 0.919 m long, 0.62 m apart outside, the handles 0.05 m thick and 1.041 m high at its rear corners; it carries 5.0 kg in all and its runners slide on the turf with a friction coefficient of 0.45. The sled's front edge stands on the start line; the finish line is 12.5 m beyond it, and the lane is 1.0 m to each side of its centre line. Push the sled: only your hands may touch it, and only on the two upright handles (they cannot grip: push, do not pull). The sled has moved once its rear has gone 0.1 m forward. You succeed when the whole sled, its rear included, is over the finish line. You fail if any part of you other than a hand touches the sled, or a hand touches it anywhere but on a handle; if any part of the sled leaves the lane; if you fall (your pelvis lower than 0.5 m above the ground, or any part of you other than your feet on the ground); or after 60 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+rules: A prowler-type push sled stands on the turf in front of you, its two upright handles towards you: two steel runners 0.919 m long, 0.62 m apart outside, the handles 0.05 m thick and 1.041 m high at its rear corners; it carries 5.0 kg in all and its runners slide on the turf with a friction coefficient of 0.45. The sled's front edge stands on the start line; the finish line is 12.5 m beyond it, and the lane is 1.0 m to each side of its centre line. Push the sled: only your hands may touch it, and only on the two upright handles (they cannot grip: push, do not pull). The sled has moved once its rear has gone 0.1 m forward. You succeed when the whole sled, its rear included, is over the finish line. You fail if any part of you other than a hand touches the sled, or a hand touches it anywhere but on a handle; if any part of the sled leaves the lane; if you fall (your pelvis lower than 0.5 m above the ground, or any part of you other than your feet on the ground); or after 60 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

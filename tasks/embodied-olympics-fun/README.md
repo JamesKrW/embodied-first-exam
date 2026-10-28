@@ -88,7 +88,7 @@ controller or a magic action that makes the sport's events happen in physics) an
 
 ## Network: open
 
-The tasks declare `[metadata] network = "open"`: the instruction encourages the agent to find, vet and adapt public
+The tasks declare open egress, `[agent] network_mode = "public"`: the instruction encourages the agent to find, vet and adapt public
 tools, robot models and pretrained controllers (fair equipment, as a published walking controller is for a real G1)
 and asks only that it not look up a ready-made solution to the task, such as this repository's reference solutions
 (an honour rule; trials are reviewed). Results are open-network results; the harness's web search stays off in

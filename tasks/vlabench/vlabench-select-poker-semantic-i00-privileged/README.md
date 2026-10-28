@@ -8,7 +8,7 @@
 | Simulator / robot | `vlabench` / `franka-panda` |
 | Family / instance | `vlabench/select_poker_semantic` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:vlabench-0.2.0` |
 
 ## Task
@@ -35,18 +35,17 @@ the last action (VLABench's termination condition; actions after it make the tra
 end in the live state (hash `eb42d04ae4fc…`) and succeed. `nop`: no trajectory, reward 0; the instance is not solved at
 the start (checked on every load).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 10 GB | 6 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 20 GiB | 8192 | no GPU | 10 GiB |
+| verifier | 4 | 16 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: sim p90 6.9 GB, privileged container p90 8.1 GB, verifier 4.7 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU-only; CPU author estimate
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 16 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: memory: the [environment] cap 16 GiB, which every past trial ran under (docker peak 9.0 GiB over 5 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 10 GiB: design defaults, not yet measured.
+- Measured: memory: privileged container p90 8.1 GB, verifier 4.7 GB (a per-container memory sampler); CPU only; CPU: an estimate
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -60,6 +59,3 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 The instance (`environment/instance.json`, byte copy in `tests/`) and the
 reference come from PR #4 (closed without merging; commit ad3c510, still fetchable as `refs/pull/4/head`) and were re-verified in
 `ghcr.io/mll-lab-nu/efe-private:vlabench-0.1.0`.
-
-### Change Log
-- 2026-10-19 (in place: a new DIGEST, PROTOCOL H.8): the VLABench image is built by the task itself when the runner cannot pull it. Its Dockerfiles (`environment/`, `tests/`) start with its recipe (`images/vlabench/Dockerfile`, stage `vlabench-base`) and compose `build.cache_from` names `ghcr.io/mll-lab-nu/efe-private:vlabench-0.2.0`, the same recipe prebuilt (Debian packages from a dated snapshot, the same package versions as before); the environment's build time limit is 3600 s (was 1800 s). The scene, the frozen instance, VLABench's code and assets, the grading and the time limit are unchanged.

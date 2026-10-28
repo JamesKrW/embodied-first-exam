@@ -67,8 +67,8 @@ def test_rule():
 def test_verify():
     sys.path.insert(0, HERE)
     import rcb_limits as r
-    lim = {"max_gpu_memory_gb": 4.0, "max_memory_gb": 8.0, "max_processes": 100, "max_disk_gb": 10.0,
-           "sustain_sec": 60, "window_sec": 120, "tick_sec": 5}
+    lim = {"format": "rcb-limits/2", "gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5,
+           "caps": {"main": {"cpus": 4, "memory_gb": 8.0, "pids": 8192, "gpu_memory_gb": 4.0, "disk_gb": 10.0}}}
     for enforce, gpu, want in ((1, 6.0, "fail"), (0, 6.0, "observe"), (1, 3.0, "pass")):
         with tempfile.TemporaryDirectory() as d:
             rec, tests, logs = (os.path.join(d, x) for x in ("rec", "tests", "logs"))

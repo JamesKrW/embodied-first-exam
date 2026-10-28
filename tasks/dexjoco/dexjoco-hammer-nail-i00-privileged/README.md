@@ -6,9 +6,9 @@
 | Mode | privileged |
 | Twin | `dexjoco-hammer-nail-i00-standard` |
 | Simulator / robot | `dexjoco` / `franka-allegro` |
-| Family / instance | `hammer_nail` |
+| Family / instance | `hammer_nail` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexjoco-0.1.2` |
 
 ## Task
@@ -39,18 +39,17 @@ A file that is not a readable trajectory (not an npz, no `task` / `actions`, a w
 nothing and gives no verdict: `too_few_cpus`, `grader_error` and `infra_error` = 1, not the agent's 0.
 Oracle: success after 202 control steps.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 4 | 4 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: sim 1.9 GB, privileged container 2.1 GB, verifier 2.1 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU-only; CPUs: 4, visible to each container that runs the simulator (cpuset / affinity, not a quota): OpenBLAS runs no more threads than that and DexJoCo's result differs below 4 (tasks/dexjoco/README.md, Threads); with fewer there is no verdict (too_few_cpus, infra_error)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 8 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 8 GiB memory. Limits measured: memory: the [environment] cap 8 GiB, which every past trial ran under (docker peak 2.1 GiB over 2 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 10 GiB: design defaults, not yet measured.
+- Measured: memory: privileged container 2.1 GB, verifier 2.1 GB (a per-container memory sampler); CPU only; 4 CPUs visible to each container that runs the simulator (cpuset / affinity, not a quota): OpenBLAS runs no more threads than that and DexJoCo's result differs below 4 (tasks/dexjoco/README.md, Threads); with fewer there is no verdict (too_few_cpus, infra_error)
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -67,15 +66,3 @@ real-time sleep, episode cap and hanoi's wall-clock auto-reset are disabled in t
 
 ### Provenance
 Generated from the frozen instance (`environment/instance.npz`), restored from DexJoCo's demonstration of the task.
-
-### Change Log
-- 2026-10-14 (review, B-M3 and B6-3): `environment/instance.npz` and `tests/instance.npz` no longer name
-  the demonstration the scene was restored from: their `meta` entry had `source` (the dataset) and `demo` (the
-  demonstration's id), and the reference solution is that demonstration's own actions, so the agent could read at
-  `/app/instance.npz` where a solution was (PROTOCOL §2.7). Only `meta` changed: every array of the scene is the same
-  (instance sha `095c53d8e9a1cae0`), so the scene, the pass rule and the reference are unchanged and the task keeps its
-  name. The tooling (`rcb_dexjoco.py`, both copies) refuses to save an instance whose `meta` says where its scene came
-  from. `tests/grade.py`: a rebuilt instance that does not match its recorded hash is now no verdict
-  (`instance_mismatch`, `grader_error`, `infra_error` = 1, nothing replayed); before, it was the agent's 0 with
-  `infra_error` = 0 and `instance_ok` = 0. Past results: the demonstration itself was out of reach under the egress
-  allowlist (Hugging Face is not on it); a past 0 with `instance_ok` = 0 was an infrastructure failure.

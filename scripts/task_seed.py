@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a task from one of its allowed seeds (docs/protocol/README.md §2.13). The runner chooses the seed, never the agent:
+"""Run a task from one of its allowed seeds (docs/protocol/README.md §2). The runner chooses the seed, never the agent:
 
     python3 scripts/task_seed.py list tasks/<benchmark>/<task>                      # default, allowed, oracle
     python3 scripts/task_seed.py pick tasks/<benchmark>/<task> [--rng N]            # a seed drawn uniformly from `allowed`
@@ -9,8 +9,9 @@
 (`tests/seeds/<S>/instance.{json,npz}` of the task that holds the pair's instances: the privileged twin of a standard
 task, else the task itself) in every place the task runs and grades from: privileged `environment/` (or a scorer
 sidecar's `environment/scorer/`) and `tests/`; standard and standard-realtime `environment/sim/` and, without a twin,
-their own `tests/`; each also in an `instance/` folder one level down (ManiGuard). The copy's `[metadata.seeds]`
-`default` (and `instance_seed`, where present) say the seed it runs from, so a result records it; its `tests/seeds/`
+their own `tests/`; each also in an `instance/` folder one level down (ManiGuard). The copy's `instance_seed` says the
+seed it runs from, so a result records it, and its `[metadata.seeds]` keeps the task's allowed and oracle seeds
+explicitly (their defaults follow instance_seed); its `tests/seeds/`
 is removed, and every file gets its content-derived mtime (scripts/stamp_mtimes.py, issue #258). A seed without a
 committed instance, of a task with `build = "runtime"`, is written instead as a file `seed` (the integer) in each of
 those places, from which the task builds the seed's instance itself. A seed that is
@@ -37,7 +38,7 @@ def seeds(task: Path) -> dict:
 
 
 def holder(task: Path) -> Path:
-    twin = tc.twin_of(task)          # the mode registry's twin mode (PROTOCOL §2.16)
+    twin = tc.twin_of(task)          # the mode registry's twin mode (PROTOCOL §3)
     return twin if twin is not None and twin.is_dir() else task
 
 
@@ -93,8 +94,13 @@ def materialize(task: Path, seed: int, out: Path) -> Path:
     shutil.rmtree(dst / "tests" / "seeds", ignore_errors=True)
     p = dst / "task.toml"
     s = p.read_text()
-    s = re.sub(r"(?m)^(\[metadata\.seeds\](?:\n#.*)*\ndefault = )-?\d+", rf"\g<1>{seed}", s, count=1)
-    s = re.sub(r"(?m)^instance_seed = -?\d+", f"instance_seed = {seed}", s, count=1)
+    s, n = re.subn(r"(?m)^instance_seed = -?\d+", f"instance_seed = {seed}", s, count=1)   # the one field that names it
+    if n != 1:
+        raise SystemExit(f"{task.name}: task.toml has no `instance_seed` (run scripts/task_conventions.py on the task)")
+    if seed != sd["default"]:                      # the task's seeds stay the task's, whatever instance_seed now says
+        s = re.sub(r"(?ms)^\[metadata\.seeds\]\n.*?(?=^\[|\Z)", "", s)
+        s = s.rstrip("\n") + "\n\n[metadata.seeds]\n" + f"allowed = {tc.seeds_text(sd['allowed'])}\noracle = {tc.seeds_text(sd['oracle'])}\n" \
+            + (f'build = "{sd["build"]}"\n' if sd["build"] != "frozen" else "")
     p.write_text(s)
     if stamp_mtimes.stamp_tree(str(dst), full=True)["err"]:     # Harbor builds from this copy: content-derived mtimes (issue #258)
         raise SystemExit(f"{dst}: could not stamp its files (scripts/stamp_mtimes.py)")

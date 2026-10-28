@@ -8,7 +8,7 @@
 | Simulator / robot | `autobio` / `ur5e-robotiq-2f85` |
 | Family / instance | `insert` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:autobio-0.1.0` |
 
 ## Task
@@ -24,18 +24,17 @@ AutoBio's scripted expert (transfer_centrifuge_tube.py @ 0850421), seed 0: the p
 ## Verification
 `tests/grade.py` in a separate sandbox without network: two replays of `/app/output/trajectory.npz`, each in a fresh process, from the verifier's own copy of the instance (`tests/instance.json`; the compiled model and the rebuilt start state are checked against its recorded hashes); pass iff both episodes succeed (the first control step at which AutoBio's check holds ends the episode in success) in the same state (`deterministic`). `nop`: no trajectory, reward 0.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 4 | 4 |
-| Memory | 8 GB | 8 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 12 GiB | 8192 | no GPU | 10 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author (merged PR #94): CPU-only, 4 CPUs and 8 GB per trial, verifier the same
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 10 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 10 GiB memory. Limits measured: memory: the [environment] cap 8 GiB, which every past trial ran under (no samples); processes 512 and disk 10 GiB: design defaults, not yet measured.
+- Measured: CPU only; 4 CPUs and 8 GB per trial, the verifier the same (the benchmark's estimate)
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -44,7 +43,3 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Instance | `Insert` (`transfer_centrifuge_tube.py`) after AutoBio's `reset(seed=0)`; model hash `3be600fd69c42e20`, start-state hash `26cdc6033fab7de6`, checked on every load |
 | Actions | 7 position targets per control step (2 ms, one physics step); success rule `first` (tasks/autobio/README.md) |
 | Resources | 4 CPUs, no GPU (CPU physics, OSMesa rendering) |
-
-### Change Log
-- 2026-10-10: the grader's time limits and flags; the scene, the frozen instance and the pass rule are unchanged, so the task keeps its name. `tests/grade.py`: each verdict replay may take 2400 s and the video replay gets what is left of the verifier's 5400 s (every replay had 1700 s), so a reward is written before Harbor's timeout whatever the trajectory's length; a replay without a result also sets `infra_error` (with `grader_error`, as before), every `reward.json` carries `infra_error`, and an error inside the grader still writes a reward (`grader_error = 1`). A trajectory that was graded before gets the same verdict.
-- 2026-10-10 (review round 3): `tests/grade.py` only. A byte that is not valid UTF-8 in the session log the agent's tools write (`/app/output/rcb_session_log.jsonl`, read only for the self-reported `agent_*` cost fields) was graded `grader_error = 1` and `infra_error = 1` with reward 0, whatever the trajectory; the log is now read tolerantly and can no longer decide anything. A trial whose log is valid is graded as before; the pass rule is unchanged.

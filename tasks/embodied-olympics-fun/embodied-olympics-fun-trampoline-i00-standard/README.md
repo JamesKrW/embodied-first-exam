@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `trampoline` / seed 0 |
 | Oracle | `full` — Reference: a scripted G1 tuck jump (a balanced crouch, a lowcmd push on the sprung bed, the tuck held mid-flight, a squat landing that sinks as the bed recoils, one straight out-bounce, an ankle-strategy stand-up, 3 s still), chosen from 12 settings: 0.457 s of flight, a centre-of-mass rise of 0.32 m. The bed passes the FIG IV TRA 1 impact test in simulation (60 kg sphere from 4.00 m: deflection 0.988 m, in 940-1010 mm; rebound 3.486 m, in 3410-3660 mm). Negatives: nop, a tuck without a jump, pike first, a bent out-bounce, a second flight, a fall, an injected roll spin, an injected push onto the padding. The privileged twin's reference rows (755 control steps, success after 7.55 s) streamed through the client. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -27,18 +27,17 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 `/data/final.json`: pass iff the live attempt succeeded. The
 rules: You stand at the centre of the trampoline's bed, 1.155 m above the floor, facing +x along its length. A flight is a time of at least 0.1 s in which nothing of you touches anything; your centre of mass's height when you stand at the start is the reference height. Straight bounces first are free. The tuck jump is your first flight in which your body is not straight: at some moment of its middle half (from a quarter to three quarters of the flight's time) each leg must be tucked: the angle at the hip between your shoulder and your knee, and the angle at the knee between your hip and your ankle, both 135.0 degrees or less (180 is straight), held for at least 0.05 s without a break, and it must be a jump: in it your centre of mass rises at least 0.1 m above the reference height (a tuck without that height fails). A flight before it in which a hip or a knee closes to 135.0 degrees or less in the middle half without the tuck is another element and fails. Every landing must be on the bed, on your feet only, both feet within 0.1 s of each other. After the tuck jump's landing you may make one more flight, an out-bounce, which must be straight (hips and knees more open than 135.0 degrees through its middle half); a second flight fails. Then stop: stand still for 3.0 s without a break: only your feet on the bed, your torso within about 20 degrees of vertical, your pelvis slower than 0.35 m/s, your ankles at most 0.28 m apart. You fail on a landing with any other part of you on the bed, on touching anything other than the bed (the padding over the frame and springs, the end platforms, the floor), or after 30 s. Success: the tuck jump, its landing and the stop, in that order.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

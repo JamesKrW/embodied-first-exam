@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-double-dutch-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `double_dutch` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (a teleported entry and ten 1.5 m/s kicks timed to the ropes: 10 jumps, a landing, success). No controller: entering needs the whole body across 1.0 m of rope sweep in a 0.58 s clear window (1.7 m/s; the G1 walks 0.6 m/s), then hops at 2.2 Hz; the best G1 hop controller found makes 1.7 Hz, 19 hops in 11 s with 10-15 cm clearance; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (a teleported entry and ten 1.5 m/s kicks timed to the ropes: 10 jumps, a landing, success). No controller: entering needs the whole body across 1.0 m of rope sweep in a 0.58 s clear window (1.7 m/s; the G1 walks 0.6 m/s), then hops at 2.2 Hz; the best G1 hop controller found makes 1.7 Hz, 19 hops in 11 s with 10-15 cm clearance; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -23,20 +23,19 @@ None. No reference controller exists for this family yet: positive by injection 
 ## Verification
 `/tests/grade.py` replays `/app/output/trajectory.npz` from the frozen start in two fresh processes (`rcb_rfo.py replay`:
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
-and both end in the same state. The rules: Two rope-turning machines stand 3.9 m apart, at y = -1.95 and +1.95 m; each turns the ends of two ropes on cranks 0.3 m long whose axles are 0.95 m above the floor, 0.4 m apart (one at x = +0.2 m, one at x = -0.2 m), at 1.1 turns per second each, the two ropes in opposite directions and half a turn apart, so that a rope passes under the middle every 0.4545 s, the two ropes taking turns: the rope at +x goes over the top towards -x and under the middle towards +x, the rope at -x the other way round. They are already turning at the start, and they never stop. You start outside the ropes and must enter them: the centre zone is within 0.35 m of x = 0 and 0.5 m of y = 0 (your pelvis decides). A jump counts when a rope passes under both your feet while nothing of you touches the ground and your pelvis is in the centre zone, if that rope has passed over your head since it last passed under you, and if it is not the same flight as the last counted jump (one rope per jump). You succeed when, after 10 counted jumps, your first contact with the floor is your feet only. You fail at once if a rope touches any part of you (a miss), if a rope passes under a foot that is on the ground or through you, if your pelvis leaves the centre zone after it has entered it, on a fall (your pelvis lower than 0.35 m, or any part of you other than your feet on the floor), on a landing after the last jump that is not on the feet, if you touch a turning machine, or after 25 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+and both end in the same state. The rules: Two rope-turning machines stand 3.9 m apart, at y = -1.95 and +1.95 m; each turns the ends of two ropes on cranks 0.3 m long whose axles are 0.95 m above the floor, 0.4 m apart (one at x = +0.2 m, one at x = -0.2 m), at 1.1 turns per second each, the two ropes in opposite directions and half a turn apart, so that a rope passes under the middle every 0.4545 s, the two ropes taking turns: the rope at +x goes over the top towards -x and under the middle towards +x, the rope at -x the other way round. They are already turning at the start, and they never stop. You start outside the ropes and must enter them: the centre zone is within 0.35 m of x = 0 and 0.5 m of y = 0 (your pelvis decides). A jump counts when a rope passes under both your feet while nothing of you touches the ground and your pelvis is in the centre zone, if that rope has passed over your head since it last passed under you, and if it is not the same flight as the last counted jump (one rope per jump). You succeed when, after 10 counted jumps, your first contact with the floor is your feet only. You fail at once if a rope touches any part of you (a miss), if a rope passes under a foot that is on the ground or through you, if your pelvis leaves the centre zone after it has entered it, on a fall (your pelvis lower than 0.35 m, or any part of you other than your feet on the floor), on a landing after the last jump that is not on the feet, if you touch a turning machine, or after 25 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

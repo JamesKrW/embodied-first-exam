@@ -1,5 +1,5 @@
 """eai-standard/2.3 sim service for RoboCasa365's standard-realtime tasks -- the adapter behind the shared realtime layer
-(`python /srv/rcb_realtime.py`, which imports this module and calls build(); docs/protocol/README.md §4b,
+(`python /srv/rcb_realtime.py`, which imports this module and calls build(); docs/protocol/README.md §3,
 docs/benchmarks/robocasa365.md "Standard-realtime").
 
 The simulator-specific half only: `RoboCasa` implements rcb_service.Sim (the contract documented in rcb_service.py) for

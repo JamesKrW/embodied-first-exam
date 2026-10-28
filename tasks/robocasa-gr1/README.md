@@ -32,7 +32,7 @@ instance each (PR #4's `i00`; its other 9 instances of the same environments are
   channels -- the right then the left grip site's absolute pose target in the robot's base frame (XYZ metres,
   axis-angle radians), solved by the whole-body inverse-kinematics controller (mink), then six unscaled Fourier hand
   commands per hand (`little, ring, middle, index, thumb_flexion, thumb_rotation`). This is the controller the
-  demonstrations were recorded with. In standard mode the type is `ee_pose` (a planner-executed action, PROTOCOL §4.4
+  demonstrations were recorded with. In standard mode the type is `ee_pose` (a planner-executed action, docs/protocol/standard_mode.md
   MAY); a `joint_position` type is not offered (SHOULD): the references are whole-body IK commands, and the GR1's
   29 arm, waist and finger joints are driven through that controller.
 - **Success.** The environment's own `_check_success` on the state after the last action (PROTOCOL §3), and not
@@ -58,7 +58,7 @@ instance each (PR #4's `i00`; its other 9 instances of the same environments are
   while the IK's posture term may still move the waist and elbows by a few hundredths of a radian.
 
 ## Standard-mode service
-`images/robocasa/standard/server_casa.py`, the RoboCasa benchmark's service: derived from
+`embodied_first_exam/benchmarks/robocasa/sim/server_casa.py`, the RoboCasa benchmark's service: derived from
 `images/mujoco/limited/server_mj.py`, `eai-standard/2.1`, crash recovery, collect hooks. The collect hook is
 each standard task's `environment/sim/finalize.sh`; both files are RoboCasa's byte for byte (`tasks/robocasa/README.md`:
 graded by the live episode, nothing replayed, the start checked against the frozen instance (`RCB_INSTANCE_SHA`,

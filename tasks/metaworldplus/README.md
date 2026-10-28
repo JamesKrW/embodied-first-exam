@@ -25,7 +25,7 @@ Every image is public: Harbor pulls it.
   with a SHA-256 checked on every load. Copied into `environment/`, `tests/` and `environment/sim/`.
 - **Actions.** Meta-World's native action in both modes, `[dx, dy, dz, grip]` clipped to [-1, 1], one per control step
   (0.0125 s = timestep 0.0025 s × frame_skip 5): the hand's mocap target moves by `[dx, dy, dz]` × 1 cm and the arm
-  follows through a weld; `grip` drives the fingers. There is no `joint_position` action (PROTOCOL §4.4 SHOULD): the
+  follows through a weld; `grip` drives the fingers. There is no `joint_position` action (docs/protocol/standard_mode.md): the
   Sawyer in Meta-World has no arm actuators (`model.nu = 2`, the two fingers), so joint targets would mean changing
   the upstream robot model. In standard mode the type is called `ee_delta`.
 - **Success.** Meta-World's own check (`evaluate_state`) on the state after the last action (PROTOCOL §3): no

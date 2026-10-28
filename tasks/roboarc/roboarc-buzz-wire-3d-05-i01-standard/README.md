@@ -7,8 +7,8 @@
 | Twin | `roboarc-buzz-wire-3d-05-i01-privileged` |
 | Simulator / robot | `roboarc` / `franka-robotiq-2f85` |
 | Family / instance | `buzz_wire_3d` / seed 0 |
-| Oracle | `none` — No oracle; human review in PR #N (PROTOCOL §2.7). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. |
-| Agent time budget | 10800 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — No oracle; human review in the pull request that adds the task (PROTOCOL §4). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. |
+| Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` |
 
 ## Task
@@ -23,25 +23,26 @@ the privileged task to measure the cost of losing resets, privileged state and t
 Same scene, instance and success rule as `roboarc-buzz-wire-3d-05-i01-privileged` (see its Difficulty). In standard mode the agent loses resets, privileged state and planning primitives: it sees camera images and proprioception only, acts through the client, and gets one episode, so it has to estimate the scene from images and recover from its own mistakes without starting over.
 
 ## Reference solution
-No oracle; human review in PR #N (PROTOCOL §2.7). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. `oracle = "none"`: there is no `solution/`, and Harbor checks the nop agent only.
+No oracle; human review in the pull request that adds the task (PROTOCOL §4). No reference solution and no positive example yet: nothing is known to solve this task. Its physics was accepted on the family's acceptance rounds and a smoke stress round on this instance. `oracle = "none"`: there is no `solution/`, and Harbor checks the nop agent only.
 
 ## Verification
 See `tests/grade.py`.
 
 `nop` scored 0 on this base in both modes (the release image efe:roboarc-0.1.0; harbor run -a nop with rendering off; 2026-10-14).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 4 | 2 |
-| Memory | 7 GB | 6 GB |
-| GPU memory | 2 GB | 2 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | 12 GiB | — |
+| verifier (as `main`) | 4 | 16 GiB | no cap | no GPU | 20 GiB |
 
-- GPU: required, any NVIDIA GPU; recommended: L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer).
-- Measured: partial MuJoCo measurements of 2026-10-13 (rendering off) with the protocol's margin; calibration pending; GPU 2 GB: owner 10-17 (evaluation-pool trial peak 1.1 GB on 24 GB cards)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 12 GiB GPU memory, 16 GiB memory. Limits measured: partial MuJoCo measurements of 2026-10-13 (rendering off) with the protocol's margin; calibration pending.
+- GPU: any NVIDIA GPU, held by `sim`.
+- Recommended GPU: L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer).
+- Measured: MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards
+- Measured (caps): GPU memory (the sim service): a per-trial peak of 1.1 GiB on 24 GB cards, measured with rendering off; the cap leaves room for rendering: 12 GiB
 
 ## Details
 
@@ -84,7 +85,3 @@ Guide the metal loop along the entire wire from start to finish without touching
 - Frozen instance files (`instance.json`, `instance_assets/`): not in this directory. The public image carries them in `/opt/robotangle/instances/buzz-wire-3d-05-i01/` (`images/roboarc/assets.json` pins each file's sha256), and `/opt/robotangle/stage_instance.py` copies this task's instance next to its `runtime_binding.json`, which names the instance's canonical sha256 and every asset's sha256. The tooling checks them again at every session start.
 - Release: dev/robotangle_mujoco `7947eaa7b`, image `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` (images/roboarc/).
 - Name: RoboARC is the published name of this benchmark (2026-10-13). Code identifiers keep the simulator's name: the simulator package `topogym`, the tooling `rcb_topogym.py`, `TOPOGYM_*` variables.
-
-### Change Log
-- 2026-10-14: new task of roboarc (RoboARC on MuJoCo 3.14.0, tasks/roboarc/README.md): the scene, goal and rules of the Genesis 1.2.1 task `buzz-wire-3d-hard-i00` (standard mode), ported to MuJoCo: its own frozen instance and reference, the numpy / OpenBLAS SIMD masking in every container that runs a Session, and the render bridge next to the tooling (Nyx frames).
-- 2026-10-17 (owner): graded by the live episode; no grading replay. `success` = the live success (the instance's own thresholds; a live success with a deep task contact is still held for review); the fresh-process replay of the collect hook (with its grading hold and replay tolerances) no longer decides anything and runs only as the video-only pass after the verdict, so a replay failure, a GPU lost after the episode or a breakdown met only in the replay no longer voids a trial. The frozen instance, the rows and the agent's texts other than the grading line are unchanged.

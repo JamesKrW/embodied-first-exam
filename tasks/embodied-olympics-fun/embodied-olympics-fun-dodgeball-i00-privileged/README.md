@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `dodgeball` / seed 0 |
 | Oracle | `full` — Reference: the G1 turns side-on and walks back and forth on the walking policy so that it is moving at each feed; five 14.2 m/s throws from turret-aimed machines all miss; 9 of 10 perturbations (feed times, speed, gap, aim height, machine distance) succeed, the machine at 2.8 m fails. Measured: success after 13.06 s of the 15.5 s limit, live and in a fresh replay, ending in the same state. |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,18 +25,17 @@ A ball thrown at you reaches you about 0.75 s after it leaves the machine, aimed
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
 and both end in the same state. The rules: You stand in your fair territory on a WDBF cloth dodgeball court (18.0 m x 9.0 m, lines 5 cm wide drawn inside it), 5 m behind the centre line, facing it (+x). Five ball machines stand in the opponents' half, 3.0 m beyond the centre line, 1.5 m apart across the court (at 0, -3, +3, -1.5 and +1.5 m from its middle, in the order they throw), each holding one dodgeball (17.78 cm, 0.13 kg, cloth over foam, in air). Each machine's exit is 1.2 m above the floor; its turret points it at where your pelvis is at that moment, at a height of 0.8 m, allowing for the ball's drag, until it is fed; it throws at 14.0 m/s. The first is fed at 2.0 s, the others 2.5 s apart. A thrown ball is live from the moment it leaves its machine until it touches the floor or anything that is not you or a ball; then it is dead. You fail if a live ball touches any part of you (rule 15.1); if any part of you touches a boundary line or the floor outside them, the opponents' neutral zone line (7.0 m from their back line) or anything beyond it (rule 26); if you fall (your pelvis lower than 0.35 m above the floor, or any part of you other than the feet on the floor); or after 15.5 s. A throw is dodged when its ball is dead, or 3.0 s after it left the machine, without having touched you; you succeed when all five are dodged. The machines' wheels turn at 15.9 m/s at their rims (the throw's speed comes from them).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

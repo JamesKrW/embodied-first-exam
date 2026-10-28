@@ -6,9 +6,9 @@
 | Mode | privileged |
 | Twin | `robocasa-coffee-press-button-i00-standard` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa/CoffeePressButton` |
+| Family / instance | `robocasa/CoffeePressButton` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa-0.1.0` |
 
 ## Task
@@ -23,18 +23,17 @@ The demonstration's own actions (original: 113 actions), executed from the froze
 ## Verification
 `tests/grade.py` in a separate sandbox without network: two replays in fresh processes from the verifier's own copy of the instance; `success = deterministic ∧ success on the final state ∧ not solved at the start`. Reference: two fresh-process replays end in the live run's state (hash `9d47c8ab8d55…`) and succeed. `nop`: no trajectory, reward 0; the instance is not solved at the start.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 14 GB | 5 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 20 GiB | 8192 | no GPU | 10 GiB |
+| verifier | 4 | 16 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: robosuite sim p90 9.7 GB, verifier p90 4.0 GB (RoboCasa and RoboCasa-GR1 together), mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU-only (OSMesa cameras); CPU author estimate
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 16 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: memory: the [environment] cap 16 GiB, which every past trial ran under (docker peak 16.0 GiB over 3 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 10 GiB: design defaults, not yet measured.
+- Measured: memory: verifier p90 4.0 GB (RoboCasa and RoboCasa-GR1 together; a per-container memory sampler); the standard twin's sim service, the same robosuite simulator, p90 9.7 GB; CPU only (OSMesa cameras); CPU: an estimate
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

@@ -6,9 +6,9 @@
 | Mode | privileged |
 | Twin | `abc-sim-count-one-i00-standard` |
 | Simulator / robot | `mujoco` / `i2rt-yam-bimanual` |
-| Family / instance | `count_one` |
+| Family / instance | `count_one` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.1.0` |
 
 ## Task
@@ -24,18 +24,18 @@ The commanded actions of one of upstream's validation demonstrations of this tas
 ## Verification
 `/opt/abc-tools/grade.py` in a separate sandbox without network: two replays of `/app/output/trajectory.npz`, each in a fresh process (side by side), from the verifier's own copy of the instance (`tests/instance.npz`; the rebuilt start state is checked against its recorded hash); pass iff both episodes end in success in the same state (`deterministic`). `nop`: no trajectory, reward 0.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 5 GB |
-| GPU memory | 1.5 GB | 1.5 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 16 GiB | 8192 | 5 GiB | 10 GiB |
+| verifier | 4 | 8 GiB | no cap | 5 GiB | no cap |
 
-- GPU: required, any NVIDIA GPU; recommended: any NVIDIA GPU with EGL (RTX 4090 / L4).
-- Measured: oracle trials of all 60 directories, RTX 4090 workstation, 2026-10-21 (docker stats every 3 s; the rcb_monitor's NVML samples): the agent's container 1.9 GB (one Session replaying chess, no rendering), the verifier 3.9 GB (chess: two replays side by side, then the filmed one); a Session rendering three cameras 2.4 GB and 0.9 GiB of GPU memory (the spike, 2026-10-20); CPU 2.6-3.1 cores at peak
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 5 GiB GPU memory, 12 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 5 GiB GPU memory, 12 GiB memory. Limits measured: GPU: max(1.5 x 0.9, 0.9 + 4) GiB (a rendering Session 0.9 GiB); memory: several Sessions at once (2.4 GB each while rendering; the oracle trials' agent container 1.9 GB) under the 16 GiB cap by the monitor's margin; processes 512 and disk 10 GiB: design defaults.
+- GPU: any NVIDIA GPU, held by `main`.
+- Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
+- Measured: oracle trials of all 60 directories on an RTX 4090 workstation (docker stats every 3 s, the trial's resource monitor): the agent's container 1.9 GB (one Session replaying chess, no rendering), the verifier 3.9 GB (chess: two replays side by side, then the filmed one); a Session rendering three cameras 2.4 GB and 0.9 GiB of GPU memory; CPU 2.6-3.1 cores at peak
+- Measured (caps): GPU memory: a rendering Session 0.9 GiB -> max(1.5 x peak, peak + 4), rounded up: 5 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -48,6 +48,3 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 ### Provenance
 The frozen instance (`instance.npz`) and the reference solution (`solution/oracle.npy`) were made at generation time from
 an upstream validation demonstration; see `tasks/abc-sim/README.md`.
-
-### Change Log
-- 2026-10-21: first version.

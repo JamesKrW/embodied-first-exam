@@ -19,11 +19,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = ("ghcr.io/mll-lab-nu/efe:", "ghcr.io/mll-lab-nu/efe-private:")   # efe:<name>-<version> (public), efe-private:<name>-<version> (BUILD_ONLY)
 sys.path.insert(0, str(ROOT / "scripts"))
-import task_conventions as tc  # noqa: E402  (the mode registry, PROTOCOL §2.16)
+import task_conventions as tc  # noqa: E402  (the mode registry, PROTOCOL §3)
 # the `protocol` values each mode may declare: standard 2.1 / 2.2 / 2.4 (2.4: the operations capability, issue #89),
-# standard-realtime 2.3 (the realtime capability, §4b), privileged none
+# standard-realtime 2.3 (the realtime capability, §3), privileged none
 MODE_PROTOCOLS = {m: set(d["protocols"]) for m, d in tc.MODE_REGISTRY.items()}
-# Tasks a benchmark exports with its own service inside (PROTOCOL §4c): each such benchmark keeps a manifest,
+# Tasks a benchmark exports with its own service inside (PROTOCOL §3): each such benchmark keeps a manifest,
 # ci_checks/benchmarks/<bench>/exported.toml, that lists the directories (`[[tasks]] name`) and the protocol(s) each mode serves
 # (`[protocols]`, a string or a list); a listed directory may declare one of its manifest's protocols for its mode. No
 # per-benchmark table here.
@@ -96,19 +96,18 @@ def image_refs(task: Path) -> list[str]:
 def check_task(task: Path) -> None:
     name = task.name
     meta = tomllib.loads((task / "task.toml").read_text()).get("metadata", {})
-    mode = meta.get("mode")
-    if mode is None:
-        warn("missing `mode` (" + " | ".join(tc.MODES) + ")", name)
-    # whole suffixes only (`-standard-realtime` does not end in `-standard`), and `mode` is compared exactly
+    # the mode is the directory's whole suffix (`-standard-realtime` does not end in `-standard`)
     try:
         named = tc.mode_of(task)
     except ValueError:
         named = None
-    if name.endswith("-realtime") and not name.endswith("-standard-realtime") or mode == "realtime":
-        warn("mode name `realtime` / `-realtime` (the third mode is `standard-realtime`, PROTOCOL D12)", name)
+        warn("the directory name ends in no mode (" + " | ".join(tc.MODES) + ")", name)
+    mode = named
+    if name.endswith("-realtime") and not name.endswith("-standard-realtime"):
+        warn("mode name `realtime` / `-realtime` (the third mode is `standard-realtime`, PROTOCOL §3)", name)
     proto = meta.get("protocol")
     if proto is not None and proto in own_protocols(name, mode):
-        pass                                   # PROTOCOL §4c: the benchmark's own protocol
+        pass                                   # PROTOCOL §3: the benchmark's own protocol
     else:
         for m in {mode, named} & set(tc.MODES):
             allowed = MODE_PROTOCOLS[m]
@@ -132,15 +131,15 @@ def check_task(task: Path) -> None:
 
     for ref in image_refs(task):
         if ref.startswith("ghcr.io/") and not ref.startswith(REGISTRY):
-            warn("base image outside the registry (`ghcr.io/mll-lab-nu/efe:<name>-<version>` or `efe-private:<name>-<version>`, PROTOCOL §2.4)", f"{name}: {ref}")
+            warn("base image outside the registry (`ghcr.io/mll-lab-nu/efe:<name>-<version>` or `efe-private:<name>-<version>`, PROTOCOL §1)", f"{name}: {ref}")
 
     if (task / "results").exists():
-        warn("results/ in a task directory (results are published on the results site, PROTOCOL D3)", name)
+        warn("results/ in a task directory (results are published on the results site, PROTOCOL §1)", name)
 
 
 def check_repository() -> None:
     if (ROOT / "results").is_dir():
-        warn("top-level results/ directory (results are published on the results site, PROTOCOL D3)", "results/")
+        warn("top-level results/ directory (results are published on the results site, PROTOCOL §1)", "results/")
     try:
         files = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"], capture_output=True, text=True, check=True).stdout.split("\0")
     except (OSError, subprocess.CalledProcessError):

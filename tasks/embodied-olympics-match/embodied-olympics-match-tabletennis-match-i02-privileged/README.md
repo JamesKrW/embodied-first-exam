@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `franka-panda` |
 | Family / instance | `tabletennis_match` / seed 12 |
 | Oracle | `partial` — full-state reference program (solution/): the camera-only reference player's serve and stroke planner fed the true ball state; its wins on this instance and across levels 1-4 are in the Embodied Olympics privileged report; not reproduced in this repository: the owner waived the oracle runs on 2026-10-17 (validated = false) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0@sha256:99255569bf68bcf27f4e4867b58bad55c1d54fe73281920882e97c310836b6c7` |
 
 ## Task
@@ -31,15 +31,14 @@ closed-loop match depends on the verifier host's speed, as for the standard-real
 pinned (4, minimum = cap). If any process of the program's user survives the end of the match, the trial
 is the program's 0 (never a win, never a retry).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 4 | 4 |
-| Memory | 6 GB | 8 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 8 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (Embodied Olympics, an RTX 4090 workstation, 2026-10-15): CPU-only MuJoCo 3.3.7, no cameras; one world about 0.4 GB, 470 control steps/s on one core; the verifier holds the service, the policy (2 GiB address space) and two fresh replays
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 6 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 6 GiB memory. Limits measured: author estimate, not yet measured: 6 GiB under the 8 GiB container cap (2 GiB for the monitor's margin), enough for about ten worlds at once; processes 512 and disk 20 GiB: design defaults.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo 3.3.7, no cameras; one world about 0.4 GB, 470 control steps/s on one core; the verifier holds the service, the policy (2 GiB address space) and two fresh replays
+- Measured (caps): processes and disk: defaults, not measured

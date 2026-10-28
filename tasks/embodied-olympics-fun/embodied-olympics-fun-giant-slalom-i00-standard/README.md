@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-giant-slalom-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `giant_slalom` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: A giant slalom with the U16-U14 minimum vertical drop (200 m: 640 m at 33 %, 26 open gates with panels), a level start platform and a self-start. Positive by injection: pushed off the platform, straight runs re-aimed by hand at each gate; sliding, crossings and finish are physics; deterministic. Negatives: did not start, a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: A giant slalom with the U16-U14 minimum vertical drop (200 m: 640 m at 33 %, 26 open gates with panels), a level start platform and a self-start. Positive by injection: pushed off the platform, straight runs re-aimed by hand at each gate; sliding, crossings and finish are physics; deterministic. Negatives: did not start, a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -25,20 +25,19 @@ The sim sidecar's referee judges the live attempt, and that is the verdict (`fin
 no grading replay, owner 2026-10-17); the frozen start is checked on the live simulator (`instance_mismatch`:
 infrastructure), and the video is rendered from the recorded attempt afterwards. `/tests/grade.py` reads
 `/data/final.json`: pass iff the live attempt succeeded. The
-rules: FIS alpine giant slalom, one run (a course of the U16-U14 minimum vertical drop). The course is a groomed slope falling at 18.3 degrees along +x (the fall line), 40.0 m wide, centred on y = 0. Each of your feet is bound to a giant-slalom ski. You stand on your skis on the level start platform at the top of the course, your boots 0.3 m behind its edge (the start line); the start signal is given at t = 0 and you must leave the platform by your own action (nothing holds or pushes you) within 20.0 s; your run's time starts when both feet cross the start line. There are 26 open gates: gate 1's line is 15.0 m down the slope (measured along it) from x = 0, the slope's reference line, 1 m below where the brink's curve meets the slope; each next one 24.0 m further. A gate is two pairs of flexible poles across the slope, each pair joined by a panel, red and blue in turn: the inner pole of its turning pair stands 2.0 m from the centre line, on the left (y > 0) for gate 1 and then alternately right and left; the inner pole of its outside pair stands 5.0 m further out on the same side. Its gate line is the line on the snow between the two inner poles. A gate is passed when both ski tips (the front ends of the skis) and both feet have crossed its gate line going down the slope; a point that comes back up across a gate line must cross it again. Gates are passed in order: if any of those four points goes down past the next gate's line, or the finish line, while a gate is not passed, you missed it and the run fails. Hitting a pole or a panel is allowed. The finish line is 640.0 m down the slope from x = 0, 14.0 m wide and centred on y = 0: you succeed when, after every gate, both feet cross it between its posts, within 150 s. The run fails if you fall (a part of you other than your feet and your hands touches the snow, or your pelvis is less than 0.35 m above the snow, measured along the slope's normal), if you stop after the start (your pelvis slower than 0.1 m/s for 1.5 s; ICR 614.2.3), if you do not start within 20.0 s, if a foot crosses the finish line outside its posts, or at 150 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+rules: FIS alpine giant slalom, one run (a course of the U16-U14 minimum vertical drop). The course is a groomed slope falling at 18.3 degrees along +x (the fall line), 40.0 m wide, centred on y = 0. Each of your feet is bound to a giant-slalom ski. You stand on your skis on the level start platform at the top of the course, your boots 0.3 m behind its edge (the start line); the start signal is given at t = 0 and you must leave the platform by your own action (nothing holds or pushes you) within 20.0 s; your run's time starts when both feet cross the start line. There are 26 open gates: gate 1's line is 15.0 m down the slope (measured along it) from x = 0, the slope's reference line, 1 m below where the brink's curve meets the slope; each next one 24.0 m further. A gate is two pairs of flexible poles across the slope, each pair joined by a panel, red and blue in turn: the inner pole of its turning pair stands 2.0 m from the centre line, on the left (y > 0) for gate 1 and then alternately right and left; the inner pole of its outside pair stands 5.0 m further out on the same side. Its gate line is the line on the snow between the two inner poles. A gate is passed when both ski tips (the front ends of the skis) and both feet have crossed its gate line going down the slope; a point that comes back up across a gate line must cross it again. Gates are passed in order: if any of those four points goes down past the next gate's line, or the finish line, while a gate is not passed, you missed it and the run fails. Hitting a pole or a panel is allowed. The finish line is 640.0 m down the slope from x = 0, 14.0 m wide and centred on y = 0: you succeed when, after every gate, both feet cross it between its posts, within 150 s. The run fails if you fall (a part of you other than your feet and your hands touches the snow, or your pelvis is less than 0.35 m above the snow, measured along the slope's normal), if you stop after the start (your pelvis slower than 0.1 m/s for 1.5 s; ICR 614.2.3), if you do not start within 20.0 s, if a foot crosses the finish line outside its posts, or at 150 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

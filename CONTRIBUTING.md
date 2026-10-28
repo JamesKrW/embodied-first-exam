@@ -37,44 +37,89 @@ Open a benchmark-proposal issue first (or e-mail the proposal to embodiedfirstex
   modes, PROTOCOL H.4);
 - **scrubbable** — upstream reference solutions can be removed from everything the agent can reach.
 
-It also states the oracle source (PROTOCOL §4), the minimum compute per trial (CPU cores, memory, GPU memory
-and GPU class, §6), image size, whether the images can be published, and
+It also states the oracle source (PROTOCOL §4), the caps of each container of a trial (CPU cores, memory, processes, GPU memory
+and GPU type: RTX-class, any or none; §6), image size, whether the images can be published, and
 the expected size of the pull request.
-A new benchmark's shared-files change adds its label to `scripts/task_conventions.py` `BENCHMARKS` (task-directory prefix
--> name) and its row to `ci_checks/ci_scope.py` `UNITS`; every benchmark has its own prefix
-(`task_conventions.py benchmarks --check`).
+A new benchmark's shared-files change adds its row to `scripts/task_conventions.py` `BENCHMARK_TABLE` (task-directory
+prefix, label, folder), and to `ci_checks/ci_scope.py` `UNITS` only for image directories of other names; every benchmark
+has its own prefix (`task_conventions.py benchmarks --check`, `ci_scope.py --check`).
 
 ## Authoring a task
 1. Copy the closest existing pair (`tasks/robotwin-2/robotwin_2_0_stack_blocks_two-privileged/` and `-standard/`), or
    generate tasks with your own tooling (kept outside this repository). Name them `<base>-privileged` / `<base>-standard` (and `<base>-standard-realtime` for the standard-realtime mode, PROTOCOL §1, §3) and write
    the README in the standard layout (§1); there is no `results/` directory.
-2. Fill in `task.toml` (PROTOCOL §1, §2: declare its settings, `dynamics` and `network` included), `instruction.md`
-   (§5, written by a human), the verifier under `tests/` (Appendix H.1, separate sandbox) and `solution/` (H.2).
-   The agent's time cutoff (PROTOCOL §2) is the task's own `[agent] timeout_sec`, which you set in this pull
-   request and state in its Contract: a whole number of seconds,
-   3600 unless you justify another number, at most 14400, the same for a task's privileged and standard versions,
-   and one number for all your benchmark's tasks of a mode unless you say why. There is no central table. `normalize`
-   writes from it the standard modes' `RCB_WALL_CLOCK_S` and the README row, and ends `instruction.md` with the
-   `## Time limit` section, after `## External material` and `## Resource limits` ("You have N seconds to complete this
-   task. Do not cheat by using online solutions or hints specific to this task.", then what the cutoff means in the
-   mode). Your own text never repeats the limit as a duration: say "the time limit (`## Time limit`)", and add what is
-   particular to your benchmark (a simulator's start-up cost). Your service's `time_s` / `time_left_s` count from the
-   agent's first request to it, never from the service's start, and a resumed service keeps that moment
-   (docs/protocol/standard_mode.md, "The agent's clock": the shared layers do it for you; a test must show it).
-3. State the minimum compute (PROTOCOL §6): CPU cores, memory and GPU memory of the agent phase and the verifier
-   phase, the GPU class and a recommended GPU, derived from measured peaks (oracle or agent trials; `docker stats` /
-   cgroup `memory.stat` and `nvidia-smi` while they run). Add a rule to `scripts/task_resources.toml` (or write
-   `[metadata.resources]` yourself); `scripts/task_conventions.py` writes it into `task.toml` and renders the
-   README's `## Compute resources`.
-   Add the resource limits and caps too (PROTOCOL §6, docs/protocol/running.md "Resources"): a `[[limit]]` and a `[[cap]]` rule in the same file (scope
-   `trial` for privileged tasks, `agent` for standard ones; GPU memory, memory, processes, disk in GiB, the whole trial's
-   expected peak, `measured`; docker caps per compose service). `normalize` writes `[metadata.resources.limits]` /
-   `.caps` and writes the `## Resource limits` paragraph the agent reads into `instruction.md` (just before the closing
-   `## Time limit`). With enforcement on
-   (`RCB_LIMITS_ENFORCE=1`) exceeding a limit fails the trial, so set them a generous margin above measured peaks
-   (e.g. `max(1.5 x peak, peak + 4 GiB)`) and make sure the oracle stays inside them. The caps are the ones docker
-   applies: `normalize` sets `[environment].memory_mb` from `caps.main.memory_gb` and writes the other services' caps
-   into the compose file; a cap your compose file sets itself must be the declared value (`check-resources.py`).
+2. Fill in `task.toml` (PROTOCOL §1, §2: its settings, among them `[metadata] dynamics` and `[agent] network_mode`),
+   `instruction.md` (§5, written by a human), the verifier under `tests/` (Appendix H.1, separate sandbox) and
+   `solution/` (H.2). A privileged task's `task.toml`, with the fields you write (`normalize` adds the resource
+   monitor's artifact and hook, `[verifier] network_mode` and main's caps):
+
+   ```toml
+   schema_version = "1.3"
+   artifacts = ["/app/output/"]          # must include "/app/output/" (check-task-fields.sh)
+
+   [task]
+   name = "embodied-first-exam/mybench-pick-cube-i00-privileged"   # embodied-first-exam/<directory name>
+
+   [metadata]
+   task_type = "trajectory"              # or "policy"
+   simulator = "mujoco"                  # simulator and robot: docs/TAXONOMY.md
+   robot = "franka-panda"
+   family = "pick_cube"
+   dynamics = "static"                   # or "dynamic" (docs/TAXONOMY.md "Dynamics")
+   oracle = "full"                       # "partial" / "none" also need oracle_evidence = "..."
+   instance_seed = 0                     # the default seed; [metadata.seeds] only for other seeds (PROTOCOL §2)
+   expert_time_estimate_hours = 0.5      # a standard task adds protocol = "eai-standard/2.x"
+
+   [verifier]
+   timeout_sec = 1800
+   environment_mode = "separate"         # Appendix H.1
+
+   [agent]
+   timeout_sec = 3600                    # the agent's cutoff (PROTOCOL §2)
+   network_mode = "allowlist"            # or "public": open egress, the author's choice, with no host list
+   ```
+
+   On the allowlist, `python3 scripts/set_agent_egress.py allowlist <task dirs>` writes `[agent] allowed_hosts`:
+   `check-verifier-isolation.sh` requires exactly its list. The cutoff, `[agent] timeout_sec`, is yours to set in this
+   pull request within PROTOCOL §2 and to state in its Contract; what `normalize` renders from it and how the clock
+   runs: docs/protocol/running.md "The agent's time". Your own text never repeats the limit as a duration: say "the
+   time limit (`## Time limit`)", and add what is particular to your benchmark (a simulator's start-up cost). Your
+   service's `time_s` / `time_left_s` count from the agent's first request to it, never from the service's start, and
+   a resumed service keeps that moment (docs/protocol/standard_mode.md, "The agent's clock": the shared layers do it
+   for you; a test must show it).
+3. State the caps of every container: each number is an upper bound for one container, never a minimum. The rule
+   format and where each cap ends up: PROTOCOL §6. Add a `[[cap]]` rule to `scripts/task_resources.toml`; for a
+   standard task with a `sim` sidecar that holds the GPU:
+
+   ```toml
+   [[cap]]
+   match = "^mybench-.*-standard$"          # a regular expression on the task directory's name; the last match wins
+                                            # (`-standard$` does not match `-standard-realtime` tasks: give them a rule too)
+   main = { cpus = 4, memory_gb = 10, pids = 8192, disk_gb = 20 }      # the agent's container (cpus: a whole number)
+   sim = { cpus = 4, memory_gb = 8, pids = 8192, gpu_memory_gb = 6 }   # gpu_memory_gb: only on the service that holds the GPU
+   recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
+   measured = "oracle trials on an RTX 4090: sim 1.9 GiB, 1.2 GiB of GPU memory; agent's container 0.1 GiB"
+   caps_measured = "GPU memory (the sim service): 1.2 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB"
+   ```
+
+   and for its privileged twin, where the agent's own container runs the simulator and holds the GPU:
+
+   ```toml
+   [[cap]]
+   match = "^mybench-.*-privileged$"
+   main = { cpus = 8, memory_gb = 16, pids = 8192, disk_gb = 30, gpu_memory_gb = 6 }
+   gpu_types = ["L40S", "L4", "RTX 4090"]   # only if the task needs ray-tracing cores (RTX-class models); else leave it out
+   ```
+
+   One table per compose service (the names must be the compose file's), `gpu_types` only when the task needs an
+   RTX-class GPU. The GPU itself is a device reservation you write in the compose file (`deploy.resources.reservations.
+   devices`, `driver: nvidia`, `capabilities: [gpu]`); caps go in `cpus` / `mem_limit` / `pids_limit`, never in
+   `deploy.resources.limits`. A separate verifier's caps are `cpus` / `memory_mb` you set in `[verifier.environment]`
+   (PROTOCOL §6). Measure the oracle (and agent trials if you can: `docker stats` / cgroup `memory.peak`,
+   `nvidia-smi`), set the caps a generous margin above the peaks (e.g. `max(1.5 x peak, peak + 4 GiB)`) and make sure
+   the oracle stays inside them, unless the benchmark's README states an exception: memory over its cap is an OOM kill,
+   and GPU memory or disk over theirs fails the trial when a run enforces them (`RCB_LIMITS_ENFORCE=1`). Then run
+   `scripts/task_conventions.py` on the tasks; `check-resources.py` checks the result.
 4. Base images: `images/<sim>/Dockerfile`, versioned in `images/<sim>/VERSION`, built and pushed with
    `scripts/build_images.sh` / `scripts/push_images.sh`. Images that cannot be published carry `images/<sim>/BUILD_ONLY`
    and build instructions. A task on a private image builds it itself when the runner cannot pull it: its Dockerfile
@@ -96,7 +141,7 @@ bash ci_checks/run_invariants.sh tasks/<benchmark>/<your tasks>   # must pass (t
 bash ci_checks/run_all.sh tasks/<benchmark>/<your tasks>      # both tiers: fix the advisory findings or say why the task departs
 bash ci_checks/run_all.sh --changed               # what CI runs on your pull request (scope: ci_checks/ci_scope.py)
 python3 scripts/task_conventions.py --check tasks/<benchmark>/<your tasks>     # README, task.toml, test.sh in the standard layout
-python3 ci_checks/check-resources.py tasks/<benchmark>/<your tasks>             # [metadata.resources] + limits + README / instruction (PROTOCOL §6)
+python3 ci_checks/check-resources.py tasks/<benchmark>/<your tasks>             # the caps of every container + README / instruction (PROTOCOL §6)
 python3 ci_checks/check-cutoffs.py tasks/<benchmark>/<your tasks>               # the time cutoff: task.toml = instruction = README = sim service, twins equal, cap (PROTOCOL §2)
 python3 scripts/stamp_mtimes.py tasks             # before any image build from the checkout (below)
 harbor run -p tasks/<benchmark>/<task> -a oracle               # on a sample: >= 2 tasks per mode
@@ -149,9 +194,9 @@ The checklist is in PROTOCOL §4.
 
 ## Rules that apply to every contribution
 - A published task may be changed in place, its scene included: it keeps its name and gets a new `DIGEST` (PROTOCOL
-  H.8), and results are attributed by digest. Recommended: say what changed and why in the pull request and the README's
-  Change Log.
-- To change a time cutoff (the task author's decision; owner involvement only where official results must stay
+  H.8), and results are attributed by digest. Say what changed and why in the pull request; the README describes the
+  task as it is.
+- To change a time cutoff (the task author's decision; the maintainers step in only where official results must stay
   comparable), set the new `[agent] timeout_sec` in the tasks concerned, in both twins, run `python3 scripts/task_conventions.py` on them
   and say old -> new and why in the pull request (docs/protocol/running.md "The agent's time"). The task keeps its name and gets
   a new digest; results under the earlier cutoff are ranked separately (PROTOCOL §2, H.8).
@@ -165,10 +210,9 @@ The checklist is in PROTOCOL §4.
   under `/srv`; `.dockerignore` keeps the two build files out). A private evaluator's own data (hidden plants, case banks)
   and files that may not be redistributed stay in the task dir.
 - Pin everything (`FROM` tags or digests, pip versions); no network access during verification.
-- The agent's egress is the model APIs and the package registries (PyPI, the Debian / Ubuntu apt archives) by default
-  (`[agent] network_mode = "allowlist"` with the hosts of `scripts/set_agent_egress.py`; PROTOCOL Appendix H.6); a task
-  whose author chooses open egress declares `[metadata] network = "open"` and writes its own `## External material`
-  paragraph, and its results are ranked apart. Bake
+- The agent's egress (PROTOCOL Appendix H.6, docs/protocol/running.md "Network"): the allowlist by default; a task
+  whose author chooses open egress declares `[agent] network_mode = "public"` and writes its own `## External material`
+  paragraph. Bake
   what the task itself needs at run time into the image or the task directory (an agent may install packages; a task
   must not depend on it). `normalize` writes the `## External material` paragraph, an honour rule, into
   `instruction.md`. If a distribution on PyPI ships your benchmark's solutions or task sources, add it to the table in

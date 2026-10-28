@@ -2,8 +2,8 @@
 
 Part of the task protocol ([README](README.md); its Appendix H binds every run): how runs are configured, and what
 makes a run official. The sections "Official runs" to "Results" below are the runner's rules:
-`scripts/run_agent_batch.sh` applies them by default, and the evaluation pool's scheduler (its run policy, called from
-the dispatcher's launch and retry paths) refuses a launch that breaks one.
+`scripts/run_agent_batch.sh` applies them by default, and a runner's scheduler (its run policy, checked at every launch
+and retry) refuses a launch that breaks one.
 
 ## Official runs
 A result is official only when its run had all of these:
@@ -23,18 +23,58 @@ A result is official only when its run had all of these:
 - **The runner's seed, the task's network, at most one infrastructure retry** (the next three sections), and the
   effective configuration recorded with the result (Results).
 
-## Seeds: the runner chooses
-The seed is the runner's, never the agent's: it is one of the task's `[metadata.seeds] allowed` (a list, `{from, to}`,
-`"any"`), official batches draw one uniformly per trial, and a run on the default seed only records `default-only`.
-The verifier grades the drawn seed's instance from its own copy (`build = "runtime"`: from its own seed file). How to
-run a seed: "Seeds (which frozen instance a trial runs from)" below.
+## Seeds
+The seed is the runner's, never the agent's. A task's default seed is `[metadata] instance_seed`, the task directory as
+committed; the seeds a runner may draw from are `[metadata.seeds] allowed` (a list, a range `{ from = A, to = B }` or
+`"any"`; without the table, the default seed alone), and `oracle` names the ones the reference solution is for (PROTOCOL
+§2). Official batches draw one uniformly per trial; a run on the default seed only records `default-only`. The verifier
+grades the drawn seed's instance from its own copy (`build = "runtime"`: from its own seed file). To run another allowed
+seed, or one drawn from the allowed list, let the runner write a copy and run that:
 
-## Network: what the task declares
+```bash
+python3 scripts/task_seed.py list tasks/<benchmark>/<task>                      # {'default': 0, 'allowed': [0, ...], 'oracle': [...]}; default = instance_seed
+python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --seed draw --out /tmp/run1   # prints the copy and the seed
+harbor run -p /tmp/run1/<task> -a <agent> ...
+```
+
+The agent never chooses or sees the list: another seed's instance lives under the privileged task's `tests/seeds/`,
+and the copy carries only the drawn one. Every task allows its default seed only, and `scripts/run_agent_batch.sh`
+runs each job on it, from a stamped copy of the task as it is (with the gateway, the copy's egress is the gateway; with
+a CPU cap above the host's count, `HOST_CPUS`, the copy has that cap clamped, Resources below).
+
+## Network
 The default is the allowlist (PROTOCOL Appendix H.6); whether a task has open network is its author's decision,
-declared as `[metadata] network = "open"`. The runner applies the declaration: an allowlist task's copy is narrowed to
-the gateway and the package registries (`scripts/set_agent_egress.py only`), an open task's copy is left open (the
-gateway still records its usage). `python3 scripts/set_agent_egress.py network <task>` prints the declaration.
-`network` is part of the recorded configuration, so open-network results are never ranked with allowlist ones.
+declared in Harbor's own field, `[agent] network_mode = "public"`. The runner applies the declaration: an allowlist
+task's copy is narrowed to the gateway and the package registries (`scripts/set_agent_egress.py only`), an open task's
+copy is left open (the gateway still records its usage). `python3 scripts/set_agent_egress.py network <task>` prints the
+declaration. `network` is part of the recorded configuration, so open-network results are never ranked with allowlist
+ones.
+
+Every task's `[agent]` allowlist is one list, `HOSTS` in `scripts/set_agent_egress.py`: the model APIs and the package
+registries (PyPI: pypi.org, files.pythonhosted.org; apt: deb.debian.org, security.debian.org, archive.ubuntu.com,
+security.ubuntu.com, snapshot.ubuntu.com). So `pip install` (or `uv pip install` in the images without pip) and
+`apt-get update && apt-get install` work in every agent container, in both modes; GitHub, raw.githubusercontent.com,
+Hugging Face and the general web do not answer (PROTOCOL §5, Appendix H.6: the honour rule is the instruction's; the network keeps the
+places where solutions are published out of reach). Both installs work with and without the
+usage gateway (Debian 12 and 13, Ubuntu 22.04 images).
+In the Ubuntu images built on NVIDIA's CUDA base, `apt-get update` warns about NVIDIA's own repository
+(developer.download.nvidia.com is not on the list) and goes on; the Ubuntu archives answer.
+Before it applies an allowlist, Harbor checks the host kernel once per job by running a small alpine image, and gives
+the pull and run 30 s: a slower pull reads as "allowlist unsupported" for the whole job. On docker and podman this
+repository's `harbor run` (`scripts/efe.py`) pulls that image first when it is missing.
+
+The list is the one switch.
+- Another host for every task: add it to `HOSTS` (to `PACKAGE_HOSTS` too if a run through the gateway should reach it
+  directly), then `python3 scripts/set_agent_egress.py allowlist` and `python3 scripts/task_conventions.py tasks/*/*/`
+  (normalize refreshes each DIGEST).
+- A run with no restriction at all (the agent may reach anything): run a copy of the tasks, since CI keeps the list
+  in `tasks/`:
+  `cp -a tasks /some/dir/tasks && python3 scripts/set_agent_egress.py public /some/dir/tasks/*/*/`, then
+  `harbor run -p /some/dir/tasks/<benchmark> ...` (with `scripts/run_agent_batch.sh`: a copy of the repository with that
+  `tasks/`; the copies say `network_mode = "public"`, so the runner keeps each job's copy open, with the gateway or
+  without, `set_agent_egress.py allowlist` skips them, and their results record `network` = open). The instructions'
+  last sentence about the network does not hold for such a run: `EXTERNAL_TEXT` in `scripts/task_conventions.py` is
+  the text every allowlist task carries.
 
 ## Infrastructure failures: one full retry
 The rule is PROTOCOL Appendix H.5; how the runner applies it:
@@ -42,11 +82,11 @@ The rule is PROTOCOL Appendix H.5; how the runner applies it:
   `infra_error` / `grader_error`, no `reward.json`, a Harbor exception other than the agent's cutoff, a model-account or
   usage-gateway failure (`scripts/account_failure_check.py`). The agent's own end, its cutoff and its token budget are
   results and are never retried.
-- The voided attempt's directory is moved aside (in the evaluation pool: `_superseded/`) and never counted; the retry starts
+- The voided attempt's directory is moved aside (e.g. into `_superseded/`) and never counted; the retry starts
   from a new environment with the first attempt's recorded configuration. A failed retry keeps the default handling
   (it stays an infrastructure failure, reported as such). A launch that never started a trial is no attempt.
 - One implementation of the rule, `scripts/retry_policy.py` (`decide`, `check_attempts`), tested by the required CI
-  job; the evaluation pool's scheduler uses it. `write_task_results.py` keeps every attempt of a task x run id in
+  job; a runner's scheduler uses it. `write_task_results.py` keeps every attempt of a task x run id in
   `attempts.json` and flags a sequence that breaks the rule (`attempts_over_cap`).
 - In-trial crash recovery (a sidecar that replays its journal and resumes the episode, standard_mode.md) is the shared
   layers' implementation, not a rule; a crash it cannot recover is an infrastructure failure, unless every crash was
@@ -89,45 +129,58 @@ their names and are not evaluated by official runs; results they already have ar
 summary marks them in their configuration's table and leaves them out of its rate). `set` in `config.json` is the
 value when the result was written; a report derives it from `docs/core_set.toml` at the commit it publishes.
 
-A standard-mode result recorded while a grading replay still decided is re-read from its own `final.json` (the live
-episode's success, where that record applied the task's whole rule); the recorded verdict stays beside it, and a trial
-without such a live verdict, started off the frozen instance (`instance_mismatch`) or re-graded under a stricter rule
-keeps the recorded one (benchmark docs name their fields where they differ).
+A standard-mode result whose recorded verdict a grading replay decided (no `graded_by_live`) is re-read from its own
+`final.json` (the live episode's success, where that record applied the task's whole rule); the recorded verdict stays
+beside it, and a trial without such a live verdict, started off the frozen instance (`instance_mismatch`) or
+re-graded under a stricter rule keeps the recorded one (benchmark docs name their fields where they differ).
 
-## Resources: limits and their enforcement
-Each task declares its minimum compute, `[metadata.resources]`, its limits `[metadata.resources.limits]` and the docker
-caps `[metadata.resources.caps]` (PROTOCOL §6; values from `scripts/task_resources.toml`, written by `normalize`,
-checked by `ci_checks/check-resources.py`).
-- **Minimum** = the smallest allocation on which one trial, alone on the machine, runs correctly. Derivation: memory,
-  the largest sum over the phase's containers of cgroup `anon + shmem` × 1.2, rounded up to a GB; GPU memory, the largest
-  `nvidia-smi` sum × 1.15, rounded up to 0.5 GB; CPU, the 90th percentile of 30-second samples, rounded up, at least
-  one core per simulator process plus one for the agent. Limits sit with a margin above measured peaks (e.g.
-  `max(1.5 × peak, peak + 4 GiB)`); the oracle passes within them.
-- **Scope**: `trial` (privileged: every container the agent drives) or `agent` (standard modes: the agent's container;
-  the `sim` sidecar is recorded, never a failure). Limits: `max_gpu_memory_gb` (NVML per process, summed),
-  `max_memory_gb` (cgroup `anon + shmem`), `max_processes`, `max_disk_gb` (growth under `disk_paths`), a violation =
-  above a limit for `sustain_sec` (60 s) within any `window_sec` (120 s), disk two measurements in a row; gaps never
-  count against the agent. CPU is only a cap. A CPU cap above the host's count means the host's count: the runner
-  clamps it in its copy (`scripts/clamp_cpus.py`); memory and pids caps are never clamped.
+## Resources: caps and their enforcement
+Every resource number of a task is an upper bound for one container; where each is set: PROTOCOL §6. This section is
+how a run applies and enforces them.
+- **What enforces what.** Memory: docker (cgroup); a process that goes over is killed by the kernel. Processes (and
+  threads): docker. Shared memory: docker applies the compose file's `shm_size` (a setting, not a cap), and it counts
+  against the memory cap. CPU: docker, a throttle only. A CPU cap above the host's count means the host's count: the
+  runner clamps it in its copy (`scripts/clamp_cpus.py`); memory and pids caps are never clamped. Disk: a cloud
+  backend applies `storage_mb`; local docker cannot (overlay2 on ext4), so the monitor measures it. GPU memory: docker
+  cannot cap it (a card may be shared between trials): the monitor measures it, and the agent is told its cap.
+- **Placing trials.** Harbor caps each container and does not check whether a machine has room (concurrency is `-n`).
+  A machine that holds the sum of a phase's caps (agent; verifier) never runs short; packing more is the runner's call.
+  GPU memory: `x-gpu-memory-gb`; an RTX-class card where `gpu_types` is set. The verifier's caps (a key its
+  `[verifier.environment]` lacks is no cap): PROTOCOL §6.
 - **Monitor**: the `rcb_monitor` sidecar samples every few seconds into its own record (`rcb-monitor/1`), sealed in the
-  first collect hook, and shows current values in `/run/rcb-limits/usage.json`, with the agent's clock (`elapsed_s`,
-  `time_left_s`, `deadline_utc`: `[agent] timeout_sec` from the environment's start, so never more than the agent has);
-  the verifier recomputes violations from the raw samples with its own copy of the limits. A missing, unsealed or mostly
-  empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`. A runner whose container runtime
-  cannot run the monitor (no `pid: host`) runs the same service as `monitor.py beacon` (no pid / cgroup host, no record):
-  `usage.json` then has the clock and `"measured": false`.
+  first collect hook: GPU memory (NVML per process, summed), memory (cgroup `anon + shmem`), processes, disk (growth of
+  the files under `/app`, `/tmp`, `/root` of the agent's container), per container and summed over its scope (privileged:
+  every container the agent drives; standard modes: the agent's container; the `sim` sidecar and other benchmark-owned
+  services are recorded, never a failure). It writes `/run/rcb-limits/usage.json`: current use, the agent's own
+  container's caps (`caps`), the two caps it may enforce (`limits`: `gpu_memory_gb`, null without a GPU in the scope,
+  `disk_gb`, and the protocol's 60 s / 120 s as `sustain_sec` / `window_sec`) and the agent's clock (`elapsed_s`, `time_left_s`, `deadline_utc`: `[agent]
+  timeout_sec` from the environment's start, so never more than the agent has). Inside its container the agent can
+  also read its cgroup (`/sys/fs/cgroup/memory.max`, `cpu.max`, `pids.max`). The verifier recomputes violations from
+  the raw samples with its own copy of the caps (`tests/rcb_limits.json`, format `rcb-limits/2`). A missing, unsealed
+  or mostly empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`. A runner whose
+  container runtime cannot run the monitor (no `pid: host`) runs the same service as `monitor.py beacon` (no pid /
+  cgroup host, no record): `usage.json` then has the caps, the clock and `"measured": false`.
+- **Violations** (the protocol's rules, the same for every task): the scope's GPU memory above its cap (the
+  `x-gpu-memory-gb` of the scope's one GPU service) for 60 s within any 2 minutes, the agent's disk above `storage_mb` at two
+  measurements in a row (once a minute), or a kernel OOM kill in the scope at the container's own memory cap; gaps
+  never count against the agent. A scope without a GPU has no GPU-memory cap: GPU memory seen there is recorded only. A
+  `limits.json` that is not `rcb-limits/2` is an unusable record (`resource_monitor_missing = 1`; not a result when
+  enforced).
 - **Session log**: the monitor copies the agent's `/app/output/rcb_session_log.jsonl` append-only into its record
   (`session_log/`); before the grader, the verifier step gives the grader that copy when the agent's file was removed or
   rewritten (`session_log_tampered`, `session_log_from_monitor` in `reward.json`). The log feeds cost fields only.
 - **The switch** `RCB_LIMITS_ENFORCE` (compose default 0, so it does not change the digest): `1` — a confirmed violation
   kills the scope's processes and fails the trial (`reward 0`, `success_before_limits`, `resource_limit_exceeded = 1`),
   never retried; `0` — observe and record only (`limits_violation_observed`, `/logs/verifier/resource_limits.json`);
-  any other value — nothing is killed, `infra_error = 1`, `resource_switch_error = 1`. Official runs so far: 0.
+  any other value — nothing is killed, `infra_error = 1`, `resource_switch_error = 1`.
 - **Out-of-memory kills**: a kill at a container's own cap in the scope is a violation (`over_oom`); a host OOM kill is
   never one (enforcement on: `infra_error = 1`, `resource_host_oom`); a benchmark-owned service killed for memory in an
   episode that did not succeed is `infra_error = 1` (`resource_service_oom`) in both settings. Host protection
-  (enforcement on): GPU memory above 1.5 × its limit kills the process holding the most; never a violation by itself.
+  (enforcement on): GPU memory above 1.5 × its cap kills the process holding the most; never a violation by itself.
   A trial a pool kills to protect its host is an operations abort (`killed_by_pool`), not a graded result.
+- **reward.json** (always): `resource_enforced`, `limits_violation_observed`, `resource_monitor_missing`,
+  `peak_gpu_memory_gb`, `peak_memory_gb`, `peak_processes`, `peak_disk_gb`, `resource_emergency_kills`,
+  `resource_oom_kills`, `resource_host_oom_kills`, `resource_service_oom_kills`, and `over_<metric> = 1` per violation.
 
 ## Agent logs and timelines
 Harbor keeps, per trial, `agent/codex.txt` (every message, command and output), `agent/trajectory.json` and the raw
@@ -236,7 +289,8 @@ node-local scratch (podman's storage does not work on most network file systems)
    `harbor run -p`, the same copy by hand: `podman pull` the image, stage a copy as in 5., replace the block with that
    `FROM` line and stamp the copy again.
 7. Where podman cannot give each container a cgroup of its own (cgroup v1, or a cgroup v2 node whose cgroup is not
-   delegated to your user, e.g. a Slurm job step), the resource caps are not applied (`RCB_LIMITS_ENFORCE` stays 0), and
+   delegated to your user, e.g. a Slurm job step), docker's caps are not applied and the monitor's enforcement stays off
+   (`RCB_LIMITS_ENFORCE=0`), and
    podman cannot stop the `rcb_monitor` sidecar, which shares the host's PID namespace (podman stops such a container by
    signalling its cgroup's processes): the monitor then ends itself once its record is sealed.
 8. On cgroup v2 the containers' CPU caps need the `cpu` controller delegated to your user: when
@@ -288,38 +342,18 @@ append-only copy of every trial's `agent/` record that neither the agent nor the
 `scripts/account_failure_check.py` (structured evidence only: Codex's rate limits and last event, Claude Code's result
 event). `LOG_MIRROR=0` / `MEM_GUARD=0` skip starting the first two.
 
-## Seeds (which frozen instance a trial runs from)
-
-Every task names its seeds in `task.toml` (`[metadata.seeds]`: `default`, `allowed`, `oracle`; PROTOCOL §2). Each
-seed is an instance (`allowed`: a list, a range `{ from = A, to = B }` or `"any"`); the default one is the task
-directory as committed. To run another allowed seed, or one
-drawn from the allowed list (official batches draw one per trial), let the runner
-write a copy and run that:
-
-```bash
-python3 scripts/task_seed.py list tasks/<benchmark>/<task>                      # {'default': 0, 'allowed': [0, ...], 'oracle': [...]}
-python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --seed draw --out /tmp/run1   # prints the copy and the seed
-harbor run -p /tmp/run1/<task> -a <agent> ...
-```
-
-The agent never chooses or sees the list: another seed's instance lives under the privileged task's `tests/seeds/`,
-and the copy carries only the drawn one. Every task allows its default seed only today, so
-`scripts/run_agent_batch.sh` runs each job from a stamped copy of the task as it is (with the gateway, the copy's
-egress is the gateway; with a CPU cap above the host's count, `HOST_CPUS`, the copy has that cap clamped, Resources
-above); it materializes a seed per trial once a benchmark allows more than one.
-
 ## The agent's time (the cutoff)
 Every task gives the agent a fixed wall-clock time, its cutoff: Harbor's `[agent] timeout_sec` in the task's own
-`task.toml`, set by the task's author in the pull request that adds or changes the task  `ci_checks/check-cutoffs.py` checks per task: a whole number
-of seconds, at most 14400 (`CUTOFF_CAP`), 3600 unless the pull request justifies another; the instruction's closing
-`## Time limit`, the README's `Agent time budget` row and, in the standard modes, the sim service's `RCB_WALL_CLOCK_S`
-state the same number; nothing else in the instruction states the limit as a duration. A task's privileged and
-standard versions have the same cutoff (H.7, the mode registry's `same_cutoff_as`). A benchmark uses one number for all its tasks of a mode unless the pull
-request says why.
+`task.toml`, set by the task's author in the pull request that adds or changes the task, within the rules of PROTOCOL
+§2 (3600 s unless the pull request justifies another number, at most 14400 s, `CUTOFF_CAP`; the same for a task's
+privileged and standard versions, H.7; one number for a benchmark's tasks of a mode unless the pull request says why).
+`ci_checks/check-cutoffs.py` checks per task that the number is a whole number of seconds within the cap and that the
+instruction's closing `## Time limit`, the README's `Agent time budget` row and, in the standard modes, the sim
+service's `RCB_WALL_CLOCK_S` state the same number; nothing else in the instruction states the limit as a duration.
 
-**What the agent is told.** `normalize` ends every `instruction.md` with `## Time limit`: "You have N seconds to
-complete this task. Do not cheat by using online solutions or hints specific to this task.", then what the cutoff means
-in the mode (`CUTOFF_NOTE` in `scripts/task_conventions.py`: wall-clock time from the start of the session; at the cutoff
+**What the agent is told.** `normalize` ends every `instruction.md` with `## Time limit`: the cutoff sentence
+(`CUTOFF_SENTENCE` in `scripts/task_conventions.py`, the task's number in Terminal-Bench's format), then what the cutoff
+means in the mode (`CUTOFF_NOTE`: wall-clock time from the start of the session; at the cutoff
 the agent is stopped and only `/app/output/` (privileged) or the episode as it stands (standard modes) is graded;
 `/run/rcb-limits/usage.json` gives `time_left_s` and `deadline_utc`; long waits in tool calls count). A benchmark's own
 text about its time says "the time limit (`## Time limit`)", never a number.
@@ -339,7 +373,7 @@ installs) is fine: set-up is not the agent's time.
 **Changing a cutoff** (the author's decision): set the new `[agent] timeout_sec` in both twins, run `python3 scripts/task_conventions.py tasks/<benchmark>/<task> ...` (it rewrites the closing section, the
 README row, `RCB_WALL_CLOCK_S` and `DIGEST`), and state old -> new and why in the change (label `cutoff-change`). The task
 changes in place and keeps its name; results under another cutoff are a different configuration (`config_key`). Not
-derived from the cutoff: the token budget, the resource limits, reset budgets, step caps, verifier timeouts. When
+derived from the cutoff: the token budget, the resource caps, reset budgets, step caps, verifier timeouts. When
 raising one, look at collect-hook and verifier budgets sized for an episode as long as the agent's time (RoboCasa,
 RoboCasa365 and RoboCasa-GR1 `COLLECT_TIMEOUT_S`; RoboLab, YAMLab, DexJoCo, BEHAVIOR-1K: their `tasks/<benchmark>/README.md`
 pages) and, for Embodied Olympics - Match's exported matches, a match's wall time at its slowdown plus the reviews between points.
@@ -356,31 +390,6 @@ for byte from the repository, so it has the digest the task Dockerfiles pin (`CO
 `files_image.py push` pushes those same bytes (`docker push` would recompress the layer). A private one built locally
 serves the tasks unchanged on Docker's containerd image store (Docker Engine 29's and Docker Desktop's default); the
 classic store resolves a digest only for a pulled image.
-
-## What an agent's container reaches
-Every task's `[agent]` allowlist is one list, `HOSTS` in `scripts/set_agent_egress.py`: the model APIs and the package
-registries (PyPI: pypi.org, files.pythonhosted.org; apt: deb.debian.org, security.debian.org, archive.ubuntu.com,
-security.ubuntu.com, snapshot.ubuntu.com). So `pip install` (or `uv pip install` in the images without pip) and
-`apt-get update && apt-get install` work in every agent container, in both modes; GitHub, raw.githubusercontent.com,
-Hugging Face and the general web do not answer (PROTOCOL §5, Appendix H.6: the honour rule is the instruction's; the network keeps the
-places where solutions are published out of reach). Both installs work with and without the
-usage gateway (Debian 12 and 13, Ubuntu 22.04 images).
-In the Ubuntu images built on NVIDIA's CUDA base, `apt-get update` warns about NVIDIA's own repository
-(developer.download.nvidia.com is not on the list) and goes on; the Ubuntu archives answer.
-Before it applies an allowlist, Harbor checks the host kernel once per job by running a small alpine image, and gives
-the pull and run 30 s: a slower pull reads as "allowlist unsupported" for the whole job. On docker and podman this
-repository's `harbor run` (`scripts/efe.py`) pulls that image first when it is missing.
-
-The list is the one switch.
-- Another host for every task: add it to `HOSTS` (to `PACKAGE_HOSTS` too if a run through the gateway should reach it
-  directly), update the generators' copies of the list, `python3 scripts/set_agent_egress.py allowlist`,
-  `python3 scripts/task_conventions.py tasks/*/*/` (normalize refreshes each DIGEST).
-- A run with no restriction at all (the agent may reach anything): run a copy of the tasks, since CI keeps the list
-  in `tasks/`:
-  `cp -a tasks /some/dir/tasks && python3 scripts/set_agent_egress.py public /some/dir/tasks/*/*/`, then
-  `harbor run -p /some/dir/tasks/<benchmark> ...` (with `scripts/run_agent_batch.sh`: a copy of the repository with that `tasks/`,
-  and `GATEWAY_EGRESS=task`, or the runner narrows each job's copy again). The instructions' last sentence about the
-  network is then no longer true: change `EXTERNAL_TEXT` in `scripts/task_conventions.py` if that becomes the default.
 
 ## No tool outside the container (web search off by default)
 `scripts/run_agent_batch.sh` turns the harness's web search off unless `WEB_SEARCH=allowed`: Codex gets
@@ -408,8 +417,8 @@ allowlist.
 
 **Model-API calls only, and the only way out (Official runs above).** The gateway forwards the requests listed per provider
 in `scripts/usage_gateway/api_paths.json` (responses, messages, token counting, the model list; chat completions only
-to a self-hosted upstream: no official run used them, and at the providers that API serves models that search the web
-without any tool declaration) and answers anything else 403 without forwarding it: connectors and apps,
+to a self-hosted upstream: official runs do not use them, and at the providers that API serves models that search the
+web without any tool declaration) and answers anything else 403 without forwarding it: connectors and apps,
 plugins, files, conversations, web search. A model request is forwarded as it is or not at all: its body must be one
 JSON object the gateway can read (one Content-Length of at most 256 MiB, at most one Content-Encoding), and every tool
 it declares (top-level `tools`, and the `tools` of an `input` item, where Codex declares its own) must be one the agent
@@ -437,8 +446,8 @@ registries (`scripts/set_agent_egress.py only <GATEWAY_BIND>,<PACKAGE_HOSTS>`; H
 host, not remove one). `GATEWAY_EGRESS=task` keeps the task's own allowlist (the hosts reachable directly; not for
 official runs).
 Harbor's allowlist names addresses, not ports: every TCP service that listens on the gateway's address (the docker
-bridge) of the runner host is reachable from a trial, as it has been since the gateway exists; bind the host's other
-services to 127.0.0.1 or firewall the bridge.
+bridge) of the runner host is reachable from a trial; bind the host's other services to 127.0.0.1 or firewall the
+bridge.
 One exception, Codex with a ChatGPT login: before its first model call Codex 0.160.1 asks
 `chatgpt.com/backend-api/wham/accounts/check` for the account's workspace, at `chatgpt_base_url` and not at the model's
 base URL, and it accepts only an HTTPS origin there, which the plain-HTTP gateway is not (through the gateway the lookup

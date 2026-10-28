@@ -42,7 +42,7 @@ every task goes through the human review in PR #3.
   frozen instance and predicate).
 
 **Not in the repository: 11 families** without a valid positive. A later PR can add one once it
-has a positive; their frozen instances are in dev/qineng 9eb18edf.
+has a positive; their frozen instances are in dev branch 9eb18edf.
 - No graded positive: balance_board, ball_into_jar, differentiate_cubes, pinch_card, place_book, retrieve_roll,
   round_dough_sheet, seal_colander, water_into_mug. place_book can pass only with the thin book stood on its edge: the book
   (22 x 19 cm) is larger than the mat (12 x 20 cm), so a flat book has at most about 57 % of its footprint over the mat,
@@ -108,8 +108,7 @@ which was graded on an AMD workstation (with `instance_exact = 1`).
 - **Machine-readable:** a task bound to one vendor carries `host_cpu_vendor = "GenuineIntel"` in `[metadata]` of `task.toml`
   (a RoboWits field, docs/TAXONOMY.md; no task in the repository needs it now), and
   its README a `Host CPU` row. A scheduler runs such a task only on a host whose `/proc/cpuinfo` `vendor_id` equals
-  the value; a task without the key runs on either vendor. The key is not in `[metadata.resources]`, whose fields are
-  fixed by PROTOCOL §6.
+  the value; a task without the key runs on either vendor. It is not a resource cap (PROTOCOL §6 has caps only).
 - **A host that cannot rebuild the instance is an infrastructure error, never a result.** Privileged: the
   verifier writes `success = 0`, `instance_ok = 0`, `infra_error = 1` (and `instance_build_failed = 1` with
   `grader_error = 1` when the scene does not build at all). Standard: the service checks the rebuilt instance once, at

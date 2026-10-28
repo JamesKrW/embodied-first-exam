@@ -14,70 +14,26 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 [task]
 name = "embodied-first-exam/labutopia-place-i00-standard"
 description = "STANDARD MODE (robot as a service, eai-standard/2.2): LabUtopia place (Place) on the same frozen instance as labutopia-place-i00-privileged: Pick up the glass beaker and set it down on the white square plate. The agent only gets a client: cameras (RGB, optional depth, calibration), the robot's proprioception, joint target chunks, arm kinematics; one episode, no reset, no object or instrument state; the sim service records the episode and grades the live episode (no grading replay)."
-authors = [{ name = "Canyu Chen" }]
 keywords = ["robotics", "labutopia", "isaac-sim", "laboratory", "chemistry", "franka-panda", "code-as-policy", "trajectory", "place", "standard-mode"]
 
 [metadata]
-author_name = "Canyu Chen"
 task_type = "trajectory"
 simulator = "labutopia"           # LabUtopia @ 8df7278 on NVIDIA Isaac Sim 6.1.0 (PhysX on the CPU, RTX cameras)
 robot = "franka-panda"
 family = "place"
-mode = "standard"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.2"
 oracle = "full"
 level = 1                         # LabUtopia's own level for the task (config level1_place)
 instance_seed = 0                 # numpy's and Python's random generators before LabUtopia's reset
 expert_time_estimate_hours = 2.5
 
-[metadata.resources]
-# minimum compute to run this task (docs/protocol/README.md §2.9)
-min_cpus = 8.0
-min_memory_gb = 23.0
-min_gpu_memory_gb = 8.5
-gpu_required = true
-gpu_class = "rtx"
-recommended_gpu = "RTX 4090 24GB / L40S 48GB"
-verifier_min_cpus = 8.0
-verifier_min_memory_gb = 22.0
-verifier_min_gpu_memory_gb = 8.5
-measured = "oracle checks on RTX 4090 (driver 580), lab_001 pick: rendering container peak 17 GB RAM, about 7 GB GPU, 8 CPUs (start-up bursts to 16 cores for about 70 s); author: lab_003 families 21 GB at the peak (8 vCPU host)"
-
-[metadata.resources.limits]
-# agent-phase limits in GiB (docs/protocol/README.md §2.10); scope: trial = every container, agent = the agent's container;
-# enforced from protocol v1.2 when RCB_LIMITS_ENFORCE=1 (a violation fails the trial), otherwise recorded only
-scope = "agent"
-max_gpu_memory_gb = 0.0
-max_memory_gb = 8.0
-max_processes = 512
-max_disk_gb = 20.0
-disk_paths = ["/app", "/tmp", "/root"]
-disk_exclude = []
-sustain_sec = 60.0
-window_sec = 120.0
-trial_max_gpu_memory_gb = 16.0
-trial_max_memory_gb = 28.0
-measured = "GPU: about 7 GiB, oracle on an RTX 4090 (author); no trial data -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: no samples of the agent's container; floor 8 GiB (at most the 32 GiB cap); whole trial: + the sim service's 20 GiB (docker peak 12.7 GiB, 1 samples); processes 512 and disk 20 GiB: design defaults, not yet measured"
-
-[metadata.resources.caps]
-# docker caps per compose service, applied from protocol v1.2 (docs/protocol/README.md §2.10)
-main = { cpus = 8.0, memory_gb = 32.0, pids = 16384 }
-sim = { cpus = 16.0, memory_gb = 24.0, pids = 16384 }
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
-
 [verifier]
 timeout_sec = 600.0
 environment_mode = "separate"
 network_mode = "no-network"
 
-# Resource limits (docs/protocol/README.md §2.10): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -106,6 +62,8 @@ allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.
 build_timeout_sec = 1800.0
 cpus = 8
 memory_mb = 32768
+storage_mb = 20480
+gpu_types = ["RTX 4090", "L40S"]
 
 [verifier.env]
 RCB_LIMITS_ENFORCE = "${RCB_LIMITS_ENFORCE:-0}"

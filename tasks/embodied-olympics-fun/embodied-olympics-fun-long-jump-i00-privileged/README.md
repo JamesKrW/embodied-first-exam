@@ -7,8 +7,8 @@
 | Twin | `embodied-olympics-fun-long-jump-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `long_jump` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (at the board, 3.6 m/s forward and 2.5 m/s up: a mark of 1.50 m in the sand); negatives: running through, walking over the line, a foot over the line, short, beside the pit, beside the board, feet pulled up (no rise), into the sand without a flight, back out behind the mark. The sand follows a published resistive-force law of dry silica sand (2.02 N/cm^3, phi 34 deg): the G1 sinks 7.4 mm standing and 75 mm landing at 2.5 m/s, with a 0.10 m/s rebound. Nothing known jumps out of a run; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
-| Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (at the board, 3.6 m/s forward and 2.5 m/s up: a mark of 1.50 m in the sand); negatives: running through, walking over the line, a foot over the line, short, beside the pit, beside the board, feet pulled up (no rise), into the sand without a flight, back out behind the mark. The sand follows a published resistive-force law of dry silica sand (2.02 N/cm^3, phi 34 deg): the G1 sinks 7.4 mm standing and 75 mm landing at 2.5 m/s, with a 0.10 m/s rebound. Nothing known jumps out of a run; human review in the pull request that adds the benchmark (PROTOCOL §4) |
+| Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task
@@ -23,20 +23,19 @@ None. No reference controller exists for this family yet: positive by injection 
 ## Verification
 `/tests/grade.py` replays `/app/output/trajectory.npz` from the frozen start in two fresh processes (`rcb_rfo.py replay`:
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
-and both end in the same state. The rules: World Athletics rules for the long jump. The runway is 40.0 m long and 1.22 m wide along +x. The take-off line is x = 0, the edge of the white take-off board (0.2 m long, level with the runway) that is nearer the pit. The landing area is a pit of sand, level with the runway, that begins 1.0 m beyond the take-off line and is 9.0 m long and 2.75 m wide, centred on y = 0. Before your landing in the sand: no foot that is on the ground may have any part of it on or over the take-off line's plane (TR 30.1.1; the whole foot counts, also the parts of it that are in the air), and nothing of you may touch the ground at x >= 0 outside the sand (TR 30.1.4: the runway beyond the line and the ground beside the pit). Your jump is the flight (nothing of you touches anything, for at least 0.05 s) that ends with your first contact with the sand: its last ground contact before lift-off must have been within the runway's width (TR 30.1.2), and during it your pelvis must rise at least 0.05 m above its height at lift-off. Taking off before the board is allowed; the jump is measured from the take-off line all the same. You may land on any part of your body. The mark is the point nearest the take-off line at which any part of you touches the sand in the first 2.0 s after the first contact; in that time you may not touch the ground outside the pit nearer the take-off line than the mark (TR 30.1.5). You succeed when that time has passed after a valid jump: the mark is then at least 1.0 m. A fall is not a failure by itself. You fail on any of the faults above, when you touch the sand without such a flight, if you leave the venue (the level ground ends 8 m to each side of the runway's axis, 45 m behind the take-off line and 6 m beyond the pit), or after 60 s (the time allowed for a trial). No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
+and both end in the same state. The rules: World Athletics rules for the long jump. The runway is 40.0 m long and 1.22 m wide along +x. The take-off line is x = 0, the edge of the white take-off board (0.2 m long, level with the runway) that is nearer the pit. The landing area is a pit of sand, level with the runway, that begins 1.0 m beyond the take-off line and is 9.0 m long and 2.75 m wide, centred on y = 0. Before your landing in the sand: no foot that is on the ground may have any part of it on or over the take-off line's plane (TR 30.1.1; the whole foot counts, also the parts of it that are in the air), and nothing of you may touch the ground at x >= 0 outside the sand (TR 30.1.4: the runway beyond the line and the ground beside the pit). Your jump is the flight (nothing of you touches anything, for at least 0.05 s) that ends with your first contact with the sand: its last ground contact before lift-off must have been within the runway's width (TR 30.1.2), and during it your pelvis must rise at least 0.05 m above its height at lift-off. Taking off before the board is allowed; the jump is measured from the take-off line all the same. You may land on any part of your body. The mark is the point nearest the take-off line at which any part of you touches the sand in the first 2.0 s after the first contact; in that time you may not touch the ground outside the pit nearer the take-off line than the mark (TR 30.1.5). You succeed when that time has passed after a valid jump: the mark is then at least 1.0 m. A fall is not a failure by itself. You fail on any of the faults above, when you touch the sand without such a flight, if you leave the venue (the level ground ends 8 m to each side of the runway's axis, 45 m behind the take-off line and 6 m beyond the pit), or after 60 s (the time allowed for a trial). No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `boston-dynamics-spot` |
 | Family / instance | `mujoco_playground/SpotFlatTerrainJoystick` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 1800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:mujoco-0.1.3` |
 
 ## Task
@@ -19,7 +19,7 @@ the last episode is graded), the robot's own sensors and the cameras that follow
 ## Difficulty
 Same instance and success check as `mujoco_playground_spot_flat_terrain_joystick-privileged`. In standard mode the agent loses free resets, the simulator and
 the world state: it sees camera images and proprioception (joints, IMU, foot contacts), acts in joint position chunks,
-and gets 10 resets (`RCB_RESET_BUDGET`, the compose file's default; PROTOCOL §4.5), so it has to close the loop
+and gets 10 resets (`RCB_RESET_BUDGET`, the compose file's default; PROTOCOL §2), so it has to close the loop
 on the robot's own sensors; only the last episode is graded.
 
 ## Reference solution
@@ -36,18 +36,18 @@ recorded trajectory in one video-only pass (`environment/sim/video.py`), which n
 instance when it builds the scene: a start state that does not hash to the instance's `state_sha` gets no episode
 (`instance_mismatch`, `infra_error = 1`). Oracle: success, worst segment errors 0.155 m/s and 0.072 rad/s.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 3 GB | 2 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 7 GiB | 8192 | no GPU | — |
+| verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: not needed.
-- Measured: GPU 1.0-1.3 GB, evaluation-pool GPU profile (per-trial GPU peaks, 10-03..10); memory: privileged container p90 2.6 GB, sim 0.7 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU p90 1.9 cores, live sampler (docker stats + cgroup anon + nvidia-smi every 30 s, 13 cloud GPU hosts + an RTX 4090 workstation, 10-10)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: memory: agent container docker peak 2.5 GiB over 4 samples (mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)) -> max(1.5 x peak, peak + 4, 8), at most the 8 GiB cap; whole trial: + the sim service's 5 GiB (docker peak 0.7 GiB, 3 samples); processes 512 and disk 20 GiB: design defaults, not yet measured.
+- Measured: memory: sim 0.7 GB (a per-container memory sampler); CPU only; CPU p90 1.9 cores (a per-container sampler every 30 s)
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -55,10 +55,3 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Upstream | MuJoCo Playground @ 4057c14 (Apache-2.0): `locomotion/spot/xmls/scene_mjx_feetonly_flat_terrain.xml`; MuJoCo Menagerie @ 1b86ece (`boston_dynamics_spot`); MuJoCo 3.3.7 on the CPU |
 | Service | `environment/sim/server.py` (the adapter) on the shared 2.2 layer `rcb_limited.py` (`embodied_first_exam/standard/`); cameras `track`, `side`, `back`, `top` (they follow the robot) (320 x 240), the feet's kinematics in the trunk frame |
 | Resources | 4 CPUs, no GPU (CPU physics, EGL or OSMesa rendering); the collect hook replays nothing, its video pass takes well under a minute (at most the horizon, ~150 frames) |
-
-### Change Log
-- 2026-10-10 (review 0067): a `final.json` that is missing, unreadable or was never finalized by the collect hook is graded `infra_error = 1` (no verdict on the agent); before, a missing one was a plain 0 and an unfinalized one was graded as it stood. The collect hook writes `final.json` atomically. A request field of the wrong type (`dt` or `seconds` null, `cameras` not a list of names, a `note` that is not a string) is answered 400 before any physics instead of ending the episode with a 500. `meta["time_left_s"]` counts from the agent's first call, not from the service's start.
-- 2026-10-10 (review round 2): the client only (`environment/rcb_client.py`). `Robot()` waits up to 3600 s for the service (was 600 s) and prints its progress to stderr once a minute, so the first `Robot()` outlasts the simulator's start (no effect on this benchmark, whose service is up within a minute); `cameras="name"` (a string) is one camera, no longer its characters. The service, the collect hook, the grader, the scene and the pass rule are unchanged.
-- 2026-10-10 (review round 3): the shared service layer and the client only (`environment/sim/rcb_limited.py`, `environment/rcb_client.py`). A camera named more than once in `cameras` is rendered and returned once (N copies of one name made the service build N x N images within the frame budget, which could exhaust its memory). A service that has given up on the episode (it could not start it, or could not resume it after its crashes) answers every request with 409 and the reason, and `Robot()` / `wait_ready()` raise `EpisodeOver` at once; before, nothing answered and they waited out their timeout (up to an hour). The adapter, the collect hook, the grader, the scene and the pass rule are unchanged.
-- 2026-10-14 (owner decision C1): 10 resets (PROTOCOL §4.5). The service (`environment/sim/server.py`) gained the optional reset capability: `RCB_RESET_BUDGET` (the compose file's default 10; 0 restores the old single episode), `POST /reset` abandons the running or ended episode and starts a new one from the same frozen start (no physics), refused (409) after a success, once the agent's time is up and once the budget is spent; only the last episode is graded (`trajectory.npz` holds its rows, replayed twice from the frozen start as before); `/status` and every `meta` add `episode`, `resets_left` and `control_steps_total`; `final.json` and `reward.json` add `resets`, `reset_budget` and `episodes`. A crash resumes the current episode (the journal is replayed with the committed resets). The instruction's rules, the client example (`POST /reset` through `Robot._post`) and this README say so. The scene, the instance, the success check and the grader's pass rule are unchanged; results recorded before this change ran with one episode and are reported separately.
-- 2026-10-17 (owner, boards 0150 and 0151): **graded by the live episode, no grading replay.** `environment/sim/finalize.sh`, `environment/sim/server.py`, the new `environment/sim/video.py`, `tests/grade.py`, `task.toml`, the compose file. Success is the task's check on the episode the service ran (`graded_by = "live"`, `replays = 0`): `rcb_quadruped.Session.check()` on the live simulator when the episode ends, with its holds inside it. The collect hook no longer replays the trajectory in two fresh processes (success was live ∧ both replays ∧ the same final state); the rule is the same, since the replays ran the same rows through the same check. `replay.mp4` comes from one video-only pass after the verdict. A new collect hook on `main` (`kill -9 -1`, before the sim's) stops whatever the agent left running before the episode is ended and judged (PROTOCOL H.4). The frozen instance is checked when the service builds the scene (its `state_sha`; a mismatch gets no episode, `instance_mismatch`, infrastructure; before, the tooling raised and the service restarted until compose gave up). The scene, the instance, the pass rule and what the agent sees are unchanged, so the task keeps its name; `reward.json` no longer has `replay_success`, `deterministic` and `live_matches_replay`.

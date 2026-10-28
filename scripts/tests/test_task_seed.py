@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seeds (PROTOCOL §2.13): ci_checks/check-seeds.py and scripts/task_seed.py on a real task pair given a second
+"""Seeds (PROTOCOL §2): ci_checks/check-seeds.py and scripts/task_seed.py on a real task pair given a second
 allowed seed (in a temporary copy of the repository's task directories). Standard library only."""
 import re
 import shutil
@@ -22,8 +22,20 @@ def run(cmd):
 
 
 def with_seeds(toml: Path, allowed: str) -> None:
+    """`[metadata.seeds] allowed = <allowed>` (the table appended when the task has none; its other keys kept)."""
     s = toml.read_text()
-    toml.write_text(re.sub(r"(?m)^allowed = .*$", f"allowed = {allowed}", s, count=1))
+    if re.search(r"(?m)^\[metadata\.seeds\]$", s):
+        s = re.sub(r"(?m)^allowed = .*$", f"allowed = {allowed}", s, count=1)
+    else:
+        s = s.rstrip("\n") + f"\n\n[metadata.seeds]\nallowed = {allowed}\n"
+    toml.write_text(s)
+
+
+def with_build(toml: Path, build: str | None) -> None:
+    s = re.sub(r'(?m)^build = ".*"\n', "", toml.read_text())
+    if build:
+        s = re.sub(r"(?m)^(allowed = .*)$", rf'\1\nbuild = "{build}"', s, count=1)
+    toml.write_text(s)
 
 
 def main() -> int:
@@ -55,7 +67,7 @@ def main() -> int:
             for p in places:
                 assert (m / p / "instance.json").read_text() == (d / "instance.json").read_text(), (t.name, p)
             assert not (m / "tests" / "seeds").exists()
-            assert re.search(r"(?m)^default = 7$", (m / "task.toml").read_text()), t.name
+            assert re.search(r"(?m)^instance_seed = 7$", (m / "task.toml").read_text()), t.name
         rc, out = run(SEED + ["materialize", str(priv), "--seed", "3", "--out", str(Path(td) / "run3")])
         assert rc != 0 and "not allowed" in out, out
         # the rules: a missing instance, a stale one, a seeds directory in the agent's build context, default not allowed
@@ -73,7 +85,7 @@ def main() -> int:
         (priv / "environment" / "seeds").rmdir()
         with_seeds(priv / "task.toml", "[7]")
         rc, out = run(CHECK + [str(priv)])
-        assert rc != 0 and "seeds.default 0 is not in seeds.allowed" in out, out
+        assert rc != 0 and "(instance_seed) 0 is not in seeds.allowed" in out, out
         # a range and "any": only for a task that builds a seed's instance itself (build = "runtime")
         shutil.rmtree(priv / "tests" / "seeds")
         for allowed in ("{ from = 0, to = 100 }", '"any"'):
@@ -82,8 +94,7 @@ def main() -> int:
             rc, out = run(CHECK + [str(priv), str(std)])
             assert rc != 0 and 'build = "runtime"' in out, (allowed, out)
             for t in (priv, std):
-                s = (t / "task.toml").read_text()
-                (t / "task.toml").write_text(re.sub(r"(?m)^(oracle = \[.*\])$", r'\1\nbuild = "runtime"', s, count=1))
+                with_build(t / "task.toml", "runtime")
             rc, out = run(CHECK + [str(priv), str(std)])
             assert rc == 0, (allowed, out)
             rc, out = run(SEED + ["pick", str(priv), "--rng", "3"])
@@ -96,11 +107,9 @@ def main() -> int:
                 for p in places:                            # the seed where the task builds its instance from
                     assert (o / t.name / p / "seed").read_text() == f"{seed}\n", (t.name, p)
             for t in (priv, std):                           # back to frozen for the next form
-                s = (t / "task.toml").read_text()
-                (t / "task.toml").write_text(s.replace('build = "runtime"\n', ""))
+                with_build(t / "task.toml", None)
         with_seeds(priv / "task.toml", "{ from = 5, to = 100 }")
-        s = (priv / "task.toml").read_text()
-        (priv / "task.toml").write_text(re.sub(r"(?m)^(oracle = \[.*\])$", r'\1\nbuild = "runtime"', s, count=1))
+        with_build(priv / "task.toml", "runtime")
         rc, out = run(CHECK + [str(priv)])
         assert rc != 0 and "is not in seeds.allowed" in out, out
     print("task seeds: check-seeds.py and task_seed.py hold on a pair with two seeds, a range and \"any\"")

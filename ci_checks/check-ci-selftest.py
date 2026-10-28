@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """The checks check something: mutation self-test of the rules that guard the trust boundary and the resource caps.
 
-A rule that reads compose files or task.toml by pattern can go blind without anyone noticing: the trailing comment that
-images/monitor/rcb_monitor/inject.py writes after `volumes:` once hid every volume of the agent's container from
-check-verifier-isolation.sh, and all checks stayed green on a task whose agent container mounted the simulator's trusted
-volume (review of 2026-10-10, M5). This script copies a few real tasks into a temporary directory, breaks each copy in one
+A rule that reads compose files or task.toml by pattern can go blind without anyone noticing (a trailing comment after
+`volumes:` can hide every volume of the agent's container from a check that reads the block by pattern). This script copies a few real tasks into a temporary directory, breaks each copy in one
 way a rule exists for, and requires that the rule's check fails with the rule's message -- and that the unbroken copy
 passes. A mutation that passes is a blind rule: fix the check, not this list.
 
@@ -49,14 +47,14 @@ WITH_NEIGHBOURS = (IDENTITY, TWINS)   # run on the broken copy among (links to) 
 
 STD = "behavior-boxing-books-up-for-storage-i00-standard"      # a sim sidecar with a trusted cache volume
 PRIV = "behavior-boxing-books-up-for-storage-i00-privileged"   # a verifier compose file with a trusted volume
-HEAVY = "maniguard-cabinet-pickup-i19-standard"                # an allowlist; a sidecar with a large verifier minimum
+HEAVY = "maniguard-cabinet-pickup-i19-standard"                # an allowlist; a sidecar that holds the GPU
 RT = "humanoidbench-loco-walk-i00-standard-realtime"           # a standard-realtime task: main and sim capped
 # benchmarks whose generators have no check mode: their shared files are held together by check-tooling-identity.sh
 DTB, DTB_P = "dextoolbench_hammer_claw_hammer_swing_down-standard", "dextoolbench_hammer_claw_hammer_swing_down-privileged"
 MJ = "mujoco_playground_aloha_hand_over-standard"              # serves DexToolBench's service (server_mj.py)
 MWP, MWP_P = "metaworldplus-coffee-button-i00-standard", "metaworldplus-coffee-button-i00-privileged"
 TWIN_P = "robotwin_2_0_grab_roller-privileged"
-OPEN = "embodied-olympics-fun-sprint-i00-standard"                      # declares open egress, `[metadata] network = "open"` (Appendix H.6)
+OPEN = "embodied-olympics-fun-sprint-i00-standard"                      # declares open egress, `[agent] network_mode = "public"` (Appendix H.6)
 FUN_P = "embodied-olympics-fun-sprint-i00-privileged"                   # its tooling and grader from a files-only image (COPY --from)
 RP = "robopaint-acrylic-applesoranges-i00-privileged"           # a benchmark with its own leak hook (ci_checks/benchmarks/*/invariant-*)
 
@@ -89,6 +87,16 @@ def in_service(service: str, lines: str, after: str = ""):
 
 def append(text: str):
     return lambda s: s + text
+
+
+def seeds_block(allowed: str):
+    """A `[metadata.seeds]` table with `allowed = [<allowed>]`, where `{d}` is the task's default seed (instance_seed)."""
+    def f(s: str) -> str:
+        m = re.search(r"(?m)^instance_seed = (-?\d+)", s)
+        if not m:
+            raise AssertionError("mutation does not apply: no instance_seed")
+        return s + "\n[metadata.seeds]\nallowed = [" + allowed.format(d=m.group(1)) + "]\n"
+    return f
 
 
 def sidecar_drift(name: str, file: str, text: str = "# drift\n") -> dict:
@@ -180,17 +188,16 @@ MUTATIONS = [
     ("... `network_mode: bridge`", HEAVY, COMPOSE, in_service("main", "    network_mode: bridge"), ISOLATION, "service main: `network_mode` is not allowed"),
     ("a sidecar on a network of its own", STD, COMPOSE, in_service("sim", "    networks: [default]"), ISOLATION, "service sim: `networks` is not allowed"),
     ("a top-level networks block", STD, COMPOSE, append("networks:\n  default:\n    driver: bridge\n"), ISOLATION, "top-level `networks` is not allowed"),
-    ("a task drops its allowlist (PROTOCOL §2.11: one host list, in every task)",
+    ("a task drops its allowlist (PROTOCOL Appendix H.6: one host list, in every task)",
      HEAVY, TOML, sub(r'^network_mode = "allowlist".*\nallowed_hosts = .*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
-    ("... a task of a benchmark that was open until 2026-10-10",
+    ("... a privileged twin task drops its allowlist",
      TWIN_P, TOML, sub(r'^network_mode = "allowlist".*\nallowed_hosts = .*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
-    ("a task that declares open egress but sets an allowlist of its own in [agent]",
-     OPEN, TOML, sub(r'^\[agent\]\n', '[agent]\nnetwork_mode = "allowlist"\nallowed_hosts = ["pypi.org"]\n'), ISOLATION,
-     "sets another network policy"),
+    ("a task that declares open egress but keeps a host list in [agent]",
+     OPEN, TOML, sub(r'^(network_mode = "public".*\n)', r'\1allowed_hosts = ["pypi.org"]\n'), ISOLATION, "with allowed_hosts"),
     ("a task without an allowlist that does not declare open egress (the default is the allowlist)",
-     OPEN, TOML, sub(r'^network = "open".*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
-    ("a network declaration that is neither the allowlist nor open",
-     OPEN, TOML, sub(r'^network = "open"', 'network = "any"'), ISOLATION, "[metadata] network = 'any'"),
+     OPEN, TOML, sub(r'^network_mode = "public".*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
+    ("a copy of the egress in [metadata] (it is [agent] network_mode's alone)",
+     OPEN, TOML, sub(r'^(\[metadata\]\n)', r'\1network = "open"\n'), ISOLATION, "[metadata] network = 'open'"),
     # ---- Appendix H.6, the verifier has no network: without [verifier] network_mode Harbor leaves the
     # separate verifier on its environment's baseline, public
     ("a privileged verifier with the network (no [verifier] network_mode)",
@@ -235,7 +242,7 @@ MUTATIONS = [
     ("the instruction states the external-material rule in other words",
      STD, "instruction.md", sub(r"This is an honour rule; trials are reviewed\.", "Do as you like."), RESOURCES,
      "does not state `## External material`"),
-    # ---- the agent's time cutoff (PROTOCOL §2.12): the task's own number; task.toml, the instruction and the sim service agree
+    # ---- the agent's time cutoff (PROTOCOL §2): the task's own number; task.toml, the instruction and the sim service agree
     ("task.toml's cutoff changed without normalizing (the instruction still states the old number)",
      STD, TOML, sub(r"(^\[agent\]\n(?:(?!\[).*\n)*?timeout_sec = )[0-9.]+", r"\g<1>1234.0"), CUTOFFS,
      "does not end with the `## Time limit` section rendered for its 1234 s"),
@@ -254,7 +261,7 @@ MUTATIONS = [
      PRIV, "instruction.md", sub(r"^You have \d+ seconds to complete this task\.[^\n]*\n\n", ""), CUTOFFS, "the sentence is missing"),
     ("the cutoff section is not the end of the instruction: something follows it",
      PRIV, "instruction.md", append("\nOne more remark after the time limit.\n"), CUTOFFS, "does not end with the `## Time limit` section"),
-    ("the cutoff paragraphs under the title, where they stood until 2026-10-12, instead of at the end",
+    ("the cutoff paragraphs under the title instead of at the end",
      PRIV, "instruction.md",
      lambda s: (lambda head, sep, block: head.split("\n", 1)[0] + "\n\n" + block.split("\n", 1)[1] + "\n" + head.split("\n", 1)[1])(*s.partition("\n## Time limit\n"))
      if "\n## Time limit\n" in s else (_ for _ in ()).throw(AssertionError("no `## Time limit` section")),
@@ -262,16 +269,16 @@ MUTATIONS = [
     ("a privileged task with the standard modes' second paragraph",
      PRIV, "instruction.md", sub(r"only what is in `/app/output/` at that moment is\s+graded", "the episode is graded as it stands"),
      CUTOFFS, "does not end with the `## Time limit` section"),
-    ("the closing sections in another order (`## Time limit` before `## Resource limits`)",
+    ("the closing sections in another order (`## Time limit` before `## Resources`)",
      STD, "instruction.md",
-     lambda s: (lambda a, b, c: a + "\n## Time limit\n" + c.rstrip("\n") + "\n\n## Resource limits\n" + b.rstrip("\n") + "\n")(
-         s.split("\n## Resource limits\n")[0], *s.split("\n## Resource limits\n")[1].split("\n## Time limit\n")),
+     lambda s: (lambda a, b, c: a + "\n## Time limit\n" + c.rstrip("\n") + "\n\n## Resources\n" + b.rstrip("\n") + "\n")(
+         s.split("\n## Resources\n")[0], *s.split("\n## Resources\n")[1].split("\n## Time limit\n")),
      CUTOFFS, "does not end with the `## Time limit` section"),
     ("... which the resources check refuses too (the limits paragraph is the last thing before `## Time limit`)",
      STD, "instruction.md",
-     lambda s: (lambda a, b, c: a + "\n## Time limit\n" + c.rstrip("\n") + "\n\n## Resource limits\n" + b.rstrip("\n") + "\n")(
-         s.split("\n## Resource limits\n")[0], *s.split("\n## Resource limits\n")[1].split("\n## Time limit\n")),
-     RESOURCES, "does not end (before `## Time limit`) with the `## Resource limits` paragraph"),
+     lambda s: (lambda a, b, c: a + "\n## Time limit\n" + c.rstrip("\n") + "\n\n## Resources\n" + b.rstrip("\n") + "\n")(
+         s.split("\n## Resources\n")[0], *s.split("\n## Resources\n")[1].split("\n## Time limit\n")),
+     RESOURCES, "does not end (before `## Time limit`) with the `## Resources` paragraph"),
     ("the instruction states the limit a second time, in a benchmark's old words",
      STD, "instruction.md", sub(r"^(## External material)$", r"Your wall-clock budget is 4 h (14400 s); there is no step budget.\n\n\1"),
      CUTOFFS, "states the agent's limit a second time"),
@@ -364,31 +371,44 @@ MUTATIONS = [
      sidecar_drift(OPEN, "rcb_rfo.py"), IDENTITY, "embodied-olympics: 2 versions of rcb_rfo.py"),
     ("... a sidecar takes its shared files from an image other than the pinned files image", OPEN, "environment/sim/Dockerfile",
      sub(r"(efe:embodied-olympics-fun-files-\S+@sha256:)[0-9a-f]{64}", r"\g<1>" + "0" * 64), IDENTITY, "not the pinned"),
-    # ---- caps and minimums (PROTOCOL §2.10)
-    ("a sidecar's memory cap below the verifier phase's declared minimum (the kernel would kill it at a cap the task itself says is too low)",
-     HEAVY, None, {TOML: sub(r"^(sim = \{ cpus = [0-9.]+, memory_gb = )[0-9.]+", r"\g<1>20.0"),
-                   COMPOSE: sub(r"^    mem_limit: \d+m(   # rcb-monitor)$", r"    mem_limit: 20480m\1")},
-     RESOURCES, "verifier_min_memory_gb 22.0 > the memory cap of the sidecar"),
-    ("the CPU minimum above the CPU caps of all services together",
-     RT, TOML, sub(r"^min_cpus = [0-9.]+", "min_cpus = 9.0"), RESOURCES, "min_cpus 9.0 > the CPU caps of all services together 8"),
+    # ---- caps (PROTOCOL §6): every container's, where Harbor and docker read them, and only those
+    ("a GPU service without its GPU-memory cap", HEAVY, COMPOSE, sub(r"^    x-gpu-memory-gb: .*\n", ""), RESOURCES,
+     "reserves a GPU but sets no `x-gpu-memory-gb`"),
+    ("a separate verifier's GPU service without its GPU-memory cap", PRIV, TEST_COMPOSE, sub(r"^    x-gpu-memory-gb: .*\n", ""),
+     RESOURCES, "tests/docker-compose.yaml: service main reserves a GPU but sets no `x-gpu-memory-gb`"),
+    ("`[environment].gpus` (Harbor's local docker refuses it)", RT, TOML, sub(r"^(\[environment\]\n)", r"\1gpus = 1\n"),
+     RESOURCES, "[environment].gpus"),
+    ("the old minimums table brought back", RT, TOML, sub(r"^(\[verifier\]\n)", r"[metadata.resources]\nmin_cpus = 2.0\n\n\1"),
+     RESOURCES, "task.toml has [metadata.resources]"),
+    ("a sidecar without a memory cap", RT, COMPOSE, sub(r"^(  sim:\n(?:    .*\n)*?)    mem_limit: \d+m   # rcb-monitor\n", r"\1"),
+     RESOURCES, "service sim: no `mem_limit`"),
     ("a declared cap that docker does not apply",
      STD, COMPOSE, sub(r"^    mem_limit: \d+m(   # rcb-monitor)$", r"    mem_limit: 1024m\1"), RESOURCES, "declare the cap that is applied"),
-    # ---- seeds (PROTOCOL §2.13): the runner draws the seed; no other seed's instance where the agent's image is built
+    # ---- seeds (PROTOCOL §2): the runner draws the seed; no other seed's instance where the agent's image is built
     ("the default seed is not among the allowed ones",
-     TWIN_P, TOML, sub(r"^allowed = \[.*\]$", "allowed = [12345]"), SEEDS, "is not in seeds.allowed"),
+     TWIN_P, TOML, seeds_block("12345"), SEEDS, "is not in seeds.allowed"),
     ("an allowed seed without its frozen instance",
-     TWIN_P, TOML, sub(r"^allowed = \[(.*)\]$", r"allowed = [\1, 12345]"), SEEDS, "has no frozen instance"),
+     TWIN_P, TOML, seeds_block("{d}, 12345"), SEEDS, "has no frozen instance"),
+    ("a second copy of the default seed (it is instance_seed alone)",
+     TWIN_P, TOML, append("\n[metadata.seeds]\ndefault = 0\n"), SEEDS, "[metadata.seeds] has `default`"),
+    ("a task.toml without instance_seed",
+     TWIN_P, TOML, sub(r"^instance_seed = .*\n", ""), SEEDS, "no `instance_seed`"),
     ("another seed's instance in the agent's build context",
      TWIN_P, "+environment/seeds/7/instance.json", append("{}"), SEEDS, "a `seeds` directory where the agent's image"),
     # PROTOCOL §2: scene dynamics, the task's own declaration (no table)
     ("a task.toml without dynamics",
      TWIN_P, TOML, sub(r'^dynamics = .*\n', ""), FIELDS, "[metadata].dynamics must be declared"),
+    # copies of what another source says (the mode: the directory's suffix; the reset budget: the sim service's default)
+    ("a copy of the mode in [metadata]",
+     TWIN_P, TOML, sub(r'^(dynamics = .*\n)', r'\1mode = "privileged"\n'), FIELDS, "[metadata].mode"),
+    ("a copy of the reset budget in [metadata]",
+     STD, TOML, sub(r'^(dynamics = .*\n)', r'\1reset_budget = 0\n'), FIELDS, "[metadata].reset_budget"),
     # ---- Appendix H.7: twins share cutoff, seeds and frozen instance; H.3: no simulator in the agent's image; H.1: the
     # monitor's own isolation and the sanitize step; H.8: DIGEST; H.2: a benchmark's own leak hook
     ("a standard task whose cutoff is not its privileged twin's", STD, TOML,
      sub(r"(^\[agent\]\n(?:(?!\[).*\n)*?timeout_sec = )[0-9.]+", r"\g<1>1234.0"), TWINS, "the twins have the same cutoff"),
     ("a standard task whose allowed seeds are not its privileged twin's", STD, TOML,
-     sub(r"^allowed = \[(.*)\]$", r"allowed = [\1, 12345]"), TWINS, "differ from its privileged twin's"),
+     seeds_block("{d}, 12345"), TWINS, "differ from its privileged twin's"),
     ("the verifier's frozen instance is not the one the task runs from", PRIV, "tests/instance.json",
      sub(r"^\{", '{"x": 1, ', count=1, flags=0), INSTANCE, "differ, or one is missing"),
     ("a standard task's agent image takes the sidecar's code", STD, "environment/Dockerfile",
@@ -420,10 +440,10 @@ MUTATIONS = [
      RP_LEAK, "only an allowed agent-side file of the pinned"),
     ("a RoboPaint task dir's own rcb_brush.py with grader code, next to the files-only image's", RP, "+environment/rcb_brush.py",
      append("def score_canvas(sheet):\n    pass\n"), RP_LEAK, "grader code ('def score_canvas') in the agent's tooling"),
-    # PROTOCOL §4b: a standard-realtime task declares its slowdown S and its reset budget, and they agree
-    ("a standard-realtime task.toml whose slowdown is not its service's",
-     "humanoidbench-loco-walk-i00-standard-realtime", TOML, sub(r"^slowdown = [0-9.]+", "slowdown = 2"), REALTIME,
-     "but its service's default is 1"),
+    # PROTOCOL §2: a standard-realtime task declares its slowdown S and its reset budget once, in its sim service
+    ("a copy of the slowdown S in [metadata]",
+     "humanoidbench-loco-walk-i00-standard-realtime", TOML, sub(r'^(dynamics = .*\n)', r'\1slowdown = 1\n'), REALTIME,
+     "[metadata] slowdown copies its service's default"),
     ("a standard-realtime service whose reset budget is not the one its instruction states",
      "humanoidbench-loco-walk-i00-standard-realtime", COMPOSE, sub(r"RCB_RESET_BUDGET:-50\}", "RCB_RESET_BUDGET:-7}"),
      REALTIME, "instruction.md states 50 resets, but the task's reset budget is 7"),
@@ -447,9 +467,9 @@ def run(cmd: list[str], task: Path) -> tuple[int, str]:
 
 
 def twin_cutoffs(tmp: Path) -> int:
-    """The cutoff is each task's own (PROTOCOL §2.12): normalize renders a changed `[agent] timeout_sec` into the
+    """The cutoff is each task's own (PROTOCOL §2): normalize renders a changed `[agent] timeout_sec` into the
     instruction's closing section, the README row and the sim service's wall clock, check-cutoffs.py accepts the task on
-    its own, and check-twins.py refuses it next to its privileged twin, whose number differs (`same_cutoff_as`, §2.15). Returns the
+    its own, and check-twins.py refuses it next to its privileged twin, whose number differs (`same_cutoff_as`, H.7). Returns the
     number of failures."""
     import tomllib
     bad = 0
@@ -482,6 +502,64 @@ def twin_cutoffs(tmp: Path) -> int:
     if not bad:
         print(f"check-ci-selftest: a task's own cutoff ({sec} s) rendered by normalize and accepted alone, refused next to its "
               "privileged twin")
+    return bad
+
+
+def gpu_rule_change(tmp: Path) -> int:
+    """A rule's GPU-memory cap changes (PROTOCOL §6): normalize replaces the generated `x-gpu-memory-gb` line with the new
+    value (never keeps the old one), check-resources.py then refuses the copy against the repository's rule with a
+    message that names the fix, and normalize with the repository's rule brings the old value back and passes; inject.py
+    run alone on a task whose compose file it generated keeps main's processes cap. Returns the number of failures."""
+    sys.path.insert(0, str(ROOT / "images/monitor"))
+    from rcb_monitor import inject
+    bad = 0
+
+    def expect(ok: bool, what: str, out: str = "") -> None:
+        nonlocal bad
+        if not ok:
+            bad += 1
+            print(f"FAIL check-ci-selftest [GPU rule change: {what}]" + (f":\n{out[-600:]}" if out else ""))
+
+    t = tmp / "gpurule" / HEAVY
+    shutil.copytree(tc.task_dir(HEAVY), t)
+    comp = t / "environment/docker-compose.yaml"
+    svc, old = next((n, c["gpu_memory_gb"]) for n, c in inject.service_caps(comp.read_text()).items()
+                    if c.get("gpu") and c.get("gpu_memory_gb"))
+    new = old + 7
+    rules = tmp / "gpurule" / "task_resources.toml"   # the repository's rules plus a last one for this task: GPU + 7
+    r = tc.rule_for(t)
+    line = ", ".join(f"{k} = {v:g}" if isinstance(v, float) else f"{k} = {v}" for k, v in
+                     dict(r["services"][svc], gpu_memory_gb=new).items())
+    extra = "".join(f"{n} = {{ " + ", ".join(f"{k} = {v:g}" for k, v in c.items()) + " }\n"
+                    for n, c in r["services"].items() if n != svc)
+    gt = r.get("gpu_types")
+    rules.write_text(tc.RESOURCES_FILE.read_text() + f"\n[[cap]]\nmatch = '^{re.escape(HEAVY)}$'\n{svc} = {{ {line} }}\n"
+                     + extra + (("gpu_types = [" + ", ".join(f'"{x}"' for x in gt) + "]\n") if gt else ""))
+    code = ("import sys; sys.path.insert(0, sys.argv[1]); import task_conventions as tc; from pathlib import Path; "
+            "tc.RESOURCES_FILE = Path(sys.argv[2]); tc.normalize(Path(sys.argv[3]))")
+    p = subprocess.run([sys.executable, "-c", code, str(ROOT / "scripts"), str(rules), str(t)], capture_output=True, text=True)
+    expect(p.returncode == 0, "normalize with the changed rule", p.stdout + p.stderr)
+    got = inject.service_caps(comp.read_text())[svc]["gpu_memory_gb"]
+    n = sum(1 for ln in comp.read_text().splitlines() if ln.strip().startswith(inject.GPU_KEY + ":"))
+    expect(got == new and n == 1, f"service {svc}: x-gpu-memory-gb {got} ({n} line(s)) after normalize, the rule says {new:g}")
+    rc, out = run(RESOURCES, t)
+    expect(rc != 0 and "declare the cap that is applied" in out and "task_conventions.py" in out,
+           "check-resources.py must refuse the copy against the repository's rule, naming normalize", out)
+    p = subprocess.run([sys.executable, str(ROOT / "scripts/task_conventions.py"), str(t)], capture_output=True, text=True)
+    rc, out = run(RESOURCES, t)
+    expect(p.returncode == 0 and rc == 0 and inject.service_caps(comp.read_text())[svc]["gpu_memory_gb"] == old,
+           "normalize with the repository's rule restores its value and passes", p.stdout + p.stderr + out)
+    gen = next(x for x in tc.iter_tasks() if inject.is_generated((x / "environment/docker-compose.yaml").read_text()))
+    g = tmp / "gpurule" / gen.name
+    shutil.copytree(gen, g)
+    before = inject.service_caps((g / "environment/docker-compose.yaml").read_text())["main"]["pids"]
+    p = subprocess.run([sys.executable, str(ROOT / "images/monitor/rcb_monitor/inject.py"), str(g)], capture_output=True, text=True)
+    after = inject.service_caps((g / "environment/docker-compose.yaml").read_text())["main"]["pids"]
+    expect(p.returncode == 0 and before and after == before,
+           f"inject.py alone on {gen.name} (a generated compose file): main's pids_limit {before} -> {after}", p.stderr)
+    if not bad:
+        print(f"check-ci-selftest: a rule's GPU-memory cap change ({old:g} -> {new:g} GiB on {svc}) reaches the compose file "
+              "through normalize, and inject.py alone keeps a generated file's caps")
     return bad
 
 
@@ -534,6 +612,7 @@ def main(argv: list[str]) -> int:
                       + ("PASSED the broken task: the rule is blind" if rc == 0 else f"failed, but not with `{expect}`:\n{out[-600:]}"))
         if tier != "advisory":
             bad += twin_cutoffs(Path(tmp))
+            bad += gpu_rule_change(Path(tmp))
     if not bad:
         print(f"check-ci-selftest ({tier}): {len(sel)} mutations of real tasks, each caught by its rule")
     return 1 if bad else 0

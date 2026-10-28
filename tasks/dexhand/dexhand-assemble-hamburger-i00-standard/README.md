@@ -6,9 +6,9 @@
 | Mode | standard (`eai-standard/2.2`) |
 | Twin | `dexhand-assemble-hamburger-i00-privileged` |
 | Simulator / robot | `mujoco` / `sharpa-wave-floating` |
-| Family / instance | `assemble_hamburger` |
+| Family / instance | `assemble_hamburger` / seed 0 |
 | Oracle | `full` — solution/ replays the validated Sharpa Wave authoring trajectory (privileged: 6,090 controls, success after 5,794; standard: the recorded 5,793-control public-client episode). Both pass two fresh-process replays with identical state hashes. solution/wuji/trajectory.npz is a validated Wuji Hand 2.2 trajectory of this instance (5,847 controls, motor targets only, physical contact only); the oracle uses it when the run selects wuji (privileged: DEXHAND_HAND=wuji; standard: the sim service's hand), and it replays to success in two fresh processes with identical state hashes. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task
@@ -40,18 +40,18 @@ leaving the workspace box, a cheese/lettuce bend above 0.65 rad, unstable physic
 The frozen recipe and thresholds come from the task, never from an agent archive. A no-op fails. Human review and
 full agent-trial calibration remain pending; report this task as provisional.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 2 GB | 2 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `sim` | 2 | 8 GiB | 8192 | no GPU | — |
+| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: 30 Harbor 0.23 trials of the six essential families (12 oracle, 12 nop, 6 Wuji smoke; rcb_monitor samples every 5 s, efe:dexhand-0.2.0, CPU-only, 2026-10-14) plus the hamburger and paper oracle/nop trials: agent container peak <= 0.03 GiB; one fresh replay process 0.25-0.32 GiB max RSS (os.wait4; paper 0.31 GiB, hamburger 0.28 GiB), the privileged verifier runs two at once (<= 0.65 GiB); standard sim service peak 0.65 GiB (VmHWM, held_joystick oracle episode), paper 0.51 GiB; one core per replay process; x1.2 rounded up to a GB, raised to the 2 CPU / 2 GB design minimum (an agent's own simulator sessions take about 0.3 GiB each)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: memory: 8 GiB lets an agent run about twenty 0.3 GiB simulator sessions (pot/sweep: three or four 2 GiB sessions) next to its harness; measurements as in the [[rule]]; processes 512 and disk 10 GiB: design defaults, not yet measured; whole trial: + the sim service's 8 GiB cap (peaks 0.65 GiB, dual-arm 2.53 GiB).
+- Measured: 30 Harbor trials of both modes of the six essential families (12 oracle, 12 nop, 6 Wuji) plus the hamburger and paper oracle and nop trials, CPU only, the trial's resource monitor every 5 s: the sim service at most 0.65 GiB (paper 0.51 GiB); the agent's container at most 0.03 GiB; one core per replay process
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 
@@ -66,8 +66,3 @@ tomato have rigid cylinder contacts; cheese and lettuce have three passive elast
 approximation of thin-sheet bending, not continuum soft-food, crushing or tearing simulation. The bottom bun starts on
 the plate; preparation supports give access to the other ingredients. This is assembly feasibility on a floating wrist
 stage, not a gripper-superiority, full-arm or zero-shot claim.
-
-### Change Log
-- 2026-10-14 (before the first scored run): 20 resets in standard mode (owner; PROTOCOL §4.5, DexToolBench's value). `POST /reset` starts a new episode from the frozen start (the same state hash as a fresh process); only the last episode is graded, a success ends the trial; `reward.json` adds `resets` and `reset_budget`. Before, one trial was one episode.
-- 2026-10-16 (video only): the collect hook renders the replay video in its remaining time (timeout_sec minus 60 s) instead of a fixed 300 s, which cut the video of episodes longer than ~10k steps. The verdict, the replays and `reward.json` are unchanged; earlier results stay valid.
-- 2026-10-17 (owner): standard mode graded by the live episode; no grading replay; video by one render pass from the trajectory after the verdict. `success` is the sim service's own verdict on the episode it ran (the same predicate a replay recomputed: the same rows through the same step, a success ending the episode); the collect hook no longer replays it twice in fresh processes, and `final.json` / `reward.json` drop `replay_success`, `deterministic` and `live_matches_replay` (`graded_by = "live"`, `replays = 0`). The service checks the frozen instance's files against the generator's record when an episode begins (`instance_mismatch`, an infrastructure error). A collect hook on `main` (`kill -9 -1`) stops whatever the agent left running before the service ends the episode. The agent's side (the instruction's grading sentence aside), the scene and the predicate are unchanged.

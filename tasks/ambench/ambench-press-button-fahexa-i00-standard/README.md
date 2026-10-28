@@ -8,7 +8,7 @@
 | Simulator / robot | `ambench` / `ambench-fahexa` |
 | Family / instance | `press_button_fahexa` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:ambench-0.3.1` |
 
 ## Task
@@ -40,18 +40,19 @@ failure), and GPU faults in the live episode's physics (`live_gpu_faults`) make 
 episode ended in the privileged oracle's end state (hash `fcd4de9b60a77009`; under the earlier rule both replays did too). `nop`: the episode ends at the
 agent's time-out with the check never met, reward 0.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 8 | 8 |
-| Memory | 24 GB | 20 GB |
-| GPU memory | 8 GB | 8 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 16 | 32 GiB | 16384 | 16 GiB | — |
+| verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 20 GiB |
 
-- GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: RTX 4090, 2026-10-14 (conformance run and oracle trials, nvidia-smi every 15 s): the sim sidecar runs the camera-free physics process (2.0 GiB of memory, 1.2 GiB of GPU memory with one environment's PhysX buffers; 2.65 GiB with Isaac Lab's) and the render worker (11.9 GiB, 3.4 GiB): 14 GiB and 4.6 GiB; the agent's container holds the client only; the collect hook replayed camera-free (1.2 GiB) and then filmed through the render worker (4.6 GiB) until 2026-10-17; since then it only films, through the render worker (4.6 GiB)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 16 GiB GPU memory, 30 GiB memory. Limits measured: the agent's container holds Python and the client only (as every standard task's); the whole trial adds the sim sidecar (physics + render worker, the rule's measurement): provisional.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, RTX PRO 6000 Blackwell, held by `sim`.
+- Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
+- Measured: an RTX 4090 (conformance run and oracle trials, nvidia-smi every 15 s): the sim sidecar runs the camera-free physics process (2.0 GiB of memory, 1.2 GiB of GPU memory with one environment's PhysX buffers; 2.65 GiB with Isaac Lab's) and the render worker (11.9 GiB, 3.4 GiB): 14 GiB and 4.6 GiB; the agent's container holds the client only; the collect hook films through the render worker (4.6 GiB)
+- Measured (caps): GPU memory (the sim service): the physics process and the render worker, 4.6 GiB at most -> at least 16 GiB for Isaac Sim: 16 GiB
 
 ## Details
 | | |
@@ -62,19 +63,3 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 | Images | the `sim` sidecar runs efe-private:ambench (BUILD_ONLY, `images/ambench/BUILD_ONLY`); the agent container and the verifier run the shared client image with its pip pins (`embodied_first_exam/standard/client.env`) |
 | Crash recovery | resume class `approx` (GPU PhysX replays the journal to the checkpointed state almost always; a rare race can leave the last bits different, so a resume's deviation is recorded, `resume_state_mismatch`, and the episode continues; the live state after it is graded): every control step journaled, a checkpoint with the state hash after every call; `restart: on-failure:6`, the service resumes the same episode (docs/protocol/standard_mode.md §13) |
 | Benchmark notes | tasks/ambench/README.md |
-
-### Change Log
-- 2026-10-17 (owner, boards 0150/0151; in place: a new DIGEST, PROTOCOL v2.0 §1 and H.8): standard modes graded by the live
-  episode; no grading replay; video by one film pass after the verdict (`replay.mp4`, the render worker drawing the recorded
-  rows; it never decides anything and is not run again). `success` is the live episode's success as the service judged it
-  (AM-Bench's check at a control step); it was live success ∧ two camera-free fresh-process replays that succeed ∧ agree on
-  the outcome (a task graded by verdict: the live success already, its replays recorded). The collect hook's limit 7200 s ->
-  4800 s. The start-state check is made by the service before it serves the agent: a rebuilt scene whose state hash is not
-  the frozen instance's ends the trial as an infrastructure failure (`instance_mismatch`, a give-up; before, the strict check
-  made the service crash and restart until the hook timed out, and the replays checked it again). GPU faults logged by the
-  live episode are an infrastructure failure for every task (before: for a task graded by verdict; for the others when the
-  live outcome differed from the replays' or the live episode failed). A collect hook on `main` (`kill -9 -1`) now stops
-  whatever the agent left running in its container before the service ends the episode (PROTOCOL H.4). reward.json:
-  `graded_by_live` = 1, `replays` = 0, no `replay_success` / `deterministic`. The scene, the frozen instance, AM-Bench's
-  success check, the agent's interface and the time limit are unchanged; a trial recorded before this date is re-scored by
-  its live episode (tasks/ambench/README.md, Grading).

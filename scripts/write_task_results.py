@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write per-task agent results for the results site (not into the repository, PROTOCOL D3): <out>/<task>/<run id>/README.md
+"""Write per-task agent results for the results site (not into the repository, PROTOCOL §1): <out>/<task>/<run id>/README.md
 (+ replay.mp4, replay.last.png, replay.first.mp4 and replay.first.last.png when the trial made resets, config.json,
 attempts.json). One folder per agent+model; the privileged and standard twins
 each get their own.
@@ -43,7 +43,7 @@ NOT_A_RESULT = "**not a result** — infrastructure error ({}): run it again; it
 
 
 def not_a_result(trial, r, rw):
-    """Why a trial that is not a success is no result either (PROTOCOL §2.6, §2.12: an infrastructure failure is neither a
+    """Why a trial that is not a success is no result either (PROTOCOL §4, H.5: an infrastructure failure is neither a
     success nor the agent's 0; only the agent's own end, its deliverable or the cutoff, AgentTimeoutError, is a result),
     or None. A trial whose verifier never ran (no reward.json: `docker compose up` failed, e.g. a CPU
     cap above the host's; the verifier timed out) was published as the agent's 0."""
@@ -80,8 +80,8 @@ def classify(trial, r, rw):
     """(status, reason, over the token budget): status `success`, `fail` (the agent's own result, counted) or
     `not_a_result` (infrastructure: voided, never counted)."""
     gw = load_json(trial / "gateway/totals.json")
-    over = bool(gw.get("over_token_budget"))               # PROTOCOL §5: over the token budget = failed
-    # PROTOCOL §2.6: infra_error (or a grader error) = not a result, neither a success nor the agent's 0; so is a trial
+    over = bool(gw.get("over_token_budget"))               # running.md "Official runs": over the token budget = failed
+    # PROTOCOL §4: infra_error (or a grader error) = not a result, neither a success nor the agent's 0; so is a trial
     # the verifier never graded, or that Harbor or the model account ended (not_a_result). A verdict of success with no
     # infrastructure flag stands; over the token budget is the agent's failure unless the verifier flagged infrastructure.
     infra = bool(rw.get("infra_error") or rw.get("grader_error"))
@@ -106,7 +106,7 @@ def first_success(rw, mode):
 def trial_config(trial, task, r):
     """The trial's effective configuration (task_conventions.effective_config) with how its seed is known. The seed: the
     runner's copy of the task the trial ran from (scripts/task_seed.py materialize writes the chosen seed as its
-    `[metadata.seeds] default`), else the task's default seed (`seed_source = "default"`). Run-time overrides: the trial's
+    `instance_seed`), else the task's default seed (`seed_source = "default"`). Run-time overrides: the trial's
     recorded environment. A trial of another version of the task (the digest in its lock.json is not the task's DIGEST now, nor that of the
     runner's copy of it, <jobs>/<job>.copies.json) keeps
     only what its name says; the rest is "legacy"."""
@@ -163,9 +163,9 @@ def record_attempt(out, trial, r, status):
 
 def main(argv):
     jobs, job, slug, label = pathlib.Path(argv[1]), argv[2], argv[3], argv[4]
-    if "--out" not in argv: sys.exit("--out <dir> is required: results are published on the results site, not committed (PROTOCOL D3)")
+    if "--out" not in argv: sys.exit("--out <dir> is required: results are published on the results site, not committed (PROTOCOL §1)")
     out_root = pathlib.Path(argv[argv.index("--out") + 1]).resolve()
-    if out_root == ROOT or ROOT in out_root.parents: sys.exit("--out must be outside the repository (PROTOCOL D3)")
+    if out_root == ROOT or ROOT in out_root.parents: sys.exit("--out must be outside the repository (PROTOCOL §1)")
     n = 0
     trials = []
     for trial in (jobs / job).glob("*__*"):

@@ -8,7 +8,7 @@
 | Simulator / robot | `ispatialgym` / `r1pro` |
 | Family / instance | `inter_object_relation_satisfaction_nextto_small_scale` / seed 0 |
 | Oracle | `none` — upstream's goal image of this instance is the last frame of a successful replay of upstream's own demonstration of it (kmy17518/ispatialgym-eval-data@15cb9a7, ispatialgym-eval-instances/README.md, Goal images) |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:ispatialgym-0.2.1` |
 
 ## Task
@@ -34,18 +34,18 @@ tolerances x 3, held over the last 45 control steps with the task's objects and 
 `(T, 23)` finite, more than 2076 rows) scores 0; a replay that dies or times out, a failed restore or a start that
 does not rebuild is `infra_error` + `grader_error`. `/logs/verifier/replay.mp4`.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 6 | 6 |
-| Memory | 16 GB | 16 GB |
-| GPU memory | 6 GB | 6 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 12 | 40 GiB | 16384 | 22 GiB | 20 GiB |
+| verifier (as `main`) | 12 | 40 GiB | no cap | 22 GiB | 20 GiB |
 
-- GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: privileged prototype trials, GPT-6 Luna, RTX 4090, 2026-10-16 (docker stats and nvidia-smi per process every 30 s, 9 trials and their verifiers): the agent container peaked at 14.2 GiB of memory, 14.6 GiB of GPU memory and 12 cores (an agent may run two Isaac processes of about 13 GiB / 4.6 GiB each), the verifier at 14.4 GiB and 12 cores; limits max(1.5 x peak, peak + 4), memory kept at 32 GiB for two processes
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 22 GiB GPU memory, 32 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 22 GiB GPU memory, 32 GiB memory. Limits measured: privileged prototype trials, GPT-6 Luna, RTX 4090, 2026-10-16 (docker stats and nvidia-smi per process every 30 s, 9 trials and their verifiers): the agent container peaked at 14.2 GiB of memory, 14.6 GiB of GPU memory and 12 cores (an agent may run two Isaac processes of about 13 GiB / 4.6 GiB each), the verifier at 14.4 GiB and 12 cores; limits max(1.5 x peak, peak + 4), memory kept at 32 GiB for two processes.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
+- Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
+- Measured: privileged trials with an agent on an RTX 4090 (docker stats and nvidia-smi per process every 30 s, 9 trials and their verifiers): the agent container peaked at 14.2 GiB of memory, 14.6 GiB of GPU memory and 12 cores (an agent may run two Isaac processes of about 13 GiB / 4.6 GiB each), the verifier at 14.4 GiB and 12 cores
+- Measured (caps): GPU memory: at most 14.6 GiB in the agent's container -> max(1.5 x peak, peak + 4), rounded up: 22 GiB
 
 ## Details
 | | |

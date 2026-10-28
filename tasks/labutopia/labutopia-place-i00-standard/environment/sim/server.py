@@ -307,7 +307,7 @@ def recorder(cams, fps: int, meta: dict, video: str) -> L.Recorder:
 
 def checked(parse):
     """A request is checked in full before anything is executed. The layer answers a ValueError with 400 and takes any
-    other exception for a simulator error that ends the episode (PROTOCOL §4.6), so whatever a malformed field raises
+    other exception for a simulator error that ends the episode (PROTOCOL §4), so whatever a malformed field raises
     while it is being checked (null, a list where a number belongs, a number too large for a float) is a ValueError."""
 
     def run(*args):

@@ -19,72 +19,27 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-long-rope-i00-standard"
 description = "STANDARD MODE (robot as a service, eai-standard/2.1): Embodied Olympics long-rope on the same frozen instance as embodied-olympics-fun-long-rope-i00-privileged. Jump the long rope: standing in the middle of a rope turned by two rope-turning machines, jump it 10 times in a row, the rope passing under both your feet while you are in the air, without the rope ever touching you. The agent only gets a client: the robot's two head cameras (depth on one), its joint sensors and IMUs, the venue's fixed camera, and action chunks (walking, running, joint targets, Unitree LowCmd, the hands' grip). 5 resets, the last attempt graded; no object state, no referee state during an attempt. The sim service records the attempt and grades it live with the family's referee (no grading replay)."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "standard-mode", "trajectory", "long-rope"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"
 simulator = "mujoco"
 robot = "unitree-g1"
 family = "long_rope"
 category = "track-and-jumps"
-mode = "standard"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 5
 expert_time_estimate_hours = 32.0
 oracle = "full"
 oracle_evidence = "Reference: a periodic hop from a balanced crouch (joints/lowcmd rows) timed to the rope's angle, closed loop on privileged rope and pelvis state: 10 consecutive jumps, the rope 4-9 cm under the soles, lands at 10.17 s and stands 0.5 s before the rope comes round (success 10.85 s); the crank torque peaks at 3.0 of 10 N m and the rope collides with itself; 4 of 4 with the tempo +-2 % and the phase +-3 deg, 10 of 10 under small perturbations of the rope's phase and tempo and a push at the start, 48 of 50 with its own lead and push gain varied (push gain +3 %: 8 of 10). Negatives: standing still, a late or low hop, a squat, leaving the centre zone, lying down, a tipping jump, a bad last landing, no stand after the landing; two hops per turn count once. The privileged twin's reference rows (1080 control steps, success after 10.8 s) streamed through the client."
-
-[metadata.resources]
-# minimum compute to run this task (docs/protocol/README.md §2.9)
-min_cpus = 3.0
-min_memory_gb = 5.0
-min_gpu_memory_gb = 0.0
-gpu_required = false
-gpu_class = "none"
-verifier_min_cpus = 2.0
-verifier_min_memory_gb = 3.0
-verifier_min_gpu_memory_gb = 0.0
-measured = "author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client"
-
-[metadata.resources.limits]
-# agent-phase limits in GiB (docs/protocol/README.md §2.10); scope: trial = every container, agent = the agent's container;
-# enforced from protocol v1.2 when RCB_LIMITS_ENFORCE=1 (a violation fails the trial), otherwise recorded only
-scope = "agent"
-max_gpu_memory_gb = 0.0
-max_memory_gb = 8.0
-max_processes = 512
-max_disk_gb = 20.0
-disk_paths = ["/app", "/tmp", "/root"]
-disk_exclude = []
-sustain_sec = 60.0
-window_sec = 120.0
-trial_max_gpu_memory_gb = 0.0
-trial_max_memory_gb = 16.0
-measured = "author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default"
-
-[metadata.resources.caps]
-# docker caps per compose service, applied from protocol v1.2 (docs/protocol/README.md §2.10)
-main = { cpus = 4.0, memory_gb = 10.0, pids = 8192 }
-sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 900.0
 environment_mode = "separate"
 network_mode = "no-network"
 
-# Resource limits (docs/protocol/README.md §2.10): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -109,14 +64,16 @@ timeout_sec = 900
 
 [agent]
 timeout_sec = 7200.0
-# Egress: open (Harbor's default), as `[metadata] network` declares. Embodied Olympics lets the agent search for and download
+# Egress: open, `network_mode = "public"` below (the author's choice). Embodied Olympics lets the agent search for and download
 # public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md). The agent's
 # container holds no simulator, no referee and no instance.
+network_mode = "public"        # open egress, the task author's choice (docs/protocol/README.md Appendix H.6)
 
 [environment]
 build_timeout_sec = 1800.0
 cpus = 4
 memory_mb = 10240
+storage_mb = 20480
 
 [verifier.environment]
 build_timeout_sec = 600.0

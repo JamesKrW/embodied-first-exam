@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared-source rules (PROTOCOL §2.1, D9: copies of shared sources are byte-identical). Two parts:
+# Shared-source rules (PROTOCOL §1: copies of shared sources are byte-identical). Two parts:
 # 1. BEHAVIOR-1K, RoboLab, RoboWits, ManiGuard, MolmoSpaces, MyoSuite, DexJoCo, DexHand, RoboARC, BiGym 2.0, YAMLab, RoboDojo, Panda Dynamic Scenes, AM-Bench, LabUtopia and AutoBio: within one benchmark (RoboARC's IKEA suite, roboarc-ikea-*, is a group of its own), every mode, every copy of a shared file is byte-identical
 #    (one source per benchmark, copied unchanged):
 #    - the tooling module rcb_<sim>.py wherever it sits (privileged environment/ and tests/, standard environment/sim/);
@@ -11,13 +11,13 @@
 #    the line must name the image FILES.json pins (contexts: environment/, tests/ and a sidecar's own environment/sim/ or
 #    environment/scorer/).
 #    A change to one of them is rolled out to every task of the benchmark at once. Same approach as ci_checks/benchmarks/robopaint/advisory-tooling.sh.
-#    Tasks the benchmark's own exporter wrote (task.toml [metadata] exporter: Embodied Olympics, PROTOCOL §4c) are a group of their own,
+#    Tasks the benchmark's own exporter wrote (task.toml [metadata] exporter: Embodied Olympics, PROTOCOL §3) are a group of their own,
 #    one per exporter and [metadata] skill_in_loop.
-# 2. The eai-standard/2.2 layer (every task whose metadata.protocol is 2.2: BEHAVIOR, RoboLab, RoboWits, RoboPaint, MolmoSpaces, MyoSuite, DexJoCo, DexHand, YAMLab, RoboDojo, LabUtopia, AutoBio; Panda Dynamic Scenes until 2026-10-17): the
+# 2. The eai-standard/2.2 layer (every task whose metadata.protocol is 2.2: BEHAVIOR, RoboLab, RoboWits, RoboPaint, MolmoSpaces, MyoSuite, DexJoCo, DexHand, YAMLab, RoboDojo, LabUtopia, AutoBio): the
 #    agent's client environment/rcb_client.py + rcb1.py and the service's environment/sim/rcb_limited.py + rcb1.py +
 #    run.sh are byte-identical to their source in embodied_first_exam/standard/ (docs/protocol/standard_mode.md), and the sidecar is
 #    set up for crash recovery: `command: sh /srv/run.sh` (run.sh exits non-zero when the service crashes) and
-#    `restart: on-failure:N` with N >= 3 (PROTOCOL §4.1, §4.7).
+#    `restart: on-failure:N` with N >= 3 (docs/protocol/standard_mode.md).
 #    The eai-standard/2.4 layer (metadata.protocol 2.4: RoboARC, its IKEA suite included) is held to the same rules, with rcb_limited.py and
 #    rcb_client.py from embodied_first_exam/standard/v2_4/ (docs/protocol/standard_mode.md) and 2.2's rcb1.py and run.sh.
 # 3. The eai-standard/2.3 realtime layer (every task whose metadata.protocol is 2.3: HumanoidBench, BiGym 2.0
@@ -40,7 +40,7 @@ import collections, hashlib, os, re, sys, tomllib
 from pathlib import Path
 tasks, src = sys.argv[1], sys.argv[2]
 ROOTD = os.path.dirname(os.path.dirname(os.path.abspath(src)))   # the repository (src: embodied_first_exam/standard)
-sys.path.insert(0, os.path.join(ROOTD, "scripts")); import task_conventions as tc   # the mode registry (§2.16)
+sys.path.insert(0, os.path.join(ROOTD, "scripts")); import task_conventions as tc   # the mode registry (§3)
 MODULE = {"behavior": "rcb_behavior.py", "robolab": "rcb_robolab.py", "robowits": "rcb_robowits.py", "maniguard": "rcb_maniguard.py",
           "molmospaces": "rcb_molmospaces.py", "myosuite": "rcb_myosuite.py",
           "dexjoco": "rcb_dexjoco.py", "dexhand": "rcb_dexhand.py", "roboarc": "rcb_topogym.py", "bigym2": "rcb_bigym2.py", "yamlab": "rcb_yamlab.py", "robodojo": "rcb_robodojo.py",
@@ -198,7 +198,7 @@ for t in sorted(TDIR):
     if bench not in MODULE:
         continue
     module = MODULE[bench]
-    if meta.get("exporter"):   # written by the benchmark's own exporter (Embodied Olympics, PROTOCOL §4c; Embodied Safety Exam 0.5.4): its own sources
+    if meta.get("exporter"):   # written by the benchmark's own exporter (Embodied Olympics, PROTOCOL §3; Embodied Safety Exam 0.5.4): its own sources
         # one group per exporter and skill-in-the-loop setting: Embodied Olympics - Match's table-tennis privileged twins come
         # from their own simulator's exporter (tools.tt_fullsim, #282 / #325) and the low-level matches with the agent's
         # skill in the loop have their own standard-realtime grader (#300); each is shared within its group

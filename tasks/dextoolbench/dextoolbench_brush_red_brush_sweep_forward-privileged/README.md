@@ -8,7 +8,7 @@
 | Simulator / robot | `mujoco` / `kuka-iiwa14-sharpa-ha4` |
 | Family / instance | `dextoolbench/brush/red_brush/sweep_forward` / seed 0 |
 | Oracle | `partial` — SimToolReal's pretrained policy, replayed in this scene, reaches 20/38 goals (solution/; README of dextoolbench_brush_red_brush_sweep_forward-privileged) |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:mujoco-0.1.2` |
 
 ## Task
@@ -23,18 +23,18 @@ Dexterous tool use: a KUKA iiwa 14 arm with a 22-DoF Sharpa HA4 hand (29 positio
 ## Verification
 DexToolBench task progress: goal reached when all 8 grasp-box keypoints are within 1.5 cm; 30 s per goal (upstream 10 s); `reward.txt` = 1 iff every goal is reached (both replays agreeing); `progress` = goals / 38 in `reward.json`
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 6 GB | 3 GB |
-| GPU memory | 1.5 GB | 1.5 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 20 GiB | 8192 | 7 GiB | 10 GiB |
+| verifier | no cap | no cap | no cap | 7 GiB | no cap |
 
-- GPU: required, any NVIDIA GPU; recommended: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
-- Measured: GPU 0.3-0.9 GB on 24 GB cards, evaluation-pool GPU profile (per-trial GPU peaks, 10-03..10); memory: sim p90 0.9 GB, privileged container p90 4.4 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU author estimate
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 7 GiB GPU memory, 16 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 7 GiB GPU memory, 16 GiB memory. Limits measured: GPU: 2.1 GiB on a 48 GB card (the evaluation pool's GPU profile (per-trial GPU peaks by card, 10-03..10)) -> max(1.5 x peak, peak + 4); memory: the [environment] cap 16 GiB, which every past trial ran under (docker peak 13.1 GiB over 26 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 10 GiB: design defaults, not yet measured.
+- GPU: any NVIDIA GPU, held by `main`.
+- Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
+- Measured: GPU memory: per-trial peaks of past trials 0.3-0.9 GB on 24 GB cards and up to 2.1 GiB on a 48 GB card; memory: privileged container p90 4.4 GB (a per-container memory sampler); CPU: an estimate
+- Measured (caps): GPU memory: a per-trial peak of 2.1 GiB on a 48 GB card -> max(1.5 x peak, peak + 4), rounded up: 7 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

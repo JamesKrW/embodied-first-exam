@@ -6,9 +6,9 @@
 | Mode | privileged |
 | Twin | `yamlab-put-pot-on-cooktop-i03-standard` |
 | Simulator / robot | `yamlab` / `i2rt-yam-bimanual` |
-| Family / instance | `put_pot_on_cooktop` |
+| Family / instance | `put_pot_on_cooktop` / seed 0 |
 | Oracle | `full` |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:yamlab-0.2.1` |
 
 ## Task
@@ -36,18 +36,18 @@ both wrist cameras). Oracle: 413 control steps, every stage latched at the last 
 fresh-process replays end in the same state (hash `47cde4fb2fab209d`). `nop`: no trajectory, reward 0; no stage holds at
 the start.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 8 | 4 |
-| Memory | 16 GB | 9 GB |
-| GPU memory | 5 GB | 5 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 29 GiB | 16384 | 16 GiB | 20 GiB |
+| verifier | 8 | 24 GiB | no cap | 16 GiB | no cap |
 
-- GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: GPU 3.8-4.0 GB per trial, anon memory 11.1-11.8 GB, CPU p90 5.8-8.7 cores over 12 trials, live sampler (docker stats + cgroup anon + nvidia-smi every 30 s, 13 cloud GPU hosts + an RTX 4090 workstation, 10-10); evaluation-pool GPU profile peaks 5.5-6.5 GB on 24 GB cards; about 11 GB RAM and 8 CPUs per simulator; verifier 7.2 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 16 GiB GPU memory, 24 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 16 GiB GPU memory, 24 GiB memory. Limits measured: GPU: 10.4 GiB on a 48 GB card, 6.5 on 24 GB (the evaluation pool's GPU profile (per-trial GPU peaks by card, 10-03..10)) -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: the [environment] cap 24 GiB, which every past trial ran under (docker peak 16.0 GiB over 4 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 20 GiB: design defaults, not yet measured.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, RTX PRO 6000 Blackwell, held by `main`.
+- Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
+- Measured: GPU memory 3.8-4.0 GB per trial, anon memory 11.1-11.8 GB, CPU p90 5.8-8.7 cores over 12 trials (a per-container sampler every 30 s); per-trial peaks of past trials 5.5-6.5 GB of GPU memory on 24 GB cards; about 11 GB of memory and 8 CPUs per simulator; verifier 7.2 GB (a per-container memory sampler)
+- Measured (caps): GPU memory: per-trial peaks of 10.4 GiB on a 48 GB card and 6.5 GiB on a 24 GB card -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |
@@ -61,17 +61,3 @@ Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.reso
 
 ### Provenance
 The frozen instance was chosen and frozen in `ghcr.io/mll-lab-nu/efe-private:yamlab-0.1.0`.
-
-### Change Log
-- 2026-10-10: grading robustness and time limits; the scene, the frozen instance and the pass rule are
-  unchanged, so the task keeps its name. `tests/grade.py`: each fresh-process replay has
-  max(1800 s, 1200 s + rows / 20) instead of a flat 1800 s and `[verifier] timeout_sec` is 13000 s (was 2400 s, less than two
-  replays at their limit), so a long trajectory is graded instead of the verifier being killed; a replay that still runs
-  out of time is `replay_timed_out` with `grader_error` = `infra_error` = 1; a file that is not a readable trajectory is
-  `bad_trajectory` (was `grader_error`); `instance_ok` = 0 (the rebuilt scene differs on this host) sets `grader_error` and
-  `infra_error`; every reward has `deterministic` and `infra_error`. Tooling: a failed replay video never voids the
-  replay, and the video of a trajectory longer than 18,000 rows is a time lapse (at most 9,000 frames).
-- 2026-10-10 (owner decision): the frozen instance file no longer names the recording it was made from
-  (`instance.json` had a `source` entry with the dataset, the file and the demonstration index, and the tooling's usage
-  text named such a file; the reference solution replays that demonstration). Nothing reads the entry: the scene, its
-  state hash, the tooling's behaviour and the pass rule are unchanged, so the task keeps its name.

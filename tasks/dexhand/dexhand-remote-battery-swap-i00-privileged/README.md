@@ -6,9 +6,9 @@
 | Mode | privileged |
 | Twin | `dexhand-remote-battery-swap-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `remote_battery_swap` |
+| Family / instance | `remote_battery_swap` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz replays the validated Sharpa Wave authoring trajectory on the Marvin right arm (2,416 controls; success after 2,266, the last 150 rows are hold slack) in both modes: two fresh-process replays with identical state hashes, also with the rows rounded to float32; standard mode streams the same rows through the public client. |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
 
 ## Task
@@ -46,18 +46,17 @@ cell touching nothing at all moving down faster than 0.5 m/s (no catch window), 
 budget. The frozen instance and thresholds come from the task, never from an agent archive. A no-op
 fails. Human review and full agent-trial calibration remain pending; report this task as provisional.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 5 GB | 5 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
+| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: wave-3 integration smoke of the Marvin-arm families (Harbor 0.23, efe:dexhand-0.2.0, CPU-only, 2026-10-15; one privileged and one standard Sharpa oracle per family; docker cgroup memory.peak): privileged verifier 3.40-3.51 GiB with two concurrent replays, standard sim sidecar 2.13-2.65 GiB, agent containers < 0.05 GiB; one fresh replay process 1.75-1.81 GiB max RSS (os.wait4); x1.2 rounded up to a GB, the values of pot_shelf_transfer (the same robot); two cores for the two concurrent verifier replays
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 8 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 8 GiB memory. Limits measured: memory: 8 GiB lets an agent run three or four 1.8 GiB Marvin simulator sessions next to its harness; measurements as in the [[rule]]; processes 512 and disk 10 GiB: design defaults, not yet measured.
+- Measured: one Sharpa oracle per Marvin-arm family in each mode (CPU only, cgroup memory.peak): the verifier 3.40-3.51 GiB with two concurrent replays, the agent's container under 0.05 GiB; one fresh replay process 1.75-1.81 GiB max RSS; two cores for the verifier's two concurrent replays
+- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 
@@ -78,6 +77,3 @@ MuJoCo Menagerie commit `0059d4335f8156206f63a35662313385f7ad6d74` (Apache-2.0);
 (`hand2/hand2_2`) is pinned to wuji-technology/wuji-description commit `829c9aa27cb12c3a49d5b8d63c9869dd8f656702`
 (MIT) and mounted on the same arm flanges with its vendor joints, actuators and contact geometry unchanged. This is
 manipulation feasibility with an arm-mounted hand in simulation, not a zero-shot or real-robot claim.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

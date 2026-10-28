@@ -16,11 +16,13 @@ benchmark copies from another, e.g. MyoSuite and HumanoidBench's realtime servic
     python3 ci_checks/ci_scope.py                       # vs the merge base with origin/main
     python3 ci_checks/ci_scope.py --diff-from HEAD^1    # CI on a pull request: GitHub's merge commit vs main
     python3 ci_checks/ci_scope.py --paths a b ...       # explain the scope of the given paths
+    python3 ci_checks/ci_scope.py --check               # the table against the benchmarks and images/ (run_all.sh)
 
 Output: shell assignments (`eval "$(python3 ci_checks/ci_scope.py ...)"`): RCB_SCOPE=full|benchmarks|none,
 RCB_SCOPE_REASON, RCB_SCOPE_BENCHES (labels, `;`-separated), RCB_SCOPE_PATHS (the affected benchmarks' own path
-prefixes, for check-unit-tests.sh `--only`), RCB_SCOPE_TASKS (their task dirs). A new
-benchmark without a row here makes every pull request that touches it run the full suite: add its row.
+prefixes, for check-unit-tests.sh `--only`), RCB_SCOPE_TASKS (their task dirs). A new benchmark gets the conventional
+paths from task_conventions.BENCHMARK_TABLE; an image directory of another name needs a row here (`--check` fails
+until it has one).
 """
 from __future__ import annotations
 
@@ -33,7 +35,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import task_conventions as tc  # noqa: E402  (BENCHMARKS: (task dir prefix, label); bench_of)
+import task_conventions as tc  # noqa: E402  (BENCHMARK_TABLE: (task dir prefix, label, folder); bench_of)
 
 # label -> the benchmark's own path prefixes besides its task dirs (tasks/<folder>/<task>/, the folder BENCHMARK_DIRS
 # names; its pages tasks/<folder>/*.md are its own through owners()). Default for a label not listed with a key here: none
@@ -45,12 +47,12 @@ def _own(d: str, *extra: str) -> list[str]:
 UNITS: dict[str, list[str]] = {
     "RoboTwin 2.0": _own("robotwin"),
     "DexToolBench": ["images/mujoco/"],   # serves server_mj.py
-    "MuJoCo Playground": _own("mujoco-playground", "images/mujoco/", "embodied_first_exam/benchmarks/dextoolbench/standard/", "images/dextoolbench-files/"),   # ALOHA / Panda: DexToolBench's grader
+    "MuJoCo Playground": ["images/mujoco/", "embodied_first_exam/benchmarks/dextoolbench/standard/", "images/dextoolbench-files/"],   # ALOHA / Panda: DexToolBench's grader
     "KinDER": _own("kinder"),
     "HumanoidBench": _own("humanoidbench"),
-    "MetaWorld+": _own("metaworldplus", "images/metaworld/"),
+    "MetaWorld+": ["images/metaworld/"],
     "RoboWits": _own("robowits"),
-    "RoboPaint": ["images/robopaint/", "images/robopaint-files/"],
+    "RoboPaint": _own("robopaint", "images/robopaint-pictures-files/"),
     "RoboLab": _own("robolab", "images/robolab-files/"),
     "BEHAVIOR-1K": _own("behavior", "images/behavior-files/"),
     "ManiGuard": _own("maniguard"),
@@ -58,14 +60,14 @@ UNITS: dict[str, list[str]] = {
     "MyoSuite": _own("myosuite"),
     "DexJoCo": _own("dexjoco"),
     "DexHand": _own("dexhand"),
-    "VLABench": _own("vlabench"),
-    "RoboCasa-GR1": _own("robocasa-gr1", "images/robocasa/standard/", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service, tooling, graders
+    "VLABench": _own("vlabench", "images/vlabench-build-files/"),
+    "RoboCasa-GR1": _own("robocasa-gr1", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service, tooling, graders
     "RoboCasa": _own("robocasa"),
-    "RoboCasa365": _own("robocasa365", "images/robocasa/standard/", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service and graders
+    "RoboCasa365": _own("robocasa365", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service and graders
     "LIBERO-MAX": _own("libero-max"),
     "RoboARC": _own("roboarc", "images/roboarc-files/", "images/ikea-mujoco/", "images/ikea-mujoco-files/"),   # the IKEA suite's images keep their name
     "Embodied Olympics - Fun": _own("embodied-olympics-fun", "images/embodied-olympics-fun-files/"),
-    "Embodied Olympics - Match": ["images/embodied-olympics-match-files/"],   # its simulator images are built from Embodied Olympics' tree, not here
+    "Embodied Olympics - Match": ["images/roboengineer-files/"],   # its simulator images are built from Embodied Olympics' tree, not here; its skill tasks use roboEngineer's files
     "BiGym 2.0": _own("bigym2"),
     "YAMLab": _own("yamlab"),
     "LabUtopia": _own("labutopia"),
@@ -73,12 +75,14 @@ UNITS: dict[str, list[str]] = {
     "RoboDojo": _own("robodojo"),
     "Panda Dynamic Scenes": _own("pandadyn"),
     "AM-Bench": _own("ambench"),
-    "iSpatialGym": _own("ispatialgym"),
-    "roboEngineer": _own("roboengineer",
-                         "images/control-transfer/", "images/quadrotor-landing/",
-                         "images/roboengineer-files/"),
+    "iSpatialGym": _own("ispatialgym", "images/ispatialgym-goals-files/"),
+    "roboEngineer": ["images/control-transfer/", "images/quadrotor-landing/"],
     "ABC Sim": _own("abc-sim"),
+    "Embodied Safety Exam": _own("ese"),
 }
+HAND_UNITS = {k: list(v) for k, v in UNITS.items()}   # the rows above, before the conventional paths below are added
+# images/ directories every benchmark builds on: a change to one runs the full suite (no unit owns it)
+SHARED_IMAGES = ("monitor", "standard-files")
 # the benchmark's shared task code, embodied_first_exam/benchmarks/<folder>/ (embodied_first_exam/README.md), its CI
 # hooks, ci_checks/benchmarks/<folder>/, and its files-only image, images/<folder>-files/ (task images and sidecars): the folder of its
 # task dirs, tasks/<folder>/ (task_conventions.BENCHMARK_DIRS)
@@ -91,7 +95,7 @@ for _label, _folder in tc.BENCHMARK_DIRS.items():
 NO_TASK_EFFECT = ("README.md", "CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md", "LICENSE", "SECURITY.md", "CODE_OF_CONDUCT.md", "docs/protocol/running.md",
                   "docs/REVIEWING.md", ".gitignore",
                   "docs/core_set.toml")   # read by reports only; its own check (run_all.sh) and test (run_invariants.sh) always run
-# tasks/dataset.toml: no longer committed (generated for a release; check-dataset-manifest.sh fails when it is tracked)
+# tasks/dataset.toml: not committed (generated for a release; check-dataset-manifest.sh fails when it is tracked)
 REPO_LEVEL_ONLY = ("tasks/dataset.toml",)
 REF = re.compile(r"\b(scripts|images)/([A-Za-z0-9_.-]+)")
 
@@ -188,7 +192,33 @@ def scope(paths: list[str]) -> dict:
             "benches": sorted(benches)}
 
 
+def check() -> list[str]:
+    """The table against the benchmarks (task_conventions.BENCHMARK_TABLE) and the tree: every UNITS key is a label,
+    every FILES_IMAGE key a folder, every hand-written path exists, and every images/<d>/ belongs to a benchmark or is
+    one of SHARED_IMAGES (an image no unit owns would run the full suite on every change to it, silently)."""
+    errs = []
+    labels, folders = {lab for _, lab, _ in tc.BENCHMARK_TABLE}, {f for _, _, f in tc.BENCHMARK_TABLE}
+    errs += [f"UNITS: {k!r} is not a benchmark label (task_conventions.BENCHMARK_TABLE)" for k in sorted(set(UNITS) - labels)]
+    errs += [f"FILES_IMAGE: {k!r} is not a benchmark folder" for k in sorted(set(FILES_IMAGE) - folders)]
+    errs += [f"UNITS[{k!r}]: {p} does not exist" for k, ps in HAND_UNITS.items() for p in ps if not (ROOT / p).exists()]
+    errs += [f"RT_CORES_BY_README: {k!r} is not a benchmark label" for k in sorted(set(tc.RT_CORES_BY_README) - labels)]
+    for d in sorted(x.name for x in (ROOT / "images").iterdir() if x.is_dir()):
+        if d in SHARED_IMAGES:
+            if owners(f"images/{d}/"):
+                errs.append(f"images/{d}/ is in SHARED_IMAGES but {sorted(owners(f'images/{d}/'))} own it")
+        elif not owners(f"images/{d}/"):
+            errs.append(f"images/{d}/ belongs to no benchmark: add it to its UNITS row (or to SHARED_IMAGES)")
+    return errs
+
+
 def main(argv: list[str]) -> int:
+    if argv == ["--check"]:
+        errs = check()
+        for e in errs:
+            print(f"FAIL ci_scope: {e}")
+        if not errs:
+            print(f"ci_scope: {len(UNITS)} benchmarks, every images/ directory owned or shared")
+        return 1 if errs else 0
     diff_from, base, paths = None, "origin/main", None
     i = 0
     while i < len(argv):
