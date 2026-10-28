@@ -86,6 +86,18 @@ infrastructure, a reference implementation, one benchmark using it, CI support t
   `ci_checks/benchmarks/<bench>/exported.toml`); they are plain Harbor tasks, Appendix H applies to them unchanged, and their results
   are reported apart.
 
+**Images per call (standard modes).** Every call that returns images has a per-call image budget,
+`max_frames_per_call`, stated in the task (its `/spec` and its instruction). Each camera frame is one image, and a depth
+frame one more: a service keeps depth as it is sent (uint16 millimetres or float16 metres), so it costs no more than an
+RGB frame. The count is of the frames the service really captures, at the capture stride it uses (one frame every
+`round(control rate / video_fps)` control steps, plus the call's first and last), not at the requested rate. It is
+checked before the call runs: a call over the budget is refused with an error that says so and runs nothing. A call
+whose length is known only while it runs (`ee_pose` rows, a chunk the service plans, a watch that ends with the
+episode) stops filming at the budget and always keeps its final frame. `video` = `mp4` or `frames` changes what is
+sent, not the budget. A service builds a response holding about one copy of its frames (streamed, or written once into
+the body), and its memory cap covers the largest response the budget allows (§6). In standard-realtime mode the
+pending watches and the answers not yet sent count against one budget together.
+
 ## 4. Grading and results
 
 | Recommended | Notes |

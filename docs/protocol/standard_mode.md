@@ -363,12 +363,12 @@ In both cases the executed prefix stays: it is journaled and checkpointed like a
 response with fewer rows executed; `rcb_client` exposes `Result.stopped` and prints a one-line warning.
 
 A third bound keeps one call from exhausting the service's memory (every frame is held until the response is sent):
-**`max_frames_per_call`** (`/spec`, where the adapter states one; the numbers are in the benchmarks' docs): the images a
-call may return, cameras x frames with per-frame depth counted again. A request over it is a 400 before anything is
-executed (`rcb_limited.check_frames`); a camera named twice is one camera. Where the length of a call is known only while
-it runs (planner-executed rows), the call stops taking frames at the bound, runs to its end, always returns the last
-frame, and `meta.frames_skipped` counts the frames left out. A service that states no bound is bounded by
-`max_watch_s`, `max_chunk_s` and the frame rate.
+**`max_frames_per_call`** (`/spec`; the rule: PROTOCOL §3 "Images per call"): the images a call may return, cameras x
+frames at the real capture stride (`rcb_limited.frames_per_call`) with per-frame depth counted again. A request over it
+is a 400 before anything is executed (`rcb_limited.check_frames`); a camera named twice is one camera. Where the length
+of a call is known only while it runs (planner-executed rows), the call stops taking frames at the bound
+(`Recorder(max_images=...)`), runs to its end, always returns the last frame, and `meta.frames_skipped` counts the frames
+left out.
 
 ### 13. Crash recovery (the shared layer's default behaviour)
 The shared layer (`rcb_limited.Episode`; adapters call it as `toy_server.py` does) resumes a crashed service in the same

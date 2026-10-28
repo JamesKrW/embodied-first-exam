@@ -1,0 +1,257 @@
+#!/usr/bin/env python3
+"""The per-call image budget and the one-copy response build of the shared layers (PROTOCOL §3 "Images per call"), on
+toy simulators (numpy only, no image, a few seconds):
+
+  - rcb1.frames_part() gives the header and bytes of array_part(np.stack(...)) (dtype promotion, empty, shape errors),
+    rcb1.size() the length of encode() before it is built, and encode() empties the frame lists it writes;
+  - 2.2 (rcb_limited): a Recorder's captures never exceed frames_per_call() at its stride; check_frames accepts a call
+    at the budget and refuses one image over it; Recorder(max_images=...) stops filming at the budget and keeps the
+    last frame; depth is kept as it is sent (uint16 mm, float16), never more bytes than an RGB frame;
+  - 2.1 (every distinct rcb_service.py): a call at the budget is accepted, one image over refused, at the real stride;
+  - 2.3 (rcb_realtime): an answer built but not sent counts against max_frames_per_call with the pending watches (429
+    until it is sent), and at most MAX_UNSENT_BODIES such answers wait.
+"""
+import hashlib
+import importlib.util
+import os
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[2]
+STD = ROOT / "embodied_first_exam/standard"
+sys.path.insert(0, str(STD))
+import rcb1  # noqa: E402
+import rcb_limited as L  # noqa: E402
+
+fails: list[str] = []
+
+
+def check(cond, what):
+    if not cond:
+        fails.append(what)
+        print("FAIL", what)
+
+
+def refused(fn) -> bool:
+    try:
+        fn()
+    except ValueError:
+        return True
+    return False
+
+
+# ---------------------------------------------------------------- rcb1
+rng = np.random.default_rng(0)
+for arrays in ([rng.integers(0, 255, (4, 5, 3), dtype=np.uint8) for _ in range(6)],
+               [rng.random((3, 2)).astype(np.float16) for _ in range(3)],
+               [np.zeros((2, 2), np.float16), np.ones((2, 2), np.float32)]):
+    ref = rcb1.array_part("frames/c", np.stack(arrays))
+    lazy = rcb1.frames_part("frames/c", list(arrays))
+    meta = {"n": 1}
+    body = rcb1.encode(meta, [lazy])
+    check(len(lazy[2]) == len(ref[2]) and lazy[3] == ref[3], f"frames_part header {lazy[3]} != {ref[3]}")
+    check(bytes(body) == rcb1.encode(meta, [ref]), f"frames_part bytes differ ({ref[3]})")
+    check(rcb1.size(meta, [ref]) == len(body), "rcb1.size != len(encode)")
+    check(lazy[2].arrays == [], "encode() did not empty the frame list")
+check(rcb1.frames_part("f", [], empty=np.zeros((0, 1, 1, 3), np.uint8))[3]["shape"] == [0, 1, 1, 3], "empty frames_part")
+check(refused(lambda: rcb1.frames_part("f", [])) and refused(lambda: rcb1.frames_part("f", [np.zeros(2), np.zeros(3)])),
+      "frames_part: no arrays / unequal shapes must raise as np.stack does")
+
+
+# ---------------------------------------------------------------- 2.2: count at the stride, the budget, max_images
+def grab(cams, want):
+    return ({c: np.full((6, 8, 3), 7, np.uint8) for c in cams},
+            {c: np.full((6, 8), 1.25, np.float32) for c in cams} if want else {})
+
+
+def recorder(cams, every, depth="none", max_images=None):
+    k = [0]
+    rec = L.Recorder(cams, every, grab, lambda: np.zeros(3, np.float32), lambda cs: {c: np.eye(3, 4) for c in cs},
+                     lambda: k[0], depth=depth, clock_hz=50, max_images=max_images)
+    return rec, k
+
+
+def run_call(rec, k, steps):
+    rec.tick(force=True)                 # the adapters' pattern: the first frame, a tick per control step, the last
+    for i in range(steps):
+        k[0] += 1
+        rec.tick(last=(i == steps - 1))
+    if not steps:
+        rec.tick(force=True, last=True)
+    return len(rec.steps)
+
+
+for steps in (0, 1, 2, 9, 10, 11, 49, 50, 51, 150):
+    for every in (1, 2, 3, 7, 25):
+        rec, k = recorder(["a"], every)
+        n = run_call(rec, k, steps)
+        check(n <= L.frames_per_call(steps, every), f"2.2: {n} captures > frames_per_call({steps}, {every})")
+# fps 24 at 50 Hz is a stride of 2 (25 frames a second): 30 s = 1500 steps -> 752 frames, not 24 x 30 + 2 = 722
+every = max(1, round(50 / 24))
+per_cam = L.frames_per_call(1500, every)
+check(per_cam == 752, f"frames_per_call(1500, 2) = {per_cam}")
+budget = 2 * per_cam * 2
+check(L.check_frames(2, per_cam, True, budget) == budget, "check_frames refused a call at the budget")
+check(refused(lambda: L.check_frames(2, per_cam, True, budget - 1)), "check_frames accepted a call one image over")
+rec, k = recorder(["a", "b"], 1, depth="frames", max_images=40)
+run_call(rec, k, 100)
+check(len(rec.steps) * 4 <= 40 and rec.steps[-1] == 100 and rec.skipped > 0,
+      f"max_images: {len(rec.steps)} frames x 4 images, last step {rec.steps[-1]}, skipped {rec.skipped}")
+rec, k = recorder(["a"], 1, depth="frames")
+run_call(rec, k, 3)
+rec2, k2 = recorder(["a"], 1, depth="legacy")
+run_call(rec2, k2, 3)
+check(rec.depth["a"][0].dtype == np.uint16 and rec2.depth["a"][0].dtype == np.float16
+      and rec.depth["a"][0].nbytes <= rec.frames["a"][0].nbytes, "2.2 depth is not kept as it is sent")
+n = len(rec.steps)
+parts = rec.parts("frames", 10)
+check(rec.frames["a"] == [] and rec.depth["a"] == [], "2.2 parts() kept its frame lists")
+body = L.encode_response({}, parts)
+_, got = rcb1.decode(bytes(body))
+check(got["frames/a"]["data"].shape == (n, 6, 8, 3), f"2.2 frames/a shape {got['frames/a']['data'].shape}, {n} frames")
+
+
+# ---------------------------------------------------------------- 2.1 and 2.3
+class Toy:
+    raw_dim = 2
+    control_dt = 0.02
+    max_control_steps = 10_000
+    proprio_layout = ["x"]
+    cameras = ["a", "b"]
+    depth_cameras = ["a"]
+
+    def __init__(self):
+        self.x = 0.0
+
+    def spec(self):
+        return {"cameras": {}, "action_types": {"joints": {"dim": 2}}}
+
+    def interpolable(self, t):
+        return True
+
+    def images(self, cams, depth):
+        return ({c: np.zeros((4, 4, 3), np.uint8) for c in cams},
+                {c: np.ones((4, 4), np.float32) for c in cams if depth and c in self.depth_cameras})
+
+    def proprio(self):
+        return np.array([self.x], np.float32)
+
+    def clip(self, t, rows):
+        return rows, []
+
+    def to_sim(self, t, row):
+        return np.asarray(row, float)
+
+    def command(self, t):
+        return np.zeros(2)
+
+    def hold(self):
+        return "joints", np.zeros(2)
+
+    def step(self, row):
+        self.x += float(row[0])
+        return False, False, {}
+
+    def reset(self):
+        self.x = 0.0
+
+    def state_sha(self):
+        return hashlib.sha256(np.array([self.x]).tobytes()).hexdigest()[:12]
+
+    def save_trajectory(self, rows, path, meta):
+        np.savez(path, actions=rows)
+
+    def render_video(self, rows, path):
+        open(path, "wb").write(b"mp4")
+
+
+def load(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+copies: dict[str, Path] = {}
+for p in sorted((ROOT / "embodied_first_exam/benchmarks").glob("*/*/rcb_service.py")):
+    copies.setdefault(hashlib.sha256(p.read_bytes()).hexdigest(), p)
+for h, path in copies.items():
+    S = load(path, f"rcb_service_{h[:8]}")
+    tag = path.relative_to(ROOT)
+    d = tempfile.mkdtemp()
+    try:
+        svc = S.Service(Toy(), data=d, max_frames_per_call=1000)
+        # 2 cameras + depth on one: 3 images a frame; fps 24 at 50 Hz films every 2 steps
+        rec = S.Recorder(svc.sim, ["a", "b"], 24, True, "frames")
+        steps = (1000 // 3 - 2) * rec.every                  # 333 frames x 3 = 999 images: at the budget
+        svc._frame_budget(rec, steps)
+        check(refused(lambda: svc._frame_budget(rec, steps + 2 * rec.every)), f"{tag}: one frame over the budget passed")
+        rec.start()
+        for _ in range(steps):
+            rec.step()
+        rec.finish()
+        check(rec.images_per_call(steps) // 3 - 1 <= len(rec.prop) <= rec.images_per_call(steps) // 3,
+              f"{tag}: {len(rec.prop)} frames captured, images_per_call {rec.images_per_call(steps)}")
+        code, _, body = S.Service._reply_rcb1({}, rec.parts())
+        _, got = rcb1.decode(bytes(body))
+        check(got["frames/a"]["data"].shape[0] == len(rec.prop) and got["depth/a"]["data"].dtype == np.float16,
+              f"{tag}: the response's frames")
+    finally:
+        shutil.rmtree(d)
+
+# 2.3 on one 2.1 copy
+path = next(iter(copies.values()))
+sys.modules["rcb_service"] = load(path, "rcb_service")
+R = load(STD / "realtime/rcb_realtime.py", "rcb_realtime")
+d = tempfile.mkdtemp()
+try:
+    svc = R.RealtimeService(Toy(), data=d, max_frames_per_call=300, slowdown=1.0)
+    svc.start()
+    view = (["a", "b"], 25, "frames", False)                 # 2 images a frame, a frame every 2 steps
+    job1 = R._Job("POST", "/observe")
+    svc._rt_observe({"seconds": 2.0, "view": view}, job1)    # 100 steps -> 52 frames x 2 = 104 images
+    w = svc.watches[0]
+    svc._complete_watch(w)                                   # done, not sent yet: its images are still in flight
+    check(svc.unsent_images == 104 and svc.unsent_bodies == 1, f"2.3: unsent {svc.unsent_images} / {svc.unsent_bodies}")
+    job2 = R._Job("POST", "/observe")
+    svc._rt_observe({"seconds": 3.6, "view": view}, job2)    # 180 steps -> 92 frames x 2 = 184: 104 + 184 = 288 <= 300
+    svc._complete_watch(svc.watches[0])
+    try:
+        svc._rt_observe({"seconds": 0.1, "view": view}, R._Job("POST", "/observe"))   # 4 x 2 = 8 more: 296 ok
+        svc._complete_watch(svc.watches[0])
+        svc._rt_observe({"seconds": 0.1, "view": view}, R._Job("POST", "/observe"))   # 8 more: 304 > 300
+        check(False, "2.3: a watch over the budget with unsent answers was accepted")
+    except R.Refused as exc:
+        check(exc.code == 429 and exc.body.get("images_in_flight") == 296, f"2.3: refusal {exc.code} {exc.body}")
+    for j in (job1, job2):
+        svc._sent(j)
+    check(svc.unsent_images == 8 and svc.unsent_bodies == 1, f"2.3: after sending {svc.unsent_images}")
+    svc._rt_observe({"seconds": 0.1, "view": view}, R._Job("POST", "/observe"))       # accepted again
+    check(len(svc.watches) == 1, "2.3: a watch within the budget after the answers were sent was refused")
+    svc.watches.clear()
+    svc.unsent_images, svc.unsent_bodies = 0, R.MAX_UNSENT_BODIES
+    try:
+        svc._rt_observe({"seconds": 0.0, "view": view}, R._Job("POST", "/observe"))
+        check(False, "2.3: more than MAX_UNSENT_BODIES answers waiting was accepted")
+    except R.Refused as exc:
+        check(exc.code == 429, f"2.3: bodies refusal {exc.code}")
+    svc.unsent_bodies = 0
+    j = R._Job("POST", "/observe")
+    svc._rt_observe({"seconds": 0.0, "view": (["a"], 25, "none", False)}, j)       # seconds = 0: answered at once
+    check(j.images == 1 and svc.unsent_images == 1, f"2.3: an immediate answer's images {j.images}")
+    svc._reply_rcb1(j.reply[1], j.reply[2].parts())
+    svc._sent(j)
+    check(svc.unsent_images == 0 and svc.unsent_bodies == 0, "2.3: _sent did not release")
+finally:
+    shutil.rmtree(d)
+
+if fails:
+    print(f"{len(fails)} failure(s)")
+    sys.exit(1)
+print(f"ok per-call image budget: rcb1 frames_part/size, 2.2 stride count + max_images + depth as sent, "
+      f"{len(copies)} distinct rcb_service.py (at the budget / one over), 2.3 unsent answers in flight")
