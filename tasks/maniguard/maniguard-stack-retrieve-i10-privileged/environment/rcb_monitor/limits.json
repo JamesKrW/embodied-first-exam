@@ -4,7 +4,7 @@
   "main": {
    "cpus": 8.0,
    "disk_gb": 20.0,
-   "gpu_memory_gb": 30.0,
+   "gpu_memory_gb": 18.0,
    "memory_gb": 30.0,
    "pids": 16384
   }
@@ -13,7 +13,7 @@
  "disk_tick_sec": 60,
  "format": "rcb-limits/2",
  "gpu": true,
- "gpu_memory_gb": 30.0,
+ "gpu_memory_gb": 18.0,
  "mode": "privileged",
  "scope_services": [
   "main"

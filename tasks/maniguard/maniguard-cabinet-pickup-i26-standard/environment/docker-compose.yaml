@@ -17,7 +17,7 @@ services:
     cpus: 12   # rcb-monitor
     mem_limit: 43008m   # rcb-monitor
     pids_limit: 16384   # rcb-monitor
-    x-gpu-memory-gb: 30   # GiB of GPU memory (docs/protocol/README.md §6)   # rcb-monitor
+    x-gpu-memory-gb: 18   # GiB of GPU memory (docs/protocol/README.md §6)   # rcb-monitor
     # maniguard-base (the first stage of the Dockerfile) is built from public sources; with read access to the prebuilt
     # image its layers are pulled instead (cache_from)
     build:

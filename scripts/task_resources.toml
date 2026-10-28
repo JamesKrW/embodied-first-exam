@@ -199,21 +199,21 @@ caps_measured = "processes and disk: defaults, not measured"
 # 30 task(s)
 [[cap]]
 match = "^maniguard-.*-privileged$"
-main = { cpus = 8, memory_gb = 30, pids = 16384, gpu_memory_gb = 30, disk_gb = 20 }
+main = { cpus = 8, memory_gb = 30, pids = 16384, gpu_memory_gb = 18, disk_gb = 20 }
 gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "GPU memory and CPU from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack); the verifier 15.8 GB (a per-container memory sampler); the standard twin's sim service, the same simulator, in one trial: anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s)"
-caps_measured = "GPU memory: per-trial peaks of 19.4 GiB on a 48 GB card and 18.1 GiB on a 24 GB card (no texture budget in its tooling) -> max(1.5 x peak, peak + 4), rounded up: 30 GiB; processes and disk: defaults, not measured"
+caps_measured = "GPU memory: cap 18 GiB (owner); measured peaks 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling), so a run may exceed it; recorded, enforced only when RCB_LIMITS_ENFORCE=1; processes and disk: defaults, not measured"
 
 # 30 task(s)
 [[cap]]
 match = "^maniguard-.*-standard$"
 main = { cpus = 8, memory_gb = 24, pids = 16384, disk_gb = 20 }
-sim = { cpus = 12, memory_gb = 42, pids = 16384, gpu_memory_gb = 30 }
+sim = { cpus = 12, memory_gb = 42, pids = 16384, gpu_memory_gb = 18 }
 gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "one trial: sim anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s); GPU memory and CPU otherwise from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack)"
-caps_measured = "GPU memory (the sim service): per-trial peaks of 19.4 GiB on a 48 GB card and 18.1 GiB on a 24 GB card (no texture budget in its tooling) -> max(1.5 x peak, peak + 4), rounded up: 30 GiB; processes and disk: defaults, not measured"
+caps_measured = "GPU memory (the sim service): cap 18 GiB (owner); measured peaks 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling), so a run may exceed it; recorded, enforced only when RCB_LIMITS_ENFORCE=1; processes and disk: defaults, not measured"
 
 # 50 task(s)
 [[cap]]
