@@ -12,7 +12,10 @@ A :class:`RigidAssemblyTask` is driven by ``tasks/<name>/cfg.yaml``:
   ``require_grasp_latch`` is off), and the gripper has released for good
   (``end_on_release``: the policy announced the finish release and the fingers
   opened by ``release_open_mm``; otherwise the end-effector moved
-  ``assembled_clear`` away);
+  ``assembled_clear`` away); with ``final_check`` (``margin``, optional ``lateral`` /
+  ``axis_deg``), ``is_success()`` also needs every part still in its bore when the
+  episode is judged (its end): depth >= bore - margin, within the lateral / axis
+  tolerances (default: the latch's), so a part pulled out again after the latch fails;
 * ``tactile`` - which object meshes the two gel pads are raycast against.
 
 The task exposes privileged accessors (object poses, insertion geometry, grasp
@@ -165,6 +168,10 @@ class RigidAssemblyTask(Task):
         self.assembled_lateral = float(s.get("assembled_lateral", 0.008))
         self.assembled_axis_deg = float(s.get("assembled_axis_deg", 15.0))
         self.final_margin = s.get("final_margin")
+        fc = s.get("final_check") or {}
+        self.final_check_margin = None if fc.get("margin") is None else float(fc["margin"])
+        self.final_check_lateral = float(fc.get("lateral", self.assembled_lateral))
+        self.final_check_axis_deg = float(fc.get("axis_deg", self.assembled_axis_deg))
         self.require_grasp_latch = bool(s.get("require_grasp_latch", True))
         self.end_on_release = bool(s.get("end_on_release", True))
         self.release_open_mm = float(s.get("release_open_mm", 10.0))
@@ -480,6 +487,24 @@ class RigidAssemblyTask(Task):
         clear = float(np.linalg.norm(eef[:3] - held[:3])) >= self.assembled_clear
         return assembled and clear
 
+    def final_state_ok(self) -> bool:
+        """Every part in its bore now (``final_check``; True without one): judged at the end of the episode."""
+        if self.final_check_margin is None or self.scene is None:
+            return True
+        for k in range(len(self.parts)):
+            st = self._part_state(k)
+            if not (
+                st["lateral"] <= self.final_check_lateral
+                and st["axis_err_deg"] <= self.final_check_axis_deg
+                and st["depth"] >= st["bore"] - self.final_check_margin
+            ):
+                return False
+        return True
+
+    def is_success(self) -> bool:
+        """The success latch, and (``final_check``) every part still in its bore at the end."""
+        return bool(self._latched) and self.final_state_ok()
+
     # ------------------------------------------------------------------ observation
     def privileged_obs(self) -> Dict[str, np.ndarray]:
         out: Dict[str, np.ndarray] = {}
@@ -503,6 +528,17 @@ class RigidAssemblyTask(Task):
             "parts_deep": int(self._parts_deep.sum()),
             "ever_grasped": int(self._ever_grasped),
         }
+        if self.scene is not None:  # every part's place now (what the final check judges)
+            for k in range(len(self.parts)):
+                try:
+                    st = self._part_state(k)
+                except Exception:  # noqa: BLE001 - a diagnostic
+                    continue
+                d[f"now{k}_depth_mm"] = 1e3 * st["depth"]
+                d[f"now{k}_bore_mm"] = 1e3 * st["bore"]
+                d[f"now{k}_lateral_mm"] = 1e3 * st["lateral"]
+                d[f"now{k}_axis_err_deg"] = st["axis_err_deg"]
+            d["final_state_ok"] = int(self.final_state_ok())
         if self.tactile is not None:
             d["tactile_contact_frames"] = self.tactile.contact_frames
         return d
