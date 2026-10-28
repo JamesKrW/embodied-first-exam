@@ -57,8 +57,10 @@ simulator thread. What a request can cost the clock is bounded:
   BEHIND_PACE times as long, clock on time or not; requests without images (cameras = [], /status) are not held
   back by it, so a controller's loop goes on. Requests can so take at most 1 / (1 + BEHIND_PACE) of the clock's time.
 - Cameras are rendered (and the proprioception read) at most once per control step, however many requests and watches
-  ask for them: all of them get that step's frames. The pending watches together hold at most max_frames_per_call
-  images; a watch that would exceed it is refused (429) until one completes.
+  ask for them: all of them get that step's frames. The pending watches and the answers not yet sent (built, or
+  being written to a client that reads slowly) together hold at most max_frames_per_call images; a request that would
+  exceed it is refused (429) until one completes or is sent. At most MAX_UNSENT_BODIES answers with images wait to be
+  sent, and an answer whose client does not take it within SEND_TIMEOUT_S is dropped with its connection.
 More than MAX_LAG_S behind, the service drops the debt instead of fast-forwarding the robot (a stall: counted, and its
 seconds added to stalled_s).
 
@@ -110,6 +112,8 @@ CHILD_TIMEOUT_S = 60.0   # the child process's time for one body
 CHILD_MEM = 1 << 30      # ... and its memory above what its interpreter needs (a body that needs more is refused)
 SWITCH_INTERVAL_S = 0.001   # the interpreter's thread switch interval while serving (default 0.005): HTTP threads
                             # hand the lock back to the simulator thread within a millisecond
+MAX_UNSENT_BODIES = 8    # answers with images built or being sent at a time (each counts its images in flight too)
+SEND_TIMEOUT_S = 30.0    # a client that has not taken an answer within this loses it (and its connection)
 FIELDS = ("type", "dt", "interpolate", "at", "cameras", "video_fps", "video", "include_depth", "note", "seconds")
 
 # The child process that parses a body with more than INLINE_JSON bytes of JSON text (argv: the most elements a valid
@@ -193,6 +197,7 @@ class _Job:
         self.queued = time.monotonic()
         self.done = threading.Event()
         self.reply: tuple = ()           # ("raw", code, ctype, body) | ("rcb1", meta, parts) | ("rec", meta, Recorder)
+        self.images = 0                  # the images its answer holds until it is sent (RealtimeService._sent)
 
     def finish(self, *reply) -> None:
         self.reply = reply
@@ -280,6 +285,10 @@ class RealtimeService(Service):
         self._gate = {True: 0.0, False: 0.0}               # behind the clock, none of the kind is served before this
         self._render_gate = 0.0                            # ... and no rendering request before this, behind or not
         self._held: collections.deque = collections.deque()   # requests taken from the queue before their time
+        # answers with images that are done but not sent yet (their HTTP thread builds and writes them): their images
+        # count against max_frames_per_call with the pending watches' until the body is sent or dropped
+        self._unsent_lock = threading.Lock()
+        self.unsent_images = self.unsent_bodies = 0
 
     # ------------------------------------------------------------------ spec, status, evidence
     def _spec(self) -> dict:
@@ -717,6 +726,7 @@ class RealtimeService(Service):
         nxt = len(self.episode)
         typ, A, dt, k, interp, at = (req[x] for x in ("type", "actions", "dt", "k", "interpolate", "at"))
         cams, fps, video, depth = req["view"]
+        self._in_flight(Recorder(self.views, cams, fps, depth, "none").images_per_call(0))
         if at is not None and at - nxt > self.max_ahead:
             raise Refused(400, {"error": f"at = {at} is more than max_ahead_steps = {self.max_ahead} control steps "
                                          f"ahead of the next one ({nxt})"})
@@ -764,7 +774,7 @@ class RealtimeService(Service):
                "interpolate": interp, "at": at, "start_step": max(at, nxt), "late_steps": late,
                "plan_end_step": nxt + len(self.plan), "clipped": clipped[:200], "n_clipped": len(clipped), "ok": True}
         self._save_call({**out, "note": req["note"]}, A)
-        job.finish("rec", out, rec)
+        self._finish_rec(job, out, rec, rec.images_per_call(0))
 
     def _rt_observe(self, req: dict, job: _Job) -> None:
         with bad_request():
@@ -772,25 +782,55 @@ class RealtimeService(Service):
             n = int(round(seconds / self.sim.control_dt)) if not (self.done or self.stopping) else 0
             rec = Recorder(self.views, cams, fps, depth, video if n or video != "mp4" else "frames")   # no time: no video
             self._frame_budget(rec, n)
-        if n:
-            # Every pending watch holds its images until it completes: together they stay within the per-call frame
-            # budget, or concurrent watches could exhaust the sidecar's memory (an OOM kill is no crash record, so it
-            # would count as infrastructure: a free retry). Nothing ran: a 429 to retry once a watch completes.
-            pending = sum(w.rec.images_per_call(w.end - w.start) for w in self.watches)
-            if pending + rec.images_per_call(n) > self.max_frames:
-                raise Refused(429, {"error": f"the pending watches already hold up to {pending} images and this one "
-                                             f"would add {rec.images_per_call(n)}: more than max_frames_per_call = "
-                                             f"{self.max_frames} in flight; wait for a watch to complete, or ask for "
-                                             "fewer cameras or a lower video_fps", "images_in_flight": pending})
+        # Every pending watch and every answer not sent yet holds its images: together they stay within the per-call
+        # frame budget, or concurrent calls could exhaust the sidecar's memory (an OOM kill is no crash record, so it
+        # would count as infrastructure: a free retry). Nothing ran: a 429 to retry once one completes or is read.
+        self._in_flight(rec.images_per_call(n))
         self.calls += 1
         rec.start()
         if not n:
             rec.finish()
             out = {**self.meta(), "obs_id": self.calls, "seconds": 0.0, "control_steps_watch": 0, "ok": True}
             self._save_call(out, None)
-            return job.finish("rec", out, rec)
+            return self._finish_rec(job, out, rec, rec.images_per_call(0))
         self._start_clock()
         self.watches.append(_Watch(job, rec, len(self.episode), n, cams, self.calls))
+
+    def _in_flight(self, images: int) -> None:
+        """Refuse (429, nothing ran) a request whose answer would carry `images` when the pending watches and the
+        answers not yet sent hold too many already: every one of them keeps its images in memory until it is sent."""
+        if not images:
+            return
+        pending = sum(w.rec.images_per_call(w.end - w.start) for w in self.watches)
+        with self._unsent_lock:
+            unsent, bodies = self.unsent_images, self.unsent_bodies
+        if pending + unsent + images > self.max_frames:
+            raise Refused(429, {"error": f"the pending watches and the answers not sent yet hold up to {pending + unsent} "
+                                         f"images and this call would add {images}: more than max_frames_per_call = "
+                                         f"{self.max_frames} in flight; wait for a watch to complete or an answer to be "
+                                         "read, or ask for fewer cameras or a lower video_fps",
+                                "images_in_flight": pending + unsent})
+        if bodies + len(self.watches) >= MAX_UNSENT_BODIES:
+            raise Refused(429, {"error": f"{bodies} answers with images are not read yet and {len(self.watches)} "
+                                         f"watches are pending: at most {MAX_UNSENT_BODIES} at a time; read them first",
+                                "images_in_flight": pending + unsent})
+
+    def _finish_rec(self, job: _Job, out: dict, rec: Recorder, images: int) -> None:
+        """Answer with a Recorder: its images count as in flight until the HTTP thread has sent the body (_sent)."""
+        if images:
+            with self._unsent_lock:
+                self.unsent_images += images
+                self.unsent_bodies += 1
+            job.images = images
+        job.finish("rec", out, rec)
+
+    def _sent(self, job: _Job) -> None:
+        """The body of `job` was written, or dropped (an error, a client gone or too slow): its images are out."""
+        n, job.images = getattr(job, "images", 0), 0
+        if n:
+            with self._unsent_lock:
+                self.unsent_images -= n
+                self.unsent_bodies -= 1
 
     def _complete_watch(self, w: _Watch) -> None:
         self.watches.remove(w)
@@ -799,7 +839,7 @@ class RealtimeService(Service):
         out = {**self.meta(), "obs_id": w.obs_id, "seconds": round(ran * self.sim.control_dt, 4),
                "control_steps_watch": ran, "ok": True}
         self._save_call(out, None)
-        w.job.finish("rec", out, w.rec)
+        self._finish_rec(w.job, out, w.rec, w.rec.images_per_call(w.end - w.start))
 
     def _release_watches(self) -> None:
         for w in list(self.watches):
@@ -890,6 +930,7 @@ class RealtimeService(Service):
         if kind == "raw":
             return tuple(rest)
         meta, payload = rest                         # a Recorder's parts are encoded here, off the simulator's thread
+        job.reply = ()                               # the body takes the frames over (one copy: rcb1.Frames)
         return self._reply_rcb1(meta, payload.parts() if kind == "rec" else payload)
 
     def http_server(self, address: tuple[str, int]) -> ThreadingHTTPServer:
@@ -906,7 +947,11 @@ class RealtimeService(Service):
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(body)
+                self.connection.settimeout(SEND_TIMEOUT_S)   # a client that does not read keeps no body for long
+                try:
+                    self.wfile.write(body)
+                finally:
+                    self.connection.settimeout(self.timeout)
 
             def do_GET(self):
                 self._serve("GET", 0)
@@ -928,7 +973,13 @@ class RealtimeService(Service):
                 except Exception as exc:  # noqa: BLE001 -- never an HTTP thread's traceback instead of an answer
                     traceback.print_exc()
                     req = ("reply", *svc._reply_json(500, {"error": "service error", "detail": repr(exc)[:200]}))
-                self._send(*(req[1:] if req[0] == "reply" else svc.submit_job(_Job(method, self.path, req=req))))
+                if req[0] == "reply":
+                    return self._send(*req[1:])
+                job = _Job(method, self.path, req=req)
+                try:
+                    self._send(*svc.submit_job(job))
+                finally:
+                    svc._sent(job)                   # sent or dropped: its images are no longer in flight
 
         class Server(ThreadingHTTPServer):
             daemon_threads = True

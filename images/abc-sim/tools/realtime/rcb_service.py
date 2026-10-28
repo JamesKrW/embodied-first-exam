@@ -274,7 +274,8 @@ def give_up(data: str, reason: str, infra: bool) -> None:
         f.write(str(os.getpid()))
 
 
-def encode_mp4(frames: np.ndarray, fps: float) -> bytes:
+def encode_mp4(frames, fps: float) -> bytes:
+    """H.264 mp4 of (N,H,W,3) frames: an array, or a list (or any iterable) of (H,W,3) frames."""
     import imageio.v2 as imageio
     fd, path = tempfile.mkstemp(suffix=".mp4")
     os.close(fd)
@@ -327,23 +328,32 @@ class Recorder:
             rgb, dep = self.sim.images(self.cams, self.depth)
             for c in self.cams:
                 self.frames[c].append(rgb[c])
-                if c in dep:
-                    self.dep[c].append(dep[c])
+                if c in dep:                         # kept as it is sent: float16 (2 bytes a pixel; RGB has 3)
+                    self.dep[c].append(np.asarray(dep[c]).astype(np.float16))
         if proprio:
             self.prop.append(np.asarray(self.sim.proprio(), np.float32))
             self.grabbed_at = self.k
 
     def parts(self) -> list:
+        """The response's RCB1 parts; the Recorder hands its frames over (call it once). One copy of the frames: no
+        np.stack; frames/ and depth/ are written into the body from the lists (rcb1.Frames, which empties them), the
+        mp4 is encoded from the list, and a list nothing sends is let go of here."""
         out = []
         for c in self.cams:
-            fr = np.stack(self.frames[c])
+            fp = rcb1.frames_part(f"frames/{c}", self.frames[c])   # np.stack's dtype and shape (and its error if empty)
+            fr, self.frames[c] = fp[2], []
             if self.video in ("mp4", "both"):
-                out.append((f"video/{c}", "mp4", encode_mp4(fr, self.fps), {"fps": round(self.fps, 3), "n": int(len(fr))}))
+                out.append((f"video/{c}", "mp4", encode_mp4((np.asarray(f, fr.dtype) for f in fr.arrays), self.fps),
+                            {"fps": round(self.fps, 3), "n": int(len(fr.arrays))}))
+            last = rcb1.array_part(f"last/{c}", np.asarray(fr.arrays[-1], fr.dtype))
             if self.video in ("frames", "both"):
-                out.append(rcb1.array_part(f"frames/{c}", fr))
-            out.append(rcb1.array_part(f"last/{c}", fr[-1]))
+                out.append(fp)
+            else:
+                fr.arrays.clear()
+            out.append(last)
             if self.dep[c]:
-                out.append(rcb1.array_part(f"depth/{c}", np.stack(self.dep[c]).astype(np.float16)))
+                out.append(rcb1.frames_part(f"depth/{c}", self.dep[c]))
+            self.dep[c] = []
         out.append(rcb1.array_part("proprio", np.stack(self.prop)))
         return out
 
@@ -636,12 +646,13 @@ class Service:
 
     @staticmethod
     def _reply_rcb1(meta: dict, parts: list) -> tuple[int, str, bytes]:
-        body = rcb1.encode(meta, parts)
-        if len(body) > MAX_RESPONSE:
+        if rcb1.size(meta, parts) > MAX_RESPONSE:    # known before anything is built: the body is built once
+            for p in parts:
+                if p[0].startswith(("frames/", "depth/")) and isinstance(p[2], rcb1.Frames):
+                    p[2].arrays.clear()
             parts = [p for p in parts if not p[0].startswith(("frames/", "depth/"))]
             meta = {**meta, "degraded": f"response over {MAX_RESPONSE} bytes: frames/ and depth/ dropped"}
-            body = rcb1.encode(meta, parts)
-        return 200, "application/x-rcb1", body
+        return 200, "application/x-rcb1", rcb1.encode(meta, parts)
 
     def _view(self, meta: dict, default_video: str) -> tuple[list[str], int, str, bool]:
         cams = meta.get("cameras") or list(self.sim.cameras)
