@@ -2,7 +2,6 @@
 # turn it one full turn (pitch 2 mm) with the screw followers, re-gripping when the wrist
 # wind budget is spent. No insert stage.
 name: nut_thread
-max_steps: 12000
 success_hold: 1
 
 scene:

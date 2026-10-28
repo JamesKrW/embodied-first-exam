@@ -52,7 +52,6 @@ task:
   workspace_radius: 0.09
   outside_tol: 0.03
   success_hold: 20
-  max_steps: 3600
   settle_ticks: 30
 policy:                         # DoughScriptPolicy settings + script parameters (override the task block's)
   init_limit: 30

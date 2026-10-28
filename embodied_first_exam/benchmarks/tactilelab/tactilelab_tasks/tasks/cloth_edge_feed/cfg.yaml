@@ -1,6 +1,5 @@
 name: cloth_edge_feed
 table_z: 1.102
-max_steps: 6000
 scene:
   fixture_physics: true
   gel: {stiffness: 650.0, damping: 0.5, friction: 1.5}

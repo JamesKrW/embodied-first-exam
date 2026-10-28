@@ -1,5 +1,4 @@
 name: cable_route_channel
-max_steps: 7200
 table_z: 1.102
 scene:
   right_arm_q0: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

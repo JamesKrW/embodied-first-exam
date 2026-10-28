@@ -1,5 +1,4 @@
 name: drawer_container
-max_steps: 12000
 success_hold: 1
 scene:
   settle_ticks: 150

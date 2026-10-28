@@ -58,7 +58,6 @@ task:
   surface_tol: 0.0
   outside_tol: 0.02
   success_hold: 20
-  max_steps: 3600
   settle_ticks: 30
 sidecar: {min_free_mib: 3000, gpu_wait_s: 600.0, call_timeout: 900.0}
 tactile: {enable: true}

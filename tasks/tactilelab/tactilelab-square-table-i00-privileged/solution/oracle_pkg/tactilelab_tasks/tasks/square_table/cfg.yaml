@@ -1,7 +1,6 @@
 # square_table: assemble the four legs of the square table (far corners first). Each leg
 # runs the one_leg cycle: rehome -> grasp -> insert -> release -> screw to a stop.
 name: square_table
-max_steps: 24000
 success_hold: 1
 home_ref_azimuth_deg: 2.0
 

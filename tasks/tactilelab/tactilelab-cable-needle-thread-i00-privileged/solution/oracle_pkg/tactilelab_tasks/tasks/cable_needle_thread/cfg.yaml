@@ -2,7 +2,6 @@
 # Fixed nominal scene (the centre of the randomisation ranges). Units: metres, degrees, env frame.
 # The wall and the hole are placed relative to the gel-pad midpoint of the reset pose (world.wall_dx / hole_dy / hole_dz).
 name: cable_needle_thread
-max_steps: 6000
 table_z: 1.102
 
 scene:

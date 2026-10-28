@@ -1,5 +1,4 @@
 name: lift
-max_steps: 10000
 success_hold: 20
 scene:
   settle_ticks: 60

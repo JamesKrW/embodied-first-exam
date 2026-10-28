@@ -1,5 +1,4 @@
 name: cable_needle_thread
-max_steps: 6000
 table_z: 1.102
 scene:
   right_arm_q0: [0.0, 0.0, 0.0, 0.0, 0.0, 3.141592653589793]

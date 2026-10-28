@@ -1,7 +1,6 @@
 # cloth_fold_half: pinch the overhanging flap, roll it over the fold line onto the pinned half, release (nominal scene).
 name: cloth_fold_half
 table_z: 1.102
-max_steps: 6000
 scene:
   fixture_physics: true
   gel: {stiffness: 650.0, damping: 0.5, friction: 1.5}

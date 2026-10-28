@@ -1,5 +1,4 @@
 name: square_table
-max_steps: 24000
 success_hold: 1
 home_ref_azimuth_deg: 2.0
 scene:

@@ -1,7 +1,6 @@
 # cable_slack_reduce: pinch the free end of a slack cable and pull it taut between the clamp and the gripper.
 # Fixed nominal scene (the centre of the randomisation ranges). Units: metres, degrees, env frame.
 name: cable_slack_reduce
-max_steps: 6000
 table_z: 1.102
 
 scene:

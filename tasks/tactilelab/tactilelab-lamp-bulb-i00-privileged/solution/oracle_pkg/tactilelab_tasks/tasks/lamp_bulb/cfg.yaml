@@ -2,7 +2,6 @@
 # base (plain insert and release). The base is spawned upside down (ori 180 deg about X)
 # so its socket opens upward; the annotations are written for that pose.
 name: lamp_bulb
-max_steps: 12000
 success_hold: 1
 home_ref_azimuth_deg: 8.8
 

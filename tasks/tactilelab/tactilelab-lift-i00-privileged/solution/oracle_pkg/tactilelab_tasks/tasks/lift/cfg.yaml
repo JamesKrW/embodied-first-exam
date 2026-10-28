@@ -2,7 +2,6 @@
 # mid-air (hops of 30 deg about the bottle centre) and place it standing on the pad.
 # Fixed nominal scene. Units: metres, degrees (extrinsic XYZ), env frame.
 name: lift
-max_steps: 10000
 success_hold: 20               # ticks the bottle must hold the pad pose with the jaws open
 
 scene:

@@ -2,7 +2,6 @@
 # HDMISlot's vertical trapezoid port (12.5 mm plate, port 9.9 mm deep), release, freeze.
 # Fixed nominal scene. Units: metres, degrees (extrinsic XYZ), env frame.
 name: insert_hdmi
-max_steps: 4000
 success_hold: 1
 
 scene:

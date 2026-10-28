@@ -3,7 +3,6 @@
 # (slide axis world +x) and each is pushed to its back stop. Fixed nominal scene.
 # Units: metres, degrees (extrinsic XYZ), env frame.
 name: drawer_container
-max_steps: 12000
 success_hold: 1
 
 scene:

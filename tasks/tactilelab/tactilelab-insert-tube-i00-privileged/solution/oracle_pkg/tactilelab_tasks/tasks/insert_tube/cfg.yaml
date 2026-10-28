@@ -3,7 +3,6 @@
 # -x, entry on the slanted face, 8.2 cm long, 2.1 cm bore vs 2.0 cm tube), release, freeze.
 # Fixed nominal scene. Units: metres, degrees (extrinsic XYZ), env frame.
 name: insert_tube
-max_steps: 4000
 success_hold: 1
 
 scene:

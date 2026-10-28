@@ -1,5 +1,4 @@
 name: gear_mesh
-max_steps: 6000
 success_hold: 1
 scene:
   settle_ticks: 60

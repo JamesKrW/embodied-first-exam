@@ -1,5 +1,4 @@
 name: insert_hdmi
-max_steps: 4000
 success_hold: 1
 scene:
   settle_ticks: 60

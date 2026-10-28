@@ -2,7 +2,6 @@
 # through the live mesh with the free-spinning small and large gears. Insert only (no
 # screw); on a stall the tooth phase is searched against the large gear (reclock).
 name: gear_mesh
-max_steps: 6000
 success_hold: 1
 
 scene:

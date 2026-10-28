@@ -2,7 +2,6 @@
 # table top and screw it in until it stops. Fixed nominal scene (centre of the
 # randomisation ranges). Units: metres, degrees (extrinsic XYZ), env frame.
 name: one_leg
-max_steps: 6000
 success_hold: 1
 
 scene:

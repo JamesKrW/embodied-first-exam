@@ -1,5 +1,4 @@
 name: handover
-max_steps: 4000
 success_hold: 15
 scene:
   settle_ticks: 2

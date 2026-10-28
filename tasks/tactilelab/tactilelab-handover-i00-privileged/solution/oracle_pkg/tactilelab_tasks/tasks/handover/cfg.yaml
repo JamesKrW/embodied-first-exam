@@ -4,7 +4,6 @@
 # along y; the rod (24 x 2.5 x 2.5 cm bar, axis along world x) hangs 0.2 m above the worktop.
 # Fixed nominal scene. Units: metres, degrees (extrinsic XYZ), env frame.
 name: handover
-max_steps: 4000
 success_hold: 15
 
 scene:

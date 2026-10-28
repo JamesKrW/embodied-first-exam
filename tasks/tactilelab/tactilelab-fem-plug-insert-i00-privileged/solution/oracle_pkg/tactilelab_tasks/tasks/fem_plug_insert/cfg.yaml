@@ -55,7 +55,6 @@ task:
   tilt_max_deg: 10.0
   xy_tol: 0.004
   success_hold: 20
-  max_steps: 3600
   settle_ticks: 30
 policy:
   init_limit: 30
