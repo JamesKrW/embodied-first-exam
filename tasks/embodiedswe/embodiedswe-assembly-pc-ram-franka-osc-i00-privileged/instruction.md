@@ -20,7 +20,7 @@ as `progress`), but only success counts as solved.
 ## The environment
 
 The env is EmbodiedSWE's `assembly.pc_ram.franka.osc` preset: one environment (`num_envs = 1`), built with seed 0 and PhysX on the
-CPU (`device="cpu"`; grading uses the same build). Build it exactly as grading does:
+GPU (`device="cuda:0"`, as EmbodiedSWE grades; grading uses the same build). Build it exactly as grading does:
 
 ```python
 import sys; sys.path.insert(0, "/opt/efe")
@@ -28,7 +28,7 @@ from rcb_embodiedswe import make_env
 env = make_env()        # launches Isaac Sim headless first, then builds and resets the env from /app/instance.json
 ```
 
-`make_env()` checks that the start state is the frozen instance of this task (`/app/instance.json`). In development
+`make_env()` compares the start state with the frozen instance of this task (`/app/instance.json`). In development
 anything goes: reset it, restore states, read anything, make cameras, run many processes. `env.step(action)` takes a
 `(1, 8)` tensor; one step is 0.066667 s of simulated time. `env.describe()`, `env.describe_stage()`, the
 scene's and the robot's own methods and the source under `/opt/embodiedswe` tell you the rest.
@@ -84,15 +84,30 @@ sandboxed (Landlock) and sees only its own files:
 - it can start subprocesses (at most 512 processes in all); every one of them is ended with it.
 
 Keep module level light: no simulator launch or env build at import time (a `if __name__ == "__main__":` block that
-builds an env with `make_env()` and calls `solve(env)` is a good pattern for development). Importing `solve.py` may
-take at most 5 minutes.
+builds an env with `make_env()` and calls `solve(env)` is a good pattern for development).
 
-The graded run ends when `solve` returns or raises, its process ends, or after **30 minutes** of wall-clock time; every
-process it started is then ended, and the verdict is read on the state at that moment (a crash or a hang is not
-retried). That verdict is the result: success = the task's success predicate on that state. Every action is
-recorded; a second fresh simulator process then re-executes the recorded actions from the frozen instance to
-check that the run repeats bit for bit and to render the video; this check does not change the verdict. Only
-the final `/app/output/solution/` is graded, once.
+The graded run has **30 minutes** of wall-clock time, counted from the start of the grading process: the
+simulator's start-up and the import of `solve.py` count (as in EmbodiedSWE). It ends when `solve` returns or raises,
+its process ends, or the 30 minutes are up; every process it started is then ended, and the verdict is read on the
+state at that moment (a crash or a hang is not retried). That verdict is the run's result: success = the task's
+success predicate on that state, progress = EmbodiedSWE's rubric score. Every action is recorded, with the scene's
+state every few steps; the video poses those recorded states afterwards and does not change the verdict.
+
+## Checkpoints
+
+As in EmbodiedSWE, you can freeze checkpoints while you work:
+
+```
+submit "a short note"
+```
+
+copies `/app/output/solution/` as it is now to `/app/output/submissions/NNNNNN/` (with a receipt, `submission.json`).
+At most **64** checkpoints; the final `/app/output/solution/` is graded as well. Every distinct checkpoint and the
+final folder are each graded in their own fresh simulator, exactly as above (30 minutes each); identical copies are
+graded once. The result is the one with the highest progress; a tie goes to the one with success, then to the
+earliest (the final folder counts as the last). Its success is the verdict. Do not edit `/app/output/submissions/`
+by hand: a checkpoint whose files no longer match its receipt scores 0. Leaving the best version in `solution/`
+is enough; checkpoints are a safety net for versions you might break later.
 
 Rules of the graded run (they hold whatever the proxy lets through): change the world only by stepping forward with
 `env.step`; never reset, restore states, move objects, modify physics, the task, the scene or the robot's controller,
@@ -105,8 +120,9 @@ python /opt/efe/rcb_embodiedswe.py check --solution /app/output/solution
 ```
 
 runs your folder exactly as grading does (a fresh simulator, your `solve` as an unprivileged process behind the
-proxy) and prints, as its last line, a JSON summary with `success`, `n_actions`, `solve_status` and the proxy's
-refusals (it takes a few minutes: one Isaac Sim launch plus your rollout).
+proxy, the same 30-minute limit from the process's start) and prints, as its last line, a JSON summary with
+`success`, `n_actions`, `solve_status`, `boot_s` and the proxy's refusals (it takes a few minutes: one Isaac Sim
+launch plus your rollout).
 
 ## Practical notes
 
@@ -114,12 +130,13 @@ refusals (it takes a few minutes: one Isaac Sim launch plus your rollout).
   jobs in the background and poll their logs. Kit sometimes hangs on exit: `os._exit(0)` after your script has
   written its results is fine.
 - Every Python process starts from a fresh simulator; nothing carries over between scripts.
-- Physics runs on the CPU, so a fresh process repeats a run bit for bit; the proxy adds a little time per call
-  (about 0.05 ms per read or step request, measured), so a closed-loop solve that reads state every step is fine.
+- Physics runs on the GPU. Do not count on a recorded action sequence repeating exactly: the grading machine's GPU
+  may be another model than yours, and drawing frames between steps changes later physics in some scenes. A
+  closed-loop solve that reads the state and reacts is robust to both; the proxy adds a little time per call
+  (about 0.05 ms per read or step request, measured), so reading state every step is fine.
 - You can look at the scene: add a camera (`make_env(cameras=True)`, then Isaac Lab's `Camera`), save frames to PNG
-  and look at the images themselves. Rendering can change the physics: a run with frames drawn between steps may
-  not repeat bit for bit without them (in some scenes it ends elsewhere). The graded run draws nothing, so judge a
-  recorded action sequence by `check`, not by a rendered run.
+  and look at the images themselves. The graded run draws nothing, so judge a solution by `check`, not by a
+  rendered run.
 
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.

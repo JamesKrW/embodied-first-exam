@@ -1,38 +1,42 @@
-"""EmbodiedSWE tasks in Embodied First Exam: frozen instances, the graded rollout of a delivered `solve(env)`, replay
-and video. One file, in the image at /opt/efe/rcb_embodiedswe.py (with esw_proxy.py beside it).
+"""EmbodiedSWE tasks in Embodied First Exam: frozen instances, the graded rollout of a delivered `solve(env)` and the
+video. One file, in the image at /opt/efe/rcb_embodiedswe.py (with esw_proxy.py and esw_submit.py beside it).
 
 Development (the agent, privileged mode: the full simulator):
 
     from rcb_embodiedswe import make_env
-    env = make_env()                    # launches Isaac Sim (headless, PhysX on the CPU), builds and resets the task's
-                                        # env from /app/instance.json exactly as grading does, checks the start state
+    env = make_env()                    # launches Isaac Sim (headless, GPU PhysX as EmbodiedSWE grades), builds and
+                                        # resets the task's env from /app/instance.json exactly as grading does
     import solve; solve.solve(env)      # anything goes in development
 
     python /opt/efe/rcb_embodiedswe.py check --solution /app/output/solution
                                         # the graded flow without the hidden grader: solve runs as `nobody` in its own
                                         # process against a proxy env; prints the task's success predicate at the end
+    submit "note"                       # freeze a checkpoint of solution/ (esw_submit.py; every checkpoint is graded)
 
-Grading (the verifier; root; no network):
+Grading (the verifier, tests/grade.py; root; no network), once per distinct candidate, each in a fresh process:
 
     rcb_embodiedswe.py rollout --instance I --grader G --solution DIR --out OUT     the graded run (trusted sim process)
-    rcb_embodiedswe.py replay  --instance I --grader G --traj OUT/actions.npz       a fresh process re-executes it
-    rcb_embodiedswe.py video   --instance I --traj OUT/actions.npz --video V.mp4    the video, after the verdict
+    rcb_embodiedswe.py video   --instance I --traj OUT/trajectory.npz --video V.mp4    the selected one's video
 
 Building the task (maintainers): `rcb_embodiedswe.py make-instance --preset P --seed S --out instance.json`.
 
-The rollout: build the env from the frozen instance (EmbodiedSWE's own build + seeded reset, `device="cpu"`: PhysX
-on the CPU), check its state hash, construct the task's grader on it (EmbodiedSWE's rubric, recorded after every
-step as their GradedEnv does), then start the solution process (esw_proxy.py) as `nobody` and serve its requests:
-reads answered with copies, `env.step(action)` executed and recorded, everything else refused. The rollout ends when
-`solve` returns or raises, its process dies, or the rollout time limit passes (the verdict is then read from the state
-at that moment, as EmbodiedSWE's grader does at its budget kill). Every process of `nobody` is killed before the
-verdict is read. Verdict: success = the grader's `check_success` on the final state (their end predicate); progress =
-the grader's rubric score (its peak recorded progress); a task with a tool-only rule (puzzle.spatula: the hand or a
-finger touching the bread disqualifies the episode) scores success 0 and progress 0 once PhysX reports such a contact
-(ToolOnlyMonitor, read after every physics substep). An exception from `env.step` is raised in `solve`, as
-EmbodiedSWE's GradedEnv lets it propagate: the rollout goes on if `solve` handles it. Actions are applied as given
-(robobench's controllers scale task-space deltas by pos_scale / rot_scale without clipping); only the shape and
-finiteness of an action are checked. The replay and the video are diagnostics: they never change the verdict.
+The rollout: build the env from the frozen instance (EmbodiedSWE's own build + seeded reset, `device="cuda:0"`: GPU
+PhysX, as EmbodiedSWE grades), compare its start state with the frozen one (bit for bit on the GPU model that froze
+it; on another model the difference is recorded, never an error), construct the task's grader on it (EmbodiedSWE's
+rubric, recorded after every step as their GradedEnv does), then start the solution process (esw_proxy.py) as
+`nobody` and serve its requests: reads answered with copies, `env.step(action)` executed and recorded, everything else
+refused. The candidate's time limit (EmbodiedSWE's rollout limit, 1800 s) runs from the start of this process, so the
+simulator's start-up and the import of solve.py count, as in EmbodiedSWE; at the limit (or on SIGTERM from the
+verifier) the solution's processes are killed and the verdict is read from the state at that moment, as EmbodiedSWE's
+grader does at its budget kill. Every process of `nobody` is killed before the verdict is read. Verdict: success = the
+grader's `check_success` on the final state (their end predicate); progress = the grader's rubric score (its peak
+recorded progress); a task with a tool-only rule (puzzle.spatula: the hand or a finger touching the bread disqualifies
+the episode) scores success 0 and progress 0 once PhysX reports such a contact (ToolOnlyMonitor, read after every
+physics substep). An exception from `env.step` is raised in `solve`, as EmbodiedSWE's GradedEnv lets it propagate: the
+rollout goes on if `solve` handles it. Actions are applied as given (robobench's controllers scale task-space deltas by
+pos_scale / rot_scale without clipping); only the shape and finiteness of an action are checked. The trajectory
+(OUT/trajectory.npz) holds every action and the scene's state every few control steps (Recorder). The video poses
+those recorded states on the bodies and draws them (no physics); it never changes the verdict.
 """
 from __future__ import annotations
 
@@ -52,10 +56,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 BENCH_ROOT = os.environ.get("ESW_BENCH_ROOT", "/opt/embodiedswe")
 NOBODY = 65534
-DEVICE = "cpu"                     # PhysX on the CPU: a fresh process replays bit for bit (measured per task)
+DEVICE = "cuda:0"                  # GPU PhysX, EmbodiedSWE's device
 MAX_STEPS = 400_000                # runaway guard on control steps in one rollout (a technical cap, not a budget)
-ROLLOUT_TIMEOUT_S = 1800.0         # EmbodiedSWE's rollout limit (30 min of solve wall clock)
-LOAD_TIMEOUT_S = 300.0             # importing solve.py
+ROLLOUT_TIMEOUT_S = 1800.0         # EmbodiedSWE's rollout limit: the whole candidate process (start-up, import, solve)
+START_TOL = 1e-4                   # start-state tolerance on another GPU model (max abs difference; a diagnostic)
+MAX_FRAMES = 3000                  # recorded states per trajectory (the cadence doubles when full)
+FRAME_DT = 0.1                     # their target spacing in simulated seconds (the video's 10 fps)
+T_START = time.monotonic()         # this process's start: the candidate's time limit runs from here
 INSTANCE_FORMAT = "esw-instance/1"
 
 # The tasks of this benchmark: preset -> the module and class of the grader its tests/ ship, and the scene's own
@@ -83,10 +90,7 @@ TASKS = {
     "cutting.dice.franka.osc": {"grader": "DiceFoodGrader", "check": "cut_success"},
     "locomanip.box_to_bin.g1.loco_pink_ik": {"grader": "BoxToBinGrader", "check": "success"},
     "locomanip.wheel_carry.g1.loco_pink_ik": {"grader": "WheelCarryGrader", "check": "success"},
-    # no success(); rendering perturbs this scene's PhysX state (measured: the first rendered frame changes later
-    # steps), so its video poses recorded states instead of rendering during the physics (cmd_video, "states")
-    "assembly.so101.bimanual_franka.osc": {"grader": "SO101AssemblyGrader", "check": "so101_success",
-                                           "video": "states"},
+    "assembly.so101.bimanual_franka.osc": {"grader": "SO101AssemblyGrader", "check": "so101_success"},  # no success()
     # the scene states a TOOL-ONLY rule (finger or gripper contact with the bread disqualifies the episode) and leaves
     # it to the harness (its module docstring); the tooling enforces it (ToolOnlyMonitor)
     "puzzle.spatula.franka.osc": {"grader": "SpatulaFlipServeGrader", "check": "success",
@@ -262,9 +266,9 @@ def launch(cameras: bool = False):
 
 
 def build(instance: dict, before_reset=None, reset_impl=None):
-    """The env exactly as EmbodiedSWE's grader builds it (registered preset, seed, one trajectory), PhysX on the CPU.
-    A task with a tool-only rule gets its contact monitor (ToolOnlyMonitor). `before_reset` / `reset_impl`: the
-    video's camera (see _build_with_camera)."""
+    """The env exactly as EmbodiedSWE's grader builds it (registered preset, seed, one trajectory), GPU PhysX. A task
+    with a tool-only rule gets its contact monitor (ToolOnlyMonitor). `before_reset` / `reset_impl`: the video's
+    camera (see _build_with_camera)."""
     if BENCH_ROOT not in sys.path:
         sys.path.insert(0, BENCH_ROOT)
     import robobench
@@ -273,7 +277,7 @@ def build(instance: dict, before_reset=None, reset_impl=None):
     seed = int(instance["seed"])
     if instance.get("device", DEVICE) != DEVICE:
         raise ValueError(f"instance built on {instance.get('device')!r}; these tasks run PhysX (and the G1 locomotion "
-                         f"policy) on {DEVICE!r} only: another device gives another start state and other bits")
+                         f"policy) on {DEVICE!r}, as EmbodiedSWE grades them")
     spec = TASKS[instance["preset"]].get("tool_only")
     hooks = [lambda: _enable_contact_reports(spec["payload"])] if spec else []
     if before_reset:
@@ -340,6 +344,98 @@ def state_sha(env) -> str:
         else:
             h.update(repr(v).encode())
     return h.hexdigest()
+
+
+def scene_vector(env) -> tuple[list, "object"]:
+    """Isaac Lab's scene state (every asset's root pose and velocity, joint positions and velocities, world frame) as
+    ([(path, shape)], one float64 vector)."""
+    import numpy as np
+    import torch
+    layout, parts = [], []
+    for path, v in _leaves(env.iscene.get_state(is_relative=False)):
+        if isinstance(v, torch.Tensor):
+            layout.append((path, list(v.shape)))
+            parts.append(v.detach().to("cpu").double().reshape(-1).numpy())
+    return layout, (np.concatenate(parts) if parts else np.zeros(0))
+
+
+def gpu_model() -> str:
+    try:
+        import torch
+        return torch.cuda.get_device_name(0)
+    except Exception:  # noqa: BLE001
+        return "unknown"
+
+
+def check_start(env, inst: dict) -> dict:
+    """The start state against the frozen instance: `instance_ok` = the same state hash (expected on the GPU model that
+    froze it, `instance_gpu`); otherwise `instance_max_abs_diff` over the scene state vector and `instance_within_tol`
+    (START_TOL), a diagnostic. `instance_mismatch` = 1 only when the hash differs on the freezing GPU model."""
+    import numpy as np
+    sha = state_sha(env)
+    model = gpu_model()
+    out = {"instance_sha": sha, "instance_ok": int(sha == inst["state_sha"]), "gpu_model": model,
+           "instance_gpu": inst.get("gpu_model"), "instance_same_gpu": int(model == inst.get("gpu_model"))}
+    if out["instance_ok"]:
+        out.update(instance_max_abs_diff=0.0, instance_within_tol=1, instance_mismatch=0)
+        return out
+    layout, vec = scene_vector(env)
+    ref = inst.get("start_state") or {}
+    if [list(x) for x in ref.get("layout", [])] == [list(x) for x in layout] and len(ref.get("vector", [])) == len(vec):
+        d = float(np.max(np.abs(vec - np.asarray(ref["vector"], dtype=np.float64)))) if len(vec) else 0.0
+    else:
+        d = float("inf")                         # another scene layout
+    out.update(instance_max_abs_diff=d if d != float("inf") else -1.0, instance_within_tol=int(d <= START_TOL),
+               instance_mismatch=int(bool(out["instance_same_gpu"])))
+    return out
+
+
+class Recorder:
+    """The run's trajectory: every action (recorded before its step) and the scene state (scene_vector, float32) every
+    `every` control steps, the start and the end included. At most MAX_FRAMES states: when full, the cadence doubles and
+    every other kept state goes. Written by `save` to an npz (trajectory.npz)."""
+
+    def __init__(self, env, preset: str, seed: int):
+        import numpy as np
+        self.np = np
+        self.env, self.preset, self.seed = env, preset, seed
+        self.control_dt = float(env.dt * env.robot.control_period)
+        self.every = max(1, int(round(FRAME_DT / self.control_dt)))
+        self.actions: list = []
+        self.steps: list[int] = []
+        self.rows: list = []
+        self.layout = None
+
+    def frame(self) -> None:
+        n = len(self.actions)
+        if self.steps and self.steps[-1] == n:
+            return
+        layout, vec = scene_vector(self.env)
+        if self.layout is None:
+            self.layout = layout
+        elif layout != self.layout:
+            raise RuntimeError("the scene state changed layout during the run")
+        self.rows.append(vec.astype(self.np.float32))
+        self.steps.append(n)
+        if len(self.rows) > MAX_FRAMES:
+            self.every *= 2
+            keep = [i for i, s in enumerate(self.steps) if s % self.every == 0 or i == len(self.steps) - 1]
+            self.rows = [self.rows[i] for i in keep]
+            self.steps = [self.steps[i] for i in keep]
+
+    def after_step(self) -> None:
+        if len(self.actions) % self.every == 0:
+            self.frame()
+
+    def save(self, path: Path, **extra) -> None:
+        np = self.np
+        A = np.stack(self.actions).astype(np.float32) if self.actions else np.zeros((0, self.env.robot.action_dim),
+                                                                                    np.float32)
+        S = np.stack(self.rows) if self.rows else np.zeros((0, 0), np.float32)
+        np.savez(path, task=np.array(self.preset), seed=np.array(self.seed), actions=A,
+                 frame_step=np.asarray(self.steps, dtype=np.int64), frame_state=S,
+                 state_layout=np.array(json.dumps(self.layout or [])), control_dt=np.array(self.control_dt),
+                 **{k: np.array(v) for k, v in extra.items()})
 
 
 def load_instance(path) -> dict:
@@ -643,8 +739,12 @@ def prepare_solution(src: Path, dst: Path) -> None:
             os.chmod(Path(root) / f, 0o644)
 
 
-def run_solution(env, solution: Path, work: Path, on_step, timeout_s: float, log_path: Path) -> dict:
-    """Start the solution process as `nobody` and serve it until solve ends, it dies, or `timeout_s` passes."""
+TERM = threading.Event()             # SIGTERM from the verifier at the candidate's time limit (cmd_rollout)
+
+
+def run_solution(env, solution: Path, work: Path, on_step, deadline: float, log_path: Path) -> dict:
+    """Start the solution process as `nobody` and serve it until solve ends, it dies, the monotonic clock passes
+    `deadline` or TERM is set (status "timeout" for the last two)."""
     from esw_proxy import LANDLOCK_ABI_MIN, Wire, landlock_abi
     if landlock_abi() < LANDLOCK_ABI_MIN:
         raise RuntimeError(f"this kernel offers no Landlock ABI >= {LANDLOCK_ABI_MIN}: the solution cannot be sandboxed")
@@ -673,12 +773,12 @@ def run_solution(env, solution: Path, work: Path, on_step, timeout_s: float, log
     wire = Wire(p_r, p_w)
     srv = Server(env, on_step)
     out = {"solve_status": "running", "requests": 0, "refused": 0}
-    deadline = [time.monotonic() + LOAD_TIMEOUT_S]
+    t_start = time.monotonic()
     timer_fired = threading.Event()
 
     def watchdog():
         while proc.poll() is None:
-            if time.monotonic() > deadline[0]:
+            if time.monotonic() > deadline or TERM.is_set():
                 timer_fired.set()
                 try:
                     os.killpg(proc.pid, signal.SIGKILL)
@@ -704,8 +804,7 @@ def run_solution(env, solution: Path, work: Path, on_step, timeout_s: float, log
             op = req.get("op")
             if op == "loaded":
                 t0 = time.monotonic()
-                deadline[0] = t0 + timeout_s
-                out["load_s"] = None
+                out["load_s"] = round(t0 - t_start, 3)
                 wire.send({"value": None})
                 continue
             if op == "done":
@@ -731,7 +830,7 @@ def run_solution(env, solution: Path, work: Path, on_step, timeout_s: float, log
                 wire.send({"error": str(exc), "kind": "PermissionError"})
             except Exception as exc:  # noqa: BLE001 — the solve's error (a bad attribute, a bad index) is its own
                 wire.send({"error": f"{type(exc).__name__}: {exc}"[:4000], "kind": type(exc).__name__})
-            if time.monotonic() > deadline[0]:
+            if time.monotonic() > deadline or TERM.is_set():
                 out["solve_status"] = "timeout"
                 break
     finally:
@@ -754,6 +853,8 @@ def run_solution(env, solution: Path, work: Path, on_step, timeout_s: float, log
 
 # ------------------------------------------------------------------------------------------------ commands
 def cmd_make_instance(a) -> int:
+    """Freeze an instance: the preset, the seed, the device, the start state's hash, its scene state vector (for the
+    comparison on another GPU model) and the GPU model it was frozen on."""
     launch()
     inst = {"format": INSTANCE_FORMAT, "preset": a.preset, "seed": int(a.seed), "device": DEVICE}
     try:
@@ -762,22 +863,24 @@ def cmd_make_instance(a) -> int:
         traceback.print_exc()
         stop_app(1)
     inst["state_sha"] = state_sha(env)
+    inst["gpu_model"] = gpu_model()
+    layout, vec = scene_vector(env)
+    inst["start_state"] = {"layout": layout, "vector": [float(x) for x in vec]}
     inst["action_dim"] = int(env.robot.action_dim)
     inst["control_dt"] = round(float(env.dt * env.robot.control_period), 6)
     inst["physics_dt"] = float(env.dt)
     Path(a.out).write_text(json.dumps(inst, indent=1, sort_keys=True) + "\n")
     if a.describe:
         Path(a.describe).write_text(env.describe().strip() + "\n")
-    print(json.dumps(inst), flush=True)
+    print(json.dumps({k: v for k, v in inst.items() if k != "start_state"}), flush=True)
     stop_app()
     return 0
 
 
 def _graded_env(inst: dict, grader_path: str | None):
     env = build(inst)
-    sha = state_sha(env)
     grader = load_grader(grader_path, inst["preset"])(env) if grader_path else None
-    return env, grader, sha
+    return env, grader
 
 
 def _final(env, grader, inst: dict) -> dict:
@@ -815,22 +918,44 @@ def _peak(grader) -> float:
         return 0.0
 
 
+_PHASE = ["boot"]
+
+
+def _set_phase(out: Path, phase: str) -> None:
+    """The rollout's phase, in OUT/phase.json: the verifier reads it when the process ends without a result (killed at
+    the time limit): in "solve" that is the candidate's 0, in any other phase the verifier's error."""
+    _PHASE[0] = phase
+    (out / "phase.json").write_text(json.dumps({"phase": phase}) + "\n")
+
+
+def _on_term(signum, frame) -> None:
+    if _PHASE[0] != "solve":
+        return                     # finalizing: the verdict is on its way (the verifier allows a grace period)
+    TERM.set()                     # run_solution ends the solve; the verdict is read on the state at this moment
+
+
 def cmd_rollout(a) -> int:
-    """The graded run. Prints one JSON line (also written to OUT/rollout.json); the actions go to OUT/actions.npz."""
-    import numpy as np
+    """The graded run of one candidate. Prints one JSON line (also written to OUT/rollout.json); the trajectory goes to
+    OUT/trajectory.npz. The time limit (`--timeout`) runs from this process's start (T_START)."""
+    import torch
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    res: dict = {"phase": "boot"}
-    t_boot = time.monotonic()
+    res: dict = {"phase": "boot", "label": a.label or ""}
+    deadline = T_START + float(a.timeout)
+    _set_phase(out, "boot")
     try:
         launch()
         inst = load_instance(a.instance)
-        env, grader, sha = _graded_env(inst, a.grader)
-        res.update(instance_sha=sha, instance_ok=sha == inst["state_sha"], boot_s=round(time.monotonic() - t_boot, 1))
-        if not res["instance_ok"]:
+        env, grader = _graded_env(inst, a.grader)
+        res.update(check_start(env, inst), boot_s=round(time.monotonic() - T_START, 1))
+        if res["instance_mismatch"]:
             res.update(phase="instance_mismatch", infra_error=1)
             raise StopRollout("instance_mismatch")
-        actions: list = []
+        if time.monotonic() > deadline:
+            res.update(phase="boot_timeout", infra_error=1)
+            raise StopRollout("boot_timeout")
+        rec = Recorder(env, inst["preset"], int(inst["seed"]))
+        rec.frame()                                   # the start state
         step_s = [0.0]
         bad = [0]
         step_err: list = []                           # (index, message) of every env.step that raised
@@ -840,13 +965,13 @@ def cmd_rollout(a) -> int:
                 bad[0] += 1
                 raise ValueError(f"action has {act.numel()} values; the env takes ({env.num_envs}, "
                                  f"{env.robot.action_dim})")
-            if not bool(__import__("torch").isfinite(act).all()):
+            if not bool(torch.isfinite(act).all()):
                 bad[0] += 1
                 raise ValueError("action contains NaN or inf")
-            if len(actions) >= MAX_STEPS:
+            if len(rec.actions) >= MAX_STEPS:
                 raise StopRollout(f"step_cap ({MAX_STEPS} control steps)")
             act = act.reshape(env.num_envs, env.robot.action_dim).contiguous()
-            actions.append(act[0].numpy().copy())     # recorded BEFORE the step: a step that raises is in the record
+            rec.actions.append(act[0].numpy().copy())     # recorded BEFORE the step: a step that raises is in the record
             t = time.perf_counter()
             try:
                 env.step(act.to(env.device))
@@ -854,16 +979,20 @@ def cmd_rollout(a) -> int:
                     grader.record()
             except Exception as exc:  # noqa: BLE001 — the env could not take this action (e.g. a controller
                 # singularity). As in EmbodiedSWE's GradedEnv, the error reaches solve: the rollout goes on if solve
-                # handles it, and ends (verdict on the state then) if it does not. The replay repeats it.
-                step_err.append((len(actions) - 1, f"{type(exc).__name__}: {exc}"[:1000]))
+                # handles it, and ends (verdict on the state then) if it does not.
+                step_err.append((len(rec.actions) - 1, f"{type(exc).__name__}: {exc}"[:1000]))
                 raise
             finally:
                 step_s[0] += time.perf_counter() - t
+            rec.after_step()
             return None
 
         res["phase"] = "solve"
-        run = run_solution(env, Path(a.solution), out / "work", on_step, float(a.timeout), Path(a.solve_log))
-        res.update(run)
+        _set_phase(out, "solve")
+        signal.signal(signal.SIGTERM, _on_term)
+        run = run_solution(env, Path(a.solution), out / "work", on_step, deadline, Path(a.solve_log))
+        _set_phase(out, "finalize")
+        res.update(run, terminated=int(TERM.is_set()))
         if run.get("solve_status") == "sandbox_failed":
             res.update(phase="sandbox_failed", infra_error=1)
             raise StopRollout("sandbox_failed")
@@ -876,15 +1005,20 @@ def cmd_rollout(a) -> int:
                 res.update(_unreadable_final(env, grader, exc))
         else:
             res.update(_final(env, grader, inst))
-        A = np.stack(actions).astype(np.float32) if actions else np.zeros((0, env.robot.action_dim), np.float32)
-        np.savez(out / "actions.npz", task=np.array(inst["preset"]), seed=np.array(inst["seed"]), actions=A)
-        res.update(phase="done", n_actions=int(len(A)), bad_actions=bad[0], sim_step_s=round(step_s[0], 3),
-                   ms_per_step=round(1000 * step_s[0] / max(1, len(A)), 3), infra_error=0)
+        try:
+            rec.frame()                               # the final state
+        except Exception as exc:  # noqa: BLE001 — an env broken by a failed step: the trajectory ends at its last frame
+            res["final_frame_error"] = f"{type(exc).__name__}: {exc}"[:300]
+        rec.save(out / "trajectory.npz", label=a.label or "", final_sha=res.get("final_sha") or "")
+        n = len(rec.actions)
+        res.update(phase="done", n_actions=n, n_frames=len(rec.steps), frame_every=rec.every, bad_actions=bad[0],
+                   sim_step_s=round(step_s[0], 3), ms_per_step=round(1000 * step_s[0] / max(1, n), 3), infra_error=0)
+        _set_phase(out, "done")
     except StopRollout:
         pass
     except Exception:  # noqa: BLE001
         res.update(infra_error=1, error=traceback.format_exc()[-4000:])
-    res["wall_s"] = round(time.monotonic() - t_boot, 1)
+    res["wall_s"] = round(time.monotonic() - T_START, 1)
     (out / "rollout.json").write_text(json.dumps(res, indent=1) + "\n")
     print(json.dumps(res), flush=True)
     stop_app()
@@ -902,49 +1036,12 @@ def _load_actions(path: str, preset: str, action_dim: int):
     return A
 
 
-def cmd_replay(a) -> int:
-    """Re-execute a recorded rollout in this fresh process (no solution code). One JSON line."""
-    import torch
-    res: dict = {}
-    t0 = time.monotonic()
-    try:
-        launch()
-        inst = load_instance(a.instance)
-        env, grader, sha = _graded_env(inst, a.grader)
-        res.update(instance_sha=sha, instance_ok=sha == inst["state_sha"])
-        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim)
-        t1 = time.perf_counter()
-        n_err = 0
-        for i, row in enumerate(A):
-            try:
-                env.step(torch.from_numpy(row).reshape(1, -1).to(env.device))
-                if grader is not None:
-                    grader.record()
-            except Exception as exc:  # noqa: BLE001 — a recorded action the rollout's env also raised on; the
-                if not n_err:         # rollout went on after it (its solve handled the error), so the replay does too
-                    res.update(step_error=f"{type(exc).__name__}: {exc}"[:1000], step_error_at=i)
-                n_err += 1
-        if n_err:
-            res["step_errors"] = n_err
-        try:
-            res.update(_final(env, grader, inst))
-        except Exception as exc:  # noqa: BLE001
-            res.update(_unreadable_final(env, grader, exc))
-        res.update(n_actions=int(len(A)), replay_step_s=round(time.perf_counter() - t1, 3))
-    except Exception:  # noqa: BLE001
-        res.update(error=traceback.format_exc()[-4000:])
-    res["wall_s"] = round(time.monotonic() - t0, 1)
-    print(json.dumps(res), flush=True)
-    stop_app()
-    return 0
-
-
 def _build_with_camera(inst: dict, make_camera):
-    """`build(inst)` exactly as replay builds it, with a camera that never touches the physics: the camera prim is
-    added just before the env's own (single) `sim.reset()`, and that reset skips Isaac Lab's two warm-up renders.
-    Measured: those warm-up renders (fabric flush + app update with rendering on) and an extra `sim.reset()` change
-    later physics bits (a kinematic body's pose by 1 ulp); with neither, a rendered replay repeats the graded run's
-    final state bit for bit. `make_camera()` is called once and its result returned with the env."""
+    """`build(inst)` exactly as grading builds it, plus a camera: the camera prim is added just before the env's own
+    (single) `sim.reset()`, and that reset skips Isaac Lab's two warm-up renders (they and an extra `sim.reset()`
+    change later physics bits), so the camera's env starts from the graded start state. Frames drawn between steps can
+    still change GPU PhysX's later bits (measured in the stack scene; not in SO101's). `make_camera()` is called once
+    and its result returned with the env."""
     from isaaclab.sim import SimulationContext
     made: list = []
 
@@ -961,25 +1058,51 @@ def _build_with_camera(inst: dict, make_camera):
     return env, made[0]
 
 
-def _clone(obj):
-    """A deep copy of a nested state (dicts / lists of tensors)."""
-    if isinstance(obj, dict):
-        return {k: _clone(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return type(obj)(_clone(v) for v in obj)
-    return obj.clone() if hasattr(obj, "clone") else obj
+def _unflatten(row, layout: list, device):
+    """Isaac Lab's scene-state dict from one recorded state vector (Recorder) for `InteractiveScene.reset_to`."""
+    import torch
+    st: dict = {}
+    i = 0
+    for path, shape in layout:
+        n = 1
+        for d in shape:
+            n *= int(d)
+        node = st
+        keys = path.strip("/").split("/")
+        for k in keys[:-1]:
+            node = node.setdefault(k, {})
+        node[keys[-1]] = torch.as_tensor(row[i:i + n], dtype=torch.float32, device=device).reshape(shape)
+        i += n
+    if i != len(row):
+        raise ValueError("a recorded state does not match its layout")
+    return st
+
+
+def load_trajectory(path: str, preset: str, action_dim: int) -> dict:
+    import numpy as np
+    d = np.load(path, allow_pickle=False)
+    A = _load_actions(path, preset, action_dim)
+    steps = np.asarray(d["frame_step"], dtype=np.int64)
+    S = np.asarray(d["frame_state"], dtype=np.float32)
+    layout = json.loads(str(d["state_layout"]))
+    if S.ndim != 2 or len(S) != len(steps) or len(S) > MAX_FRAMES + 1 or not np.isfinite(S).all() \
+            or (len(steps) and (steps.min() < 0 or steps.max() > len(A) or (np.diff(steps) <= 0).any())):
+        raise ValueError("malformed trajectory states")
+    return {"actions": A, "steps": steps, "states": S, "layout": layout,
+            "label": str(d["label"]) if "label" in d else "", "final_sha": str(d["final_sha"]) if "final_sha" in d else ""}
 
 
 def cmd_video(a) -> int:
-    """Render a recorded rollout to an mp4: a fresh replay (the same build, reset and physics steps as `replay`) with
-    a camera, rendered between physics steps without changing them. A preset whose physics a render changes
-    (TASKS "video": "states") is replayed without rendering, keeping the state of every frame to draw; once the replay
-    is done each kept state is posed on the bodies (no physics step) and drawn. Never part of a verdict; `final_sha`
-    (the replay's final state) lets the verifier check that the video reached the graded run's final state."""
-    import numpy as np
+    """The selected candidate's video, from its trajectory, in this fresh process (never part of a verdict):
+    1. the camera replay, a diagnostic: the recorded actions re-executed with the camera drawing at the recorded
+       frames, as a live recording would (drawing can change GPU PhysX's later bits, so it may end elsewhere):
+       `camera_replay` (done / budget / error), `camera_replay_match` (its final state hash equals the graded run's),
+       `camera_replay_success` (the task's public predicate at its end); at most `--replay-budget` seconds;
+    2. the video: each recorded state posed on the bodies (InteractiveScene.reset_to, no physics step) and drawn, so
+       the video shows the graded run's own states (Isaac Lab's scene state: poses and joints; a scene's non-physical
+       visuals are not part of it)."""
     import torch
     res: dict = {}
-    t0 = time.monotonic()
     try:
         launch(cameras=True)
         import imageio.v2 as imageio
@@ -989,66 +1112,69 @@ def cmd_video(a) -> int:
         env, cam = _build_with_camera(inst, lambda: Camera(CameraCfg(
             prim_path="/World/esw_cam", update_period=0.0, height=a.height, width=a.width, data_types=["rgb"],
             spawn=sim_utils.PinholeCameraCfg(focal_length=18.0, clipping_range=(0.01, 100.0)))))
-        res["instance_ok"] = state_sha(env) == inst["state_sha"]
+        st = check_start(env, inst)
+        res.update(camera_instance_ok=st["instance_ok"], camera_instance_max_abs_diff=st["instance_max_abs_diff"])
         eye, target = (env.room or {}).get("camera") or ((1.6, -1.6, 1.4), (0.3, 0.0, 0.5))
         if a.eye and a.target:
             eye, target = [float(v) for v in a.eye.split(",")], [float(v) for v in a.target.split(",")]
-        cam.set_world_poses_from_view(torch.tensor([list(eye)]), torch.tensor([list(target)]))
-        A = _load_actions(a.traj, inst["preset"], env.robot.action_dim)
-        control_dt = float(env.dt * env.robot.control_period)
-        every = max(1, int(round(1.0 / (a.fps * control_dt))))
-        if len(A) / every > a.max_frames:                   # a long rollout becomes a time lapse
-            every = int(np.ceil(len(A) / a.max_frames))
-        w = imageio.get_writer(a.video, fps=a.fps, codec="libx264", quality=7, macro_block_size=8)
-        n = 0
-        posed = TASKS[inst["preset"]].get("video") == "states"
-        states: list = []
-        fsha = None
+        cam.set_world_poses_from_view(torch.tensor([list(eye)], device=env.device),
+                                      torch.tensor([list(target)], device=env.device))
+        tr = load_trajectory(a.traj, inst["preset"], env.robot.action_dim)
+        A, steps = tr["actions"], tr["steps"]
+        final_sha = a.final_sha or tr["final_sha"]
+        res["label"] = tr["label"]
+        drawn = [0]
 
-        def grab_frame():
-            nonlocal n
-            for _ in range(1 if n else 3):      # draw the state, no physics step; the renderer's first 2 are dark
+        def draw():
+            for _ in range(1 if drawn[0] else 3):      # the renderer's first 2 frames are dark
                 env.sim.render()
                 cam.update(env.dt)
-            f = cam.data.output["rgb"][0].detach().cpu().numpy()[..., :3]
+            drawn[0] += 1
+            return cam.data.output["rgb"][0].detach().cpu().numpy()[..., :3]
+
+        # 1. the camera replay
+        status, t1 = "done", time.monotonic()
+        try:
+            at = set(int(s) for s in steps)
+            if 0 in at:
+                draw()
+            for i, row in enumerate(A):
+                if time.monotonic() - t1 > a.replay_budget:
+                    status = "budget"
+                    break
+                try:
+                    env.step(torch.from_numpy(row).reshape(1, -1).to(env.device))
+                except Exception:  # noqa: BLE001 — the graded run raised on this step too and went on
+                    res.setdefault("camera_replay_step_error_at", i)
+                    continue
+                if i + 1 in at:
+                    draw()
+            if status == "done":
+                fsha = state_sha(env)
+                res.update(camera_replay_match=int(bool(final_sha) and fsha == final_sha),
+                           camera_replay_success=int(bool(task_success(env, inst["preset"])[0])))
+        except Exception as exc:  # noqa: BLE001
+            status = "error"
+            res["camera_replay_error"] = f"{type(exc).__name__}: {exc}"[:500]
+        res.update(camera_replay=status, camera_replay_s=round(time.monotonic() - t1, 1),
+                   camera_replay_frames=drawn[0])
+        # 2. the video: the recorded states, posed and drawn
+        w = imageio.get_writer(a.video, fps=a.fps, codec="libx264", quality=7, macro_block_size=8)
+        n = 0
+        t2 = time.monotonic()
+        for row in tr["states"]:
+            env.iscene.reset_to(_unflatten(row, tr["layout"], env.device), is_relative=False)
+            env.sim.forward()
+            f = draw()
             if f.size and f.any():
                 w.append_data(f)
                 n += 1
-
-        for i, row in enumerate(A):
-            grab = (i % every == 0) or i == len(A) - 1
-            try:
-                env.step(torch.from_numpy(row).reshape(1, -1))       # the physics step exactly as replay takes it
-            except Exception as exc:  # noqa: BLE001 — the rollout raised on this step too and went on after it
-                res.setdefault("step_error", f"{type(exc).__name__}: {exc}"[:500])
-                res.setdefault("step_error_at", i)
-                continue
-            if grab and posed:   # keep the state; nothing is rendered until the physics is done
-                states.append(_clone(env.iscene.get_state(is_relative=False)))
-            elif grab:
-                grab_frame()
-        if posed:
-            # the replayed physics is complete: its final state is the run's, then each kept state is posed (written
-            # to the bodies, no physics step) and drawn
-            try:
-                fsha = state_sha(env)
-            except Exception:  # noqa: BLE001
-                fsha = None
-            for st in states:
-                env.iscene.reset_to(st, is_relative=False)
-                env.sim.forward()
-                grab_frame()
         w.close()
-        if not posed:
-            try:
-                fsha = state_sha(env)
-            except Exception:  # noqa: BLE001
-                fsha = None
-        res.update(video=a.video, frames=n, every=every, final_sha=fsha, video_ok=n > 0,
-                   video_mode="states" if posed else "render")
+        res.update(video=a.video, frames=n, video_ok=int(n > 0), video_source="recorded_states",
+                   pose_s=round(time.monotonic() - t2, 1))
     except Exception:  # noqa: BLE001
-        res.update(video_ok=False, error=traceback.format_exc()[-4000:])
-    res["wall_s"] = round(time.monotonic() - t0, 1)
+        res.update(video_ok=0, error=traceback.format_exc()[-4000:])
+    res["wall_s"] = round(time.monotonic() - T_START, 1)
     print(json.dumps(res), flush=True)
     stop_app()
     return 0
@@ -1066,13 +1192,14 @@ def cmd_check(a) -> int:
 # ------------------------------------------------------------------------------------------------ development API
 def make_env(instance: str = "/app/instance.json", cameras: bool = False):
     """The task's env for development, built and reset exactly as grading builds it (then yours to use freely).
-    Launches Isaac Sim (headless, PhysX on the CPU) first if this process has not."""
+    Launches Isaac Sim (headless, GPU PhysX) first if this process has not."""
     launch(cameras=cameras)
     inst = load_instance(instance)
     env = build(inst)
-    sha = state_sha(env)
-    if sha != inst["state_sha"]:
-        log(f"warning: the start state differs from the frozen instance ({sha[:12]} != {inst['state_sha'][:12]})")
+    st = check_start(env, inst)
+    if not st["instance_ok"]:
+        log(f"note: the start state differs from the frozen instance's hash (GPU {st['gpu_model']!r}, frozen on "
+            f"{st['instance_gpu']!r}; max abs difference {st['instance_max_abs_diff']:.3g})")
     return env
 
 
@@ -1091,20 +1218,19 @@ def main(argv=None) -> int:
             p.add_argument("--grader", required=True)
         p.add_argument("--solution", default="/app/output/solution")
         p.add_argument("--out", default=None if name == "check" else "/var/lib/esw/rollout")
-        p.add_argument("--timeout", type=float, default=ROLLOUT_TIMEOUT_S)
+        p.add_argument("--timeout", type=float, default=ROLLOUT_TIMEOUT_S,
+                       help="the time limit from this process's start (start-up and import count)")
         p.add_argument("--solve-log", default=None)
-    p = sub.add_parser("replay")
-    p.add_argument("--instance", default="/app/instance.json")
-    p.add_argument("--grader", default=None)
-    p.add_argument("--traj", required=True)
+        p.add_argument("--label", default="", help="the candidate's name, kept in the trajectory")
     p = sub.add_parser("video")
     p.add_argument("--instance", default="/app/instance.json")
     p.add_argument("--traj", required=True)
     p.add_argument("--video", required=True)
+    p.add_argument("--final-sha", default="", help="the graded run's final state hash (default: the trajectory's)")
+    p.add_argument("--replay-budget", type=float, default=1800.0, help="seconds for the camera replay (0: skip it)")
     p.add_argument("--fps", type=float, default=10.0)
     p.add_argument("--width", type=int, default=960)
     p.add_argument("--height", type=int, default=540)
-    p.add_argument("--max-frames", type=int, default=9000)
     p.add_argument("--eye", default=None, help="camera eye x,y,z (env frame); default: the room's camera")
     p.add_argument("--target", default=None, help="camera target x,y,z")
     a = ap.parse_args(argv)
@@ -1112,8 +1238,7 @@ def main(argv=None) -> int:
         a.solve_log = str(Path(a.out) / "solve.log")
     if HERE.as_posix() not in sys.path:
         sys.path.insert(0, HERE.as_posix())
-    return {"make-instance": cmd_make_instance, "rollout": cmd_rollout, "replay": cmd_replay, "video": cmd_video,
-            "check": cmd_check}[a.cmd](a)
+    return {"make-instance": cmd_make_instance, "rollout": cmd_rollout, "video": cmd_video, "check": cmd_check}[a.cmd](a)
 
 
 if __name__ == "__main__":

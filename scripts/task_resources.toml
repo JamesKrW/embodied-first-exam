@@ -3219,30 +3219,14 @@ sim = { cpus = 4.0, memory_gb = 10.0, pids = 8192 }
 match = "^embodiedswe-.*-privileged$"
 min_cpus = 4.0
 min_memory_gb = 13.0
-min_gpu_memory_gb = 6.5
+min_gpu_memory_gb = 8.0
 gpu_required = true
 gpu_class = "rtx"
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 verifier_min_cpus = 4.0
 verifier_min_memory_gb = 13.0
-verifier_min_gpu_memory_gb = 6.5
-measured = "not yet measured: RoboLab's privileged figures (the same Isaac Sim 5.1 stack and recipe, CPU PhysX) as the estimate"
-
-[[rule]]
-match = "^embodiedswe-puzzle-stack-blocks-g1-pink-ik-i00-privileged$"
-min_memory_gb = 12.0
-min_gpu_memory_gb = 4.5
-verifier_min_memory_gb = 12.0
-verifier_min_gpu_memory_gb = 4.5
-measured = "measured on an L40S with a scripted reference, one graded run alone on the GPU (docker stats + nvidia-smi every 2 s): rollout through the proxy 1.6 GiB RAM / 0.6 GiB GPU, replay 0.9 / 0.6, video render 10.7 / 3.8; minimums = the video peak plus headroom"
-
-[[rule]]
-match = "^embodiedswe-locomanip-fruit-delivery-g1-loco-pink-ik-i00-privileged$"
-min_memory_gb = 13.0
-min_gpu_memory_gb = 5.0
-verifier_min_memory_gb = 13.0
-verifier_min_gpu_memory_gb = 5.0
-measured = "measured on an L40S with a scripted reference, one graded run alone on the GPU (docker stats + nvidia-smi every 2 s): rollout and replay through the proxy 3.0 GiB RAM / 0.56 GiB GPU, video render 11.9 / 4.4; minimums = the video peak plus headroom"
+verifier_min_gpu_memory_gb = 8.0
+measured = "GPU PhysX, measured on an L40S (nvidia-smi every 2 s): a graded rollout process 3.2 to 4.6 GiB of GPU memory, the video process (cameras) 6.6 to 6.9 GiB; GPU minimum = the video peak plus headroom; memory: RoboLab's privileged figures (the same Isaac Sim 5.1 stack) as the estimate"
 
 [[limit]]
 match = "^embodiedswe-.*-privileged$"
