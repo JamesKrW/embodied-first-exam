@@ -37,8 +37,8 @@ Open a benchmark-proposal issue first (or e-mail the proposal to embodiedfirstex
   modes, PROTOCOL H.4);
 - **scrubbable** — upstream reference solutions can be removed from everything the agent can reach.
 
-It also states the oracle source (PROTOCOL §4), the caps of each container of a trial (CPU cores, memory, GPU memory
-and GPU class, §6), image size, whether the images can be published, and
+It also states the oracle source (PROTOCOL §4), the caps of each container of a trial (CPU cores, memory, processes, GPU memory
+and GPU type: RTX-class, any or none; §6), image size, whether the images can be published, and
 the expected size of the pull request.
 A new benchmark's shared-files change adds its label to `scripts/task_conventions.py` `BENCHMARKS` (task-directory prefix
 -> name) and its row to `ci_checks/ci_scope.py` `UNITS`; every benchmark has its own prefix
@@ -68,6 +68,7 @@ A new benchmark's shared-files change adds its label to `scripts/task_convention
    ```toml
    [[cap]]
    match = "^mybench-.*-standard$"          # a regular expression on the task directory's name; the last match wins
+                                            # (`-standard$` does not match `-standard-realtime` tasks: give them a rule too)
    main = { cpus = 4, memory_gb = 10, pids = 8192, disk_gb = 20 }      # the agent's container (cpus: a whole number)
    sim = { cpus = 4, memory_gb = 8, pids = 8192, gpu_memory_gb = 6 }   # gpu_memory_gb: only on the service that holds the GPU
    recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
@@ -75,9 +76,19 @@ A new benchmark's shared-files change adds its label to `scripts/task_convention
    caps_measured = "GPU memory (the sim service): 1.2 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB"
    ```
 
+   and for its privileged twin, where the agent's own container runs the simulator and holds the GPU:
+
+   ```toml
+   [[cap]]
+   match = "^mybench-.*-privileged$"
+   main = { cpus = 8, memory_gb = 16, pids = 8192, disk_gb = 30, gpu_memory_gb = 6 }
+   gpu_types = ["L40S", "L4", "RTX 4090"]   # only if the task needs ray-tracing cores (RTX-class models); else leave it out
+   ```
+
    One table per compose service (the names must be the compose file's), `gpu_types` only when the task needs an
    RTX-class GPU. The GPU itself is a device reservation you write in the compose file (`deploy.resources.reservations.
-   devices`, `driver: nvidia`). A separate verifier's caps are `cpus` / `memory_mb` you set in `[verifier.environment]`
+   devices`, `driver: nvidia`, `capabilities: [gpu]`); caps go in `cpus` / `mem_limit` / `pids_limit`, never in
+   `deploy.resources.limits`. A separate verifier's caps are `cpus` / `memory_mb` you set in `[verifier.environment]`
    (a table without them means no cap; no table: main's). Measure the oracle (and agent trials if you can: `docker stats`
    / cgroup `memory.peak`, `nvidia-smi`), set the caps a generous margin above the peaks (e.g. `max(1.5 x peak, peak + 4
    GiB)`) and make sure the oracle stays inside them: memory over its cap is an OOM kill, and GPU memory or disk over

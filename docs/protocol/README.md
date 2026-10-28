@@ -120,25 +120,28 @@ limits. Each cap is written where Harbor or docker reads it:
 | Container | Where | Keys |
 |---|---|---|
 | `main` (the agent's) | `task.toml` `[environment]` | `cpus` (a whole number), `memory_mb`, `storage_mb` (disk); `gpu_types` (RTX-class models) only for a task that needs ray-tracing cores; never `gpus` (Harbor's local docker refuses it) |
-| `main`'s processes, and every other service | `environment/docker-compose.yaml` | `pids_limit` (main); `cpus`, `mem_limit`, `pids_limit` (every other service) |
-| a service that holds a GPU | its compose service | the device reservation (`deploy.resources.reservations.devices`, `driver: nvidia`, written by hand; never `gpus:` or `runtime: nvidia`) and `x-gpu-memory-gb`, its GPU-memory cap in GiB, the one field of our own |
-| the separate verifier | `task.toml` `[verifier.environment]` | `cpus`, `memory_mb`, set by hand. Harbor uses this table alone when it exists: a key it lacks is **no cap**. Without the table the verifier gets a copy of `[environment]`. A GPU service in `tests/docker-compose.yaml` gets `x-gpu-memory-gb` (main's value) |
+| `main`'s processes, and every other service | `environment/docker-compose.yaml` | `pids_limit` (main; it counts processes and threads); `cpus`, `mem_limit`, `pids_limit` (every other service); never `deploy.resources.limits` (docker refuses it beside `cpus` / `mem_limit`) |
+| a service that holds a GPU | its compose service | the device reservation (`deploy.resources.reservations.devices`, `driver: nvidia`, `capabilities: [gpu]`, written by hand; a device whose capabilities name `gpu` counts as a GPU with or without the driver line; never `gpus:` or `runtime: nvidia`) and `x-gpu-memory-gb`, its GPU-memory cap in GiB, the one field of our own |
+| the separate verifier | `task.toml` `[verifier.environment]`; `tests/docker-compose.yaml` | `cpus`, `memory_mb` (and `storage_mb`), set by hand. Harbor uses this table alone when it exists: a key it lacks is **no cap**. Without the table the verifier gets a copy of `[environment]` (`storage_mb` included). Its processes: `pids_limit` of `main` in `tests/docker-compose.yaml`, set by hand. A GPU service there gets `x-gpu-memory-gb` = main's value when main holds a GPU; otherwise the task writes that line itself (normalize keeps it) |
 
-Other compose keys (`shm_size`, devices, volumes) are set by the task's compose file and are not caps.
+Other compose keys the task writes itself are settings, not caps from the rules: `shm_size` (the size of `/dev/shm`; docker
+applies it, and what is stored there also counts against the container's memory cap), devices, volumes.
 
 The values come from the rules in `scripts/task_resources.toml`; `python3 scripts/task_conventions.py <task dirs>`
-(`normalize`) writes them, and `ci_checks/check-resources.py` checks that the declared caps are the applied ones. A rule
-is a `[[cap]]` table:
+(`normalize`, which creates `[environment]` when the task has none) writes them, and `ci_checks/check-resources.py`
+checks that the declared caps are the applied ones: a cap the compose file sets itself (normalize keeps it) must equal
+the rule's. A task no rule matches keeps the caps its own `[environment]` and compose file set; CI accepts them as long
+as every container has its caps. A rule is a `[[cap]]` table:
 
 - `match`: a regular expression searched in the task directory's name; the **last** rule that matches a task applies,
   whole (rules are never merged).
 - one inline table per compose service, keyed by its name; the services must be exactly the task's compose services
   (`rcb_monitor` aside). `main` = { `cpus` (whole), `memory_gb`, `pids`, `disk_gb` }; every other service = { `cpus`,
   `memory_gb`, `pids` }; `gpu_memory_gb` on, and only on, a service that reserves a GPU. Memory, disk and GPU memory are
-  in GiB.
+  in GiB; memory and disk a whole number of MiB (a multiple of 1/1024 GiB), since they are written in MiB.
 - optional: `gpu_types` (written to `[environment]`), `recommended_gpu`, `measured` (what the task was measured to use)
-  and `caps_measured` (where the GPU-memory and disk caps come from), all three shown in the task README's
-  `## Resources`.
+  and `caps_measured` (where the GPU-memory and disk caps come from), each shown in the task README's `## Resources`
+  (`gpu_types` as its `GPU:` line).
 
 Docker enforces CPU (a throttle), memory (the kernel's OOM killer) and processes. Docker caps neither GPU memory nor disk
 on a local host (a cloud backend may apply `storage_mb`): the resource monitor measures both and enforces them only when

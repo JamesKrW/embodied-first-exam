@@ -2,8 +2,8 @@
 
 Part of the task protocol ([README](README.md); its Appendix H binds every run): how runs are configured, and what
 makes a run official. The sections "Official runs" to "Results" below are the runner's rules:
-`scripts/run_agent_batch.sh` applies them by default, and the evaluation pool's scheduler (its run policy, called from
-the dispatcher's launch and retry paths) refuses a launch that breaks one.
+`scripts/run_agent_batch.sh` applies them by default, and a runner's scheduler (its run policy, checked at every launch
+and retry) refuses a launch that breaks one.
 
 ## Official runs
 A result is official only when its run had all of these:
@@ -42,11 +42,11 @@ The rule is PROTOCOL Appendix H.5; how the runner applies it:
   `infra_error` / `grader_error`, no `reward.json`, a Harbor exception other than the agent's cutoff, a model-account or
   usage-gateway failure (`scripts/account_failure_check.py`). The agent's own end, its cutoff and its token budget are
   results and are never retried.
-- The voided attempt's directory is moved aside (in the evaluation pool: `_superseded/`) and never counted; the retry starts
+- The voided attempt's directory is moved aside (e.g. into `_superseded/`) and never counted; the retry starts
   from a new environment with the first attempt's recorded configuration. A failed retry keeps the default handling
   (it stays an infrastructure failure, reported as such). A launch that never started a trial is no attempt.
 - One implementation of the rule, `scripts/retry_policy.py` (`decide`, `check_attempts`), tested by the required CI
-  job; the evaluation pool's scheduler uses it. `write_task_results.py` keeps every attempt of a task x run id in
+  job; a runner's scheduler uses it. `write_task_results.py` keeps every attempt of a task x run id in
   `attempts.json` and flags a sequence that breaks the rule (`attempts_over_cap`).
 - In-trial crash recovery (a sidecar that replays its journal and resumes the episode, standard_mode.md) is the shared
   layers' implementation, not a rule; a crash it cannot recover is an infrastructure failure, unless every crash was
@@ -97,8 +97,9 @@ keeps the recorded one (benchmark docs name their fields where they differ).
 ## Resources: caps and their enforcement
 Every resource number of a task is an upper bound for one container; where each is set: PROTOCOL §6. This section is
 how a run applies and enforces them.
-- **What enforces what.** Memory: docker (cgroup); a process that goes over is killed by the kernel. Processes and
-  shared memory: docker. CPU: docker, a throttle only. A CPU cap above the host's count means the host's count: the
+- **What enforces what.** Memory: docker (cgroup); a process that goes over is killed by the kernel. Processes (and
+  threads): docker. Shared memory: docker applies the compose file's `shm_size` (a setting, not a cap), and it counts
+  against the memory cap. CPU: docker, a throttle only. A CPU cap above the host's count means the host's count: the
   runner clamps it in its copy (`scripts/clamp_cpus.py`); memory and pids caps are never clamped. Disk: a cloud
   backend applies `storage_mb`; local docker cannot (overlay2 on ext4), so the monitor measures it. GPU memory: docker
   cannot cap it (a card may be shared between trials): the monitor measures it, and the agent is told its cap.
