@@ -93,11 +93,15 @@ def main(argv: list[str]) -> int:
             t = tc.task_dir(n)
             d = tomllib.loads((t / "task.toml").read_text())
             md = d.get("metadata", {})
-            caps = tc.task_caps(t)
-            m = caps["main"]
-            gpu = f"{float(m['gpu_memory_gb']):g}" if m.get("gpu") and m.get("gpu_memory_gb") else "no GPU"
-            res = (f"{m.get('cpus') or '?'} / {m.get('memory_gb') or '?'} / {gpu}"
-                   f"{'; ' + ', '.join(d.get('environment', {}).get('gpu_types') or []) if d.get('environment', {}).get('gpu_types') else ''}")
+            try:
+                m = tc.task_caps(t)["main"]
+            except ValueError as e:   # a compose file the caps cannot be read from: report it, check-resources fails it
+                m = None
+                res = f"unreadable compose file ({e})"
+            if m is not None:
+                gpu = f"{float(m['gpu_memory_gb']):g}" if m.get("gpu") and m.get("gpu_memory_gb") else "no GPU"
+                res = (f"{m.get('cpus') or '?'} / {m.get('memory_gb') or '?'} / {gpu}"
+                       f"{'; ' + ', '.join(d.get('environment', {}).get('gpu_types') or []) if d.get('environment', {}).get('gpu_types') else ''}")
             out.append(f"| `{n}` | {'added' if n in added else 'changed'} | {tc.mode_of(t)} | {md.get('oracle', '—')} | "
                        f"{cutoff(d)} s | {res} |")
         if len(shown) > 60:

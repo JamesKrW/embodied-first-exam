@@ -173,7 +173,7 @@ RTX_GPU_MODELS = ("L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada", "RTX PRO 6000
 ENFORCE_ENV = "RCB_LIMITS_ENFORCE"   # §6: run-time switch (compose default 0 = record only; 1 = a violation fails)
 EMERGENCY_GPU_FACTOR = 1.5           # §6: host protection in enforced runs (the same value: rcb_monitor/monitor.py)
 RESOURCES_HEADING = "## Resources"
-OLD_RESOURCES_HEADINGS = ("## Resource limits",)   # the section's name before protocol v2.1's caps (normalize replaces it)
+OLD_RESOURCES_HEADINGS = ("## Resource limits",)   # another name of the section (normalize replaces it)
 # PROTOCOL §2.11 (owner, 2026-10-11; relaxed 2026-10-14): an honour rule, the same words in
 # every task's instruction.md, just before `## Resources` (generator-owned: edit it here, never in a task;
 # ci_checks/check-resources.py compares). Installing packages and reading whatever is installed in the container (the
@@ -539,6 +539,12 @@ def rule_for(task: Path) -> dict | None:
             if bad:
                 raise RuntimeError(f"{task.name}: scripts/task_resources.toml service {k}: unknown or misplaced keys {bad}")
             out["services"][k] = {f: CAP_KEYS[f](v[f]) for f in CAP_KEYS if f in v}
+            for f in ("memory_gb", "disk_gb"):
+                mib = out["services"][k].get(f, 0) * 1024
+                if abs(mib - round(mib)) > 1e-9:
+                    raise RuntimeError(f"{task.name}: scripts/task_resources.toml service {k}: {f} = {v[f]} is not a "
+                                       f"whole number of MiB ({mib:g}); the caps are written in MiB (memory_mb, "
+                                       "storage_mb, mem_limit), so pick a multiple of 1/1024 GiB")
         else:
             raise RuntimeError(f"{task.name}: scripts/task_resources.toml: unknown key {k!r}")
     main = out["services"].get("main") or {}
@@ -565,32 +571,63 @@ def _toml_value(v) -> str:
 ENV_CAP_KEYS = ("cpus", "memory_mb", "storage_mb", "gpu_types")   # what normalize writes into [environment] (Harbor's)
 
 
+def _key_spans(rows: list[str], where: str) -> list[tuple[str, int, int]]:
+    """(key, first row, row after its value) of every `key = value` of a TOML table's rows; a value may span several
+    rows (a multi-line array or string): it ends at the first row where `key = value` parses."""
+    out, i = [], 0
+    while i < len(rows):
+        m = re.match(r'\s*("[^"]*"|[A-Za-z0-9_-]+)\s*=', rows[i])
+        if not m:
+            i += 1
+            continue
+        j = i + 1
+        while True:
+            try:
+                tomllib.loads("".join(rows[i:j]))
+                break
+            except tomllib.TOMLDecodeError:
+                if j >= len(rows):
+                    raise RuntimeError(f"{where}: the value of {m.group(1)} does not parse")
+                j += 1
+        out.append((m.group(1).strip('"'), i, j))
+        i = j
+    return out
+
+
 def set_table_keys(s: str, table: str, values: dict, task_name: str = "") -> str:
-    """task.toml text with `values` set in `[table]` (a key already there is rewritten in place, its comment kept; a new
-    one goes after the table's last key; None removes the key)."""
+    """task.toml text with `values` set in `[table]` (created at the end when missing; a key already there is rewritten
+    in place, a one-line value's comment kept, a multi-line value replaced whole; a new key goes after the table's last
+    value; None removes the key)."""
     m = re.search(rf"(?ms)^\[{re.escape(table)}\]\n(.*?)(?=^\[|\Z)", s)
     if not m:
-        raise RuntimeError(f"{task_name}: task.toml has no [{table}] table")
+        if all(v is None for v in values.values()):
+            return s
+        s = s.rstrip("\n") + f"\n\n[{table}]\n"
+        m = re.search(rf"(?ms)^\[{re.escape(table)}\]\n(.*?)(?=^\[|\Z)", s)
     rows = m.group(1).splitlines(keepends=True)
+    if rows and not rows[-1].endswith("\n"):
+        rows[-1] += "\n"
     for k, v in values.items():
-        at = next((i for i, ln in enumerate(rows) if re.match(rf"{re.escape(k)}\s*=", ln)), None)
+        spans = _key_spans(rows, f"{task_name}: task.toml [{table}]")
+        at = next(((a, b) for key, a, b in spans if key == k), None)
         if v is None:
             if at is not None:
-                del rows[at]
+                del rows[at[0]:at[1]]
             continue
+        line = f"{k} = {_toml_value(v)}"
         if at is not None:
-            c = re.search(r"\s+#.*$", rows[at].rstrip("\n"))
-            rows[at] = f"{k} = {_toml_value(v)}" + (c.group(0) if c else "") + "\n"
+            c = re.search(r"\s+#.*$", rows[at[0]].rstrip("\n")) if at[1] - at[0] == 1 else None
+            rows[at[0]:at[1]] = [line + (c.group(0) if c else "") + "\n"]
         else:
-            last = max((i for i, ln in enumerate(rows) if re.match(r"[A-Za-z0-9_\"-]+\s*=", ln)), default=-1)
-            rows.insert(last + 1, f"{k} = {_toml_value(v)}\n")
+            last = max((b for _, _, b in spans), default=0)
+            rows.insert(last, line + "\n")
     return s[:m.start(1)] + "".join(rows) + s[m.end(1):]
 
 
 def normalize_resources(task: Path) -> None:
     """The caps of main where Harbor reads them, `[environment]` (`cpus`, `memory_mb`, `storage_mb`, `gpu_types`), from
     the task's rule (PROTOCOL §6; the other services' and main's processes: inject.py, in the compose file). Removes the
-    `[metadata.resources]` tables of protocols before v2.1's caps (minimums, soft limits, a copy of the caps)."""
+    `[metadata.resources]` tables (resources are caps per container only: no minimums, soft limits or copies)."""
     p = task / "task.toml"
     s = p.read_text()
     s = re.sub(r"(?ms)^\[metadata\.resources(?:\.limits|\.caps)?\]\n.*?(?=^\[|\Z)", "", s)
@@ -631,6 +668,7 @@ def verifier_caps(task: Path) -> dict:
         main = {}
     return {"cpus": float(env["cpus"]) if isinstance(env.get("cpus"), (int, float)) else None,
             "memory_gb": float(env["memory_mb"]) / 1024 if isinstance(env.get("memory_mb"), (int, float)) else None,
+            "disk_gb": float(env["storage_mb"]) / 1024 if isinstance(env.get("storage_mb"), (int, float)) else None,
             "pids": main.get("pids"), "gpu": bool(main.get("gpu")), "gpu_memory_gb": main.get("gpu_memory_gb"),
             "own": venv is not None}
 
@@ -663,7 +701,7 @@ def render_resources(task: Path) -> str:
     if m.get("memory_gb"):
         parts.append(f"**{_num(m['memory_gb'])} GiB of memory** (the kernel kills a process that goes over)")
     if m.get("pids"):
-        parts.append(f"**{int(m['pids'])} processes**")
+        parts.append(f"**{int(m['pids'])} processes and threads**")
     if m.get("disk_gb"):
         parts.append(f"**{_num(m['disk_gb'])} GiB** of disk (new files under {_paths(lim.DISK_PATHS)})")
     if gpu and m.get("gpu_memory_gb"):
@@ -675,14 +713,27 @@ def render_resources(task: Path) -> str:
             if parts else "Your container has no declared caps.")
     if not gpu:
         text += " Your container has no GPU."
-    if mode_of(task) in SIDECAR_MODES and sidecars_of(task):   # a standard task without a sim service (a policy task,
-        # PROTOCOL §4c) has no simulator to leave out
+    side = sidecars_of(task) if mode_of(task) in SIDECAR_MODES else []   # a standard task without a sim service (a
+    # policy task, PROTOCOL §4c) has no simulator to leave out
+    if side == ["sim"] or (side and "sim" not in side and len(side) == 1):
         text += " The simulator runs in its own container and does not count against these."
+    elif side:
+        rest = [n for n in side if n != "sim"]
+        text += (f" The simulator (`sim`) and {_paths(rest)} run in containers of their own and do not count against "
+                 "these." if "sim" in side else f" {_paths(side)} run in containers of their own and do not count against these.")
     drive = [n for n in caps if n != "main" and rcb_monitor_inject.kind_of(mode_of(task), n) == "scope"]
-    if drive:   # privileged: services the agent drives run in containers of their own, with caps of their own
-        text += (f" {_paths(drive)} {'runs' if len(drive) == 1 else 'run'} in {'its' if len(drive) == 1 else 'their'} own "
-                 f"container{'' if len(drive) == 1 else 's'}, with {'its' if len(drive) == 1 else 'their'} own caps "
-                 f"(README.md, `## Resources`); the monitor counts {'its' if len(drive) == 1 else 'their'} use with yours.")
+    for n in drive:   # privileged: a service the agent drives runs in a container of its own, with caps of its own
+        c = caps[n]
+        own = [f"{_num(c['cpus'])} CPU{'' if float(c['cpus']) == 1 else 's'}" if c.get("cpus") else None,
+               f"{_num(c['memory_gb'])} GiB of memory" if c.get("memory_gb") else None,
+               f"{int(c['pids'])} processes and threads" if c.get("pids") else None,
+               f"one GPU, {_num(c['gpu_memory_gb'])} GiB of its memory" if c.get("gpu") and c.get("gpu_memory_gb") else None]
+        own = [x for x in own if x]
+        text += (f" `{n}` runs in its own container"
+                 + (f", capped at {', '.join(own[:-1]) + ' and ' + own[-1] if len(own) > 1 else own[0]}" if own else "")
+                 + "; the monitor counts its use with yours"
+                 + (", and when enforcement is on a process killed at its memory cap ends the trial like one killed at "
+                    "yours." if c.get("memory_gb") else "."))
     if gpu:
         text += " GPU memory counts what a process reserves (JAX, for example, reserves most of the card unless told not to)."
     gpu_cap = gpu and bool(m.get("gpu_memory_gb"))
@@ -725,7 +776,7 @@ def readme_resources(task: Path, old_readme: str = "") -> list[str]:
         v = verifier_caps(task)
         gm = nocap(v.get("gpu_memory_gb"), _gb) if v["gpu"] else "no GPU"
         rows.append(f"| verifier{'' if v['own'] else ' (as `main`)'} | {nocap(v.get('cpus'), _num)} | "
-                    f"{nocap(v.get('memory_gb'), _gb)} | {nocap(v.get('pids'), str)} | {gm} | — |")
+                    f"{nocap(v.get('memory_gb'), _gb)} | {nocap(v.get('pids'), str)} | {gm} | {nocap(v.get('disk_gb'), _gb)} |")
     held = [n for n, c in caps.items() if c.get("gpu")]
     if gpu_types:
         gpu = (f"an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: {', '.join(gpu_types)}")

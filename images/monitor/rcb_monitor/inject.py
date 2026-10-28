@@ -236,14 +236,57 @@ def _mem_gb(v: str) -> float:
 
 
 GPU_DEVICE_RE = re.compile(r"^\s*-?\s*driver:\s*[\"']?(nvidia|cdi)\b")
+# a device reservation whose capabilities name `gpu` (docker gives it a GPU with or without a `driver:` line), flow
+# (`capabilities: [gpu]`) or block (`capabilities:` then `- gpu`) style
+GPU_CAP_RE = re.compile(r"^\s*-?\s*capabilities:\s*\[[^\]#]*?[\"']?\bgpu\b")
+CAP_BLOCK_RE = re.compile(r"^(\s*)-?\s*capabilities:\s*(#.*)?$")
 # other ways compose gives a container a GPU (ci_checks/check-resources.py refuses them: a task reserves its GPU as a
 # deploy device), counted as a GPU here so that no GPU goes unseen
 GPU_OTHER_RE = re.compile(r"^    (gpus:|runtime:\s*[\"']?nvidia\b)")
 
 
 def holds_gpu(block: list[str]) -> bool:
-    """A compose service's lines reserve an NVIDIA GPU (a deploy device, `gpus:` or `runtime: nvidia`)."""
-    return any(GPU_DEVICE_RE.match(ln) or GPU_OTHER_RE.match(ln) for ln in block)
+    """A compose service's lines reserve a GPU: a deploy device with an NVIDIA (or CDI) driver or `gpu` among its
+    capabilities, `gpus:`, or `runtime: nvidia`."""
+    for n, ln in enumerate(block):
+        if GPU_DEVICE_RE.match(ln) or GPU_CAP_RE.match(ln) or GPU_OTHER_RE.match(ln):
+            return True
+        m = CAP_BLOCK_RE.match(ln)
+        if m:
+            for nxt in block[n + 1:]:
+                if not nxt.strip() or nxt.lstrip().startswith("#"):
+                    continue
+                item = re.match(r"^(\s*)-\s*[\"']?([A-Za-z0-9_.-]+)", nxt)
+                if not item or len(item.group(1)) < len(m.group(1)):
+                    break
+                if item.group(2) == "gpu":
+                    return True
+    return False
+
+
+def deploy_limits(block: list[str]) -> bool:
+    """A compose service's lines set `deploy.resources.limits` (docker refuses it beside `cpus` / `mem_limit`, the keys
+    the caps are written in)."""
+    path: list[tuple[int, str]] = []
+    for ln in block:
+        m = re.match(r"^(\s*)([A-Za-z0-9_.-]+):(.*)$", ln.rstrip("\n"))
+        if not m or ln.lstrip().startswith("#"):
+            continue
+        ind, key, rest = len(m.group(1)), m.group(2), m.group(3)
+        while path and path[-1][0] >= ind:
+            path.pop()
+        path.append((ind, key))
+        keys = [k for _, k in path]
+        if keys[-3:] == ["deploy", "resources", "limits"] or (key == "deploy" and "limits" in rest) or (
+                keys[-2:] == ["deploy", "resources"] and "limits" in rest):
+            return True
+    return False
+
+
+def check_block(name: str, block: list[str]) -> None:
+    if deploy_limits(block):
+        raise ValueError(f"service {name}: deploy.resources.limits; write the caps as `cpus`, `mem_limit` and "
+                         "`pids_limit` (docs/protocol/README.md §6; docker refuses both forms together)")
 
 
 def service_caps(text: str) -> dict[str, dict]:
@@ -254,6 +297,7 @@ def service_caps(text: str) -> dict[str, dict]:
     i, j = services_span(lines)
     out = {}
     for name, k0, k1 in service_blocks(lines, i, j):
+        check_block(name, lines[k0:k1])
         got = {}
         for key, field, conv in (("cpus", "cpus", float), ("mem_limit", "memory_gb", _mem_gb), ("pids_limit", "pids", int),
                                  (GPU_KEY, "gpu_memory_gb", float)):
@@ -341,6 +385,7 @@ def render_compose(text: str | None, mode: str, caps: dict) -> str:
     observe_any = False
     # edit the blocks bottom-up, so earlier indices stay valid
     for name, k0, k1 in reversed(blocks):
+        check_block(name, lines[k0:k1])
         kind = kind_of(mode, name)
         observe_any |= kind == "observe"
         beacon = "rcb_limits:/run/rcb-limits:ro" if kind == "scope" else "rcb_observe:/run/rcb-observe:ro"

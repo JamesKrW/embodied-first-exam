@@ -7,8 +7,10 @@ and docker read it, and nothing else.
   models, task_conventions.RTX_GPU_MODELS) only on a task with a GPU; never `gpus` (Harbor 0.23's local docker refuses
   it: the GPU is a compose device reservation, never `gpus:` or `runtime: nvidia`);
 - every other compose service (the monitor's own aside, check-monitor.py) sets `cpus`, `mem_limit` and `pids_limit`, main
-  sets `pids_limit` (its CPU and memory are Harbor's, from `[environment]`); a service that reserves an NVIDIA GPU sets
-  `x-gpu-memory-gb`, and only such a service (tests/docker-compose.yaml too); at most one service in the monitor's scope
+  sets `pids_limit` (its CPU and memory are Harbor's, from `[environment]`), none sets `deploy.resources.limits`; the
+  `deploy` key is written in block style (one key per line: what inject.py reads, cross-checked with a YAML parser when
+  PyYAML is installed); a service that reserves a GPU sets `x-gpu-memory-gb`, and only such a service
+  (tests/docker-compose.yaml too: written by normalize from main's cap, by hand when main holds no GPU); at most one service in the monitor's scope
   (main, and in privileged mode the services the agent drives) holds a GPU, since the monitor checks one GPU-memory cap
   for the scope;
 - the caps of the task's rule in scripts/task_resources.toml are the ones applied (task_conventions.py writes them);
@@ -30,6 +32,31 @@ from task_conventions import (  # noqa: E402  (one renderer of the paragraph and
     CUTOFF_HEADING, RESOURCES_HEADING, RTX_GPU_MODELS, iter_tasks, mode_of, readme_resources, render_external,
     render_resources, rule_for, task_caps)
 from rcb_monitor import inject  # noqa: E402  (one reader of the compose file's services and caps)
+
+FLOW_DEPLOY_RE = re.compile(r"^\s+(deploy|resources|reservations|devices|limits|capabilities):\s*[\[{]")
+FLOW_DEPLOY_OK_RE = re.compile(r"^\s+-?\s*capabilities:\s*\[[^\]{}]*\]\s*(#.*)?$")   # `capabilities: [gpu]` is fine
+
+
+def yaml_view(txt: str) -> dict | None:
+    """{service: (holds a GPU, sets deploy.resources.limits)} by a YAML parser, or None (no PyYAML, or no services)."""
+    try:
+        import yaml
+    except ImportError:
+        return None
+    try:
+        d = yaml.safe_load(txt) or {}
+    except yaml.YAMLError:
+        return None
+    out = {}
+    for name, svc in ((d.get("services") or {}) if isinstance(d, dict) else {}).items():
+        svc = svc if isinstance(svc, dict) else {}
+        res = ((svc.get("deploy") or {}).get("resources") or {})
+        devs = (res.get("reservations") or {}).get("devices") or []
+        gpu = any(isinstance(x, dict) and (x.get("driver") in ("nvidia", "cdi") or "gpu" in (x.get("capabilities") or []))
+                  for x in devs) or "gpus" in svc or svc.get("runtime") == "nvidia"
+        out[name] = (gpu, "limits" in res)
+    return out
+
 
 BOUNDS = {"cpus": 128, "memory_gb": 1024, "pids": 1 << 22, "gpu_memory_gb": 192, "disk_gb": 4096}
 
@@ -77,6 +104,25 @@ def check(task: Path) -> list[str]:
                     "runs on any NVIDIA GPU sets none")
     for f in ("environment/docker-compose.yaml", "tests/docker-compose.yaml"):
         txt = (task / f).read_text() if (task / f).is_file() else ""
+        for ln in txt.splitlines():
+            if FLOW_DEPLOY_RE.match(ln) and not FLOW_DEPLOY_OK_RE.match(ln):
+                errs.append(f"{f}: `{ln.strip()}`: write `deploy` in block style, one key per line (what "
+                            "images/monitor/rcb_monitor/inject.py reads)")
+                break
+        yv = yaml_view(txt) if txt else None
+        if yv is not None:
+            try:
+                lv = inject.service_caps(txt)
+            except ValueError:
+                lv = {}
+            for n, (g, lim) in yv.items():
+                if lim:
+                    errs.append(f"{f}: service {n}: deploy.resources.limits; write the caps as `cpus`, `mem_limit` and "
+                                "`pids_limit` (docker refuses both forms together)")
+                if n in lv and lv[n]["gpu"] != g:
+                    errs.append(f"{f}: service {n}: a YAML parser {'finds' if g else 'finds no'} GPU reservation, "
+                                f"inject.py {'finds' if lv[n]['gpu'] else 'none'}: write the reservation in block style "
+                                "(deploy.resources.reservations.devices, `driver: nvidia`, `capabilities: [gpu]`)")
         for m in re.finditer(r"(?m)^  ([A-Za-z0-9_.-]+):[^\n]*\n((?:    [^\n]*\n|\s*\n)*)", txt):
             if any(inject.GPU_OTHER_RE.match(ln) for ln in m.group(2).splitlines()):
                 errs.append(f"{f}: service {m.group(1)} gets its GPU through `gpus:` or `runtime: nvidia`; reserve it as "
@@ -110,7 +156,9 @@ def check(task: Path) -> list[str]:
         try:
             for svc, c in inject.service_caps(tc.read_text()).items():
                 if c.get("gpu") and not c.get("gpu_memory_gb"):
-                    errs.append(f"tests/docker-compose.yaml: service {svc} reserves a GPU but sets no `{inject.GPU_KEY}`")
+                    errs.append(f"tests/docker-compose.yaml: service {svc} reserves a GPU but sets no `{inject.GPU_KEY}`: "
+                                "normalize copies main's GPU-memory cap there only when main holds a GPU; otherwise write "
+                                f"`{inject.GPU_KEY}: <GiB>` on that service yourself (normalize keeps it; PROTOCOL §6)")
         except ValueError as e:
             errs.append(f"tests/docker-compose.yaml: {e}")
     if errs:

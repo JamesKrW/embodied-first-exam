@@ -57,9 +57,14 @@ def render() -> str:
 
 def resources_row(t: Path) -> dict:
     """The task's caps per container (PROTOCOL §6): {"gpu_types": [...] or None, "containers": {service: caps}}, main's
-    CPU / memory / disk from [environment], the rest from the compose file (GPU memory: x-gpu-memory-gb)."""
-    caps = tc.task_caps(t)
-    return {"gpu_types": (tc.task_toml(t).get("environment") or {}).get("gpu_types"),
+    CPU / memory / disk from [environment], the rest from the compose file (GPU memory: x-gpu-memory-gb); a compose file
+    the caps cannot be read from: "containers" None and the "error"."""
+    gt = (tc.task_toml(t).get("environment") or {}).get("gpu_types")
+    try:
+        caps = tc.task_caps(t)
+    except ValueError as e:   # a compose file the caps cannot be read from (ci_checks/check-resources.py fails it)
+        return {"gpu_types": gt, "containers": None, "error": f"environment/docker-compose.yaml: {e}"}
+    return {"gpu_types": gt,
             "containers": {n: {k: c[k] for k in ("cpus", "memory_gb", "pids", "gpu_memory_gb", "disk_gb") if c.get(k) is not None}
                            for n, c in caps.items()}}
 
