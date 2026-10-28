@@ -7,4 +7,4 @@ COPY --from=ghcr.io/mll-lab-nu/efe:metaworldplus-files-0.4.0@sha256:43ee7af9dfe1
      /privileged/environment/mw_tool.py \
      /sim/server_mw.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:f8652e8f64c8da11b6c60b1acbdb76db5cb48813bd6ae17d11ecbabebe3fa184 /rcb1.py /srv/rcb1.py
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:1dde7816f44b428dd7045c4883935decaec4f8a76360a3379dbe90a7fc90d7dc /rcb1.py /srv/rcb1.py

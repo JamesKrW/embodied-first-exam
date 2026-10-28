@@ -20,7 +20,7 @@ sim = { cpus = 12, memory_gb = 32, pids = 4096, gpu_memory_gb = 16 }
 gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "GPU memory 8.3-9.0 GB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (a per-container sampler every 30 s, trials on 14 GPU hosts); CPU 6-9 cores per trial; 13-16 GB of memory per Isaac process"
-caps_measured = "GPU memory (the sim service): 9.0 GiB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (trials without the budget reached 29.0 GiB on 48 GB cards) -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 132 past trials: the agent's container memory 19.4 GiB, 2089 threads, CPU at its cap (8), disk 1.7 GiB; the sim service memory 21.0 GiB, 692 threads, CPU at its cap (12), GPU memory 10.6 GiB"
+caps_measured = "GPU memory (the sim service): 9.0 GiB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (trials without the budget reached 29.0 GiB on 48 GB cards) -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 132 past trials: the agent's container memory 19.4 GiB, 2089 threads, CPU at its cap (8), disk 1.7 GiB; the sim service memory 21.0 GiB, 692 threads, CPU at its cap (12), GPU memory 10.6 GiB; the sim service's memory covers its largest legal call (an ee_pose call: 1 camera 224x224, 5412 frames (max_frames_per_call 5412 images); baseline: the live sim before the call (board 0279 Isaac run)): 0.8 GiB to build the response on top of the simulator's 22.6 GiB"
 
 # 13 task(s)
 [[cap]]
@@ -213,7 +213,7 @@ sim = { cpus = 12, memory_gb = 39, pids = 4096, gpu_memory_gb = 18 }
 gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "one trial: sim anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s); GPU memory and CPU otherwise from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack)"
-caps_measured = "GPU memory (the sim service): cap 18 GiB, the benchmark's choice, below the measured peaks of 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling); per-container peaks in 26 past trials: the agent's container memory 3.1 GiB, 163 threads, CPU at its cap (8), disk 1.1 GiB; the sim service memory 25.5 GiB, 559 threads, CPU at its cap (12), GPU memory 4.8 GiB (19.4 GiB in an earlier measurement, above the cap); 18 GiB is an owner decision (board 0276/0279: the benchmark's choice kept); from the per-container peak of 4.8 GiB the rule gives 16 GiB, the Isaac Sim floor"
+caps_measured = "GPU memory (the sim service): cap 18 GiB, the benchmark's choice, below the measured peaks of 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling); per-container peaks in 26 past trials: the agent's container memory 3.1 GiB, 163 threads, CPU at its cap (8), disk 1.1 GiB; the sim service memory 25.5 GiB, 559 threads, CPU at its cap (12), GPU memory 4.8 GiB (19.4 GiB in an earlier measurement, above the cap); the sim service's memory covers its largest legal call (an ee_pose call: 1 camera 256x256, 6020 frames (max_frames_per_call 6020 images); baseline: the live sim before the call (board 0279 Isaac run)): 1.1 GiB to build the response on top of the simulator's 12.4 GiB; 18 GiB is an owner decision (board 0276/0279: the benchmark's choice kept); from the per-container peak of 4.8 GiB the rule gives 16 GiB, the Isaac Sim floor"
 
 # 50 task(s)
 [[cap]]
@@ -382,7 +382,7 @@ sim = { cpus = 16, memory_gb = 25, pids = 2048, gpu_memory_gb = 16 }
 gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "the heaviest scene (pour_liquid_into_cup_random), a client driving 12 joint_position chunks, on an RTX 4090: sim sidecar peak 16.0 GiB (anon 14.9), GPU memory 9.5 GiB, up to 16 cores while Isaac starts; the agent's container under 0.1 GiB (a per-container sampler every 10 s); the collect hook only encodes the live video on the CPU, so the sidecar's peak is the live service's"
-caps_measured = "GPU memory (the sim service): 9.5 GiB on the heaviest scene (RTX 4090) -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 47 past trials: the agent's container memory 5.1 GiB, 305 threads, CPU 1.6 cores, disk 1.9 GiB; the sim service memory 16.9 GiB, 479 threads, CPU at its cap (16), GPU memory 9.6 GiB; the sim service's memory covers its largest legal call (1 camera 640x480 with depth, 1500 frames (3000 images)): 2.2 GiB to build the response on top of the simulator's 16.9 GiB"
+caps_measured = "GPU memory (the sim service): 9.5 GiB on the heaviest scene (RTX 4090) -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 47 past trials: the agent's container memory 5.1 GiB, 305 threads, CPU 1.6 cores, disk 1.9 GiB; the sim service memory 16.9 GiB, 479 threads, CPU at its cap (16), GPU memory 9.6 GiB; the sim service's memory covers its largest legal call (1 camera 640x480, 3000 frames (3000 images)): 2.6 GiB to build the response on top of the simulator's 16.9 GiB"
 
 # 53 task(s)
 [[cap]]
@@ -397,11 +397,11 @@ caps_measured = "per-container peaks in 77 past trials: the agent's container me
 [[cap]]
 match = "^robolab-.*-standard$"
 main = { cpus = 8, memory_gb = 24, pids = 1024, disk_gb = 10 }
-sim = { cpus = 8, memory_gb = 41, pids = 4096, gpu_memory_gb = 22 }
+sim = { cpus = 8, memory_gb = 26, pids = 4096, gpu_memory_gb = 22 }
 gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada", "RTX PRO 6000 Blackwell"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "GPU memory 4.0-5.5 GB per trial (one simulator), anon memory 7.6-10.3 GB, CPU p90 2.4-8 cores over 7 trials (a per-container sampler every 30 s); per-trial peaks of past trials 14.5-15.7 GB of GPU memory, which include agents' extra simulator processes and Isaac's card-sized pools; one Isaac simulator per 32 GB of host memory"
-caps_measured = "per-container peaks in 57 past trials: the agent's container memory 24.0 GiB (OOM-killed at the cap in 2 trials), 148 threads, CPU 7.6 cores, disk 1.6 GiB; the sim service memory 17.3 GiB, 664 threads, CPU at its cap (8), GPU memory 4.2 GiB (15.7 GiB in an earlier measurement); the sim service's memory covers its largest legal call (observe 30 s at 15 Hz, cameras 864x480 + 2 x 1280x720 with depth, 452 frames each): 19.1 GiB to build the response on top of the simulator's 17.3 GiB; GPU memory (the sim service) 22 GiB: an owner decision (board 0276/0279), so that 24 GB cards (L4) stay listed; from the peaks the rule gives 24 GiB, the earlier cap"
+caps_measured = "per-container peaks in 57 past trials: the agent's container memory 24.0 GiB (OOM-killed at the cap in 2 trials), 148 threads, CPU 7.6 cores, disk 1.6 GiB; the sim service memory 17.3 GiB, 664 threads, CPU at its cap (8), GPU memory 4.2 GiB (15.7 GiB in an earlier measurement); the sim service's memory covers its largest legal call (an ee_pose call: wrist_cam 1280x720 alone, 2712 frames (max_frames_per_call 2712 images)): 7.0 GiB to build the response on top of the simulator's 17.3 GiB; GPU memory (the sim service) 22 GiB: an owner decision (board 0276/0279), so that 24 GB cards (L4) stay listed; from the peaks the rule gives 24 GiB, the earlier cap"
 
 # 43 task(s)
 [[cap]]
@@ -552,11 +552,11 @@ caps_measured = "GPU memory: per-trial peaks of 10.4 GiB on a 48 GB card and 6.5
 [[cap]]
 match = "^yamlab-.*-standard$"
 main = { cpus = 5, memory_gb = 4, pids = 1024, disk_gb = 10 }
-sim = { cpus = 16, memory_gb = 32, pids = 2048, gpu_memory_gb = 16 }
+sim = { cpus = 16, memory_gb = 21, pids = 2048, gpu_memory_gb = 16 }
 gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada", "RTX PRO 6000 Blackwell"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "GPU memory 3.8-4.0 GB per trial, anon memory 11.1-11.8 GB, CPU p90 5.8-8.7 cores over 12 trials (a per-container sampler every 30 s); per-trial peaks of past trials 5.5-6.5 GB of GPU memory on 24 GB cards; about 11 GB of memory and 8 CPUs per simulator"
-caps_measured = "GPU memory (the sim service): per-trial peaks of 10.4 GiB on a 48 GB card and 6.5 GiB on a 24 GB card -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 8 past trials: the agent's container memory 1.7 GiB, 119 threads, CPU 4.0 cores, disk 0.5 GiB; the sim service memory 13.4 GiB, 278 threads, CPU at its cap (16), GPU memory 4.0 GiB (10.4 GiB in an earlier measurement); the sim service's memory covers its largest legal call (observe 30 s at 30 Hz, 3 cameras 640x480 with depth, 902 frames each): 15.4 GiB to build the response on top of the simulator's 13.4 GiB"
+caps_measured = "GPU memory (the sim service): per-trial peaks of 10.4 GiB on a 48 GB card and 6.5 GiB on a 24 GB card -> max(1.5 x peak, peak + 2), at least 16 GiB for Isaac Sim: 16 GiB; per-container peaks in 8 past trials: the agent's container memory 1.7 GiB, 119 threads, CPU 4.0 cores, disk 0.5 GiB; the sim service memory 13.4 GiB, 278 threads, CPU at its cap (16), GPU memory 4.0 GiB (10.4 GiB in an earlier measurement); the sim service's memory covers its largest legal call (an ee_pose call: 1 camera 640x480, 5412 frames (max_frames_per_call 5412 images)): 4.7 GiB to build the response on top of the simulator's 13.4 GiB"
 
 # 79 task(s)
 [[cap]]

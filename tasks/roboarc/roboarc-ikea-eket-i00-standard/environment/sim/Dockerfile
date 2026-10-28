@@ -11,7 +11,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.4.0@sha256:09c2edb7f49829
      /sim/server.py \
      /srv/
 COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0@sha256:beb13ec1db0d85df2c5527529cda03101b15dd6cf524d34b9b288273131f44ca /nyx_direct.py /srv/nyx_direct.py
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:f8652e8f64c8da11b6c60b1acbdb76db5cb48813bd6ae17d11ecbabebe3fa184 \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:1dde7816f44b428dd7045c4883935decaec4f8a76360a3379dbe90a7fc90d7dc \
      /rcb1.py \
      /v2_4/rcb_limited.py \
      /run.sh \
