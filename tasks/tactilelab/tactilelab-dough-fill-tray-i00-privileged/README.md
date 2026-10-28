@@ -8,7 +8,7 @@
 | Simulator / robot | `tactilelab` / `xtrainer-gsmini` |
 | Family / instance | `dough_fill_tray` / seed 0 |
 | Oracle | `full` — solution/: the scripted demonstration policy of this task, recorded through the Session; graded 1 by two fresh-process replays on an L40S (both solved; their final states also agreed in that run). |
-| Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
+| Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:tactilelab-0.2.0` |
 
 ## Task
@@ -23,18 +23,18 @@ Contact-rich manipulation with a tactile gripper, driven through end-effector ta
 ## Verification
 Open-loop replay of `/app/output/trajectory.npz` from `tests/instance.json` in two fresh processes (`tests/grade.py`); pass iff the task's success predicate holds in both replays (the Newton sidecar's replays are not compared bit for bit; `deterministic` and `replay_spread` report how close they ended), and the rebuilt frozen scene matches the recorded one (robot, rigid objects and a sample of the deformable body's particles within tolerance). A simulator error on the agent's rows scores 0 (`sim_error`); the video is rendered in a third replay after the verdict.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 8 | 6 |
-| Memory | 13 GB | 19 GB |
-| GPU memory | 34 GB | 17 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 16384 | 34 GiB | 20 GiB |
+| verifier | 8 | 19 GiB | no cap | 34 GiB | 20 GiB |
 
-- GPU: required, an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering); recommended: L40S 48GB.
-- Measured: agent container = the oracle with the self-check CLI replay running beside it in the same container (two Isaac Sim processes, and two Newton sidecars for a deformable task), verifier = two fresh-process replays and the video replay; cgroup memory.peak and the summed GPU memory of the container's own processes (nvidia-smi, 1 s samples) on an L40S, efe-private:tactilelab-0.2.0: agent insert_hdmi 7.3 GiB / 5.7 GiB GPU / 7 cores, cloth_fold_half 8.2 / 6.7 / 5, cable_needle_thread 8.2 / 6.7 / 5, dough_press_thickness 8.5 / 22.2 / 7; verifier insert_hdmi 12.2 / 5.6 / 6, cloth_fold_half 12.1 / 6.1 / 4, dough_press_thickness 11.5 / 11.1 / 5 (GiB / GiB GPU / cores); rounded up from max(1.5 x peak, peak + 4)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: 36 GiB GPU memory, 24 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 36 GiB GPU memory, 24 GiB memory. Limits measured: agent container = the oracle with the self-check CLI replay running beside it in the same container (two Isaac Sim processes, and two Newton sidecars for a deformable task), verifier = two fresh-process replays and the video replay; cgroup memory.peak and the summed GPU memory of the container's own processes (nvidia-smi, 1 s samples) on an L40S, efe-private:tactilelab-0.2.0: agent insert_hdmi 7.3 GiB / 5.7 GiB GPU / 7 cores, cloth_fold_half 8.2 / 6.7 / 5, cable_needle_thread 8.2 / 6.7 / 5, dough_press_thickness 8.5 / 22.2 / 7; verifier insert_hdmi 12.2 / 5.6 / 6, cloth_fold_half 12.1 / 6.1 / 4, dough_press_thickness 11.5 / 11.1 / 5 (GiB / GiB GPU / cores); rounded up from max(1.5 x peak, peak + 4).
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, RTX 6000 Ada, held by `main`.
+- Recommended GPU: L40S 48GB.
+- Measured: on an L40S with efe-private:tactilelab-0.2.0, cgroup memory.peak and the GPU memory of the container's own processes (nvidia-smi, 1 s samples); the agent's container = the oracle with the self-check CLI replay running beside it (two Isaac Sim processes, and two Newton sidecars for a deformable task), the verifier = two fresh-process replays and the video replay, one after the other. Agent's container (memory / GPU memory / mean cores): insert_hdmi 7.3 GiB / 5.7 GiB / 7, cloth_fold_half 8.2 / 6.7 / 5, cable_needle_thread 8.2 / 6.7 / 5, dough_press_thickness 9.1 / 22.3 / 7; verifier: insert_hdmi 12.2 / 5.6 / 6, cloth_fold_half 12.1 / 6.1 / 4, dough_press_thickness 12.4 / 13.9 / 6; the verifier's own caps ([verifier.environment], set in each task): 8 CPUs, 19 GiB
+- Measured (caps): GPU memory: the implicit-MPM dough sidecar holds about 10 GiB per Session; 22.3 GiB with the oracle and its self-check replay -> max(1.5 x peak, peak + 4), rounded up: 34 GiB, so a 48 GB card; memory: 9.1 GiB -> 14 GiB, set to 16 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |
