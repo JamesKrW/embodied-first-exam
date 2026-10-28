@@ -11,7 +11,7 @@
 set -uo pipefail
 t="${1%/}"; n="$(basename "$t")"; rc=0
 root="$(cd "$(dirname "$0")/.." && pwd)"
-# the mode registry (PROTOCOL §2.16; run_all.sh reads it once): "<mode> <sidecar 0|1> <twin mode or ->", longest first
+# the mode registry (PROTOCOL §3; run_all.sh reads it once): "<mode> <sidecar 0|1> <twin mode or ->", longest first
 modes="${RCB_MODES_TABLE:-$(python3 "$root/scripts/task_conventions.py" modes)}"
 base=""; ref="$n/tests"; copy="environment"; twin=""
 [ -d "$t/environment/scorer" ] && copy="environment/scorer"   # a scorer sidecar holds the trusted copy

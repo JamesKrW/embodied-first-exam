@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ADVISORY (docs/protocol/README.md §1). Harbor task contract: the canonical files exist and scripts are executable. solution/solve.sh is required unless the
-# task declares `oracle = "none"` (docs/protocol/README.md §2.1, §2.7).
+# task declares `oracle = "none"` (docs/protocol/README.md §1, §4).
 t="$1"; rc=0
 for f in task.toml instruction.md README.md environment/Dockerfile tests/test.sh; do
   [ -f "$t/$f" ] || { echo "FAIL $t: missing $f"; rc=1; }
@@ -11,8 +11,8 @@ if [ "$oracle" != "none" ]; then
   [ -f "$t/solution/solve.sh" ] || { echo "FAIL $t: missing solution/solve.sh (or declare oracle = \"none\")"; rc=1; }
   [ -f "$t/solution/solve.sh" ] && { [ -x "$t/solution/solve.sh" ] || { echo "FAIL $t: solution/solve.sh not executable"; rc=1; }; }
 fi
-# No agent results in the repository (docs/protocol/README.md D3): they are published on the results site.
-[ -e "$t/results" ] && { echo "FAIL $t: results/ does not belong in the repository (PROTOCOL D3)"; rc=1; }
+# No agent results in the repository (docs/protocol/README.md §1): they are published on the results site.
+[ -e "$t/results" ] && { echo "FAIL $t: results/ does not belong in the repository (PROTOCOL §1)"; rc=1; }
 # README in the standard layout (docs/protocol/README.md §1, §6).
 python3 - "$t" "$(cd "$(dirname "$0")/.." && pwd)" <<'PY' || rc=1
 import re, sys, pathlib

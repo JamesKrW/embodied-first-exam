@@ -9,23 +9,24 @@ tasks/ has, PROTOCOL Appendix H.6), or, for a run's own copy of a task, `only <h
     scripts/set_agent_egress.py public       <task dirs...>     # a run's copy with no restriction: network_mode = "public"
 
 HOSTS below is the one list, and the one switch: every task ships with it, ci_checks/check-verifier-isolation.sh requires
-exactly it of every task in tasks/, the generators and the usage gateway read it from this file's text. It is the model
-APIs (what was measured to keep Codex with a ChatGPT login, Claude Code and OpenRouter working, 2026-09-24) and
-PACKAGE_HOSTS, the package registries (owner, 2026-10-11: installing packages is part of what an agent may do): PyPI
-(pip contacts pypi.org for the index and files.pythonhosted.org for the files) and the apt archives the images'
-distributions name in their sources (Debian: deb.debian.org; Ubuntu: archive / security / snapshot.ubuntu.com; plain
-HTTP, which Harbor's egress control allows by the request's Host). GitHub, Hugging Face and the general web stay closed:
-that is where the benchmarks' sources, demonstrations and trained policies are (with open egress agents downloaded them);
-registries mostly are not (the PyPI distributions that do carry a solution: PROTOCOL §5). To change what agents reach, edit the two lists, run `allowlist` (it rewrites the
-`allowed_hosts` line of every task and leaves the other lines as the generators wrote them), update the generators'
-copies of the list, and `cd tasks && harbor add --scan .`.
+exactly it of every allowlist task in tasks/ (reading it from this file's text), and the usage gateway imports it. It
+is the model APIs (the hosts Codex with a ChatGPT login, Claude Code and OpenRouter need) and PACKAGE_HOSTS, the
+package registries (installing packages is part of what an agent may do): PyPI (pip contacts pypi.org for the index
+and files.pythonhosted.org for the files) and the apt archives the images' distributions name in their sources
+(Debian: deb.debian.org; Ubuntu: archive / security / snapshot.ubuntu.com; plain HTTP, which Harbor's egress control
+allows by the request's Host). GitHub, Hugging Face and the general web stay closed: that is where the benchmarks'
+sources, demonstrations and trained policies are; registries mostly are not (the PyPI distributions that do carry a
+solution: docs/protocol/leakage.md). To change what agents reach, edit the two lists, run `allowlist` (it rewrites the
+`allowed_hosts` line of every allowlist task and leaves the other lines as they are), then
+`python3 scripts/task_conventions.py tasks/*/*/` (normalize refreshes each DIGEST).
 
 A task whose author chose open egress declares it in Harbor's own field, `[agent] network_mode = "public"` (PROTOCOL §2,
-Appendix H.6): `allowlist` leaves such a task alone, and a runner does not narrow its copy to the gateway (`network`
-prints the declaration).
+Appendix H.6): `allowlist` leaves every task that declares it alone and names it (`skip`), and a runner does not narrow
+its copy to the gateway (`network` prints the declaration).
 
 A run with no restriction at all: `public` on a copy of the task directories (never in tasks/: CI requires the list
-there), and run that copy (docs/protocol/running.md).
+there), and run that copy (docs/protocol/running.md "Network"). Such a copy is an open task from then on (`allowlist`
+skips it too); to go back, copy the tasks again.
 
 `only <hosts>`: Harbor can add hosts to a task's allowlist at run time (`--allow-agent-host`) but not take any off, and
 the model APIs' hosts also serve what a trial does not get (account connectors, files, web tools). A run through the
@@ -85,8 +86,10 @@ def main(argv: list) -> None:
         sys.path.insert(0, str(root / "scripts"))
         import task_conventions as tc
         dirs = tc.iter_tasks(root / "tasks")
-    if mode == "allowlist":
-        dirs = [d for d in dirs if network_of(d) != "open"]      # the author's choice of open egress is kept
+    if mode == "allowlist":                                       # open egress (the author's choice, or a `public` copy) is kept
+        for d in [d for d in dirs if network_of(d) == "open"]:
+            print(f'skip {d.name}: open egress (network_mode = "public")')
+        dirs = [d for d in dirs if network_of(d) != "open"]
     done = 0
     for d in dirs:
         p = d / "task.toml"; s = p.read_text()
@@ -101,13 +104,11 @@ def main(argv: list) -> None:
         block, sep2, tail = rest.partition("\n[")
         if re.search(r"(?m)^\s*allowed_hosts\s*=\s*\[[^\]\n]*$", block):      # a list over several lines: not rewritten line by line
             sys.exit(f"{d}: [agent] allowed_hosts spans several lines; write it on one line; nothing written")
-        if mode == "allowlist":          # already on an allowlist: only its host list (and this script's own comment) change
+        if mode == "allowlist":          # already on an allowlist: only its host list changes
             m = re.search(r'(?m)^allowed_hosts[ \t]*=[ \t]*\[(.*)\][ \t]*$', block)
             if re.search(r'(?m)^network_mode\s*=\s*"allowlist"', block) and m:
-                if re.findall(r'"([^"]+)"', m.group(1)) != hosts or re.search(r"# model APIs (only|and PyPI) \(scripts|set_agent_egress\.py\); PROTOCOL §", block):
+                if re.findall(r'"([^"]+)"', m.group(1)) != hosts:
                     block2 = block[:m.start()] + "allowed_hosts = [" + ", ".join(f'"{h}"' for h in hosts) + "]" + block[m.end():]
-                    block2 = re.sub(r"# model APIs (?:only|and PyPI|and package registries) \(scripts/set_agent_egress\.py\)(; PROTOCOL (?:§[0-9.]+|Appendix H\.6))?",
-                                    lambda k: COMMENT if k.group(1) else COMMENT.split(";")[0], block2)
                     s2 = head + "[agent]\n" + block2 + (("\n[" + tail) if sep2 else "")
                     if tomllib is not None:
                         tomllib.loads(s2)

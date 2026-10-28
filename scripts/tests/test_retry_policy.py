@@ -35,7 +35,7 @@ try:
     fails.append("an unknown outcome must be refused")
 except ValueError:
     pass
-expect(rp.MAX_INFRA_RETRIES == 1, "MAX_INFRA_RETRIES is 1 (owner 2026-10-14)")
+expect(rp.MAX_INFRA_RETRIES == 1, "MAX_INFRA_RETRIES is 1 (PROTOCOL H.5)")
 
 # retry_config(): the same instance, seed and configuration
 r = rp.retry_config(CFG)

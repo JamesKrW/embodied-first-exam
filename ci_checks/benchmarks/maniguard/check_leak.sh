@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ManiGuard only (tasks/maniguard-*): ManiGuard publishes 40 scripted safe demonstrations per task, its data generator
-# (scripted skeletons, grasp annotations) and its policy servers. None of it may be in reach of the agent (PROTOCOL §2.7):
+# (scripted skeletons, grasp annotations) and its policy servers. None of it may be in reach of the agent (PROTOCOL Appendix H.2):
 #  1. the agent's build context environment/ holds only the files the generator writes there (privileged: the Dockerfile,
 #     compose file, the tooling and the frozen instance; standard: the client, its pins and the sim/ sidecar, the build
 #     context of the sidecar's own image (its Dockerfile, .dockerignore));

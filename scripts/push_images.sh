@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Push base images (needs: gh auth login && gh auth token | docker login ghcr.io -u <user> --password-stdin).
 # An image with images/<name>/BUILD_ONLY (e.g. Isaac Sim inside, which may not be redistributed) is skipped: it is never
-# public (PROTOCOL §2.4); RCB_PUSH_PRIVATE=1 pushes it to the organization's private package efe-private (org members
+# public (PROTOCOL §1); RCB_PUSH_PRIVATE=1 pushes it to the organization's private package efe-private (org members
 # only). Public images are tags <name>-<version> of the one public package efe: no package visibility to set.
 # Files-only images (images/<name>/FILES.json) are skipped: `docker push` would recompress their layer (another digest);
 # push one with scripts/files_image.py push <name> <user> (the token on stdin), then pin it.

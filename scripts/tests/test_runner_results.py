@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Runner-side tools (F-M2), standard library and bash only:
+"""Runner-side tools, standard library and bash only:
 
 - scripts/write_task_results.py publishes a trial the verifier never graded (no reward.json), one Harbor ended with an
   exception other than the agent's cutoff (AgentTimeoutError), or one stopped by a model-account failure as "not a
   result", never as the agent's 0; a verdict, the cutoff and the token budget stay results;
-- scripts/clamp_cpus.py clamps every CPU cap of a task copy to the host's count (PROTOCOL §2.10) and nothing else, and
+- scripts/clamp_cpus.py clamps every CPU cap of a task copy to the host's count (running.md "Resources") and nothing else, and
   refuses the repository's own tasks;
 - scripts/run_agent_batch.sh runs every job from its own copy of the task, every file stamped with its content's mtime
   (scripts/stamp_mtimes.py, issue #258), with a CPU cap above HOST_CPUS clamped in that copy (a stand-in `harbor` on

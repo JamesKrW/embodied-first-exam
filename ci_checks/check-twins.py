@@ -2,7 +2,7 @@
 """INVARIANT (docs/protocol/README.md Appendix H.7, comparable twins): part of the required CI job `invariants`
 (ci_checks/run_invariants.sh); no task value can turn it off. Where a task's privileged and standard versions both
 exist (the mode registry's `same_cutoff_as` and `twin`, scripts/task_conventions.py MODE_REGISTRY):
-  - they have the same cutoff, `[agent] timeout_sec` (owner 2026-10-12);
+  - they have the same cutoff, `[agent] timeout_sec`;
   - a standard or standard-realtime task has its privileged twin's seeds: `instance_seed`, and `[metadata.seeds]` allowed and build (seeds_of).
 The shared frozen instance (byte-identical copies) is ci_checks/check-instance-copies.sh, the other half of H.7.
 
@@ -49,7 +49,7 @@ def errors(tasks: list[Path]) -> list[str]:
                 errs.append(f"{t.name}: seeds unreadable ({e})")
                 continue
             if mine != theirs:
-                errs.append(f"{t.name}: seeds (default, allowed, build) {mine} differ from its privileged twin's {theirs} "
+                errs.append(f"{t.name}: seeds (instance_seed, [metadata.seeds] allowed and build) {mine} differ from its privileged twin's {theirs} "
                             "(PROTOCOL Appendix H.7: twins share instance, success rule and seeds)")
     return errs
 

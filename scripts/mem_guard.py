@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Host memory red line: keep at least --min-gb (default 2) GiB available. While MemAvailable is below it, the benchmark
 container using the most memory is killed (docker kill), one every --cooldown s, so the machine never thrashes into the
-kernel OOM killer (which on 2026-09-25 froze the desktop for 20 minutes before it picked its victims). Candidates:
+kernel OOM killer (which can freeze a host for minutes before it picks its victims). Candidates:
 running containers whose name or image matches --match, except --protect. Every kill (with the top containers at that
 moment) goes to --log, plus a heartbeat line every --heartbeat s. A runner-side tool: scripts/run_agent_batch.sh starts
 one if none runs.

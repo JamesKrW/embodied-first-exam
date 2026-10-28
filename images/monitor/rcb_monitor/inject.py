@@ -76,7 +76,7 @@ TRAP = ("trap 'p=$(command -v python3 || command -v python); \"$p\" /tests/rcb_l
         "# resource limits, after the grader (docs/protocol/README.md §6)")
 # Before the grader: what the agent left under /app/output is untrusted input (rcb_limits.sanitize).
 GUARD = ("p=$(command -v python3 || command -v python); \"$p\" /tests/rcb_limits.py sanitize /app/output || true   "
-         "# the agent's files are untrusted input: no link out of /app/output, no FIFO or device (docs/protocol/README.md §2.6)")
+         "# the agent's files are untrusted input: no link out of /app/output, no FIFO or device (docs/protocol/README.md Appendix H.1)")
 DOCKER_COPY = ("# resource limits: the verifier step (from the monitor image) and its copy of the limits "
                "(docs/protocol/README.md §6) " + MARK + "\n"
                f"COPY --from={IMAGE} {CODE_DIR}/rcb_limits.py /tests/rcb_limits.py\n"

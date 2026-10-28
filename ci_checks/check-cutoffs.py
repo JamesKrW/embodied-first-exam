@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-"""The agent's time cutoff (docs/protocol/README.md §2.12): each task sets its own, and says it once, at the end of its instruction.
+"""The agent's time cutoff (docs/protocol/README.md §2): each task sets its own, and says it once, at the end of its instruction.
 
-The number is the task's `[agent] timeout_sec` in task.toml, set by its author (or its benchmark's generator) in the
+The number is the task's `[agent] timeout_sec` in task.toml, set by its author in the
 pull request that adds or changes the task, as in Terminal-Bench; there is no table. For every task given (default:
 every task):
-  - `[agent] timeout_sec` is a whole positive number of seconds, at most 14400 (PROTOCOL D8; no benchmark is excepted);
+  - `[agent] timeout_sec` is a whole positive number of seconds, at most 14400 (PROTOCOL §2; no benchmark is excepted);
   - instruction.md ends with the section scripts/task_conventions.py renders from that number, the last thing the agent
-    reads: `## Time limit`, "You have N seconds to complete this task. Do not cheat by using online solutions or hints
-    specific to this task." with the same N (Terminal-Bench's sentence), then what the cutoff means in the task's mode;
+    reads: `## Time limit`, the sentence `CUTOFF_SENTENCE` with the same N (Terminal-Bench's), then what the cutoff
+    means in the task's mode;
     nothing follows it, and the heading and the sentence stand there once;
-  - nothing else in instruction.md states the agent's limit as a duration (the wordings tasks used before 2026-10-11:
+  - nothing else in instruction.md states the agent's limit as a duration (wordings such as
     "wall-clock budget is 90 min (5400 s)", "You have 60 minutes of wall-clock time", "Time limit: one hour", ...; and
     the obvious other shapes: "You have one hour.", "The limit is 3600 seconds.", "Finish within 60 minutes."): two
     limits in one instruction are worse than none;
   - the README's "Agent time budget" row has the number;
   - standard modes: the `sim` service is told the same number (`RCB_WALL_CLOCK_S` in environment/docker-compose.yaml,
-    what its `/spec` budget and `meta["time_left_s"]` report; PROTOCOL §2.3);
+    what its `/spec` budget and `meta["time_left_s"]` report; docs/protocol/running.md "The agent's time");
 ADVISORY (the required CI job runs the twins' equal cutoffs, an invariant, in ci_checks/check-twins.py).
 
     python3 ci_checks/check-cutoffs.py [task dirs]      # default: every task
-Fix: set `[agent] timeout_sec` in task.toml (or the generator's constant, then regenerate) and run
+Fix: set `[agent] timeout_sec` in task.toml and run
 `python3 scripts/task_conventions.py tasks/<benchmark>/<task>`, which renders the rest from it. Standard library only.
 """
 from __future__ import annotations
@@ -38,7 +38,7 @@ WORD_DUR = (r"(?:(?:an|one|two|three|four|six|half an) hours?|(?:ten|fifteen|twe
             r"a hundred and twenty|one hundred and twenty) minutes)\b")
 ANY_DUR = rf"(?:{DUR}|{WORD_DUR})"
 # Other statements of the agent's limit, searched in each sentence of the instruction's own text (outside the three
-# closing sections). The first five are the wordings tasks used before 2026-10-11.
+# closing sections). The first five are wordings instructions have used.
 OTHER_LIMIT = [
     ("a wall-clock or time budget with a duration", rf"(?:wall[- ]clock|time) budget\b.*?{ANY_DUR}"),
     ("'You have <duration> ... of wall-clock time / in all / in total'",
@@ -92,11 +92,11 @@ def number_errors(task: Path) -> list[str]:
     except (OSError, tomllib.TOMLDecodeError) as e:
         return [f"task.toml: {e}"]
     if v is None:
-        return ["task.toml has no `[agent] timeout_sec` (the agent's cutoff, set by the task's author; PROTOCOL §2.12)"]
+        return ["task.toml has no `[agent] timeout_sec` (the agent's cutoff, set by the task's author; PROTOCOL §2)"]
     if isinstance(v, bool) or not isinstance(v, (int, float)) or v <= 0 or float(v) != int(v):
         return [f"[agent] timeout_sec = {v!r} is not a whole positive number of seconds"]
     if v > tc.CUTOFF_CAP:
-        return [f"[agent] timeout_sec = {v:g} is above the {tc.CUTOFF_CAP} s cap (PROTOCOL D8, §2.3; no benchmark is excepted)"]
+        return [f"[agent] timeout_sec = {v:g} is above the {tc.CUTOFF_CAP} s cap (PROTOCOL §2; no benchmark is excepted)"]
     return []
 
 

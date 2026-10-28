@@ -30,7 +30,7 @@
 # - the file's top level holds `services:` and `volumes:` only, and a top-level volume is a bare name: `name:`,
 #   `external:` and `driver_opts:` alias one volume under two names or bind a path, `secrets:` / `configs:` /
 #   `include:` hand a container files of the task;
-# - H.6 for the verifier (owner 10-17): [verifier] network_mode = "no-network" on every task, no other policy in
+# - H.6 for the verifier: [verifier] network_mode = "no-network" on every task, no other policy in
 #   [verifier.environment], and no service of tests/docker-compose.yaml with `networks` or a `network_mode` other than none;
 # - a service takes no `secrets`, `configs` or `env_file` (the same files by another road); `build` only as BUILD_KEYS
 #   allows (main: `cache_from`; a sidecar: a Dockerfile of environment/ and `cache_from`), none in tests/.
@@ -230,14 +230,14 @@ def named_volumes(services: dict) -> dict:
 
 
 env_c, test_c = t / "environment/docker-compose.yaml", t / "tests/docker-compose.yaml"
-# The resource monitor's beacons (PROTOCOL §2.10): written only by the trusted rcb_monitor service, mounted read-only in
+# The resource monitor's beacons (PROTOCOL §6): written only by the trusted rcb_monitor service, mounted read-only in
 # the services it watches (ci_checks/check-monitor.py checks the read-only mounts); no write crosses the boundary.
 BEACONS = {"rcb_limits", "rcb_observe"}
 # Nothing that widens a container beyond its own namespaces and file system (the generated rcb_monitor service has
 # its own rules: ci_checks/check-monitor.py). Sidecars publish no port: the agent reaches the service on localhost only.
 WIDEN = ("privileged", "cap_add", "security_opt", "devices", "device_cgroup_rules", "volumes_from", "pid", "ipc", "uts",
          "cgroup", "cgroup_parent", "userns_mode", "extends", "<<",
-         "oom_kill_disable", "oom_score_adj", "memswap_limit", "sysctls", "runtime")   # around the declared caps (§2.10)
+         "oom_kill_disable", "oom_score_adj", "memswap_limit", "sysctls", "runtime")   # around the declared caps (§6)
 # A service with its own network setting is not routed through Harbor's egress control: the task's allowlist would not
 # apply to it (harbor 0.23, docker.py _egress_controlled_service_names).
 OWN_NETWORK = ("network_mode", "networks")
@@ -269,7 +269,7 @@ def build_problems(svc: str, build: dict) -> list[str]:
             if not IMAGE_REF.match(r):
                 out.append(f"service {svc}: `build` cache_from `{r}` is not a registry image reference (no type=, no host path, no variable)")
     return out
-# the mode registry (PROTOCOL §2.16): RCB_MODES_TABLE from run_all.sh, "<mode> <sidecar 0|1> <twin>" longest first
+# the mode registry (PROTOCOL §3): RCB_MODES_TABLE from run_all.sh, "<mode> <sidecar 0|1> <twin>" longest first
 import os
 _table = os.environ.get("RCB_MODES_TABLE", "")
 if not _table:
@@ -285,14 +285,14 @@ if env_c.is_file():
         for k in WIDEN:
             if k in info["keys"]: fail(f"service {svc}: `{k}` is not allowed (it widens the container beyond its own namespaces and files)")
         for k in OWN_NETWORK:
-            if k in info["keys"]: fail(f"service {svc}: `{k}` is not allowed (Harbor's egress control skips a service with its own network setting: the allowlist would not apply; a sidecar is reached on localhost only, PROTOCOL §4.1)")
+            if k in info["keys"]: fail(f"service {svc}: `{k}` is not allowed (Harbor's egress control skips a service with its own network setting: the allowlist would not apply; a sidecar is reached on localhost only, PROTOCOL §3)")
         for k in HANDS_FILES:
             if k in info["keys"]: fail(f"service {svc}: `{k}` is not allowed (it hands the container files of the task or the host outside `volumes:`)")
         if "build" in info["keys"]:
             for b in build_problems(svc, info["build"]): fail(b)
         if svc != "main":
             for k in ("ports", "expose"):
-                if k in info["keys"]: fail(f"sidecar {svc}: `{k}` is not allowed (the agent reaches a sidecar on localhost only, PROTOCOL §4.1)")
+                if k in info["keys"]: fail(f"sidecar {svc}: `{k}` is not allowed (the agent reaches a sidecar on localhost only, PROTOCOL §3)")
         for kind, src, rest in info["mounts"]:
             if kind == "bind":
                 if svc == "main" and not src.startswith("$"):

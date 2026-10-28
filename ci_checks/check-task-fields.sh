@@ -22,11 +22,12 @@ MODES = tuple(l.split()[0] for l in table.splitlines() if l.strip())   # longest
 suffix = next((x for x in MODES if t.name.endswith("-" + x)), t.name.rsplit("-", 1)[-1])
 if suffix not in MODES: fail("directory name must end in " + ", ".join("-" + x for x in MODES))
 # no copies of what another source says (scripts/task_conventions.py normalize removes them): the mode is the directory's
-# suffix, the reset budget the sim service's RCB_RESET_BUDGET default (ci_checks/check-realtime.py), the egress [agent]
-# network_mode (ci_checks/check-verifier-isolation.sh)
-for k, src in (("mode", "the directory's suffix"), ("reset_budget", "the sim service's RCB_RESET_BUDGET default")):
+# suffix, the reset budget and the slowdown S the sim service's RCB_RESET_BUDGET and RCB_SLOWDOWN defaults
+# (ci_checks/check-realtime.py), the egress [agent] network_mode (ci_checks/check-verifier-isolation.sh)
+for k, src in (("mode", "the directory's suffix"), ("reset_budget", "the sim service's RCB_RESET_BUDGET default"),
+               ("slowdown", "the sim service's RCB_SLOWDOWN default")):
     if k in m: fail(f"[metadata].{k} copies {src}: drop it (scripts/task_conventions.py normalize)")
-if "tier" in m: fail("[metadata].tier was removed in protocol v1.0 (use mode)")
+if "tier" in m: fail("[metadata].tier is not a task field (the mode is the directory name's suffix)")
 if m.get("dynamics") not in ("static", "dynamic"):
     fail(f'[metadata].dynamics must be declared, "static" or "dynamic" (PROTOCOL §2), got {m.get("dynamics")!r}')
 if "/app/output/" not in d.get("artifacts", []): fail('top-level artifacts must include "/app/output/"')

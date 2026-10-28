@@ -36,7 +36,7 @@ def seeds_table(task: Path) -> tuple[dict, dict]:
 
 def holder(task: Path) -> Path:
     """The task whose tests/ holds the pair's instances: the privileged twin of a standard task, else the task."""
-    twin = tc.twin_of(task)          # the mode registry's twin mode (PROTOCOL §2.16)
+    twin = tc.twin_of(task)          # the mode registry's twin mode (PROTOCOL §3)
     return twin if twin is not None and twin.is_dir() else task
 
 

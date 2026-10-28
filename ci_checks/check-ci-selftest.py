@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """The checks check something: mutation self-test of the rules that guard the trust boundary and the resource caps.
 
-A rule that reads compose files or task.toml by pattern can go blind without anyone noticing: the trailing comment that
-images/monitor/rcb_monitor/inject.py writes after `volumes:` once hid every volume of the agent's container from
-check-verifier-isolation.sh, and all checks stayed green on a task whose agent container mounted the simulator's trusted
-volume (review of 2026-10-10, M5). This script copies a few real tasks into a temporary directory, breaks each copy in one
+A rule that reads compose files or task.toml by pattern can go blind without anyone noticing (a trailing comment after
+`volumes:` can hide every volume of the agent's container from a check that reads the block by pattern). This script copies a few real tasks into a temporary directory, breaks each copy in one
 way a rule exists for, and requires that the rule's check fails with the rule's message -- and that the unbroken copy
 passes. A mutation that passes is a blind rule: fix the check, not this list.
 
@@ -192,7 +190,7 @@ MUTATIONS = [
     ("a top-level networks block", STD, COMPOSE, append("networks:\n  default:\n    driver: bridge\n"), ISOLATION, "top-level `networks` is not allowed"),
     ("a task drops its allowlist (PROTOCOL Appendix H.6: one host list, in every task)",
      HEAVY, TOML, sub(r'^network_mode = "allowlist".*\nallowed_hosts = .*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
-    ("... a task of a benchmark that was open until 2026-10-10",
+    ("... a privileged twin task drops its allowlist",
      TWIN_P, TOML, sub(r'^network_mode = "allowlist".*\nallowed_hosts = .*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
     ("a task that declares open egress but keeps a host list in [agent]",
      OPEN, TOML, sub(r'^(network_mode = "public".*\n)', r'\1allowed_hosts = ["pypi.org"]\n'), ISOLATION, "with allowed_hosts"),
@@ -244,7 +242,7 @@ MUTATIONS = [
     ("the instruction states the external-material rule in other words",
      STD, "instruction.md", sub(r"This is an honour rule; trials are reviewed\.", "Do as you like."), RESOURCES,
      "does not state `## External material`"),
-    # ---- the agent's time cutoff (PROTOCOL §2.12): the task's own number; task.toml, the instruction and the sim service agree
+    # ---- the agent's time cutoff (PROTOCOL §2): the task's own number; task.toml, the instruction and the sim service agree
     ("task.toml's cutoff changed without normalizing (the instruction still states the old number)",
      STD, TOML, sub(r"(^\[agent\]\n(?:(?!\[).*\n)*?timeout_sec = )[0-9.]+", r"\g<1>1234.0"), CUTOFFS,
      "does not end with the `## Time limit` section rendered for its 1234 s"),
@@ -263,7 +261,7 @@ MUTATIONS = [
      PRIV, "instruction.md", sub(r"^You have \d+ seconds to complete this task\.[^\n]*\n\n", ""), CUTOFFS, "the sentence is missing"),
     ("the cutoff section is not the end of the instruction: something follows it",
      PRIV, "instruction.md", append("\nOne more remark after the time limit.\n"), CUTOFFS, "does not end with the `## Time limit` section"),
-    ("the cutoff paragraphs under the title, where they stood until 2026-10-12, instead of at the end",
+    ("the cutoff paragraphs under the title instead of at the end",
      PRIV, "instruction.md",
      lambda s: (lambda head, sep, block: head.split("\n", 1)[0] + "\n\n" + block.split("\n", 1)[1] + "\n" + head.split("\n", 1)[1])(*s.partition("\n## Time limit\n"))
      if "\n## Time limit\n" in s else (_ for _ in ()).throw(AssertionError("no `## Time limit` section")),
@@ -442,10 +440,10 @@ MUTATIONS = [
      RP_LEAK, "only an allowed agent-side file of the pinned"),
     ("a RoboPaint task dir's own rcb_brush.py with grader code, next to the files-only image's", RP, "+environment/rcb_brush.py",
      append("def score_canvas(sheet):\n    pass\n"), RP_LEAK, "grader code ('def score_canvas') in the agent's tooling"),
-    # PROTOCOL §4b: a standard-realtime task declares its slowdown S and its reset budget, and they agree
-    ("a standard-realtime task.toml whose slowdown is not its service's",
-     "humanoidbench-loco-walk-i00-standard-realtime", TOML, sub(r"^slowdown = [0-9.]+", "slowdown = 2"), REALTIME,
-     "but its service's default is 1"),
+    # PROTOCOL §2: a standard-realtime task declares its slowdown S and its reset budget once, in its sim service
+    ("a copy of the slowdown S in [metadata]",
+     "humanoidbench-loco-walk-i00-standard-realtime", TOML, sub(r'^(dynamics = .*\n)', r'\1slowdown = 1\n'), REALTIME,
+     "[metadata] slowdown copies its service's default"),
     ("a standard-realtime service whose reset budget is not the one its instruction states",
      "humanoidbench-loco-walk-i00-standard-realtime", COMPOSE, sub(r"RCB_RESET_BUDGET:-50\}", "RCB_RESET_BUDGET:-7}"),
      REALTIME, "instruction.md states 50 resets, but the task's reset budget is 7"),
@@ -469,9 +467,9 @@ def run(cmd: list[str], task: Path) -> tuple[int, str]:
 
 
 def twin_cutoffs(tmp: Path) -> int:
-    """The cutoff is each task's own (PROTOCOL §2.12): normalize renders a changed `[agent] timeout_sec` into the
+    """The cutoff is each task's own (PROTOCOL §2): normalize renders a changed `[agent] timeout_sec` into the
     instruction's closing section, the README row and the sim service's wall clock, check-cutoffs.py accepts the task on
-    its own, and check-twins.py refuses it next to its privileged twin, whose number differs (`same_cutoff_as`, §2.15). Returns the
+    its own, and check-twins.py refuses it next to its privileged twin, whose number differs (`same_cutoff_as`, H.7). Returns the
     number of failures."""
     import tomllib
     bad = 0
