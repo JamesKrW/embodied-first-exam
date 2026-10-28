@@ -33,7 +33,6 @@ Caps per container (PROTOCOL §6).
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: CPU only; 4 CPUs and 8 GB per trial, the verifier the same (the benchmark's estimate)
 
 ## Details
 | | |

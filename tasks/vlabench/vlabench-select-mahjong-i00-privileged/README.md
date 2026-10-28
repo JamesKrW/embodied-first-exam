@@ -44,7 +44,6 @@ Caps per container (PROTOCOL §6).
 | verifier | 4 | 16 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: privileged container p90 8.1 GB, verifier 4.7 GB (a per-container memory sampler); CPU only; CPU: an estimate
 
 ## Details
 | | |

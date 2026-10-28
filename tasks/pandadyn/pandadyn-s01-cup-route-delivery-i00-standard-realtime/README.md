@@ -49,12 +49,11 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 4 | 11 GiB | 1024 | 3 GiB | — |
+| `sim` | 4 | 12 GiB | 1024 | 3 GiB | — |
 | verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU with Vulkan (RTX 4090 / L4).
-- Measured: 50 oracle trials, 25 per mode (the trial's resource monitor every 5 s, RTX 4090): the sim service's peak 0.94 GiB, GPU memory 0.35 GiB, the agent's container 0.03 GiB; CPU p90 about 1 core per container; one filmed scene (render_video, S12 and D07): RSS 1.2-1.3 GiB, GPU memory 0.25 GiB; the sim service is one scene; the graded episode is replayed in one fresh process while the live scene is still up (two scenes at once), then filmed by the live scene; CPU: one core per scene plus one for the agent
 
 ## Details
 | | |

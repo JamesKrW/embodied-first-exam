@@ -218,8 +218,8 @@ Measured on the heaviest scene (`pour_liquid_into_cup_random`: GPU PhysX liquid 
 with the trial's monitor and a per-container sampler (docker stats, cgroup anon memory, nvidia-smi every 10 s):
 one Isaac Session (privileged main container, or the standard sim sidecar) peaks at 16.0-16.1 GiB of memory and 9.0-9.5 GiB
 of GPU memory and uses every core it is given while Isaac starts; a verifier replay (filmed) 15.7 GiB and 9.6 GiB. The
-determinism runs over all 54 tasks used 4.6-8.4 GB of GPU memory per process. An RTX-class GPU (`gpu_types`). The caps (each task's `task.toml`) leave room for an agent that runs a
-second Session in privileged mode.
+determinism runs over all 54 tasks used 4.6-8.4 GB of GPU memory per process. An RTX-class GPU (`gpu_types`). The
+privileged GPU-memory cap holds one Session: a second one at once can go over it (past trials peaked at 30.7 GiB).
 
 ## Image and host
 `images/robodojo/` (~75 GB, with RoboDojo's 41 GB of assets): a recipe that needs no build context, copied verbatim into

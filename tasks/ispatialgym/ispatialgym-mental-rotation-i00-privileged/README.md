@@ -44,7 +44,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: privileged trials with an agent on an RTX 4090 (docker stats and nvidia-smi per process every 30 s, 9 trials and their verifiers): the agent container peaked at 14.2 GiB of memory, 14.6 GiB of GPU memory and 12 cores (an agent may run two Isaac processes of about 13 GiB / 4.6 GiB each), the verifier at 14.4 GiB and 12 cores
 
 ## Details
 | | |

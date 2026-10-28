@@ -35,7 +35,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: RTX 4090, L40S, held by `sim`.
 - Recommended GPU: RTX 4090 24GB / L40S 48GB.
-- Measured: oracle checks on an RTX 4090, lab_001 pick: the rendering container peaks at 17 GB of memory, about 7 GB of GPU memory, 8 CPUs (start-up bursts to 16 cores for about 70 s); lab_003 families 21 GB at the peak (on an 8 vCPU host)
 
 ## Details
 | | |

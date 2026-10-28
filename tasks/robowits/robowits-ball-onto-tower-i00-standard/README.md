@@ -51,7 +51,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
-- Measured: GPU memory 0.5-1.4 GB (physics on the CPU, the GPU renders the cameras; per-trial peaks of past trials); memory: sim p90 4.5 GB (a per-container memory sampler); CPU: an estimate (single-threaded Genesis CPU backend)
 
 ## Details
 | | |

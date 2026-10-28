@@ -33,7 +33,6 @@ Caps per container (PROTOCOL §6).
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: robosuite sim p90 9.7 GB (RoboCasa and RoboCasa-GR1 together; a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate
 
 ## Details
 | | |

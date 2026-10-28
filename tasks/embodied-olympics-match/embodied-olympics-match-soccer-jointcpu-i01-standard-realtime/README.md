@@ -41,12 +41,11 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 6 | 16 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 6 | 7 GiB | 256 | no GPU | — |
-| `practice` | 4 | 7 GiB | 256 | no GPU | — |
+| `sim` | 6 | 7 GiB | 1024 | no GPU | — |
+| `practice` | 4 | 7 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: Embodied Olympics' joint-level soccer pilot on two RTX 4090 workstations (docker stats): the agent's container uses its 6 cores (drills, CPU-parallel rollouts, practice matches), the sim up to its 6 cores (the world, the opponent, the cameras), the practice service up to 4 worlds on its 4 cores; CPU tier: no GPU
 
 ## Details
 | | |

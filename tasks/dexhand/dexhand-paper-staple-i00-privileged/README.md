@@ -47,7 +47,6 @@ Caps per container (PROTOCOL §6).
 | verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: one Sharpa oracle per Marvin-arm family in each mode (CPU only, cgroup memory.peak): the verifier 3.40-3.51 GiB with two concurrent replays, the agent's container under 0.05 GiB; one fresh replay process 1.75-1.81 GiB max RSS; two cores for the verifier's two concurrent replays
 
 ## Details
 

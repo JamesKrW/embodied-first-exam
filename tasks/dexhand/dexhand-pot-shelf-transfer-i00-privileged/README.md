@@ -57,7 +57,6 @@ Caps per container (PROTOCOL §6).
 | verifier (as `main`) | 2 | 9 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: pot_shelf_transfer oracle and nop trials (CPU only, cgroup memory.peak): the verifier 3.68 GiB with two concurrent replays (3.92 GiB for two Wuji replays); sweep_dustpan: one oracle replay 1.93 GiB max RSS (599 s); two cores for the verifier's two concurrent replays
 
 ## Details
 

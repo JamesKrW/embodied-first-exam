@@ -11,12 +11,12 @@
   "practice": {
    "cpus": 4.0,
    "memory_gb": 8.0,
-   "pids": 256
+   "pids": 1024
   },
   "sim": {
    "cpus": 6.0,
    "memory_gb": 8.0,
-   "pids": 256
+   "pids": 1024
   }
  },
  "disk_gb": 10.0,

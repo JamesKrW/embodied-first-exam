@@ -41,7 +41,6 @@ Caps per container (PROTOCOL §6).
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: peak RSS of one Session 0.27-0.45 GB per scene (3000 reference rows and final_check, on a laptop); the verifier runs two replays and the video replay at once
 
 ## Details
 | | |

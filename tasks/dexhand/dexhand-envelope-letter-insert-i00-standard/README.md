@@ -50,11 +50,10 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 2 | 4 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 2 | 7 GiB | 1024 | no GPU | — |
+| `sim` | 2 | 10 GiB | 1024 | no GPU | — |
 | verifier (as `main`) | 2 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: one Sharpa oracle per Marvin-arm family in each mode (CPU only, cgroup memory.peak): the sim service 2.13-2.65 GiB, the agent's container under 0.05 GiB
 
 ## Details
 

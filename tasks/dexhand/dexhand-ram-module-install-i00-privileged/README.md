@@ -49,7 +49,6 @@ Caps per container (PROTOCOL §6).
 | verifier (as `main`) | 2 | 7 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: one Sharpa oracle per family in each mode (CPU only, cgroup memory.peak): the verifier at most 0.64 GiB with two concurrent replays, the agent's container under 0.05 GiB; one fresh replay process 0.26-0.39 GiB max RSS; an agent's own simulator sessions take about 0.3-0.5 GiB each
 
 ## Details
 

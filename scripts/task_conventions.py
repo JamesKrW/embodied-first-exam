@@ -799,8 +799,9 @@ def _gb(v) -> str:
 
 
 def readme_resources(task: Path, old_readme: str = "") -> list[str]:
-    """README `## Resources` (PROTOCOL §6): the caps of every container, as applied, and the rule's notes (a task no rule
-    matches keeps the `- Measured` / `- Recommended GPU` lines of its README)."""
+    """README `## Resources` (PROTOCOL §6): the caps of every container, as applied, and the rule's recommended GPU (a task
+    no rule matches keeps the `- Measured` / `- Recommended GPU` lines of its README). A rule's `measured` and
+    `caps_measured` stay in the rules file: they are the benchmark's, not each task's."""
     caps = task_caps(task)
     r = rule_for(task) or {}
     gpu_types = (task_toml(task).get("environment") or {}).get("gpu_types")
@@ -827,7 +828,6 @@ def readme_resources(task: Path, old_readme: str = "") -> list[str]:
     notes = [f"- GPU: {gpu}, held by {_paths(held)}." if gpu else "- GPU: not needed."]
     if r:
         notes += [f"- Recommended GPU: {r['recommended_gpu']}."] if r.get("recommended_gpu") else []
-        notes += [f"- Measured: {r['measured']}"] if r.get("measured") else []
     else:
         sec = re.search(rf"(?ms)^{re.escape(RESOURCES_HEADING)}\n(.*?)(?=^## |\Z)", old_readme or "")
         notes += [ln for ln in (sec.group(1).splitlines() if sec else [])

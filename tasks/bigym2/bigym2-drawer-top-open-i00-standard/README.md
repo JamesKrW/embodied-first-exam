@@ -41,7 +41,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
-- Measured: GPU memory 0.7-1.2 GB (per-trial peaks of past trials); memory: no samples of the sim service or the agent's container (the privileged twin's container, which runs the same simulator, 3.0 GB; a per-container memory sampler); CPU: an estimate (MuJoCo and two ONNX policies on the CPU)
 
 ## Details
 | | |

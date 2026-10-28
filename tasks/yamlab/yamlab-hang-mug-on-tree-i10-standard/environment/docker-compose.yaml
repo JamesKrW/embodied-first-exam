@@ -14,7 +14,7 @@ services:
     depends_on: [sim]
   sim:
     cpus: 16   # rcb-monitor
-    mem_limit: 21504m   # rcb-monitor
+    mem_limit: 32768m   # rcb-monitor
     pids_limit: 2048   # rcb-monitor
     x-gpu-memory-gb: 16   # GiB   # rcb-monitor
     # yamlab-base (the first stage of the Dockerfile) is built from public sources; with read access to the prebuilt

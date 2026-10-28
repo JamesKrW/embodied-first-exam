@@ -34,7 +34,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: L40S 48GB (all measurements; a 24 GB card fits the memory but trains slower, so fewer iterations fit the cutoff).
-- Measured: Harbor oracle (the reference: 4096 environments, 12638 s of training and deployments) and smoke trials on two L40S hosts (docker stats, cgroup memory.peak and nvidia-smi per container every 3-6 s): the agent's container 16.1 GiB (16492 MiB) of GPU memory, 5.3 GiB of memory (5.6 GiB cgroup peak, growing over the 3.5 h run), 1.0-1.6 cores (one Python thread drives the GPU); the public trainer's default 256 environments 1.8 GB, its cap of 1024 4.7 GB; the sidecar 2.2-2.6 cores during deployments (OSMesa), its 4-CPU cap during finalization (12 held-out cases twice and the video: 419 s), peak 2.06 GiB; at most 0.86 GiB of new files and 6 processes in the agent's container
 
 ## Details
 

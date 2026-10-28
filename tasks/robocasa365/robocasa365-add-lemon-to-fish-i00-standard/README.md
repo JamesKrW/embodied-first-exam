@@ -33,7 +33,6 @@ Caps per container (PROTOCOL §6).
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: sim p90 5.6 GB (a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate
 
 ## Details
 | | |

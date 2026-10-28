@@ -46,11 +46,10 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 4 | 8 GiB | 1024 | no GPU | — |
+| `sim` | 4 | 9 GiB | 1024 | no GPU | — |
 | verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: memory: sim 1.9 GB (a per-container memory sampler); CPU only; 4 CPUs visible to each container that runs the simulator (cpuset / affinity, not a quota): OpenBLAS runs no more threads than that and DexJoCo's result differs below 4 (tasks/dexjoco/README.md, Threads); with fewer there is no verdict (too_few_cpus, infra_error)
 
 ## Details
 | | |

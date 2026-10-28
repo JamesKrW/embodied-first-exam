@@ -62,7 +62,6 @@ Caps per container (PROTOCOL §6).
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: the standard tasks' measurements (the sim sidecar's CPU p90 4.74 / max 5.28 cores while it finalized with two replays and the video; the current finalize, the video only, was not re-measured; its PSS max 2.84 GB; main PSS max 0.74 GB; a whole trial's PSS max 4.75 GB), the same simulator and finalize; the realtime clock keeps about a fifth of one core busy (4 ms of physics per 20 ms step)
 
 ## Details
 | | |

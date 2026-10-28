@@ -41,13 +41,12 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 6 | 16 GiB | 2048 | 12 GiB | 10 GiB |
-| `sim` | 6 | 8 GiB | 256 | no GPU | — |
-| `practice` | 4 | 8 GiB | 256 | no GPU | — |
+| `sim` | 6 | 8 GiB | 1024 | no GPU | — |
+| `practice` | 4 | 8 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: RTX 4090 24GB / L4 24GB / L40S 48GB.
-- Measured: Embodied Olympics' joint-level soccer pilot on an RTX 4090 workstation (nvidia-smi every 30 s): the agents trained with rsl_rl on the GPU worlds at 3-10 GB of GPU memory (one RTX 4090); the sim and the practice service as the CPU tier
 
 ## Details
 | | |

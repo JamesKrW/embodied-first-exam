@@ -55,7 +55,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU with Vulkan (RTX 4090 / L4).
-- Measured: 50 oracle trials, 25 per mode (the trial's resource monitor every 5 s, RTX 4090): the sim service's peak 0.94 GiB, GPU memory 0.35 GiB, the agent's container 0.03 GiB; CPU p90 about 1 core per container; one filmed scene (render_video, S12 and D07): RSS 1.2-1.3 GiB, GPU memory 0.25 GiB; the sim service is one scene, rebuilt on every reset and once after the verdict to film the graded episode in the same process; CPU: one core per scene plus one for the agent
 
 ## Details
 | | |

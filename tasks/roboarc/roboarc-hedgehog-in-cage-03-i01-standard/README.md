@@ -41,7 +41,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer).
-- Measured: MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards
 
 ## Details
 

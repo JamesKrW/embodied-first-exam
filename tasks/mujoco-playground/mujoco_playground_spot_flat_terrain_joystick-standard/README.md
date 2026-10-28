@@ -46,7 +46,6 @@ Caps per container (PROTOCOL §6).
 | verifier (as `main`) | 2 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: memory: sim 0.7 GB (a per-container memory sampler); CPU only; CPU p90 1.9 cores (a per-container sampler every 30 s)
 
 ## Details
 | | |

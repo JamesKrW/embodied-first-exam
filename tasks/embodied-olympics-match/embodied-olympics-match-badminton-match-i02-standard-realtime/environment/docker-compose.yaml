@@ -21,7 +21,7 @@ services:
     command: python3 /srv/core/launch.py
     cpus: 6
     mem_limit: 6g
-    pids_limit: 256
+    pids_limit: 1024
     cap_drop: [NET_RAW]
     environment:
       RCB_DATA: "/data"

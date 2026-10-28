@@ -30,12 +30,11 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 10 GiB | 8192 | 5 GiB | — |
+| `sim` | 4 | 13 GiB | 8192 | 5 GiB | — |
 | verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
-- Measured: oracle trials of all 60 directories on an RTX 4090 workstation (docker stats every 3 s, the trial's resource monitor): the sim sidecar 2.1 GB and 0.83 GiB of GPU memory (standard, chess; realtime 0.8 GB and 0.72 GiB), the agent's container (the client) 0.03 GB; the collect hook renders the video inside the sidecar (EGL)
 
 ## Details
 | | |

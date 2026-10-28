@@ -45,7 +45,6 @@ Caps per container (PROTOCOL §6).
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: RTX 4090 24GB / L4 24GB.
-- Measured: GPU memory: per-trial peaks of past trials up to 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card (the oracle 6.9 GB on an RTX 4090, 5.8 GB on an L4); memory: sim p90 3.2 GB (a per-container memory sampler); CPU: an estimate
 
 ## Details
 | | |

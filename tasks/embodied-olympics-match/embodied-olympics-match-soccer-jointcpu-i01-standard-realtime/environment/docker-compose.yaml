@@ -23,7 +23,7 @@ services:
     command: python3 /srv/core/launch.py
     cpus: 6
     mem_limit: 7g
-    pids_limit: 256
+    pids_limit: 1024
     cap_drop: [NET_RAW]
     environment:
       RCB_DATA: "/data"
@@ -70,7 +70,7 @@ services:
     command: python3 /practice/practice_server.py
     cpus: 4
     mem_limit: 7g
-    pids_limit: 256
+    pids_limit: 1024
     cap_drop: [NET_RAW]
     environment:
       PRACTICE_WORLDS: "4"

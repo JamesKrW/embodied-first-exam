@@ -39,12 +39,11 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 2 | 8 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 16 | 25 GiB | 2048 | 16 GiB | — |
+| `sim` | 16 | 35 GiB | 2048 | 16 GiB | — |
 | verifier (as `main`) | 2 | 8 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: the heaviest scene (pour_liquid_into_cup_random), a client driving 12 joint_position chunks, on an RTX 4090: sim sidecar peak 16.0 GiB (anon 14.9), GPU memory 9.5 GiB, up to 16 cores while Isaac starts; the agent's container under 0.1 GiB (a per-container sampler every 10 s); the collect hook only encodes the live video on the CPU, so the sidecar's peak is the live service's
 
 ## Details
 | | |

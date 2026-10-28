@@ -32,7 +32,6 @@ Caps per container (PROTOCOL §6).
 | verifier | 4 | 16 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: privileged container p90 7.2 GB (a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate
 
 ## Details
 | | |

@@ -45,7 +45,6 @@ Caps per container (PROTOCOL §6).
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: verifier 1.6 GB (a per-container memory sampler); the rest estimated (robosuite, CPU only, 256x256 OSMesa cameras)
 
 ## Details
 | | |

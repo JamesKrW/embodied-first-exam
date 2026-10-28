@@ -50,7 +50,6 @@ Caps per container (PROTOCOL §6).
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: the sim service estimated (robosuite, CPU only, 256x256 OSMesa cameras); the privileged twin's verifier, which replays the same simulator, 1.6 GB (a per-container memory sampler)
 
 ## Details
 | | |

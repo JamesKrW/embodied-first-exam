@@ -37,7 +37,6 @@ Caps per container (PROTOCOL §6).
 | verifier | 6 | 10 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: a Harbor oracle trial on an RTX 4090 workstation: CPU-only MuJoCo with two Booster T1 humanoids per team; the verifier holds the service, the program, one replay and the video renderer; 6 CPUs pinned (the match runs on the wall clock)
 
 ## Details
 

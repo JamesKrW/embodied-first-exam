@@ -30,11 +30,10 @@ Caps per container (PROTOCOL §6).
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 4 GiB | 1024 | no GPU | 10 GiB |
-| `sim` | 4 | 45 GiB | 1024 | no GPU | — |
+| `sim` | 4 | 39 GiB | 1024 | no GPU | — |
 | verifier (as `main`) | 4 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: CPU only; 4 CPUs and 8 GB per trial, the verifier the same (the benchmark's estimate)
 
 ## Details
 | | |
