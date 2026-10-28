@@ -758,8 +758,39 @@ def cmd_replay(a) -> int:
     return 0
 
 
+def _build_with_camera(inst: dict, make_camera):
+    """`build(inst)` exactly as replay builds it, with a camera that never touches the physics: the camera prim is
+    added just before the env's own (single) `sim.reset()`, and that reset skips Isaac Lab's two warm-up renders.
+    Measured: those warm-up renders (fabric flush + app update with rendering on) and an extra `sim.reset()` change
+    later physics bits (a kinematic body's pose by 1 ulp); with neither, a rendered replay repeats the graded run's
+    final state bit for bit. `make_camera()` is called once and its result returned with the env."""
+    from isaaclab.sim import SimulationContext
+    orig = SimulationContext.reset
+    made: list = []
+
+    def reset(self, soft: bool = False):        # Isaac Lab's reset minus the warm-up renders
+        if not made:
+            made.append(make_camera())
+        self._disable_app_control_on_stop_handle = True
+        super(SimulationContext, self).reset(soft=soft)
+        if self.physics_sim_view:
+            self.physics_sim_view._backend.initialize_kinematic_bodies()
+        self._disable_app_control_on_stop_handle = False
+
+    SimulationContext.reset = reset
+    try:
+        env = build(inst)
+    finally:
+        SimulationContext.reset = orig
+    if not made:
+        raise RuntimeError("the env build did not reset the simulation: no camera")
+    return env, made[0]
+
+
 def cmd_video(a) -> int:
-    """Render a recorded rollout (a fresh replay with a camera) to an mp4. Never part of a verdict."""
+    """Render a recorded rollout to an mp4: a fresh replay (the same build, reset and physics steps as `replay`) with
+    a camera, rendered between physics steps without changing them. Never part of a verdict; `final_sha` lets the
+    verifier check that the video reached the graded run's final state."""
     import numpy as np
     import torch
     res: dict = {}
@@ -770,18 +801,9 @@ def cmd_video(a) -> int:
         import isaaclab.sim as sim_utils
         from isaaclab.sensors import Camera, CameraCfg
         inst = load_instance(a.instance)
-        if BENCH_ROOT not in sys.path:
-            sys.path.insert(0, BENCH_ROOT)
-        import robobench
-        robobench.discover()
-        from robobench.core.registries import ENVS
-        seed = int(inst["seed"])
-        env = ENVS.get(inst["preset"])().build(num_envs=1, seed=seed, device=DEVICE)
-        cam = Camera(CameraCfg(prim_path="/World/esw_cam", update_period=0.0, height=a.height, width=a.width,
-                               data_types=["rgb"], spawn=sim_utils.PinholeCameraCfg(focal_length=18.0,
-                                                                                  clipping_range=(0.01, 100.0))))
-        env.sim.reset()                                     # re-parse so the camera exists, then the graded reset
-        env.reset(seed=seed)
+        env, cam = _build_with_camera(inst, lambda: Camera(CameraCfg(
+            prim_path="/World/esw_cam", update_period=0.0, height=a.height, width=a.width, data_types=["rgb"],
+            spawn=sim_utils.PinholeCameraCfg(focal_length=18.0, clipping_range=(0.01, 100.0)))))
         res["instance_ok"] = state_sha(env) == inst["state_sha"]
         eye, target = (env.room or {}).get("camera") or ((1.6, -1.6, 1.4), (0.3, 0.0, 0.5))
         if a.eye and a.target:
@@ -797,13 +819,15 @@ def cmd_video(a) -> int:
         for i, row in enumerate(A):
             grab = (i % every == 0) or i == len(A) - 1
             try:
-                env.step(torch.from_numpy(row).reshape(1, -1), render=grab)
+                env.step(torch.from_numpy(row).reshape(1, -1))       # the physics step exactly as replay takes it
             except Exception as exc:  # noqa: BLE001 — the rollout raised on this step too and went on after it
                 res.setdefault("step_error", f"{type(exc).__name__}: {exc}"[:500])
                 res.setdefault("step_error_at", i)
                 continue
             if grab:
-                cam.update(env.dt)
+                for _ in range(1 if n else 3):  # draw the state, no physics step; the renderer's first 2 are dark
+                    env.sim.render()
+                    cam.update(env.dt)
                 f = cam.data.output["rgb"][0].detach().cpu().numpy()[..., :3]
                 if f.size and f.any():
                     w.append_data(f)

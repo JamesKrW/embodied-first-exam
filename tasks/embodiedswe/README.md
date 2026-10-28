@@ -49,7 +49,9 @@ which no action reached the simulator scores 0. A fresh process then re-executes
 
 Differences from EmbodiedSWE's own grading, on purpose:
 - PhysX runs on the CPU (see Device), so a fresh process repeats a run bit for bit and the video rendered after the
-  verdict shows the graded run.
+  verdict shows the graded run. The video process builds, resets and steps exactly as the replay does; its camera is
+  added before the simulation's single reset, Isaac Lab's warm-up renders in that reset are skipped, and frames are
+  drawn between physics steps, since each of those otherwise changes later physics bits.
 - Only the final `solution/` is graded, once: no submitted checkpoints, no best-of-N.
 - `solve` runs in a sandbox (a separate process as an unprivileged user, no network, no GPU) behind a proxy env, with
   the 30-minute limit on its wall clock.
