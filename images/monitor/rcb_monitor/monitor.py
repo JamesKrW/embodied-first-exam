@@ -56,19 +56,25 @@ own (observed) services are recorded only.
              only when what the backstop may kill holds at least the excess (else `no_victim`: the memory is PID 1's,
              or files in a tmpfs); a process under MEM_MIN_VICTIM_GB is never chosen
   pids       over the cap in rcb_limits.PIDS_RUN samples in a row (the count comes from a /proc walk that is not
-             atomic): SIGKILL the newest processes until the count is back at it, like a fork that fails
+             atomic): SIGKILL the newest processes until the count is back at it, like a fork that fails, and only
+             when the processes it may kill hold enough of the count to bring it there (else `no_victim`: the rest is
+             PID 1's, or zombies nobody reaps)
   cpu        over the cap: never a kill. The container's own cgroup gets the cap as its CPU quota where the monitor can
              write it; else its processes are duty-cycled with SIGSTOP / SIGCONT (Throttler, THROTTLE_PERIOD_SEC),
-             only while their demand is above it, never resuming a process that was stopped before
+             only while their demand is above it, never resuming a process whose stop is not the monitor's own
   disk       over the cap at a disk measurement: SIGKILL the process that holds the most bytes open for writing in files
-             under the measured paths, like a write that fails with ENOSPC; no second kill without growth since
+             under the measured paths, like a write that fails with ENOSPC, and only when it holds at least the excess
+             and DISK_MIN_VICTIM_GB (else `no_victim`: killing it would free nothing); no second kill without growth
+             since, until the disk is under the cap again
   gpu memory over the container's x-gpu-memory-gb: SIGKILL the process holding the most GPU memory, one per tick, when
              the processes it may kill hold at least the excess
 Never PID 1 or what started with it (spared(): the container stays up for collection). Every signal goes through a
 pidfd opened before the process is checked to be the one measured and still in the trial (in_trial: its root shows the
-beacon, or it is in the cgroup of one of the trial's containers). Every action is a `kill` / `throttle_start` /
+beacon, or it is in the cgroup of one of the trial's containers); where pidfd_open fails (kernels before 5.3, an older
+seccomp profile), the check is made right before every signal (a `backstop_error` says so once). Every action is a `kill` / `throttle_start` /
 `throttle_end` event; a resource the monitor cannot observe (NVML not telling a process's memory, unreadable open files,
-a service whose caps it cannot tell) is an `unobservable` event and nothing is killed for it. None of this changes the
+a service whose caps it cannot tell, NVML's PIDs when the monitor is not in the host's PID namespace) is an
+`unobservable` event and nothing is killed for it. None of this changes the
 grade (rcb_limits.verify). 0: it only records; Docker / Harbor enforce what the host lets them.
 
 After the seal it stays up until the runtime stops it, except in a container without a cgroup of its own (rootless
@@ -111,6 +117,8 @@ THROTTLE_REFRESH_SEC = 1.0      # ... how often the processes of a throttled con
 CPU_PERIOD_US = 100000          # the CFS period of a quota the monitor writes (Docker's)
 MEM_MIN_VICTIM_GB = 0.01        # memory backstop: a process holding less (PSS) is never killed for memory
 DISK_GROWTH_GB = 0.01           # disk backstop: no second kill unless the disk grew this much since the last one
+DISK_MIN_VICTIM_GB = 0.01       # ... a process holding less open for writing is never killed for disk
+INIT_PID_NS = "pid:[4026531836]"  # the host's PID namespace (the kernel's fixed PROC_PID_INIT_INO): NVML's PIDs are its
 CONTAINER_CG = re.compile(r"[0-9a-f]{64}")   # a container's own cgroup (docker-<id>.scope, libpod-<id>.scope, /docker/<id>)
 RUNTIME_RES = {"cpu": "cpus", "memory": "memory_gb", "pids": "pids"}    # what a container's own cgroup can hold
 DISK_SLICE_SEC = 1.5            # of every tick a running disk walk may take (the monitor's CPU cap is half a core)
@@ -176,6 +184,39 @@ def cg_path(pid):
         if line.startswith("0::"):
             return line[3:].strip() or None
     return None
+
+
+def open_pidfd(pid):
+    """A pidfd of the process, or None where the monitor has none to open (a /proc that is not this kernel's: the tests;
+    a Python without os.pidfd_open). Raises ProcessLookupError when the process is gone, OSError when the call fails
+    (ENOSYS before Linux 5.3, EPERM under an older seccomp profile): the callers then check again before every signal."""
+    if PROC != "/proc" or not hasattr(os, "pidfd_open"):
+        return None
+    return os.pidfd_open(pid)
+
+
+def members_of(cg, mnt, mon):
+    """The processes of a container now: those of its own cgroup directory `cg` when it has one (readable), else those
+    of its mount namespace `mnt` whose root shows the trial's beacon (Monitor.in_trial)."""
+    if cg:
+        procs = read(cg + "/cgroup.procs")
+        if procs is not None:
+            return [int(x) for x in procs.split() if x.isdigit()]
+    out = []
+    try:
+        names = os.listdir(PROC)
+    except OSError:
+        names = []
+    for d in names:
+        if not d.isdigit():
+            continue
+        m = rl(f"{PROC}/{d}/ns/mnt")
+        if m is None:                               # its first thread exited, the others run on (Monitor.live_thread)
+            b = mon.live_thread(int(d))
+            m = rl(b + "/ns/mnt") if b else None
+        if m == mnt and mon.in_trial(int(d)):
+            out.append(int(d))
+    return out
 
 
 def state_of(base):
@@ -613,27 +654,33 @@ class OomWatch:
 class Throttler:
     """The CPU backstop (RCB_LIMITS_ENFORCE=1, only for a container whose own runtime does not hold its CPU at the cap:
     Monitor.enforcers). Where the container's own cgroup takes a quota from the monitor (cpu.max, or cpu.cfs_quota_us on
-    cgroup v1, writable), the kernel throttles it, exactly like Docker's `cpus` (method "cgroup"; the value is put back
-    when the throttle ends). Else it is duty-cycled, cpulimit-style (method "signal"): every THROTTLE_PERIOD_SEC its
-    processes get SIGCONT, run for `frac` of the period, then get SIGSTOP for the rest (parents stopped before their
-    children, children continued before their parents). A share too small for one period's run window
-    (THROTTLE_MIN_RUN_SEC) runs that window every k-th period instead, so any demand can be brought to the cap.
+    cgroup v1, writable), the kernel throttles it, exactly like Docker's `cpus` (method "cgroup"; the old values, the
+    period too on v1, are put back when the throttle ends). Else it is duty-cycled, cpulimit-style (method "signal"):
+    every THROTTLE_PERIOD_SEC its processes get SIGCONT, run for `frac` of the period, then get SIGSTOP for the rest
+    (parents stopped before their children, children continued before their parents). A share too small for one
+    period's run window (THROTTLE_MIN_RUN_SEC) runs a window of k times its share every k-th period instead, so any
+    demand can be brought to the cap and the share run is the share asked for.
     frac = cap / demand, demand = the CPU used over the last tick / the share it was let run; released when the demand
     fits under the cap (SIGCONT to all). A shell with job control sees the SIGSTOP of a child it waits for (a `Stopped`
-    job): PROTOCOL §6 says so. A process that was already stopped when it joined the throttle (state T: the agent's own
-    SIGSTOP) is never signalled, so it is never resumed by the monitor. Its own thread; every process is let go
-    (SIGCONT) when the container is released, when one leaves the throttled set, at the seal, when the monitor is
-    stopped, and by a restarted monitor (the set is kept in state.json, Monitor.restore). Never PID 1 or what started
-    with it (Monitor.spared). The processes are those of the container's own cgroup when it has one, else those of its
-    mount namespace whose root shows the trial's beacon (a namespace number can be reused by another trial); each is
-    signalled through a pidfd opened after that check (a reused PID is never signalled), else after the check is made
-    again at every signal."""
+    job): PROTOCOL §6 says so. Only a stop the monitor sent is ever undone: a process found stopped (state T) when the
+    monitor did not stop it last (the agent's own SIGSTOP, before the throttle or during a run window) is never
+    signalled again, so never resumed by the monitor (`foreign`). A stop the agent sends while the monitor holds the
+    process stopped cannot be told from the monitor's own: that one is resumed with it. Its own thread; every process
+    the monitor stopped is let go (SIGCONT) when the container is released, when one leaves the throttled set, at the
+    seal, when the monitor is stopped, and by a restarted monitor (state.json, written before a process that joined
+    the set is first stopped: Monitor.resume_previous). Never PID 1 or what started with it (Monitor.spared). The
+    processes are those of the container's own cgroup when it has one, else those of its mount namespace whose root
+    shows the trial's beacon (a namespace number can be reused by another trial); each is signalled through a pidfd
+    opened after that check (a reused PID is never signalled), else (no pidfd on this host) after the check is made
+    again at every signal. `sec` in `throttle_end`: the time its processes were held by signals that reached them."""
 
     def __init__(self, mon):
         self.mon = mon
         self.lock = threading.RLock()     # RLock: the SIGTERM handler may run while the sampler holds it
         self.active = {}          # mnt ns -> {"frac", "cap", "since", "service", "role", "keep", "procs": {pid: (start, fd)},
-        #                           "foreign": {(pid, start)}, "refreshed", "method", "cg", "file", "orig", "n"}
+        #                           "ours": {pid: start} (the monitor's SIGSTOP was the last signal it sent there),
+        #                           "foreign": {(pid, start)}, "refreshed", "method", "cg", "file", "orig", "pfile",
+        #                           "porig", "n", "held", "landed"}
         self.thread = None
         self.stopped = False
         self.said = set()
@@ -650,17 +697,18 @@ class Throttler:
             if e is None:
                 keep = {(p, (proc_stat(p) or (None,))[0]) for p in self.mon.spared(g["pids"])}
                 e = {"frac": frac, "cap": cap, "since": now(), "service": g.get("service"), "role": g["role"],
-                     "keep": keep, "procs": {}, "foreign": set(), "refreshed": 0.0, "n": 0, "method": "signal",
-                     "cg": g.get("cg"), "mnt": mnt}
+                     "keep": keep, "procs": {}, "ours": {}, "foreign": set(), "refreshed": 0.0, "n": 0,
+                     "method": "signal", "cg": g.get("cg"), "mnt": mnt, "held": False, "landed": 0.0}
                 f = self._cgroup_quota(e, cap)
                 if f:
-                    e["method"], e["file"], e["orig"] = "cgroup", f[0], f[1]
+                    e["method"], e["file"], e["orig"], e["pfile"], e["porig"] = "cgroup", f[0], f[1], f[2], f[3]
                 self.active[mnt] = e
                 if e["method"] == "signal":
                     self._refresh(mnt, e, g["pids"])
                 self.mon.save_state()
                 event("throttle_start", resource="cpu", service=g.get("service"), role=g["role"], value=round(demand, 2),
                       cap=cap, fraction=round(frac, 3), method=e["method"],
+                      **({"processes": len(e["procs"])} if e["method"] == "signal" else {}),
                       **({"stopped_before": len(e["foreign"])} if e["foreign"] else {}))
             else:
                 e["frac"] = frac
@@ -668,8 +716,9 @@ class Throttler:
             self.start()
 
     def _cgroup_quota(self, e, cap):
-        """(file, the value it had) after writing the cap as the cgroup's CPU quota, or None (no cgroup of its own, or
-        not writable here: `cgroup: host` mounts the tree read-only on most hosts)."""
+        """(file, the value it had, period file or None, the period it had) after writing the cap as the cgroup's CPU
+        quota, or None (no cgroup of its own, or not writable here: `cgroup: host` mounts the tree read-only on most
+        hosts)."""
         cg = e.get("cg")
         if not cg:
             return None
@@ -678,14 +727,23 @@ class Throttler:
             old = read(f)
             if old is None:
                 continue
+            pfile = porig = None
             try:
                 if f.endswith("cfs_quota_us"):
-                    with open(cg + "/cpu.cfs_period_us", "w") as fh:
+                    pfile = cg + "/cpu.cfs_period_us"
+                    porig = (read(pfile) or "").strip() or None
+                    with open(pfile, "w") as fh:
                         fh.write(str(CPU_PERIOD_US))
                 with open(f, "w") as fh:
                     fh.write(val)
-                return f, old.strip()
+                return f, old.strip(), pfile, porig
             except OSError:
+                if pfile and porig:                 # the period was written, the quota not: put the period back
+                    try:
+                        with open(pfile, "w") as fh:
+                            fh.write(porig)
+                    except OSError:
+                        pass
                 return None
         return None
 
@@ -714,14 +772,24 @@ class Throttler:
                 return
             self._let_go(e)
         self.mon.save_state()
-        event("throttle_end", resource="cpu", service=e["service"], role=e["role"], why=why,
-              sec=round(now() - e["since"], 1), method=e["method"], **kw)
+        engaged = round(now() - e["since"], 1)
+        sec = engaged if e["method"] == "cgroup" else round(e.get("landed", 0.0), 1)
+        event("throttle_end", resource="cpu", service=e["service"], role=e["role"], why=why, sec=sec,
+              engaged_sec=engaged, method=e["method"], **kw)
+
+    @staticmethod
+    def _restore(file, orig, pfile=None, porig=None):
+        """Put back a quota (and on cgroup v1 its period) the monitor wrote: the quota first (any period takes "-1")."""
+        with open(file, "w") as fh:
+            fh.write(orig)
+        if pfile and porig:
+            with open(pfile, "w") as fh:
+                fh.write(porig)
 
     def _let_go(self, e):
         if e["method"] == "cgroup":
             try:
-                with open(e["file"], "w") as fh:
-                    fh.write(e["orig"])
+                self._restore(e["file"], e["orig"], e.get("pfile"), e.get("porig"))
             except OSError as err:
                 self._err("restore", f"restoring {os.path.basename(e['file'])}: {type(err).__name__}: {err}")
         else:
@@ -744,46 +812,33 @@ class Throttler:
                 pass
 
     def state(self):
-        """What a restarted monitor must undo (state.json): the processes this one may have stopped, the quotas it wrote."""
+        """What a restarted monitor must undo (state.json): the processes this one may have stopped (and the container
+        they are in, and the stopped processes that are not its own), the quotas it wrote."""
         out = []
-        for e in list(self.active.values()):
-            if e["method"] == "cgroup":
-                out.append({"file": e["file"], "orig": e["orig"]})
-            else:
-                out.append({"procs": [[p, v[0]] for p, v in list(e["procs"].items())]})
+        with self.lock:
+            for e in self.active.values():
+                if e["method"] == "cgroup":
+                    out.append({k: e.get(k) for k in ("file", "orig", "pfile", "porig")})
+                else:
+                    out.append({"procs": [[p, v[0]] for p, v in e["procs"].items()], "mnt": e.get("mnt"),
+                                "cg": e.get("cg"), "not_ours": [[p, s] for p, s in e["foreign"] | e["keep"]]})
         return out
 
     # ---- the processes of a throttled container
     def _members(self, e):
         """The container's processes now: its own cgroup's when it has one, else its mount namespace's whose root
         shows the trial's beacon."""
-        if e.get("cg"):
-            procs = read(e["cg"] + "/cgroup.procs")
-            if procs is not None:
-                return [int(x) for x in procs.split() if x.isdigit()]
-        out = []
-        try:
-            names = os.listdir(PROC)
-        except OSError:
-            names = []
-        for d in names:
-            if not d.isdigit():
-                continue
-            mnt = rl(f"{PROC}/{d}/ns/mnt")
-            if mnt is None:                         # its first thread exited, the others run on (Monitor.live_thread)
-                b = self.mon.live_thread(int(d))
-                mnt = rl(b + "/ns/mnt") if b else None
-            if mnt == e["mnt"] and self.mon.in_trial(int(d)):
-                out.append(int(d))
-        return out
+        return members_of(e.get("cg"), e["mnt"], self.mon)
 
     def _refresh(self, mnt, e, pids=None):
         """Look up the container's processes again (new ones started since are throttled too, gone ones dropped: a
-        process that leaves the set gets SIGCONT first)."""
+        process that leaves the set gets SIGCONT first, when the monitor stopped it). A change of the set is written to
+        state.json at once, before a process that joined it is first stopped."""
         if pids is None:
             pids = self._members(e)
         keep_pids = {p for p, _ in e["keep"]}
         old = e["procs"]
+        before = set(old)
         new = {}
         for p in pids:
             if p in keep_pids:
@@ -797,28 +852,39 @@ class Throttler:
             if state_of(f"{PROC}/{p}") in ("T", "t"):
                 e["foreign"].add((p, ps[0]))        # stopped by someone else: never ours to resume
                 continue
-            fd = self._pidfd(p, ps[0])
-            if fd is None and PROC == "/proc" and hasattr(os, "pidfd_open"):
+            ok, fd = self._pidfd(p, ps[0])
+            if not ok:
                 continue                            # gone, or no longer the trial's
             new[p] = (ps[0], fd)
         if old:
-            self._signal({"procs": old}, signal.SIGCONT)
+            self._signal(dict(e, procs=old), signal.SIGCONT)
             self._close({"procs": old})
+            for p in old:
+                e["ours"].pop(p, None)
         e["procs"], e["refreshed"] = new, now()
         e["foreign"] = {(p, s) for p, s in e["foreign"] if (proc_stat(p) or (None,))[0] == s}
+        if set(new) != before:
+            self.mon.save_state()
 
     def _pidfd(self, p, start):
-        if PROC != "/proc" or not hasattr(os, "pidfd_open"):
-            return None
+        """(ok, fd): ok when the process is still the one seen (same start time) and in the trial; fd a pidfd opened
+        before that check, or None where this host has none (open_pidfd failed: the check is then made again before
+        every signal, _signal)."""
+        fd = None
         try:
-            fd = os.pidfd_open(p)
-        except OSError:
-            return None
+            fd = open_pidfd(p)
+        except ProcessLookupError:
+            return False, None
+        except OSError as err:
+            self._err("pidfd", f"pidfd_open: {type(err).__name__}: {err}: processes are signalled by PID, each "
+                               "checked again (start time, trial) right before every signal")
+            fd = None
         ps = proc_stat(p)
         if not ps or ps[0] != start or not self.mon.in_trial(p):     # the PID now names another process
-            os.close(fd)
-            return None
-        return fd
+            if fd is not None:
+                os.close(fd)
+            return False, None
+        return True, fd
 
     @staticmethod
     def _close(e):
@@ -838,9 +904,23 @@ class Throttler:
             except OSError:
                 pass
 
-    def _signal(self, e, sig):
+    def _signal(self, e, sig, fresh=False):
+        """SIGSTOP / SIGCONT to the processes of `e`; how many it reached. A SIGCONT goes only to a process whose last
+        signal from the monitor was its SIGSTOP; a process found stopped that the monitor did not stop last is the
+        agent's to resume: it leaves the set (`foreign`) and is never signalled again. fresh: only the processes the
+        monitor has not stopped (a SIGSTOP in a period the container sits out)."""
+        ours = e.setdefault("ours", {})
         order = sorted(e["procs"].items(), key=lambda kv: kv[1][0], reverse=(sig == signal.SIGCONT))
+        n, dropped = 0, []
         for p, (start, fd) in order:
+            if fresh and ours.get(p) == start:
+                continue
+            if ours.get(p) != start:
+                if state_of(f"{PROC}/{p}") in ("T", "t"):
+                    dropped.append((p, start, fd))  # stopped, not by the monitor: the agent's own stop
+                    continue
+                if sig == signal.SIGCONT:
+                    continue                        # running: nothing to resume
             try:
                 if fd is not None:
                     signal.pidfd_send_signal(fd, sig)
@@ -850,9 +930,30 @@ class Throttler:
                         continue
                     os.kill(p, sig)
             except ProcessLookupError:
-                pass
+                continue
             except OSError as err:
                 self._err(("signal", type(err).__name__), f"signal to a process: {type(err).__name__}: {err}")
+                continue
+            n += 1
+            if sig == signal.SIGSTOP:
+                ours[p] = start
+            else:
+                ours.pop(p, None)
+        if dropped:
+            procs = e["procs"]
+            for p, start, fd in dropped:
+                e.setdefault("foreign", set()).add((p, start))
+                ours.pop(p, None)
+                if procs.get(p, (None,))[0] == start:
+                    del procs[p]
+                    if fd is not None:
+                        try:
+                            os.close(fd)
+                        except OSError:
+                            pass
+            if "mnt" in e and self.active.get(e["mnt"]) is e:
+                self.mon.save_state()
+        return n
 
     # ---- the thread
     def start(self):
@@ -862,7 +963,8 @@ class Throttler:
 
     def cycle(self, sleep=time.sleep, clock=time.monotonic):
         """One period: every throttled container runs for its share of it, then is stopped for the rest (a share under
-        one run window: the window, every k-th period)."""
+        one run window: k times its share, every k-th period). A period counts in `landed` when the monitor's stop
+        reached at least one of its processes."""
         t0 = clock()
         runs = []
         with self.lock:
@@ -875,10 +977,13 @@ class Throttler:
                 if 0 < run < THROTTLE_MIN_RUN_SEC:
                     k = math.ceil(THROTTLE_MIN_RUN_SEC / run)
                     e["n"] += 1
-                    if e["n"] % k:
-                        continue                    # stays stopped this period
-                    run = THROTTLE_MIN_RUN_SEC
+                    if e["n"] % k:                  # sits this period out: stopped (one that joined, too)
+                        if len(e["ours"]) < len(e["procs"]):
+                            e["held"] = (self._signal(e, signal.SIGSTOP, fresh=True) > 0) or e.get("held", False)
+                        continue
+                    run = min(THROTTLE_PERIOD_SEC, run * k)
                 self._signal(e, signal.SIGCONT)
+                e["held"] = False
                 runs.append((run, mnt, e))
         for run, mnt, e in sorted(runs, key=lambda x: x[0]):
             wait = t0 + run - clock()
@@ -886,10 +991,14 @@ class Throttler:
                 sleep(wait)
             with self.lock:
                 if self.active.get(mnt) is e and e["frac"] < 1.0:
-                    self._signal(e, signal.SIGSTOP)
+                    e["held"] = self._signal(e, signal.SIGSTOP) > 0
         wait = t0 + THROTTLE_PERIOD_SEC - clock()
         if wait > 0:
             sleep(wait)
+        with self.lock:
+            for e in self.active.values():
+                if e["method"] == "signal" and e.get("held"):
+                    e["landed"] = e.get("landed", 0.0) + max(0.0, clock() - t0)
 
     def _loop(self):
         try:
@@ -904,6 +1013,7 @@ class Throttler:
                         for e in self.active.values():
                             if e["method"] == "signal":
                                 self._signal(e, signal.SIGCONT)
+                                e["held"] = False
                     self._err("loop", f"throttle: {type(err).__name__}: {err}")
                     time.sleep(0.5)
         finally:
@@ -965,6 +1075,8 @@ class Monitor:
         except Exception as e:
             self.caps["nvml_error"] = f"{type(e).__name__}: {e}"[:200]
         self.caps["nvml"] = int(self.nvml is not None)
+        self.pidns_host = rl(f"{PROC}/self/ns/pid") == INIT_PID_NS   # NVML's PIDs are the host's: they are ours only here
+        self.caps["pid_ns_host"] = int(self.pidns_host)
         self.caps["nvml_devices"] = len(self.nvml.handles) if self.nvml else 0
         self.t0 = now()
         self.clock_t0 = self.t0  # the agent's clock (usage.json): the first start's, across restarts (run())
@@ -1129,13 +1241,61 @@ class Monitor:
                     out[prim]["pids"] += g["pids"]
                     out[prim]["mnts"] = out[prim].get("mnts", {prim}) | {m}
         if not prim_of:
+            self.trial_cg = set()
             return
         for pid in others:
             path = cg_path(pid)
             if path in prim_of:
                 g = out[prim_of[path]]
+                if not (self.descends(pid, set(g["pids"])) or self.shows_beacon(pid)):
+                    continue                        # in the cgroup, not of the container (conmon in a shared scope)
                 g["pids"].append(pid)
                 g["mnts"] = g.get("mnts", {g["mnt"]}) | {where.get(pid)}
+        # a cgroup is the trial's (in_trial) only when every process in it is the container's (cgroup_of's check)
+        self.trial_cg = {pth for pth in self.trial_cg
+                         if self.cg_is_own(CGROUP + pth, out[prim_of[pth]]["pids"],
+                                           out[prim_of[pth]].get("mnts", {out[prim_of[pth]]["mnt"]}))}
+
+    def descends(self, pid, ancestors, depth=64):
+        """Whether one of the process's ancestors (PPid, host PIDs) is in `ancestors`."""
+        p = pid
+        for _ in range(depth):
+            try:
+                p = int(status(p).get("PPid") or 0)
+            except ValueError:
+                return False
+            if p <= 1:
+                return False
+            if p in ancestors:
+                return True
+        return False
+
+    def shows_beacon(self, pid):
+        b = self.live_thread(pid) or self.base(pid)
+        return bool(self.beacon["scope"]) and stat_id(b + "/root" + SCOPE_BEACON) == self.beacon["scope"]
+
+    def cg_is_own(self, d, pids, mnts):
+        """Whether every process in the cgroup directory `d` is the container's: one of `pids`, or one that started
+        since they were listed (a fork between the /proc walk and this read: in one of the container's mount
+        namespaces), or one that is gone since. None of them: not a cgroup of its own (rootless podman without
+        delegation leaves containers in a shared one)."""
+        procs = read(d + "/cgroup.procs")
+        if procs is None:
+            return False
+        members = {int(x) for x in procs.split() if x.isdigit()}
+        if not members:
+            return False
+        known = set(pids)
+        for p in members - known:
+            m = rl(f"{PROC}/{p}/ns/mnt")
+            if m is None:
+                b = self.live_thread(p)
+                m = rl(b + "/ns/mnt") if b else None
+            if m is None and stat_of(f"{PROC}/{p}") is None:
+                continue                            # gone since
+            if m not in mnts:
+                return False
+        return True
 
     def in_trial(self, pid):
         """Whether the process is in one of the trial's containers now: its root shows the scope beacon, or it is in
@@ -1153,9 +1313,10 @@ class Monitor:
         return bool(g.get("cgpath")) and cg_path(p) == g["cgpath"]
 
     # ---- per-container measurements
-    def cgroup_of(self, pids):
+    def cgroup_of(self, pids, mnts=()):
         """The container's own cgroup v2 directory (under the host tree, `cgroup: host`) when every process in it is this
-        container's (rootless podman without cgroup delegation leaves containers in a shared one), else None."""
+        container's (cg_is_own: rootless podman without cgroup delegation leaves containers in a shared one), else
+        None."""
         paths = set()
         for p in pids[:8]:
             s = read(f"{PROC}/{p}/cgroup") or ""
@@ -1165,13 +1326,9 @@ class Monitor:
         if len(paths) != 1:
             return None
         d = CGROUP + paths.pop()
-        procs = read(d + "/cgroup.procs")
-        if procs is None:
-            return None
-        members = {int(x) for x in procs.split() if x.isdigit()}
-        return d if members and members <= set(pids) else None
+        return d if self.cg_is_own(d, pids, set(mnts)) else None
 
-    def cgroup_v1_of(self, pids):
+    def cgroup_v1_of(self, pids, mnts=()):
         """{controller: directory} of the container's own cgroup v1 directories (cpu, memory, pids), each only when
         every process in it is this container's."""
         ctl = {}
@@ -1191,40 +1348,67 @@ class Monitor:
             if path in ("", "/"):
                 continue
             for d in (f"{CGROUP}/{mount}{path}", f"{CGROUP}/{c}{path}"):
-                procs = read(d + "/cgroup.procs")
-                if procs is None:
+                if read(d + "/cgroup.procs") is None:
                     continue
-                members = {int(x) for x in procs.split() if x.isdigit()}
-                if members and members <= set(pids):
+                if self.cg_is_own(d, pids, set(mnts)):
                     out[c] = d
                 break
         return out
 
     @staticmethod
-    def runtime_limits(cg, v1):
+    def ancestry(d):
+        """The cgroup directory `d` and its parents that still carry the container's id (crun's `container` subgroup
+        under libpod-<id>.scope, a limit set on the scope): a limit on any of them holds the container."""
+        rel = d[len(CGROUP):] if d.startswith(CGROUP) else d
+        m = CONTAINER_CG.search(rel)
+        out = [d]
+        if not m:
+            return out
+        while True:
+            parent = os.path.dirname(rel.rstrip("/"))
+            if not parent or parent == rel or m.group(0) not in parent:
+                return out
+            rel = parent
+            out.append(CGROUP + rel)
+
+    @classmethod
+    def runtime_limits(cls, cg, v1):
         """The limits the container's own cgroup holds it to (its runtime's: Docker's cpus, mem_limit, pids_limit),
-        {"cpus", "memory_gb", "pids"}, None where there is none (or no cgroup of its own)."""
+        {"cpus", "memory_gb", "pids"}, None where there is none (or no cgroup of its own). The tightest one of its
+        directory and the parents that carry its id (ancestry)."""
         rt = {"cpus": None, "memory_gb": None, "pids": None}
 
         def num(path):
             v = (read(path) or "").strip()
             return int(v) if v.lstrip("-").isdigit() else None
+
+        def least(vals):
+            vals = [v for v in vals if v is not None]
+            return min(vals) if vals else None
+        cpus, mxs, pxs = [], [], []
         if cg:
-            q = (read(cg + "/cpu.max") or "").split()
-            if len(q) == 2 and q[0].isdigit() and q[1].isdigit() and int(q[1]) > 0:
-                rt["cpus"] = round(int(q[0]) / int(q[1]), 3)
-            mx, px = num(cg + "/memory.max"), num(cg + "/pids.max")
+            for d in cls.ancestry(cg):
+                q = (read(d + "/cpu.max") or "").split()
+                if len(q) == 2 and q[0].isdigit() and q[1].isdigit() and int(q[1]) > 0:
+                    cpus.append(int(q[0]) / int(q[1]))
+                mxs.append(num(d + "/memory.max"))
+                pxs.append(num(d + "/pids.max"))
         else:
-            if "cpu" in v1:
-                quota, period = num(v1["cpu"] + "/cpu.cfs_quota_us"), num(v1["cpu"] + "/cpu.cfs_period_us")
+            for d in cls.ancestry(v1["cpu"]) if "cpu" in v1 else ():
+                quota, period = num(d + "/cpu.cfs_quota_us"), num(d + "/cpu.cfs_period_us")
                 if quota and quota > 0 and period and period > 0:
-                    rt["cpus"] = round(quota / period, 3)
-            mx = num(v1["memory"] + "/memory.limit_in_bytes") if "memory" in v1 else None
-            mx = mx if mx is not None and mx < 2 ** 60 else None      # cgroup v1's "no limit" is a huge number
-            px = num(v1["pids"] + "/pids.max") if "pids" in v1 else None
-        if mx is not None and mx > 0:
+                    cpus.append(quota / period)
+            for d in cls.ancestry(v1["memory"]) if "memory" in v1 else ():
+                mx = num(d + "/memory.limit_in_bytes")
+                mxs.append(mx if mx is not None and mx < 2 ** 60 else None)   # cgroup v1's "no limit" is a huge number
+            for d in cls.ancestry(v1["pids"]) if "pids" in v1 else ():
+                pxs.append(num(d + "/pids.max"))
+        c, mx, px = least(cpus), least(v for v in mxs if v is None or v > 0), least(v for v in pxs if v is None or v > 0)
+        if c is not None:
+            rt["cpus"] = round(c, 3)
+        if mx is not None:
             rt["memory_gb"] = round(mx / GIB, 3)
-        if px is not None and px > 0:
+        if px is not None:
             rt["pids"] = px
         return rt
 
@@ -1288,8 +1472,9 @@ class Monitor:
             info[p] = {"start": ps[0] if ps else None, "threads": max(n, 1), "rss_kb": kb(st.get("VmRSS")),
                        "gpu_mib": gpu_per.get(p, 0)}
         g["info"] = info
-        cg = self.cgroup_of(pids)
-        v1 = {} if cg else self.cgroup_v1_of(pids)
+        mnts = g.get("mnts") or {g.get("mnt")}
+        cg = self.cgroup_of(pids, mnts)
+        v1 = {} if cg else self.cgroup_v1_of(pids, mnts)
         g["cg"] = cg or v1.get("cpu")                    # where a CPU quota would go (Throttler), and its processes
         g["cgpath"] = cg_path(pids[0]) if cg and pids else None
         own = None                                       # the limits of a container cgroup of its own, even while
@@ -1387,11 +1572,11 @@ class Monitor:
 
     # ---- state that must outlive a restart of the monitor (restart: on-failure)
     def save_state(self):
+        thr = self.throttle.state()                 # before state_lock: the throttle thread saves under its own lock
         try:
             with self.state_lock:
                 write_json(os.path.join(REC, "state.json"), {"disk_base": self.disk_base, "session_log": self.slog.s,
-                                                             "disk_kill_at": self.disk_kill_at,
-                                                             "throttle": self.throttle.state()})
+                                                             "disk_kill_at": self.disk_kill_at, "throttle": thr})
         except OSError:
             pass
 
@@ -1430,10 +1615,17 @@ class Monitor:
             if not isinstance(e, dict):
                 continue
             if isinstance(e.get("file"), str) and isinstance(e.get("orig"), str):
+                pf, po = e.get("pfile"), e.get("porig")
                 try:
-                    with open(e["file"], "w") as fh:
-                        fh.write(e["orig"])
+                    Throttler._restore(e["file"], e["orig"], pf if isinstance(pf, str) else None,
+                                       po if isinstance(po, str) else None)
                 except OSError:
+                    pass
+            done, not_ours = set(), set()
+            for item in e.get("not_ours") or ():
+                try:
+                    not_ours.add((int(item[0]), item[1]))
+                except (TypeError, ValueError, IndexError):
                     pass
             for item in e.get("procs") or ():
                 try:
@@ -1442,11 +1634,30 @@ class Monitor:
                     continue
                 ps = proc_stat(p)
                 if ps and ps[0] == start:
+                    done.add(p)
                     try:
                         os.kill(p, signal.SIGCONT)
                         n += 1
                     except OSError:
                         pass
+            if "procs" not in e:
+                continue
+            # and every stopped process of that container whose stop is not known to be the agent's own: the previous
+            # instance may have stopped it after its last save (fail open: resumed)
+            mnt, cg = e.get("mnt"), e.get("cg")
+            if not isinstance(mnt, str):
+                continue
+            for p in members_of(cg if isinstance(cg, str) else None, mnt, self):
+                if p in done or state_of(f"{PROC}/{p}") != "T":
+                    continue
+                ps = proc_stat(p)
+                if not ps or (p, ps[0]) in not_ours:
+                    continue
+                try:
+                    os.kill(p, signal.SIGCONT)
+                    n += 1
+                except OSError:
+                    pass
         self.save_state()
         event("throttle_end", resource="cpu", why="the monitor restarted: what its previous instance throttled was "
                                                   "let go", sec=0.0, processes=n)
@@ -1482,14 +1693,12 @@ class Monitor:
         start = ((g.get("info") or {}).get(p) or {}).get("start")
         if start is None:
             return False                              # not measured: nothing to tell it from a reused PID
-        fd = None
-        if PROC == "/proc" and hasattr(os, "pidfd_open"):
-            try:
-                fd = os.pidfd_open(p)
-            except ProcessLookupError:
-                return False
-            except OSError:
-                fd = None
+        try:
+            fd = open_pidfd(p)
+        except ProcessLookupError:
+            return False
+        except OSError:
+            fd = None                                 # no pidfd here: the check below, right before the signal
         try:
             ps = proc_stat(p)
             if ps is None or ps[0] != start or not self.belongs(g, p) or not self.in_trial(p):
@@ -1575,12 +1784,18 @@ class Monitor:
         self.pids_run[mnt] = run
         if run >= rcb_limits.PIDS_RUN and self.over("pids", g, m.get("pids"), cap, exact=True) and \
                 by.get("pids") == "monitor":
-            left = n
-            for p in self.victims(g, key=lambda q: -(info[q]["start"] or 0)):
-                if left <= cap:
-                    break
-                if self.kill(g, p, "pids", left, cap, threads=info[p]["threads"]):
-                    left -= info[p]["threads"]
+            cand = self.victims(g, key=lambda q: -(info[q]["start"] or 0))
+            if n - sum(info[p]["threads"] for p in cand) > cap:
+                self.note("no_victim", "pids", "over the pids cap, but the processes the backstop may kill hold too "
+                                               "few of them to bring the count to the cap (the rest is PID 1's, or "
+                                               "zombies nobody reaps): nothing is killed", service=svc)
+            else:
+                left = n
+                for p in cand:
+                    if left <= cap:
+                        break
+                    if self.kill(g, p, "pids", left, cap, threads=info[p]["threads"]):
+                        left -= info[p]["threads"]
         # CPU: a throttle, never a kill
         cap = caps.get("cpus")
         if self.throttle.throttled(mnt):
@@ -1660,7 +1875,14 @@ class Monitor:
         no second kill until the disk grew since the last one (the files stay: killing more frees nothing). Nobody
         holding such a file, or open files that cannot be read: recorded only."""
         cap = self.lim.get("disk_gb")
-        if disk_gb is None or not self.over("disk", g, disk_gb, cap):
+        if disk_gb is None:
+            return
+        if not rcb_limits.over(disk_gb, cap, self.tol):
+            if self.disk_kill_at is not None:     # under the cap again: what fills it next is new growth
+                self.disk_kill_at = None
+                self.save_state()
+            return
+        if not self.over("disk", g, disk_gb, cap):
             return
         by = (self.by.get(g.get("mnt")) or {}).get("disk") or ("monitor" if self.enforce else "none")
         if by != "monitor":
@@ -1680,6 +1902,13 @@ class Monitor:
                                            "open for writing: recorded only", service=svc)
             return
         p = max(held, key=held.get)
+        need = float(disk_gb) - float(cap) * (1.0 + self.tol)
+        if held[p] / GIB < max(need, DISK_MIN_VICTIM_GB):
+            self.note("no_victim", "disk", "over the disk cap, but the process holding the most open for writing under "
+                                           "the measured paths holds less than the excess (or than DISK_MIN_VICTIM_GB): "
+                                           "killing it frees nothing, nothing is killed", service=svc,
+                      held_gb=round(held[p] / GIB, 3), excess_gb=round(need, 3))
+            return
         if self.kill(g, p, "disk", disk_gb, cap, held_gb=round(held[p] / GIB, 3)):
             self.disk_kill_at = disk_gb
             self.save_state()
@@ -1756,6 +1985,11 @@ class Monitor:
     def tick_once(self, t):
         groups = self.groups()
         gpu_per, cards, gpu_unknown = self.nvml.sample() if self.nvml else ({}, {}, set())
+        if gpu_per and not self.pidns_host:       # NVML's PIDs are the host's, the monitor's /proc is not (DinD, sysbox)
+            self.note("unobservable", "gpu_memory", "the monitor is not in the host's PID namespace: NVML's PIDs cannot "
+                                                    "be matched to processes, no GPU memory is counted per container "
+                                                    "and nothing is killed for it")
+            gpu_per, gpu_unknown = {}, set()
         self._gpu_per = gpu_per
         ms = [self.measure(g, gpu_per, t, gpu_unknown) for g in groups.values()]
         self._last_measures = ms

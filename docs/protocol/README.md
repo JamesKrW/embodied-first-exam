@@ -164,27 +164,32 @@ are recorded only, in both settings.
 
 The monitor never kills PID 1 of a container or what started with it. It kills a process only when that process still
 has the start time it was measured with and is still in the trial's container (through a pidfd where the kernel has
-them). What it cannot observe it records and never acts on: a process whose GPU memory NVML does not report, or open
-files it cannot read. Neither setting changes the grade. A killed process ends like any process that dies, the trial may
+them; elsewhere the check is made again right before each signal). What it cannot observe it records and never acts
+on: a process whose GPU memory NVML does not report, NVML's process IDs when the monitor is not in the host's PID
+namespace, or open files it cannot read. Neither setting changes the grade. A killed process ends like any process that dies, the trial may
 fail for it, and the grader judges what the agent left. Going over a cap is recorded (`limits_violation_observed`,
 running.md "Resources").
 
 | Resource | Docker / Harbor on a cgroup v2 Docker host | Hosts where they do not | Monitor backstop (a cap the runtime does not hold, `RCB_LIMITS_ENFORCE=1`) |
 |---|---|---|---|
-| CPU (`cpus`) | a throttle (CFS quota) | rootless podman without a delegated cgroup: none | writes the cap as the container's own CPU quota where its cgroup can be written, and puts the old value back after. Else it duty-cycles the container's processes with `SIGSTOP` / `SIGCONT` (100 ms periods) while their demand is above the cap. A process already stopped when the throttle starts is never signalled. Never a kill |
+| CPU (`cpus`) | a throttle (CFS quota) | rootless podman without a delegated cgroup: none | writes the cap as the container's own CPU quota where its cgroup can be written, and puts the old value back after. Else it duty-cycles the container's processes with `SIGSTOP` / `SIGCONT` (100 ms periods) while their demand is above the cap. It resumes only the processes it stopped: a process found stopped that it did not stop last is never signalled again. Never a kill |
 | Memory (`memory_gb`) | the kernel's OOM killer, at the container's own cap | rootless podman without a delegated cgroup: none | kills the process with the largest PSS, one per sample, and only when the processes it may kill hold enough to cover the excess (none holding under 10 MiB). The next sample measures again |
-| Processes and threads (`pids`) | a fork or a new thread fails at the cap | rootless podman without a delegated cgroup: none | kills the newest processes until the count is back at the cap |
-| Disk (`disk_gb`, `storage_mb`) | a cloud backend may apply `storage_mb` | local Docker (overlay2 on ext4): none | at a disk measurement over the cap, kills the process that holds the most bytes open for writing in files under the measured paths. No second kill until the disk has grown since the last one. With no such process it records only |
+| Processes and threads (`pids`) | a fork or a new thread fails at the cap | rootless podman without a delegated cgroup: none | kills the newest processes until the count is back at the cap, and only when the processes it may kill hold enough of the count to get there (not when the excess is PID 1's or unreaped zombies) |
+| Disk (`disk_gb`, `storage_mb`) | a cloud backend may apply `storage_mb` | local Docker (overlay2 on ext4): none | at a disk measurement over the cap, kills the process that holds the most bytes open for writing in files under the measured paths, when those bytes cover the excess and are at least 10 MiB. No second kill until the disk has grown since the last one or has been under the cap again. Otherwise it records only |
 | GPU memory (`x-gpu-memory-gb`) | none | every card without MIG: none (a card may be shared between trials) | kills the process holding the most GPU memory in that container, one per sample, when the processes it may kill can cover the excess |
 
 The `SIGSTOP` fallback is visible to the agent. An interactive shell with job control reports a throttled child as a
 stopped job (`Stopped`) and may stop waiting for it, so commands run under such a shell can end early or need `fg`.
 The fallback is used only where the container's runtime does not hold its CPU and its cgroup cannot take a quota
-(rootless runtimes; `cgroup: host` is read-only on most hosts). A container is its own cgroup when it has one: a process
+(rootless runtimes; `cgroup: host` is read-only on most hosts). A stop the agent sends to a process while the monitor
+holds it stopped cannot be told from the monitor's own, and is undone with it. A restarted monitor resumes every stopped
+process of a throttled container that is not known to have been stopped by the agent. A container is its own cgroup when it has one: a process
 of it in another mount namespace still counts in it.
 
 On cgroup v1, Docker applies CPU, memory and processes through the v1 controllers; the monitor then measures memory
-by PSS and reads no kernel OOM counters. A runtime that refuses `pid: host` runs the monitor as a beacon (the clock in
+by PSS and reads no kernel OOM counters. It reads the runtime's limits from the container's directories (and their
+parents that carry the container's id) where the v1 hierarchy is visible to it; where it is not, every cap is recorded as
+the monitor's (`enforced_by`), and the kernel still applies the runtime's limits first. A runtime that refuses `pid: host` runs the monitor as a beacon (the clock in
 `usage.json`, nothing measured or enforced; running.md "Without Docker"). The `x-gpu-memory-gb` of a recorded service and
 of the verifier is a cap stated for the reader: nothing measures it. The agent reads its own container's caps in
 `## Resources` (§5) and in `/run/rcb-limits/usage.json`. Placing trials, the switches, the record and the reward

@@ -156,7 +156,9 @@ Where each cap is set and who enforces it on which host: PROTOCOL §6. This sect
   summary's `enforced_by` per service), `over` (the first time a container is over a cap, per resource, in both
   settings, with `by`; a count of processes and threads over in two samples in a row), `kill` (`resource`: `memory`,
   `pids`, `disk`, `gpu_memory`; `pid`, `value`, `cap`), `throttle_start` / `throttle_end` (CPU, `method`: `cgroup` or
-  `signal`), `unobservable` and `no_victim` (the backstop could not act), `oom` (a kernel OOM kill, `cause` `cap` or
+  `signal`; `sec`: the time its stops reached the container's processes, `engaged_sec`: the time it was engaged),
+  `unobservable` and `no_victim` (the backstop could not act), `backstop_error` (an action failed, or no pidfds on the
+  host), `oom` (a kernel OOM kill, `cause` `cap` or
   `host`). The verifier recomputes what was
   over a cap from the raw samples with its own copy of the caps (`tests/rcb_limits.json`, format `rcb-limits/2`). A
   missing, unsealed or mostly empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`; with

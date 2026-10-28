@@ -510,13 +510,19 @@ def test_backstop_cpu():
                     slept.append(d)
                     vt[0] += d
                 m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+                check(k.calls == [(101, signal.SIGSTOP), (102, signal.SIGSTOP), (104, signal.SIGSTOP)],
+                      f"first period: nothing to resume (they run), parents stopped first: {k.calls}")
+                check(abs(sum(slept) - monitor.THROTTLE_PERIOD_SEC) < 1e-9 and abs(slept[0] - 0.05) < 1e-9,
+                      f"runs half the period: {slept}")
+                check(abs(m.throttle.active[mnt]["landed"] - monitor.THROTTLE_PERIOD_SEC) < 1e-9,
+                      "the period counts: its stops reached the processes")
+                del k.calls[:]
+                m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
                 order = [(p, sg) for p, sg in k.calls]
                 cont = [p for p, sg in order if sg == signal.SIGCONT]
                 stop = [p for p, sg in order if sg == signal.SIGSTOP]
                 check(cont == [104, 102, 101] and stop == [101, 102, 104] and not k.killed(),
                       f"children continued first, parents stopped first, no kill: {order}")
-                check(abs(sum(slept) - monitor.THROTTLE_PERIOD_SEC) < 1e-9 and abs(slept[0] - 0.05) < 1e-9,
-                      f"runs half the period: {slept}")
                 ev = f.events("throttle_start")
                 check(len(ev) == 1 and ev[0]["cap"] == 2.0 and ev[0]["fraction"] == 0.5, f"recorded: {ev}")
                 x["cpu"] = 2.0                                 # used 2 at a share of 0.5: the demand is still 4
@@ -528,10 +534,12 @@ def test_backstop_cpu():
                 check(not m.throttle.throttled(mnt) and set(p for p, sg in k.calls if sg == signal.SIGCONT) == {101, 102, 104},
                       f"released, every process continued: {k.calls}")
                 ev = f.events("throttle_end")
-                check(len(ev) == 1 and ev[0]["sec"] >= 0, f"recorded: {ev}")
+                check(len(ev) == 1 and abs(ev[0]["sec"] - 0.2) < 1e-9 and ev[0]["engaged_sec"] >= 0,
+                      f"recorded: held by signals for two periods: {ev}")
                 check(rcb_limits.backstop(f.events())["throttles"] == 1, "counted")
                 # a throttle left open is closed at the seal
                 m.throttle.engage(mnt, g, 2.0, 4.0, 120.0)
+                m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
                 del k.calls[:]
                 m.seal()
                 check(not m.throttle.active and {p for p, sg in k.calls if sg == signal.SIGCONT} == {101, 102, 104},
@@ -598,7 +606,7 @@ def test_backstop_disk():
     f = Fake()
     try:
         croot = _agent_container(f)
-        for name, mib in (("w102", 3), ("w101", 1), ("r104", 8), ("w100", 9), ("w103", 6)):
+        for name, mib in (("w102", 30), ("w101", 12), ("r104", 40), ("w100", 50), ("w103", 45), ("log", 1)):
             _fill(os.path.join(croot, "app", tag, name + ".bin"), mib)
         _fd(f, 102, 3, f"/app/{tag}/w102.bin")
         _fd(f, 102, 4, f"/app/{tag}/w102.bin", flags="0100002")                # the same file twice: once
@@ -613,28 +621,44 @@ def test_backstop_disk():
             os.makedirs(f.rec)
             with Kills() as k:
                 m = f.monitor(LIM, enforce=enforce)
+                c = LIM["disk_gb"] * (1.0 + m.tol)            # the cap, with the tolerance
                 groups, _ = _one(m)
                 g = next(iter(groups.values()))
                 m.disk_backstop(g, 0.001)                      # under the cap: nothing
-                m.disk_backstop(g, 0.2)
+                m.disk_backstop(g, round(c + 0.02, 6))         # 20 MiB over: 102 holds 30
             check([e["resource"] for e in f.events("over")] == ["disk"], f"over: {f.events('over')}")
             if enforce == "0":
                 check(k.calls == [] and m.by[g["mnt"]]["disk"] == "none", "0: nothing is killed")
                 continue
             ev = f.events("kill")
             check(k.killed() == [102] and ev[0]["resource"] == "disk" and m.kills["disk"] == 1
-                  and 2.9 < ev[0]["held_gb"] * 1024 < 3.2 and m.disk_kill_at == 0.2,
+                  and 29 < ev[0]["held_gb"] * 1024 < 31 and m.disk_kill_at == round(c + 0.02, 6),
                   f"1: the largest writer, PID 1 and its keepalive spared: {k.killed()} {ev}")
             with Kills() as k:
-                m.disk_backstop(g, 0.205)
+                m.disk_backstop(g, round(c + 0.025, 6))
             check(k.calls == [] and f.events("no_victim")[0]["resource"] == "disk",
                   f"no growth since the last kill: no second kill: {k.calls}")
             f.gone(102)
             with Kills() as k:
-                m.disk_backstop(g, 0.3)
-            check(k.killed() == [101], f"the disk grew again: the next writer: {k.killed()}")
-            check((rcb_limits.read_json(os.path.join(f.rec, "state.json")) or {}).get("disk_kill_at") == 0.3,
-                  "the last kill's value survives a restart")
+                m.disk_backstop(g, round(c + 0.035, 6))         # 35 MiB over: 101 holds 12, killing it frees too little
+            nv = [e for e in f.events("no_victim") if e["resource"] == "disk"]
+            check(k.calls == [] and len(nv) == 2 and 11 < nv[1]["held_gb"] * 1024 < 13,
+                  f"the largest writer holds less than the excess: nobody is killed: {k.calls} {nv}")
+            # under the cap again (the agent cleaned up): the last kill is forgotten, a refill is new growth
+            m.disk_backstop(g, 0.001)
+            check(m.disk_kill_at is None, "under the cap: disk_kill_at reset")
+            with Kills() as k:
+                m.disk_backstop(g, round(c + 0.011, 6))         # 11 MiB over, at or below the last kill's value
+            check(k.killed() == [101], f"a refill after a clean-up: the writer that covers it: {k.killed()}")
+            check((rcb_limits.read_json(os.path.join(f.rec, "state.json")) or {}).get("disk_kill_at")
+                  == round(c + 0.011, 6), "the last kill's value survives a restart")
+            # a small log held open covers no excess, and is under the minimum: never the victim (the harness's own)
+            f.gone(101)
+            _fd(f, 104, 6, f"/app/{tag}/log.bin")
+            m.disk_kill_at = None
+            with Kills() as k:
+                m.disk_backstop(g, round(c + 0.0005, 6))
+            check(k.calls == [], f"under DISK_MIN_VICTIM_GB: never killed: {k.calls}")
         # nobody holds a file there: recorded only
         f2 = Fake()
         try:
@@ -721,7 +745,7 @@ def test_runtime_first():
             check(m2.throttle.throttled(g2["mnt"]) and m2.by[g2["mnt"]]["cpu"] == "monitor",
                   "the monitor's own quota is not the runtime's: it stays")
             st = rcb_limits.read_json(os.path.join(f.rec, "state.json"))
-            check(st["throttle"] == [{"file": d + "/cpu.max", "orig": "max 100000"}], f"state.json: {st['throttle']}")
+            check(st["throttle"] == [{"file": d + "/cpu.max", "orig": "max 100000", "pfile": None, "porig": None}], f"state.json: {st['throttle']}")
             m2.seal()
         check(open(d + "/cpu.max").read() == "max 100000" and k.calls == [] and
               f.events("throttle_start")[-1]["method"] == "cgroup", f"released at the seal: the old value, no signal: {open(d + '/cpu.max').read()!r} {k.calls}")
@@ -819,14 +843,31 @@ def test_runtime_while_starting():
         _agent_container(f)
         name = "system.slice/docker-" + "ef" * 32 + ".scope"
         d = f.cgroup(name, pids=[100, 101, 102, 103, 104], anon_gb=0.1, max_gb=1.0)
+        f.pid(999, "mnt:[2]", f.host, start=9900)                # runc's init: still in the host's mount namespace
         with open(os.path.join(d, "cgroup.procs"), "a") as fh:
-            fh.write("999\n")                                  # not seen (yet)
+            fh.write("999\n")
         _cg_files(d, cpu_max="200000 100000", pids_max=5)
         m = f.monitor(LIM, enforce="1")
         with Kills():
             _, ms = _one(m)
         check(ms[0]["cgroup"] == 0 and ms[0]["runtime"] == {"cpus": 2.0, "memory_gb": 1.0, "pids": 5}
               and m.by["mnt:[111]"]["memory"] == "runtime", f"the runtime's limits: {ms[0]} {m.by}")
+        # a fork between the /proc walk and the read of cgroup.procs (in the container's namespace), and one gone since:
+        # still the container's own cgroup
+        f.gone(999)
+        f.pid(998, "mnt:[111]", f.root("main"), start=9950, ppid=101, nspid=30)
+        with open(os.path.join(d, "cgroup.procs"), "w") as fh:
+            fh.write("".join(f"{p}\n" for p in (100, 101, 102, 103, 104, 997, 998)))
+        check(m.cgroup_of([100, 101, 102, 103, 104], {"mnt:[111]"}) == d, "the fork race: still its own cgroup")
+        f.pid(996, "mnt:[777]", f.root("other", beacon=False, main=False), start=9960, nspid=1)
+        with open(os.path.join(d, "cgroup.procs"), "a") as fh:
+            fh.write("996\n")
+        check(m.cgroup_of([100, 101, 102, 103, 104], {"mnt:[111]"}) is None, "another container's process: shared")
+        # a limit on a parent that carries the container's id (crun's `container` subgroup) holds the container
+        sub = f.cgroup(name + "/container", pids=[100, 101, 102, 103, 104])
+        _cg_files(sub, cpu_max="max 100000", pids_max="max", memory_max="max")
+        check(m.runtime_limits(sub, {}) == {"cpus": 2.0, "memory_gb": 1.0, "pids": 5},
+              f"the parent's limits: {m.runtime_limits(sub, {})}")
     finally:
         f.close()
 
@@ -1521,12 +1562,171 @@ def test_stop_without_cgroup():
         shutil.rmtree(d, ignore_errors=True)
 
 
+def test_throttle_restart_and_ownership():
+    """The signal throttle after review 6: a change of the throttled set is in state.json before its new process is
+    first stopped; a restarted monitor resumes every stopped process of that container whose stop is not the agent's
+    own (fail open); a process the agent stops during a run window is never resumed by the monitor; without pidfds the
+    throttle still signals (checked again before every signal) and says so once; a share under one run window runs
+    k times its share every k-th period; only periods its stops reached count as throttled."""
+    import errno
+    import signal
+    f = Fake()
+    keep_open = monitor.open_pidfd
+    try:
+        root = _agent_container(f)
+        m = f.monitor(LIM, enforce="1")
+        groups = m.groups()
+        g = next(iter(groups.values()))
+        mnt = g["mnt"]
+
+        def nopidfd(pid):
+            raise OSError(errno.ENOSYS, "Function not implemented")
+        monitor.open_pidfd = nopidfd
+        vt = [0.0]
+
+        def vsleep(dt):
+            vt[0] += dt
+        with Kills() as k:
+            m.throttle.engage(mnt, g, 2.0, 4.0, 100.0)
+            e = m.throttle.active[mnt]
+            check(set(e["procs"]) == {101, 102, 104} and len(f.events("backstop_error")) == 1,
+                  f"no pidfd: the processes are still throttled, said once: {e['procs']} {f.events('backstop_error')}")
+            m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+            check(sorted(p for p, sg in k.calls if sg == signal.SIGSTOP) == [101, 102, 104]
+                  and e["landed"] > 0, f"signals by PID land, counted: {k.calls} {e['landed']}")
+            # a new process joins: state.json has it before the monitor first stops it
+            f.pid(105, mnt, root, start=7000, ppid=101, nspid=12)
+            st0 = []
+            real_save = m.save_state
+
+            def save():
+                real_save()
+                st0.append([p for p, _ in (rcb_limits.read_json(os.path.join(f.rec, "state.json")) or {})["throttle"][0]["procs"]])
+            m.save_state = save
+            n0 = len(k.calls)
+            e["refreshed"] = 0.0
+            m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+            first_stop = next(i for i, (p, sg) in enumerate(k.calls[n0:]) if p == 105 and sg == signal.SIGSTOP)
+            check(st0 and 105 in st0[0] and first_stop >= 0, f"saved before 105's first stop: {st0}")
+            m.save_state = real_save
+            # the agent stops 102 during a run window: never resumed by the monitor again
+            n0 = len(k.calls)
+            m.throttle._signal(e, signal.SIGCONT)
+            f.pid(102, mnt, root, start=5001, ppid=101, nspid=10, state="T")
+            m.throttle._signal(e, signal.SIGSTOP)
+            check(102 not in e["procs"] and (102, 5001) in e["foreign"] and
+                  all(p != 102 for p, _ in k.calls[n0 + 4:]), f"the agent's own stop is left alone: {k.calls[n0:]}")
+            m.throttle._signal(e, signal.SIGCONT)
+            check(all(p != 102 for p, _ in k.calls[n0 + 4:]), "and never resumed")
+            m.throttle._signal(e, signal.SIGSTOP)
+            st = rcb_limits.read_json(os.path.join(f.rec, "state.json"))["throttle"][0]
+            check([102, 5001] in st["not_ours"] and st["mnt"] == mnt, f"state.json knows it is not ours: {st}")
+            # the monitor dies (SIGKILL): a restart resumes what it may have stopped, not the agent's own stop
+            f.pid(101, mnt, root, start=5000, ppid=77, nspid=9, state="T")
+            f.pid(104, mnt, root, start=6000, ppid=100, nspid=11, state="T")
+            f.pid(106, mnt, root, start=7100, ppid=101, nspid=13, state="T")   # stopped after the last save
+            st["procs"] = [[101, 5000]]
+            monitor.write_json(os.path.join(f.rec, "state.json"), {"throttle": [st]})
+        m2 = f.monitor(LIM, enforce="1")
+        with Kills() as k:
+            m2.restore()
+        check(sorted(p for p, sg in k.calls if sg == signal.SIGCONT) == [101, 104, 106] and all(p != 102 for p, _ in k.calls),
+              f"restart: every stopped process the monitor may have stopped, never the agent's: {k.calls}")
+        for p, start, pp, nsp in ((101, 5000, 77, 9), (102, 5001, 101, 10), (104, 6000, 100, 11)):
+            f.pid(p, mnt, root, start=start, ppid=pp, nspid=nsp)
+        f.gone(105)
+        f.gone(106)
+        # a share under one run window: k times its share, every k-th period (0.015: 3 ms every 2nd period)
+        m3 = f.monitor(LIM, enforce="1")
+        g3 = next(iter(m3.groups().values()))
+        with Kills() as k:
+            m3.throttle.engage(mnt, g3, 2.0, 2.0 / 0.015, 100.0)
+            e3 = m3.throttle.active[mnt]
+            runs = []
+            for _ in range(4):
+                slept = []
+                vt3 = [0.0]
+
+                def vs(dt):
+                    slept.append(dt)
+                    vt3[0] += dt
+                m3.throttle.cycle(sleep=vs, clock=lambda: vt3[0])
+                runs.append(round(slept[0], 4) if len(slept) == 2 else None)
+            check(runs == [None, 0.003, None, 0.003], f"the share asked for: {runs}")
+            m3.throttle.release_all("test")
+            check(f.events("throttle_end")[-1]["sec"] == 0.4, f"held every period: {f.events('throttle_end')[-1]}")
+    finally:
+        monitor.open_pidfd = keep_open
+        f.close()
+
+
+def test_review6_minor():
+    """pids over the cap that killing cannot cover (zombies nobody reaps): nothing is killed; a process in the
+    container's cgroup that is not of it (conmon in a shared scope) is never merged in; NVML's PIDs outside the host's
+    PID namespace are not matched; cgroup v1: the period the monitor wrote is put back."""
+    f = Fake()
+    try:
+        _agent_container(f)
+        for z in range(30, 36):                                  # 6 zombies of PID 1 (sleep infinity never reaps)
+            f.pid(z + 200, None, None, start=8000 + z, state="Z", ppid=100)
+            f.thread(z + 200, z + 200, None, None, start=8000 + z)
+        m = f.monitor(LIM, enforce="1")
+        with Kills() as k:
+            _one(m)
+            _, ms = _one(m, 105.0)
+        check(ms[0]["pids"] == 11 and k.calls == [] and [e["resource"] for e in f.events("no_victim")] == ["pids"],
+              f"6 zombies + 5 of a cap of 5: killing every agent process cannot help: {ms[0]} {k.calls}")
+    finally:
+        f.close()
+    f = Fake()
+    try:
+        _agent_container(f)
+        name = "machine.slice/libpod-conmon-" + "ab" * 32 + ".scope"
+        f.pid(180, "mnt:[888]", f.host, start=900, ppid=1, nspid=180)         # conmon: in the scope, not a descendant
+        f.cgroup(name, pids=[100, 101, 102, 103, 104, 180], anon_gb=0.1)
+        m = f.monitor(LIM, enforce="1")
+        g = next(iter(m.groups().values()))
+        check(180 not in g["pids"] and not m.in_trial(180) and not m.trial_cg,
+              f"conmon is not the container's, the shared cgroup not the trial's: {g['pids']} {m.trial_cg}")
+        # NVML's PIDs: the host's; matched only when the monitor's /proc is the host's PID namespace
+        class FakeNvml:
+            handles = []
+
+            def sample(self):
+                return {101: 6000}, {}, set()
+        m.nvml = FakeNvml()
+        with Kills() as k:
+            m.pidns_host = False
+            m.tick_once(100.0)
+            check(m._last_measures[0]["gpu_memory_gb"] == 0 and
+                  [e["resource"] for e in f.events("unobservable")] == ["gpu_memory"] and k.calls == [],
+                  f"another PID namespace: not matched, nothing killed: {m._last_measures[0]}")
+            m.pidns_host = True
+            m.tick_once(105.0)
+            check(m._last_measures[0]["gpu_memory_gb"] > 5.8, "the host's: matched")
+        # cgroup v1: the quota and the period it had come back
+        d = os.path.join(f.d, "v1cpu")
+        os.makedirs(d)
+        _cg_files(d, **{"cpu_cfs_quota_us": "-1", "cpu_cfs_period_us": "50000"})
+        e = {"cg": d, "method": "cgroup"}
+        r = m.throttle._cgroup_quota(e, 1.5)
+        check(open(d + "/cpu.cfs_quota_us").read() == "150000" and open(d + "/cpu.cfs_period_us").read() == "100000",
+              "v1: the cap written")
+        e.update(file=r[0], orig=r[1], pfile=r[2], porig=r[3])
+        m.throttle._let_go(e)
+        check(open(d + "/cpu.cfs_quota_us").read() == "-1" and open(d + "/cpu.cfs_period_us").read() == "50000",
+              "v1: the quota and the period put back")
+    finally:
+        f.close()
+
+
 def main():
     for t in (test_classify_race, test_dead_leader_and_zombies, test_disk_walk, test_disk_baseline, test_backstop_memory,
               test_backstop_pids, test_backstop_cpu, test_backstop_gpu, test_backstop_disk, test_runtime_first,
               test_throttle_signals, test_cgroup_container, test_runtime_while_starting, test_bad_tolerance, test_selftest_fixtures, test_backstop_services,
               test_backstop_record, test_switch, test_verify_edges, test_oom_watch, test_oom_verdicts, test_sanitize, test_default_is_neutral,
-              test_clock_and_beacon, test_session_log_copy, test_stop_without_cgroup):
+              test_clock_and_beacon, test_session_log_copy, test_stop_without_cgroup,
+              test_throttle_restart_and_ownership, test_review6_minor):
         t()
     shutil.rmtree(os.environ["RCB_MONITOR_RECORD"], ignore_errors=True)
     print("rcb_monitor test_monitor: ok")
