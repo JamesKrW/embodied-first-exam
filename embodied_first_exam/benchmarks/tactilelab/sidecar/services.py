@@ -30,11 +30,19 @@ import numpy as np
 
 from .host import NewtonService, register_service
 
+SOFTBODY_DET_MAX_RECORDS = 64
+
 
 @register_service("softbody.world")
 class SoftBodyService(NewtonService):
     def __init__(self, cfg, arrays):
         super().__init__(cfg, arrays)
+        import warp as wp  # noqa: PLC0415
+
+        # deterministic mode (server.py): the VBD collision pipeline's narrow phase emits more contacts per candidate
+        # pair than static analysis bounds (a cable's capsules against the hand meshes); room for this many records per
+        # thread. Set before Newton is imported, for this world only: the MPM solver's large launches cannot afford it.
+        wp.config.deterministic_max_records = SOFTBODY_DET_MAX_RECORDS
         from .worlds.softbody import SoftWorld
 
         self.world = SoftWorld(cfg, arrays.get("collider_q0"), arrays.get("cable_points"))
@@ -88,6 +96,11 @@ class SoftBodyService(NewtonService):
 class DoughService(NewtonService):
     def __init__(self, cfg, arrays):
         super().__init__(cfg, arrays)
+        import warp as wp  # noqa: PLC0415
+
+        # not deterministic (server.py turns it on): with Warp's deterministic atomics one sidecar call of the implicit
+        # MPM solver took 6.6 s on an L40S; a dough task is graded on replays that must all succeed (spread reported)
+        wp.config.deterministic = wp.DeterministicMode.NOT_GUARANTEED
         from .worlds.mpm import DoughWorld
 
         self.world = DoughWorld(cfg, arrays["points"], float(cfg["pvol"]))

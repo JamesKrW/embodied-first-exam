@@ -47,6 +47,15 @@ def setup_path() -> None:
             sys.path.insert(0, p)
 
 
+def _deterministic() -> None:
+    """Warp's run-to-run deterministic atomics for every kernel this process compiles (before Newton is imported, which
+    the services do lazily): a replay of the same rows ends in the same state on the same GPU architecture."""
+    import warp as wp  # noqa: PLC0415
+
+    wp.config.deterministic = wp.DeterministicMode.RUN_TO_RUN
+    print("[newton-host] warp deterministic mode: RUN_TO_RUN", flush=True)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--address", required=True)
@@ -60,6 +69,7 @@ def main() -> None:
     )
     args = ap.parse_args()
     setup_path()
+    _deterministic()
     from sidecar import host  # noqa: PLC0415
 
     _exit_with_parent()

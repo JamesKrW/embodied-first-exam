@@ -374,6 +374,7 @@ class SoftWorld:
             broad_phase="nxn",
             soft_contact_gap=float(c["soft_contact"]["gap"]),
             enable_rigid_soft_full_surface_contact=bool(self.has_cloth and c["cloth"].get("full_surface", True)),
+            deterministic=True,  # sorted contacts: a replay ends in the same state (server.py)
         )
         self.contacts = self.pipeline.contacts()
         self.control = self.model.control()

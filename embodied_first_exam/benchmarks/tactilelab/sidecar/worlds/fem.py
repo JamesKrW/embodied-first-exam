@@ -157,7 +157,9 @@ class PlugPadWorld:
         self.solver = SolverVBD(
             self.model, iterations=self.iterations, rigid_compliant_alm=True, integrate_with_external_rigid_solver=False
         )
-        self.pipeline = newton.CollisionPipeline(self.model, broad_phase="nxn", soft_contact_gap=self.gap)
+        self.pipeline = newton.CollisionPipeline(
+            self.model, broad_phase="nxn", soft_contact_gap=self.gap, deterministic=True
+        )  # sorted contacts: a replay ends in the same state (server.py)
         self.contacts = self.pipeline.contacts()
         self.control = self.model.control()
         self.states = [self.model.state(), self.model.state()]
@@ -292,7 +294,9 @@ class PlugWorld:
         self.solver = SolverVBD(
             self.model, iterations=self.iterations, rigid_compliant_alm=True, integrate_with_external_rigid_solver=False
         )
-        self.pipeline = newton.CollisionPipeline(self.model, broad_phase="nxn", soft_contact_gap=self.gap)
+        self.pipeline = newton.CollisionPipeline(
+            self.model, broad_phase="nxn", soft_contact_gap=self.gap, deterministic=True
+        )  # sorted contacts: a replay ends in the same state (server.py)
         self.contacts = self.pipeline.contacts()
         self.control = self.model.control()
         self.states = [self.model.state(), self.model.state()]
