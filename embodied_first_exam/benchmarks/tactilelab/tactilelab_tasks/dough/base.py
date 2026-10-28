@@ -90,7 +90,7 @@ class DoughTask(Task):
         self.async_mpm = bool(p.get("async_mpm", True))
         self.reaction_gain = 0.0 if self.direct else float(p.get("reaction_gain", 1.0))
         self.success_hold = int(p.get("success_hold", 20))
-        self.max_steps = int(p.get("max_steps", 3600))
+        self.max_steps = int(p.get("max_steps", 0))  # 0: no step limit (the tasks have no step budget)
         self.settle_ticks = int(p.get("settle_ticks", 30))
         self.hold_release_ticks = int(p.get("hold_release_ticks", 45))
         self.tool_name = str(p.get("tool_name", "scraper_tool"))
@@ -148,6 +148,15 @@ class DoughTask(Task):
     @property
     def truncation_reason(self) -> Optional[str]:
         return self._error
+
+    @property
+    def sim_error_reason(self) -> Optional[str]:
+        """The sidecar or judge error of this episode (a simulator error: the episode scores 0), or None."""
+        return self._error
+
+    def is_success(self) -> bool:
+        """The success latch, unless a simulator error ended the episode first or after it."""
+        return bool(self._latched) and self._error is None
 
     def attach_tactile(self, device: str = "cuda"):
         """GelSight-Mini sensors on the two gel pads (``cfg.tactile.enable``); returns the provider (``.pads``)."""

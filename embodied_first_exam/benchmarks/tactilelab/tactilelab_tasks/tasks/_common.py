@@ -270,6 +270,11 @@ class RigidTask(Task):
         if self._truncation is None:
             self._truncation = reason
 
+    def is_success(self) -> bool:
+        """The success latch, unless the episode was truncated (a truncation ends it as a failure, before or after the
+        latch: the instruction's "the episode ends early (task failed)")."""
+        return bool(self._latched) and self._truncation is None
+
     # ------------------------------------------------------------------ observation
     def privileged_obs(self) -> Dict[str, np.ndarray]:
         out: Dict[str, np.ndarray] = {}
