@@ -61,9 +61,9 @@ UNITS: dict[str, list[str]] = {
     "DexJoCo": _own("dexjoco"),
     "DexHand": _own("dexhand"),
     "VLABench": _own("vlabench", "images/vlabench-build-files/"),
-    "RoboCasa-GR1": _own("robocasa-gr1", "images/robocasa/standard/", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service, tooling, graders
+    "RoboCasa-GR1": _own("robocasa-gr1", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service, tooling, graders
     "RoboCasa": _own("robocasa"),
-    "RoboCasa365": _own("robocasa365", "images/robocasa/standard/", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service and graders
+    "RoboCasa365": _own("robocasa365", "embodied_first_exam/benchmarks/robocasa/", "images/robocasa-files/"),   # RoboCasa's service and graders
     "LIBERO-MAX": _own("libero-max"),
     "RoboARC": _own("roboarc", "images/roboarc-files/", "images/ikea-mujoco/", "images/ikea-mujoco-files/"),   # the IKEA suite's images keep their name
     "Embodied Olympics - Fun": _own("embodied-olympics-fun", "images/embodied-olympics-fun-files/"),
@@ -95,7 +95,7 @@ for _label, _folder in tc.BENCHMARK_DIRS.items():
 NO_TASK_EFFECT = ("README.md", "CONTRIBUTING.md", "AGENTS.md", "CLAUDE.md", "LICENSE", "SECURITY.md", "CODE_OF_CONDUCT.md", "docs/protocol/running.md",
                   "docs/REVIEWING.md", ".gitignore",
                   "docs/core_set.toml")   # read by reports only; its own check (run_all.sh) and test (run_invariants.sh) always run
-# tasks/dataset.toml: no longer committed (generated for a release; check-dataset-manifest.sh fails when it is tracked)
+# tasks/dataset.toml: not committed (generated for a release; check-dataset-manifest.sh fails when it is tracked)
 REPO_LEVEL_ONLY = ("tasks/dataset.toml",)
 REF = re.compile(r"\b(scripts|images)/([A-Za-z0-9_.-]+)")
 
