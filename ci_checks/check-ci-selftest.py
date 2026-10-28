@@ -49,7 +49,7 @@ WITH_NEIGHBOURS = (IDENTITY, TWINS)   # run on the broken copy among (links to) 
 
 STD = "behavior-boxing-books-up-for-storage-i00-standard"      # a sim sidecar with a trusted cache volume
 PRIV = "behavior-boxing-books-up-for-storage-i00-privileged"   # a verifier compose file with a trusted volume
-HEAVY = "maniguard-cabinet-pickup-i19-standard"                # an allowlist; a sidecar with a large verifier minimum
+HEAVY = "maniguard-cabinet-pickup-i19-standard"                # an allowlist; a sidecar that holds the GPU
 RT = "humanoidbench-loco-walk-i00-standard-realtime"           # a standard-realtime task: main and sim capped
 # benchmarks whose generators have no check mode: their shared files are held together by check-tooling-identity.sh
 DTB, DTB_P = "dextoolbench_hammer_claw_hammer_swing_down-standard", "dextoolbench_hammer_claw_hammer_swing_down-privileged"
@@ -489,6 +489,64 @@ def twin_cutoffs(tmp: Path) -> int:
     return bad
 
 
+def gpu_rule_change(tmp: Path) -> int:
+    """A rule's GPU-memory cap changes (PROTOCOL §6): normalize replaces the generated `x-gpu-memory-gb` line with the new
+    value (never keeps the old one), check-resources.py then refuses the copy against the repository's rule with a
+    message that names the fix, and normalize with the repository's rule brings the old value back and passes; inject.py
+    run alone on a task whose compose file it generated keeps main's processes cap. Returns the number of failures."""
+    sys.path.insert(0, str(ROOT / "images/monitor"))
+    from rcb_monitor import inject
+    bad = 0
+
+    def expect(ok: bool, what: str, out: str = "") -> None:
+        nonlocal bad
+        if not ok:
+            bad += 1
+            print(f"FAIL check-ci-selftest [GPU rule change: {what}]" + (f":\n{out[-600:]}" if out else ""))
+
+    t = tmp / "gpurule" / HEAVY
+    shutil.copytree(tc.task_dir(HEAVY), t)
+    comp = t / "environment/docker-compose.yaml"
+    svc, old = next((n, c["gpu_memory_gb"]) for n, c in inject.service_caps(comp.read_text()).items()
+                    if c.get("gpu") and c.get("gpu_memory_gb"))
+    new = old + 7
+    rules = tmp / "gpurule" / "task_resources.toml"   # the repository's rules plus a last one for this task: GPU + 7
+    r = tc.rule_for(t)
+    line = ", ".join(f"{k} = {v:g}" if isinstance(v, float) else f"{k} = {v}" for k, v in
+                     dict(r["services"][svc], gpu_memory_gb=new).items())
+    extra = "".join(f"{n} = {{ " + ", ".join(f"{k} = {v:g}" for k, v in c.items()) + " }\n"
+                    for n, c in r["services"].items() if n != svc)
+    gt = r.get("gpu_types")
+    rules.write_text(tc.RESOURCES_FILE.read_text() + f"\n[[cap]]\nmatch = '^{re.escape(HEAVY)}$'\n{svc} = {{ {line} }}\n"
+                     + extra + (("gpu_types = [" + ", ".join(f'"{x}"' for x in gt) + "]\n") if gt else ""))
+    code = ("import sys; sys.path.insert(0, sys.argv[1]); import task_conventions as tc; from pathlib import Path; "
+            "tc.RESOURCES_FILE = Path(sys.argv[2]); tc.normalize(Path(sys.argv[3]))")
+    p = subprocess.run([sys.executable, "-c", code, str(ROOT / "scripts"), str(rules), str(t)], capture_output=True, text=True)
+    expect(p.returncode == 0, "normalize with the changed rule", p.stdout + p.stderr)
+    got = inject.service_caps(comp.read_text())[svc]["gpu_memory_gb"]
+    n = sum(1 for ln in comp.read_text().splitlines() if ln.strip().startswith(inject.GPU_KEY + ":"))
+    expect(got == new and n == 1, f"service {svc}: x-gpu-memory-gb {got} ({n} line(s)) after normalize, the rule says {new:g}")
+    rc, out = run(RESOURCES, t)
+    expect(rc != 0 and "declare the cap that is applied" in out and "task_conventions.py" in out,
+           "check-resources.py must refuse the copy against the repository's rule, naming normalize", out)
+    p = subprocess.run([sys.executable, str(ROOT / "scripts/task_conventions.py"), str(t)], capture_output=True, text=True)
+    rc, out = run(RESOURCES, t)
+    expect(p.returncode == 0 and rc == 0 and inject.service_caps(comp.read_text())[svc]["gpu_memory_gb"] == old,
+           "normalize with the repository's rule restores its value and passes", p.stdout + p.stderr + out)
+    gen = next(x for x in tc.iter_tasks() if inject.is_generated((x / "environment/docker-compose.yaml").read_text()))
+    g = tmp / "gpurule" / gen.name
+    shutil.copytree(gen, g)
+    before = inject.service_caps((g / "environment/docker-compose.yaml").read_text())["main"]["pids"]
+    p = subprocess.run([sys.executable, str(ROOT / "images/monitor/rcb_monitor/inject.py"), str(g)], capture_output=True, text=True)
+    after = inject.service_caps((g / "environment/docker-compose.yaml").read_text())["main"]["pids"]
+    expect(p.returncode == 0 and before and after == before,
+           f"inject.py alone on {gen.name} (a generated compose file): main's pids_limit {before} -> {after}", p.stderr)
+    if not bad:
+        print(f"check-ci-selftest: a rule's GPU-memory cap change ({old:g} -> {new:g} GiB on {svc}) reaches the compose file "
+              "through normalize, and inject.py alone keeps a generated file's caps")
+    return bad
+
+
 def main(argv: list[str]) -> int:
     tier = argv[1] if argv[:1] == ["--tier"] and len(argv) > 1 else "all"
     if tier not in ("invariants", "advisory", "all"):
@@ -538,6 +596,7 @@ def main(argv: list[str]) -> int:
                       + ("PASSED the broken task: the rule is blind" if rc == 0 else f"failed, but not with `{expect}`:\n{out[-600:]}"))
         if tier != "advisory":
             bad += twin_cutoffs(Path(tmp))
+            bad += gpu_rule_change(Path(tmp))
     if not bad:
         print(f"check-ci-selftest ({tier}): {len(sel)} mutations of real tasks, each caught by its rule")
     return 1 if bad else 0

@@ -13,7 +13,7 @@
 - Oracle: full / partial / none — evidence: ___
 - Base image(s): `efe:<sim>-<ver>` (published) / `efe-private:<sim>-<ver>` (BUILD_ONLY)
 - Agent time cutoff: ___ s per mode, `[agent] timeout_sec` in each task's task.toml; default 3600, reason if other; at most 14400; the same for a task's privileged and standard versions (PROTOCOL §2.12). A change of an existing task's cutoff: old -> new, decided by ___
-- Resources (caps per container, PROTOCOL §6, GiB): main ___ CPU / ___ memory / ___ processes / ___ disk / ___ GPU memory; each other service ___ CPU / ___ memory / ___ processes / ___ GPU memory; GPU types (RTX-class only) ___; measured from ___
+- Resources (caps per container, PROTOCOL §6; CPUs, GiB, processes): main ___ CPUs / ___ GiB memory / ___ processes / ___ GiB disk / ___ GiB GPU memory; each other service ___ CPUs / ___ GiB memory / ___ processes / ___ GiB GPU memory; separate verifier (`[verifier.environment]`) ___ CPUs / ___ GiB memory, or "no cap"; GPU types (RTX-class only, or none) ___; measured from ___
 
 ## Checklist
 - [ ] `bash ci_checks/run_all.sh <tasks>` passes

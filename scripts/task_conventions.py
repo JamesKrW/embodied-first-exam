@@ -167,6 +167,9 @@ OWN_SLOWDOWN_RE = re.compile(r'^\s*RO_SLOWDOWN:\s*"?([0-9.]+)"?\s*$', re.M)
 # RTX-class GPU: Harbor's `[environment].gpu_types` too), `recommended_gpu`, `measured`, `caps_measured`
 CAP_KEYS = {"cpus": float, "memory_gb": float, "pids": int, "gpu_memory_gb": float, "disk_gb": float}
 RULE_KEYS = {"match": str, "gpu_types": list, "recommended_gpu": str, "measured": str, "caps_measured": str}
+# `gpu_types` names RTX-class models only (ray-tracing cores; Harbor's spelling of the model): a task that runs on any
+# NVIDIA GPU sets none (ci_checks/check-resources.py)
+RTX_GPU_MODELS = ("L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada", "RTX PRO 6000 Blackwell", "A40", "RTX A6000")
 ENFORCE_ENV = "RCB_LIMITS_ENFORCE"   # §6: run-time switch (compose default 0 = record only; 1 = a violation fails)
 EMERGENCY_GPU_FACTOR = 1.5           # §6: host protection in enforced runs (the same value: rcb_monitor/monitor.py)
 RESOURCES_HEADING = "## Resources"
@@ -613,11 +616,14 @@ def task_caps(task: Path) -> dict[str, dict]:
 
 
 def verifier_caps(task: Path) -> dict:
-    """The separate verifier's caps: `[verifier.environment]` cpus / memory_mb (absent: Harbor gives it main's
-    `[environment]`), its GPU and GPU memory from tests/docker-compose.yaml."""
+    """The separate verifier's caps as Harbor applies them (harbor/models/task/verifier_mode.py
+    resolve_effective_verifier_env_config): the `[verifier.environment]` table alone when the task has one (a cpus or
+    memory_mb it lacks is no cap at all, never main's), a copy of main's `[environment]` when it has none; its processes,
+    GPU and GPU memory (a recorded cap: nothing measures the verifier phase) from tests/docker-compose.yaml. `own`: the
+    table exists."""
     cfg = task_toml(task)
-    env = dict(cfg.get("environment") or {})
-    env.update(((cfg.get("verifier") or {}).get("environment")) or {})
+    venv = (cfg.get("verifier") or {}).get("environment")
+    env = dict(venv if venv is not None else (cfg.get("environment") or {}))
     tc = read_text(task / "tests/docker-compose.yaml")
     try:
         main = (rcb_monitor_inject.service_caps(tc) if tc else {}).get("main") or {}
@@ -626,8 +632,7 @@ def verifier_caps(task: Path) -> dict:
     return {"cpus": float(env["cpus"]) if isinstance(env.get("cpus"), (int, float)) else None,
             "memory_gb": float(env["memory_mb"]) / 1024 if isinstance(env.get("memory_mb"), (int, float)) else None,
             "pids": main.get("pids"), "gpu": bool(main.get("gpu")), "gpu_memory_gb": main.get("gpu_memory_gb"),
-            "own": bool(((cfg.get("verifier") or {}).get("environment")) or {}) and any(
-                k in ((cfg.get("verifier") or {}).get("environment") or {}) for k in ("cpus", "memory_mb"))}
+            "own": venv is not None}
 
 
 def _num(v) -> str:
@@ -656,14 +661,14 @@ def render_resources(task: Path) -> str:
     if m.get("cpus"):
         parts.append(f"**{_num(m['cpus'])} CPUs** (a cap: more work only runs slower)")
     if m.get("memory_gb"):
-        parts.append(f"**{_num(m['memory_gb'])} GiB of memory** (a process that goes over is killed, and the trial fails)")
+        parts.append(f"**{_num(m['memory_gb'])} GiB of memory** (the kernel kills a process that goes over)")
     if m.get("pids"):
         parts.append(f"**{int(m['pids'])} processes**")
     if m.get("disk_gb"):
         parts.append(f"**{_num(m['disk_gb'])} GiB** of disk (new files under {_paths(lim.DISK_PATHS)})")
     if gpu and m.get("gpu_memory_gb"):
-        parts.append(f"**one GPU, {_num(m['gpu_memory_gb'])} GiB of its memory** (the card may be shared; using more can "
-                     "fail with out-of-memory)")
+        parts.append(f"**one GPU, {_num(m['gpu_memory_gb'])} GiB of its memory** (the card may be shared with other "
+                     "trials, so an allocation can fail even below this cap)")
     elif gpu:
         parts.append("**one GPU** (the card may be shared)")
     text = ("Your container: " + (", ".join(parts[:-1]) + " and " + parts[-1] if len(parts) > 1 else "".join(parts)) + "."
@@ -673,15 +678,22 @@ def render_resources(task: Path) -> str:
     if mode_of(task) in SIDECAR_MODES and sidecars_of(task):   # a standard task without a sim service (a policy task,
         # PROTOCOL §4c) has no simulator to leave out
         text += " The simulator runs in its own container and does not count against these."
+    drive = [n for n in caps if n != "main" and rcb_monitor_inject.kind_of(mode_of(task), n) == "scope"]
+    if drive:   # privileged: services the agent drives run in containers of their own, with caps of their own
+        text += (f" {_paths(drive)} {'runs' if len(drive) == 1 else 'run'} in {'its' if len(drive) == 1 else 'their'} own "
+                 f"container{'' if len(drive) == 1 else 's'}, with {'its' if len(drive) == 1 else 'their'} own caps "
+                 f"(README.md, `## Resources`); the monitor counts {'its' if len(drive) == 1 else 'their'} use with yours.")
     if gpu:
         text += " GPU memory counts what a process reserves (JAX, for example, reserves most of the card unless told not to)."
     gpu_cap = gpu and bool(m.get("gpu_memory_gb"))
-    what = [f"the GPU-memory cap for {_num(lim.SUSTAIN_SEC)} s within any {_num(lim.WINDOW_SEC / 60)} minutes"] if gpu_cap else []
-    what += ["the disk cap at two readings in a row (one a minute)"] if m.get("disk_gb") else []
+    what = [f"going over the GPU-memory cap for {_num(lim.SUSTAIN_SEC)} s within any {_num(lim.WINDOW_SEC / 60)} minutes"
+            ] if gpu_cap else []
+    what += ["going over the disk cap at two readings in a row (one a minute)"] if m.get("disk_gb") else []
+    what += ["a process killed at your memory cap"] if m.get("memory_gb") else []
     if what:
-        text += (f" {'GPU memory and disk' if len(what) == 2 else 'GPU memory' if gpu_cap else 'Disk'} may be enforced: "
-                 f"when enforcement is on, going over {' or '.join(what)} ends the trial as a failure (reward 0), whatever "
-                 "the deliverable.")
+        text += (" These caps may be enforced: when enforcement is on, "
+                 f"{', '.join(what[:-1]) + ' or ' + what[-1] if len(what) > 1 else what[0]} ends the trial as a failure "
+                 "(reward 0), whatever the deliverable.")
     if gpu_cap:
         text += (f" When enforcement is on and GPU memory goes above {_num(EMERGENCY_GPU_FACTOR)} times its cap, the "
                  "monitor also kills the process holding the most of it at once, to protect the machine; that alone does "
@@ -702,6 +714,7 @@ def readme_resources(task: Path, old_readme: str = "") -> list[str]:
     r = rule_for(task) or {}
     gpu_types = (task_toml(task).get("environment") or {}).get("gpu_types")
     rows = ["| Container | CPUs | Memory | Processes | GPU memory | Disk |", "|---|---|---|---|---|---|"]
+    nocap = lambda v, f: "no cap" if v is None else f(v)   # noqa: E731  (the verifier: a key Harbor lacks is no cap)
     for name, c in caps.items():
         who = f"`{name}`" + (" (the agent's)" if name == "main" else "")
         gm = _gb(c.get("gpu_memory_gb")) if c.get("gpu") else "no GPU"
@@ -710,13 +723,12 @@ def readme_resources(task: Path, old_readme: str = "") -> list[str]:
     cfg = task_toml(task)
     if ((cfg.get("verifier") or {}).get("environment_mode")) == "separate":
         v = verifier_caps(task)
-        gm = _gb(v.get("gpu_memory_gb")) if v["gpu"] else "no GPU"
-        rows.append(f"| verifier{'' if v['own'] else ' (as `main`)'} | {_num(v['cpus']) if v.get('cpus') else '—'} | "
-                    f"{_gb(v.get('memory_gb'))} | {v.get('pids') or '—'} | {gm} | — |")
+        gm = nocap(v.get("gpu_memory_gb"), _gb) if v["gpu"] else "no GPU"
+        rows.append(f"| verifier{'' if v['own'] else ' (as `main`)'} | {nocap(v.get('cpus'), _num)} | "
+                    f"{nocap(v.get('memory_gb'), _gb)} | {nocap(v.get('pids'), str)} | {gm} | — |")
     held = [n for n, c in caps.items() if c.get("gpu")]
     if gpu_types:
-        gpu = (f"an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering; `gpu_types`: "
-               f"{', '.join(gpu_types)})")
+        gpu = (f"an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: {', '.join(gpu_types)}")
     elif held:
         gpu = "any NVIDIA GPU"
     else:
@@ -731,11 +743,8 @@ def readme_resources(task: Path, old_readme: str = "") -> list[str]:
         notes += [ln for ln in (sec.group(1).splitlines() if sec else [])
                   if ln.startswith(("- Recommended GPU:", "- Measured:", "- Measured (caps):"))]
     return [RESOURCES_HEADING,
-            "Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, "
-            "memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else "
-            "from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the "
-            "service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers "
-            "running then.", "", *rows, "", *notes]
+            "Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what "
+            "enforces it.", "", *rows, "", *notes]
 
 
 VERIFIER_NETWORK_LINE = 'network_mode = "no-network"       # PROTOCOL H.6: the verifier has no network'
@@ -1473,7 +1482,7 @@ BEFORE_YOU_RUN = {
     "AutoBio": ("Before you run", "",
                 "Builds its image from AutoBio's repository, which states no licence (CPU only): a few minutes, 3 GB free disk."),
 }
-# Benchmarks whose README asks for RT cores although their tasks declare gpu_class "any" (RoboARC: its renderer Nyx).
+# Benchmarks whose README asks for RT cores although their tasks set no `gpu_types` (RoboARC: its renderer Nyx).
 RT_CORES_BY_README = {"RoboARC"}
 
 

@@ -3,11 +3,14 @@
 and docker read it, and nothing else.
 
 - task.toml has no `[metadata.resources]` (no minimums, no soft limits, no copy of the caps);
-- main's caps in `[environment]`: `cpus` (a whole number), `memory_mb`, `storage_mb` (disk), and `gpu_types` only on a
-  task with a GPU; never `gpus` (Harbor 0.23's local docker refuses it: the GPU is a compose device reservation);
+- main's caps in `[environment]`: `cpus` (a whole number), `memory_mb`, `storage_mb` (disk), and `gpu_types` (RTX-class
+  models, task_conventions.RTX_GPU_MODELS) only on a task with a GPU; never `gpus` (Harbor 0.23's local docker refuses
+  it: the GPU is a compose device reservation, never `gpus:` or `runtime: nvidia`);
 - every other compose service (the monitor's own aside, check-monitor.py) sets `cpus`, `mem_limit` and `pids_limit`, main
   sets `pids_limit` (its CPU and memory are Harbor's, from `[environment]`); a service that reserves an NVIDIA GPU sets
-  `x-gpu-memory-gb`, and only such a service (tests/docker-compose.yaml too);
+  `x-gpu-memory-gb`, and only such a service (tests/docker-compose.yaml too); at most one service in the monitor's scope
+  (main, and in privileged mode the services the agent drives) holds a GPU, since the monitor checks one GPU-memory cap
+  for the scope;
 - the caps of the task's rule in scripts/task_resources.toml are the ones applied (task_conventions.py writes them);
 - instruction.md ends (before `## Time limit`) with the `## Resources` paragraph rendered from main's caps, after the
   `## External material` paragraph every task states in the same words (§5), and the README's `## Resources` is the one
@@ -24,8 +27,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 from task_conventions import (  # noqa: E402  (one renderer of the paragraph and the README section, one rule reader)
-    CUTOFF_HEADING, RESOURCES_HEADING, iter_tasks, readme_resources, render_external, render_resources, rule_for,
-    task_caps)
+    CUTOFF_HEADING, RESOURCES_HEADING, RTX_GPU_MODELS, iter_tasks, mode_of, readme_resources, render_external,
+    render_resources, rule_for, task_caps)
 from rcb_monitor import inject  # noqa: E402  (one reader of the compose file's services and caps)
 
 BOUNDS = {"cpus": 128, "memory_gb": 1024, "pids": 1 << 22, "gpu_memory_gb": 192, "disk_gb": 4096}
@@ -68,6 +71,20 @@ def check(task: Path) -> list[str]:
         errs.append("[environment].gpu_types must be a non-empty list of GPU model names")
     elif gt and not gpu:
         errs.append("[environment].gpu_types is set but no service reserves a GPU")
+    elif gt and set(gt) - set(RTX_GPU_MODELS):
+        errs.append(f"[environment].gpu_types {sorted(set(gt) - set(RTX_GPU_MODELS))}: not RTX-class models "
+                    f"(gpu_types is for a task that needs ray-tracing cores: {', '.join(RTX_GPU_MODELS)}); a task that "
+                    "runs on any NVIDIA GPU sets none")
+    for f in ("environment/docker-compose.yaml", "tests/docker-compose.yaml"):
+        txt = (task / f).read_text() if (task / f).is_file() else ""
+        for m in re.finditer(r"(?m)^  ([A-Za-z0-9_.-]+):[^\n]*\n((?:    [^\n]*\n|\s*\n)*)", txt):
+            if any(inject.GPU_OTHER_RE.match(ln) for ln in m.group(2).splitlines()):
+                errs.append(f"{f}: service {m.group(1)} gets its GPU through `gpus:` or `runtime: nvidia`; reserve it as "
+                            "a deploy device (deploy.resources.reservations.devices, driver: nvidia)")
+    held = [n for n, c in caps.items() if c.get("gpu") and inject.kind_of(mode_of(task), n) == "scope"]
+    if len(held) > 1:
+        errs.append(f"services {held} all hold a GPU in the monitor's scope: it checks one GPU-memory cap per scope; "
+                    "give the agent's side one GPU service")
     for svc, c in caps.items():
         if svc == "main":
             m = own.get("main") or {}

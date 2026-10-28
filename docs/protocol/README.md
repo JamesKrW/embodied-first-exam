@@ -119,17 +119,36 @@ limits. Each cap is written where Harbor or docker reads it:
 
 | Container | Where | Keys |
 |---|---|---|
-| `main` (the agent's) | `task.toml` `[environment]` | `cpus`, `memory_mb`, `storage_mb` (disk); `gpu_types` (a model list) only for a task that needs an RTX-class GPU; never `gpus` (Harbor's local docker refuses it: the GPU is a device reservation in the compose file) |
-| the separate verifier | `[verifier.environment]` `cpus`, `memory_mb` | absent: Harbor gives it `[environment]` |
-| every other service, and `main`'s processes and devices | `environment/docker-compose.yaml` | `cpus`, `mem_limit`, `pids_limit`, `shm_size`, the nvidia device reservation |
-| the service that holds a GPU | its compose service (`tests/docker-compose.yaml` for a separate verifier's) | `x-gpu-memory-gb`: its GPU-memory cap in GiB, the one field of our own (docker and Harbor cannot cap GPU memory) |
+| `main` (the agent's) | `task.toml` `[environment]` | `cpus` (a whole number), `memory_mb`, `storage_mb` (disk); `gpu_types` (RTX-class models) only for a task that needs ray-tracing cores; never `gpus` (Harbor's local docker refuses it) |
+| `main`'s processes, and every other service | `environment/docker-compose.yaml` | `pids_limit` (main); `cpus`, `mem_limit`, `pids_limit` (every other service) |
+| a service that holds a GPU | its compose service | the device reservation (`deploy.resources.reservations.devices`, `driver: nvidia`, written by hand; never `gpus:` or `runtime: nvidia`) and `x-gpu-memory-gb`, its GPU-memory cap in GiB, the one field of our own |
+| the separate verifier | `task.toml` `[verifier.environment]` | `cpus`, `memory_mb`, set by hand. Harbor uses this table alone when it exists: a key it lacks is **no cap**. Without the table the verifier gets a copy of `[environment]`. A GPU service in `tests/docker-compose.yaml` gets `x-gpu-memory-gb` (main's value) |
 
-Docker enforces CPU (a throttle), memory (the kernel's OOM killer: the process is killed) and processes. GPU memory and
-disk no runtime caps on our hosts: the resource monitor sidecar measures them, and enforces them only when the run sets
-`RCB_LIMITS_ENFORCE=1` (off by default). A machine needs, per phase, the sum of the caps of the containers running then;
-placing trials on machines is the runner's job. The agent reads its own container's caps in `## Resources` (§5) and in
-`/run/rcb-limits/usage.json`. The values are the rules of `scripts/task_resources.toml`, written by `normalize`;
-enforcement and the reward fields: running.md "Resources".
+Other compose keys (`shm_size`, devices, volumes) are set by the task's compose file and are not caps.
+
+The values come from the rules in `scripts/task_resources.toml`; `python3 scripts/task_conventions.py <task dirs>`
+(`normalize`) writes them, and `ci_checks/check-resources.py` checks that the declared caps are the applied ones. A rule
+is a `[[cap]]` table:
+
+- `match`: a regular expression searched in the task directory's name; the **last** rule that matches a task applies,
+  whole (rules are never merged).
+- one inline table per compose service, keyed by its name; the services must be exactly the task's compose services
+  (`rcb_monitor` aside). `main` = { `cpus` (whole), `memory_gb`, `pids`, `disk_gb` }; every other service = { `cpus`,
+  `memory_gb`, `pids` }; `gpu_memory_gb` on, and only on, a service that reserves a GPU. Memory, disk and GPU memory are
+  in GiB.
+- optional: `gpu_types` (written to `[environment]`), `recommended_gpu`, `measured` (what the task was measured to use)
+  and `caps_measured` (where the GPU-memory and disk caps come from), all three shown in the task README's
+  `## Resources`.
+
+Docker enforces CPU (a throttle), memory (the kernel's OOM killer) and processes. Docker caps neither GPU memory nor disk
+on a local host (a cloud backend may apply `storage_mb`): the resource monitor measures both and enforces them only when
+the run sets `RCB_LIMITS_ENFORCE=1` (off by default). The GPU-memory cap it enforces is that of the one GPU service in
+its scope (main, and in privileged mode the services the agent drives; at most one of them holds a GPU); a scope without
+a GPU has no GPU-memory cap, and GPU memory seen there anyway is only recorded. The `x-gpu-memory-gb` of a recorded
+service (a standard mode's simulator sidecar, RoboPaint's scorer) and of the verifier is a cap stated for the reader:
+nothing measures it against that cap. A machine that holds the sum of a phase's caps never runs short; packing more is
+the runner's call. The agent reads its own container's caps in `## Resources` (§5) and in `/run/rcb-limits/usage.json`.
+Enforcement and the reward fields: running.md "Resources".
 
 ## 7. Versions
 
@@ -158,7 +177,7 @@ verifier, a sidecar) is `*_trusted` and never mounted by the agent's container; 
 file, host path or socket (only a directory the runner names as a whole `${RCB_*}` variable); no service widens its
 container (`privileged`, `cap_add`, `devices`, host namespaces, `volumes_from`, OOM settings), takes files by another road
 (`secrets`, `configs`, `env_file`, `build`, `include`) or sets its own network; sidecars publish no port. The resource
-monitor, the one service exempt from these, has no network, runs its code from a pinned image and mounts its limits read-only, is the only writer of the
+monitor, the one service exempt from these, has no network, runs its code from a pinned image and mounts its caps (`limits.json`) read-only, is the only writer of the
 beacons (read-only everywhere else) and seals its record in the first sidecar collect hook. Code a verifier runs for
 the agent (a `policy` deliverable) runs as an unprivileged user in its own process, without network, unable to read the
 simulator, the evaluator or the requests, under a process limit; every process it started ends before anything is

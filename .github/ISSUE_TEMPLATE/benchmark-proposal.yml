@@ -28,7 +28,7 @@ body:
     validations: {required: true}
   - type: textarea
     id: images
-    attributes: {label: Images and resources, description: "Base image size, caps per container (CPU cores, memory, processes, disk, GPU memory, an RTX-class GPU or any; PROTOCOL §6), whether the image can be published (licences, data), expected wall time of an oracle run."}
+    attributes: {label: Images and resources, description: "Base image size, caps per container (CPU cores, memory, processes, disk, GPU memory; an RTX-class GPU, any GPU, or none; PROTOCOL §6), whether the image can be published (licences, data), expected wall time of an oracle run."}
     validations: {required: true}
   - type: input
     id: size

@@ -74,8 +74,8 @@ Guide for maintainers. The contract is [protocol/README.md](protocol/README.md);
   measured with a margin (what do `measured` / `caps_measured` in `scripts/task_resources.toml` cite, and do they say
   where there are no measurements)? Would an honest agent and the oracle stay inside them (one simulator at the
   task's defaults on the largest card it runs on, the tooling's own replay checks, videos it is told to write)? Does
-  every GPU service have its `x-gpu-memory-gb`, and does `gpu_types` match the simulator (Isaac Sim / Omniverse: an
-  RTX-class GPU)? Does `instruction.md` have the rendered `## Resources` paragraph just before the closing `## Time limit`?
+  `gpu_types` match the simulator (Isaac Sim / Omniverse: an RTX-class GPU)? Does a separate verifier need caps in
+  `[verifier.environment]` (a table without `cpus` / `memory_mb` runs it uncapped)? CI checks the rest.
 
 ## Human review (oracle `partial` or `none`)
 Review per family (same scene template and predicate), at least two instances per family:

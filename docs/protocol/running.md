@@ -95,45 +95,43 @@ without such a live verdict, started off the frozen instance (`instance_mismatch
 keeps the recorded one (benchmark docs name their fields where they differ).
 
 ## Resources: caps and their enforcement
-Every resource number of a task is an upper bound for one container (PROTOCOL §6): main's in `[environment]` (`cpus`,
-`memory_mb`, `storage_mb`, `gpu_types`), every other service's and main's processes in `environment/docker-compose.yaml`
-(`cpus`, `mem_limit`, `pids_limit`, `shm_size`, devices), and the GPU-memory cap `x-gpu-memory-gb` on the service that
-holds the GPU. Values from `scripts/task_resources.toml` (the last rule that matches a task, whole), written by
-`normalize`, checked by `ci_checks/check-resources.py`; the README's `## Resources` lists them with what they were
-measured from.
+Every resource number of a task is an upper bound for one container; where each is set: PROTOCOL §6. This section is
+how a run applies and enforces them.
 - **What enforces what.** Memory: docker (cgroup); a process that goes over is killed by the kernel. Processes and
   shared memory: docker. CPU: docker, a throttle only. A CPU cap above the host's count means the host's count: the
   runner clamps it in its copy (`scripts/clamp_cpus.py`); memory and pids caps are never clamped. Disk: a cloud
-  backend applies `storage_mb`; local docker cannot (overlay2 on ext4), so the monitor measures it. GPU memory: no
-  runtime can cap it (no MIG on our cards, and a pool may share one card between trials): the monitor measures it, and
-  the agent is told its budget.
+  backend applies `storage_mb`; local docker cannot (overlay2 on ext4), so the monitor measures it. GPU memory: docker
+  cannot cap it (a card may be shared between trials): the monitor measures it, and the agent is told its cap.
 - **Placing trials.** Harbor caps each container and does not check whether a machine has room (concurrency is `-n`).
-  A trial needs, in each phase (agent; verifier), the sum of the caps of the containers running then; GPU memory by
-  `x-gpu-memory-gb`, an RTX-class card where `gpu_types` is set.
+  A machine that holds the sum of a phase's caps (agent; verifier) never runs short; packing more is the runner's call.
+  GPU memory: `x-gpu-memory-gb`; an RTX-class card where `gpu_types` is set. A separate verifier whose
+  `[verifier.environment]` lacks `cpus` or `memory_mb` runs without that cap.
 - **Monitor**: the `rcb_monitor` sidecar samples every few seconds into its own record (`rcb-monitor/1`), sealed in the
   first collect hook: GPU memory (NVML per process, summed), memory (cgroup `anon + shmem`), processes, disk (growth of
   the files under `/app`, `/tmp`, `/root` of the agent's container), per container and summed over its scope (privileged:
   every container the agent drives; standard modes: the agent's container; the `sim` sidecar and other benchmark-owned
   services are recorded, never a failure). It writes `/run/rcb-limits/usage.json`: current use, the agent's own
-  container's caps (`caps`), the two caps it may enforce (`limits`: `gpu_memory_gb`, `disk_gb`, with the rule's
-  `sustain_sec` / `window_sec`) and the agent's clock (`elapsed_s`, `time_left_s`, `deadline_utc`: `[agent]
+  container's caps (`caps`), the two caps it may enforce (`limits`: `gpu_memory_gb`, null without a GPU in the scope,
+  `disk_gb`, and the protocol's 60 s / 120 s as `sustain_sec` / `window_sec`) and the agent's clock (`elapsed_s`, `time_left_s`, `deadline_utc`: `[agent]
   timeout_sec` from the environment's start, so never more than the agent has). Inside its container the agent can
   also read its cgroup (`/sys/fs/cgroup/memory.max`, `cpu.max`, `pids.max`). The verifier recomputes violations from
   the raw samples with its own copy of the caps (`tests/rcb_limits.json`, format `rcb-limits/2`). A missing, unsealed
   or mostly empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`. A runner whose
   container runtime cannot run the monitor (no `pid: host`) runs the same service as `monitor.py beacon` (no pid /
   cgroup host, no record): `usage.json` then has the caps, the clock and `"measured": false`.
-- **Violations** (the protocol's rules, the same for every task): the scope's GPU memory above its cap (the sum of
-  `x-gpu-memory-gb` of the scope's GPU services) for 60 s within any 120 s, the agent's disk above `storage_mb` at two
+- **Violations** (the protocol's rules, the same for every task): the scope's GPU memory above its cap (the
+  `x-gpu-memory-gb` of the scope's one GPU service) for 60 s within any 2 minutes, the agent's disk above `storage_mb` at two
   measurements in a row (once a minute), or a kernel OOM kill in the scope at the container's own memory cap; gaps
-  never count against the agent.
+  never count against the agent. A scope without a GPU has no GPU-memory cap: GPU memory seen there is recorded only. A
+  `limits.json` that is not `rcb-limits/2` is an unusable record (`resource_monitor_missing = 1`; not a result when
+  enforced).
 - **Session log**: the monitor copies the agent's `/app/output/rcb_session_log.jsonl` append-only into its record
   (`session_log/`); before the grader, the verifier step gives the grader that copy when the agent's file was removed or
   rewritten (`session_log_tampered`, `session_log_from_monitor` in `reward.json`). The log feeds cost fields only.
 - **The switch** `RCB_LIMITS_ENFORCE` (compose default 0, so it does not change the digest): `1` — a confirmed violation
   kills the scope's processes and fails the trial (`reward 0`, `success_before_limits`, `resource_limit_exceeded = 1`),
   never retried; `0` — observe and record only (`limits_violation_observed`, `/logs/verifier/resource_limits.json`);
-  any other value — nothing is killed, `infra_error = 1`, `resource_switch_error = 1`. Official runs so far: 0.
+  any other value — nothing is killed, `infra_error = 1`, `resource_switch_error = 1`.
 - **Out-of-memory kills**: a kill at a container's own cap in the scope is a violation (`over_oom`); a host OOM kill is
   never one (enforcement on: `infra_error = 1`, `resource_host_oom`); a benchmark-owned service killed for memory in an
   episode that did not succeed is `infra_error = 1` (`resource_service_oom`) in both settings. Host protection
@@ -250,7 +248,8 @@ node-local scratch (podman's storage does not work on most network file systems)
    `harbor run -p`, the same copy by hand: `podman pull` the image, stage a copy as in 5., replace the block with that
    `FROM` line and stamp the copy again.
 7. Where podman cannot give each container a cgroup of its own (cgroup v1, or a cgroup v2 node whose cgroup is not
-   delegated to your user, e.g. a Slurm job step), the resource caps are not applied (`RCB_LIMITS_ENFORCE` stays 0), and
+   delegated to your user, e.g. a Slurm job step), docker's caps are not applied and the monitor's enforcement stays off
+   (`RCB_LIMITS_ENFORCE=0`), and
    podman cannot stop the `rcb_monitor` sidecar, which shares the host's PID namespace (podman stops such a container by
    signalling its cgroup's processes): the monitor then ends itself once its record is sealed.
 8. On cgroup v2 the containers' CPU caps need the `cpu` controller delegated to your user: when
@@ -353,7 +352,7 @@ installs) is fine: set-up is not the agent's time.
 **Changing a cutoff** (the author's decision): set the new `[agent] timeout_sec` in both twins, run `python3 scripts/task_conventions.py tasks/<benchmark>/<task> ...` (it rewrites the closing section, the
 README row, `RCB_WALL_CLOCK_S` and `DIGEST`), and state old -> new and why in the change (label `cutoff-change`). The task
 changes in place and keeps its name; results under another cutoff are a different configuration (`config_key`). Not
-derived from the cutoff: the token budget, the resource limits, reset budgets, step caps, verifier timeouts. When
+derived from the cutoff: the token budget, the resource caps, reset budgets, step caps, verifier timeouts. When
 raising one, look at collect-hook and verifier budgets sized for an episode as long as the agent's time (RoboCasa,
 RoboCasa365 and RoboCasa-GR1 `COLLECT_TIMEOUT_S`; RoboLab, YAMLab, DexJoCo, BEHAVIOR-1K: their `tasks/<benchmark>/README.md`
 pages) and, for Embodied Olympics - Match's exported matches, a match's wall time at its slowdown plus the reviews between points.

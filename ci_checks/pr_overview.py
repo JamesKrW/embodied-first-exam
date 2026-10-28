@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A pull request's overview: what it changes, for the sticky comment and the labels (the job `advisories` of .github/workflows/static-checks.yml).
 
-As Terminal-Bench's task-pr-overview: the changed tasks with their mode, oracle, cutoff and minimum compute, a table of
+As Terminal-Bench's task-pr-overview: the changed tasks with their mode, oracle, cutoff and main's caps, a table of
 the cutoffs it changes (old -> new; PROTOCOL §2: the task author's decision, stated in the pull request), the cutoffs per benchmark and mode after it
 (several numbers in one benchmark and mode are marked: a pull request says why), twins whose cutoffs differ, and the
 scope its static checks run on (ci_checks/ci_scope.py), and the advisory checks' findings ("Advisories (not blocking)",
@@ -95,8 +95,8 @@ def main(argv: list[str]) -> int:
             md = d.get("metadata", {})
             caps = tc.task_caps(t)
             m = caps["main"]
-            gpu = sum(float(c.get("gpu_memory_gb") or 0) for c in caps.values())
-            res = (f"{m.get('cpus') or '?'} / {m.get('memory_gb') or '?'} / {gpu:g}"
+            gpu = f"{float(m['gpu_memory_gb']):g}" if m.get("gpu") and m.get("gpu_memory_gb") else "no GPU"
+            res = (f"{m.get('cpus') or '?'} / {m.get('memory_gb') or '?'} / {gpu}"
                    f"{'; ' + ', '.join(d.get('environment', {}).get('gpu_types') or []) if d.get('environment', {}).get('gpu_types') else ''}")
             out.append(f"| `{n}` | {'added' if n in added else 'changed'} | {tc.mode_of(t)} | {md.get('oracle', '—')} | "
                        f"{cutoff(d)} s | {res} |")

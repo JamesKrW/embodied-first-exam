@@ -74,7 +74,8 @@ tasks keep their names.
   and verifier): the references' numerics on any host that lets the container run on 4 CPUs. It also stops the default
   from spinning against the containers' 4-CPU quota: `bimanual_hanoi` ran at 35 control steps/s that way on the
   32-thread host, 150 with 4 threads.
-  - **4 visible CPUs are the minimum** (`min_cpus = verifier_min_cpus = 4`, `scripts/task_resources.toml`). The
+  - **4 visible CPUs are needed**: the agent's container and the sim sidecar are capped at 4 CPUs
+    (`scripts/task_resources.toml`); the separate verifier has no CPU cap. The
     variable is an upper bound only: OpenBLAS never runs more threads than the CPUs the process may run on (its
     affinity, `os.sched_getaffinity`). A cpuset narrows that (`docker --cpuset-cpus`, `taskset`, a Slurm allocation of
     2 CPUs); a CFS quota does not (the tasks' `cpus: 4` caps, `docker --cpus 2`: the process still sees every host CPU

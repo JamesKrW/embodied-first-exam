@@ -131,18 +131,16 @@ roboEngineer task except the eight `roboengineer-neuralfly-*` ones.
 Rules: `scripts/task_resources.toml` (`^roboengineer-`), measured on 2026-10-18 (Harbor 0.23 trials,
 docker stats, cgroup `memory.peak` and per-container `nvidia-smi` every 3-6 s). The verifier only reads JSON (~20 s).
 
-- **28 CPU tasks** (all but G1): the agent's container is capped at 2 CPUs / 6 GB, the sidecar at 4 CPUs
-  / 6 GB. The sidecar uses 1.7-1.9 cores while a deployment runs (one worker, OSMesa), its full 4 cores while it
+- **28 CPU tasks** (all but G1): the agent's container is capped at 2 CPUs / 6 GiB, the sidecar at 4 CPUs
+  / 6 GiB. The sidecar uses 1.7-1.9 cores while a deployment runs (one worker, OSMesa), its full 4 cores while it
   finalizes (held-out cases twice on four single-threaded workers, then the video: 79-199 s) and, for Neural Landing,
   through the per-case reference search before the agent starts (~480 s); its peak memory is 0.6-2.1 GiB (go2-weave
-  the largest), 1.2 GiB for landing. The reference runs' agent containers stay below 0.25 GiB. A trial needs 4 CPUs (the
-  sidecar's 4 never coincide with the agent's work: the agent waits for the health check and is stopped before
-  finalization; during a deployment the agent's 2-core cap + the sidecar's ~2) and 9 GB (landing 8 GB) = the agent's
-  6 GB cap + the sidecar's peak x 1.2 + the monitor. The
-  verifier phase is the sidecar's collect hook: 4 CPUs, 3 GB. Timeouts: collection budgets 1740 s (compact laps
+  the largest), 1.2 GiB for landing. The reference runs' agent containers stay below 0.25 GiB. The sidecar's 4 cores
+  never coincide with the agent's work: the agent waits for the health check and is stopped before finalization. The
+  verifier phase is the sidecar's collect hook (the sidecar's own caps). Timeouts: collection budgets 1740 s (compact laps
   5520 s, a worst-case bound) against 79-199 s measured; the verifier step 600 s against ~20 s.
 - **G1** (`g1-terrain-walk`): one NVIDIA GPU for the agent's container (`environment/docker-compose.yaml` reserves one
-  device for `main`; the sidecar has none and checks it). Measured on an L40S (`aws:rcb-gpu14`) with the public
+  device for `main`; the sidecar has none and checks it). Measured on an L40S (a cloud GPU host) with the public
   trainer: 1.8 GB of GPU memory at its default 256 environments, 4.7 GB at its cap of 1024, 16.5 GB at 4096 (the
   reference solution), about one CPU core (the PPO loop is bound by one Python thread); over the reference's 3.5 hours
   16.1 GiB of GPU memory, 5.6 GiB of memory, 1.6 cores at most. The sidecar: 2.2-2.6 cores during a deployment (four
@@ -150,7 +148,7 @@ docker stats, cgroup `memory.peak` and per-container `nvidia-smi` every 3-6 s). 
   for `main` (`x-gpu-memory-gb`; 16.1 GiB x 1.15 = 18.5, rounded up; any CUDA GPU by memory, but all measurements are on
   the L40S: a 24 GB card fits only when otherwise free and trains slower, so fewer iterations fit the cutoff and
   results are comparable only on one GPU model; the trainer caps torch at 15 % of the card, which its 0.64 GB at
-  4096 environments stays under on 24 GB), `main` 4 CPUs / 12 GB, `sim` 4 CPUs / 6 GB. Hosts: a GPU host that holds the three
+  4096 environments stays under on 24 GB), `main` 4 CPUs / 12 GiB, `sim` 4 CPUs / 6 GiB. Hosts: a GPU host that holds the three
   control-transfer images (`-train`, `-nominal` is its base, the evaluator) and lists the `roboengineer` bench.
 
 ## Checks
@@ -160,7 +158,7 @@ The task directories are the deliverable; the tooling that built them is kept ou
 - `ci_checks/benchmarks/roboengineer/invariant-boundary.py` (the required job `invariants`): the agent's copy is exactly the
   public allowlist, the agent's Dockerfile copies nothing else, one frozen instance in sidecar and verifier.
 
-## Validation (2026-10-18, Harbor 0.23.0 on aws:rcb-cpu3, the images above)
+## Validation (2026-10-18, Harbor 0.23.0 on a cloud CPU host, the images above)
 
 - **Reference controllers** (`solution/`, Harbor's oracle agent), held-out cases succeeded / mean score per instance
   `i00`, `i01`: landing 6/6 84.11, 6/6 82.89; neuralfly-eight 10/10 90.32, 10/10 94.30 (the contributor's records:
@@ -171,7 +169,7 @@ The task directories are the deliverable; the tooling that built them is kept ou
   partial where it succeeds on some cases, none otherwise. A second run of four of them reproduced the same scores
   (determinism across fresh trials).
 - **nop** on all 28: reward 0, `infra_error` 0 (no deployment: `no_submission`; no episode, so no video).
-- **G1** (Harbor 0.23.0 on aws:rcb-gpu14 / -gpu13, L40S): the reference (trains from scratch on the
+- **G1** (Harbor 0.23.0 on two cloud L40S hosts): the reference (trains from scratch on the
   agent's GPU, 12009-12638 s of agent time, three deployments) held-out 1/12 (mean 43.14, i00) and 4/12 (82.68, i01):
   `oracle = "partial"`; nop 0 on both, `infra_error` 0; every graded trial has `replay.mp4` (`matches_graded`).
   [g1.md](g1.md).

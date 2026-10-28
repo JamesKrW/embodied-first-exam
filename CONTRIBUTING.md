@@ -37,7 +37,7 @@ Open a benchmark-proposal issue first (or e-mail the proposal to embodiedfirstex
   modes, PROTOCOL H.4);
 - **scrubbable** — upstream reference solutions can be removed from everything the agent can reach.
 
-It also states the oracle source (PROTOCOL §4), the minimum compute per trial (CPU cores, memory, GPU memory
+It also states the oracle source (PROTOCOL §4), the caps of each container of a trial (CPU cores, memory, GPU memory
 and GPU class, §6), image size, whether the images can be published, and
 the expected size of the pull request.
 A new benchmark's shared-files change adds its label to `scripts/task_conventions.py` `BENCHMARKS` (task-directory prefix
@@ -61,18 +61,28 @@ A new benchmark's shared-files change adds its label to `scripts/task_convention
    particular to your benchmark (a simulator's start-up cost). Your service's `time_s` / `time_left_s` count from the
    agent's first request to it, never from the service's start, and a resumed service keeps that moment
    (docs/protocol/standard_mode.md, "The agent's clock": the shared layers do it for you; a test must show it).
-3. State the caps of every container (PROTOCOL §6, docs/protocol/running.md "Resources"): each number is an upper
-   bound for one container, never a minimum. Add a `[[cap]]` rule to `scripts/task_resources.toml`: per compose
-   service `cpus`, `memory_gb` (GiB) and `pids`, `gpu_memory_gb` on the service that holds the GPU, `disk_gb` for
-   `main`; `gpu_types` when the task needs an RTX-class GPU (Isaac Sim / Omniverse); for the README `recommended_gpu`,
-   `measured` (what the oracle or agent trials used: `docker stats` / cgroup `memory.stat` and `nvidia-smi` while they
-   run) and `caps_measured`. Set them a generous margin above measured peaks (e.g. `max(1.5 x peak, peak + 4 GiB)`) and
-   make sure the oracle stays inside them: memory over its cap is an OOM kill, and GPU memory or disk over theirs fails
-   the trial when a run enforces them (`RCB_LIMITS_ENFORCE=1`). `scripts/task_conventions.py` writes main's caps into
-   `[environment]` (`cpus`, `memory_mb`, `storage_mb`, `gpu_types`; never `gpus`), the others into
-   `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, `x-gpu-memory-gb`), and renders the
-   `## Resources` paragraph the agent reads into `instruction.md` (just before the closing `## Time limit`) and the
-   README's `## Resources`. A cap your compose file sets itself must be the rule's value (`check-resources.py`).
+3. State the caps of every container: each number is an upper bound for one container, never a minimum. The rule
+   format and where each cap ends up: PROTOCOL §6. Add a `[[cap]]` rule to `scripts/task_resources.toml`; for a
+   standard task with a `sim` sidecar that holds the GPU:
+
+   ```toml
+   [[cap]]
+   match = "^mybench-.*-standard$"          # a regular expression on the task directory's name; the last match wins
+   main = { cpus = 4, memory_gb = 10, pids = 8192, disk_gb = 20 }      # the agent's container (cpus: a whole number)
+   sim = { cpus = 4, memory_gb = 8, pids = 8192, gpu_memory_gb = 6 }   # gpu_memory_gb: only on the service that holds the GPU
+   recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
+   measured = "oracle trials on an RTX 4090: sim 1.9 GiB, 1.2 GiB of GPU memory; agent's container 0.1 GiB"
+   caps_measured = "GPU memory (the sim service): 1.2 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB"
+   ```
+
+   One table per compose service (the names must be the compose file's), `gpu_types` only when the task needs an
+   RTX-class GPU. The GPU itself is a device reservation you write in the compose file (`deploy.resources.reservations.
+   devices`, `driver: nvidia`). A separate verifier's caps are `cpus` / `memory_mb` you set in `[verifier.environment]`
+   (a table without them means no cap; no table: main's). Measure the oracle (and agent trials if you can: `docker stats`
+   / cgroup `memory.peak`, `nvidia-smi`), set the caps a generous margin above the peaks (e.g. `max(1.5 x peak, peak + 4
+   GiB)`) and make sure the oracle stays inside them: memory over its cap is an OOM kill, and GPU memory or disk over
+   theirs fails the trial when a run enforces them (`RCB_LIMITS_ENFORCE=1`). Then run `scripts/task_conventions.py` on
+   the tasks; `check-resources.py` checks the result.
 4. Base images: `images/<sim>/Dockerfile`, versioned in `images/<sim>/VERSION`, built and pushed with
    `scripts/build_images.sh` / `scripts/push_images.sh`. Images that cannot be published carry `images/<sim>/BUILD_ONLY`
    and build instructions. A task on a private image builds it itself when the runner cannot pull it: its Dockerfile

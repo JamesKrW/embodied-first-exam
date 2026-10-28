@@ -119,7 +119,7 @@ call's deadline; a step() command is counted (`tick_submitted`) before it is app
 also makes the error the agent's; a live call that fails unexpectedly closes its connection; stale data waiting on the
 connection before a request drops it (a new connection for that call); the once-a-second retry is armed only by a call
 actually sent. Harbor 0.23.0
-trials (aws:rcb-cpu3, 2026-10-17, this patch): table tennis oracle a valid match lost 0:5 (899 step() calls, each answered
+trials (a cloud CPU host, 2026-10-17, this patch): table tennis oracle a valid match lost 0:5 (899 step() calls, each answered
 inside the 0.1 s bound, max 0.074 s, applied at the step asked; 15 hits, none failed; replay.mp4), badminton oracle a
 valid match lost 1:11 (33 act calls, none failed; replay.mp4), nop on both: no_show, valid, success 0, infra_error 0;
 an adversarial probe on table tennis (the reference player's decisions through a skill that sleeps past its limits,

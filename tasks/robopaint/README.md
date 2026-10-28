@@ -464,19 +464,17 @@ One reference execution therefore takes 10–15 minutes of the time limit, or ab
 - Verifier time. A trajectory may have 72,000 control steps (`rcb_brush.MAX_STEPS`), and the oil references
   already have 49.7k-62.0k. Two fresh replays at the 67-102 steps/s measured above take 24-36 min plus two scene builds:
   - privileged: `[verifier] timeout_sec = 3600`; each replay process gets 1650 s (`--replay-timeout-s`), and one that runs past it is
-    `grader_error = 1`. The two replays stay sequential: two sessions at once would not fit the verifier's declared
-    minimum (2 CPUs, 3 GB).
+    `grader_error = 1`. The two replays stay sequential (one scene in memory at a time).
   - standard: the collect hook has 2820 s: up to 1500 s for a service that is resuming to end its episode, then the live
     score and one render pass (a replay with the video takes at most about 250 s for up to 72,000 control steps).
 - Privileged deliverable: a file that is not a readable trajectory (not an npz, pickled or object arrays, no `actions`,
   a wrong shape, NaN/inf, more than 72,000 rows) is `bad_trajectory = 1`; every `reward.json` has `deterministic`.
 - The privileged `scorer` service has `restart: on-failure:6`. It keeps no state a request needs: after a
-  restart the next `s.score()` replays the posted actions from the reset. Known limit: the scorer is inside the trial's
-  resource scope (in privileged mode every service is, docs/protocol/running.md "Resources"; `scripts/task_resources.toml` adds 5 GiB for it
-  to the trial's memory limit and caps it at 7 GiB). With `RCB_LIMITS_ENFORCE=1` an out-of-memory kill inside the
-  scorer would therefore count against the agent, which cannot enter that container but does decide how many actions
-  it posts. Taking it out of the scope is a change to `images/monitor/rcb_monitor/inject.py` (the service class) and the
-  limit rule, not to the task.
+  restart the next `s.score()` replays the posted actions from the reset. The scorer is the benchmark's own service:
+  the resource monitor records it but keeps it out of the agent's scope (`BENCHMARK_SERVICES` in
+  `images/monitor/rcb_monitor/inject.py`), so nothing it uses counts against the agent; its caps are 2 CPUs, 7 GiB of
+  memory and 5 GiB of GPU memory (`scripts/task_resources.toml`). If the kernel kills it for memory and the episode
+  then ends without success, the trial is `infra_error = 1` (`resource_service_oom`), not the agent's 0.
 
 ## Tooling (file names)
 | main's convention | RoboPaint |
