@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">Code agents have passed many exams in the digital world.<br>
-<b>What is their first exam to enter the physical world?</b></p>
+<b>What is their first exam before entering the physical world?</b></p>
 
 <p align="center">
   <a href="https://www.embodied-first-exam.ai/suite/?id=robopaint"><img src="docs/assets/suites/robopaint.gif" alt="RoboPaint" title="RoboPaint" width="32%"></a>
