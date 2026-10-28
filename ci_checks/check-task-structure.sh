@@ -13,7 +13,7 @@ if [ "$oracle" != "none" ]; then
 fi
 # No agent results in the repository (docs/protocol/README.md D3): they are published on the results site.
 [ -e "$t/results" ] && { echo "FAIL $t: results/ does not belong in the repository (PROTOCOL D3)"; rc=1; }
-# README in the standard layout (docs/protocol/README.md §2.1, §2.9).
+# README in the standard layout (docs/protocol/README.md §1, §6).
 python3 - "$t" "$(cd "$(dirname "$0")/.." && pwd)" <<'PY' || rc=1
 import re, sys, pathlib
 t = pathlib.Path(sys.argv[1]); s = (t / "README.md").read_text() if (t / "README.md").is_file() else ""
@@ -21,10 +21,10 @@ bad = []
 if not s.startswith(f"# {t.name}\n"): bad.append(f"first line must be '# {t.name}'")
 for k in ("Benchmark", "Mode", "Twin", "Simulator / robot", "Family / instance", "Oracle", "Agent time budget", "Base image"):
     if not re.search(rf"^\| {re.escape(k)} \| ", s, re.M): bad.append(f"key table row '{k}' missing")
-pos = [s.find(f"\n## {h}\n") for h in ("Task", "Difficulty", "Reference solution", "Verification", "Compute resources")]
+pos = [s.find(f"\n## {h}\n") for h in ("Task", "Difficulty", "Reference solution", "Verification", "Resources")]
 if -1 in pos or pos != sorted(pos):
-    bad.append("sections ## Task, ## Difficulty, ## Reference solution, ## Verification, ## Compute resources (in this order) "
-               "required (Compute resources: PROTOCOL §2.9, v1.1.4)")
+    bad.append("sections ## Task, ## Difficulty, ## Reference solution, ## Verification, ## Resources (in this order) "
+               "required (Resources: PROTOCOL §6)")
 # PROTOCOL §3: a standard or standard-realtime task without its privileged twin says why in its Twin row
 sys.path.insert(0, str(pathlib.Path(sys.argv[2]) / "scripts")); import task_conventions as tc
 try:

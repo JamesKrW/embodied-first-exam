@@ -35,7 +35,7 @@ verifier decides internally) is the task's own business.
 | All task code in the directory, or in a pinned image its Dockerfiles take it from (the benchmark's base image; a files-only image built from `embodied_first_exam/benchmarks/<benchmark>/`, `COPY --from=<image@digest>`); base images hold the simulator and its assets; nothing imports repository code at run time | a task's identity is its directory (H.8) |
 | Every task is in the normal form `scripts/task_conventions.py` `normalize` writes (README layout, rendered sections, `DIGEST`) | `task_conventions.py --check` |
 | Base images `ghcr.io/mll-lab-nu/efe:<name>-<images/<name>/VERSION>` (one public package, a tag per image), or `efe-private:<name>-<VERSION>` when `images/<name>/BUILD_ONLY` (one private package); every `FROM` / `image:` pinned to a tag or digest | `check-dockerfile.sh` |
-| README in the standard layout (`# <dir>`, key table, Task, Difficulty, Reference solution, Verification, Compute resources, Details); no `results/` | rendered by `normalize` |
+| README in the standard layout (`# <dir>`, key table, Task, Difficulty, Reference solution, Verification, Resources, Details); no `results/` | rendered by `normalize` |
 | A change to a published task, its scene included, is made in place: same name, a new DIGEST, a README Change Log entry | H.8 |
 
 **What a contribution delivers.** Tasks only: task directories under `tasks/<benchmark>/`. No task-generation code
@@ -108,18 +108,28 @@ infrastructure, a reference implementation, one benchmark using it, CI support t
 | The instruction names the deliverable under `/app/output/` and never mentions `/tests/` | `check-instruction.sh` |
 | It states every convention the agent cannot infer: frames, quaternion order, units, action layout, client usage, the reset budget and S; world-frame quantities are decided per benchmark and consistent within it | benchmark hooks `ci_checks/benchmarks/<bench>/advisory-*` |
 | The success condition is written in terms the agent can observe in that mode: each object is named by its appearance and/or its starting place; an object's axis or point is described physically ("the keyboard's short edge", "the key's teeth end"), saying whether the condition already holds at the start; upstream identifiers (labels, function names, indices, asset metadata) may follow, only in brackets; thresholds stay exact and equal to the grader's. No benchmark is exempt | `check-instruction.sh` (standard modes: code-like terms with no physical description next to them) |
-| It ends with three sections `normalize` renders: `## External material` (the honour rule: install packages and read what is installed, do not fetch a ready-made solution; the open-network paragraph for an open task), `## Resource limits`, `## Time limit` (the cutoff and what it means in the mode: running.md "The agent's time"); no second statement of the limit | `check-cutoffs.py`, `check-resources.py` |
+| It ends with three sections `normalize` renders: `## External material` (the honour rule: install packages and read what is installed, do not fetch a ready-made solution; the open-network paragraph for an open task), `## Resources` (the caps of the agent's own container, §6), `## Time limit` (the cutoff and what it means in the mode: running.md "The agent's time"); no second statement of the limit | `check-cutoffs.py`, `check-resources.py` |
 | Everything a task needs at run time is in its image or directory; nothing tells the agent to download something | |
 | A trial that fetched a solution is flagged and judged case by case by the owner; installing a general-purpose package never is | running.md |
 
 ## 6. Resources
 
-Each task states the smallest allocation it runs on (`[metadata.resources]`: `min_cpus`, `min_memory_gb`,
-`min_gpu_memory_gb`, `gpu_required`, `gpu_class`, the verifier's minimums, `measured`) and the most its agent phase may
-use (`[metadata.resources.limits]`, shown in `## Resource limits`), with the docker caps every compose service applies
-(`[metadata.resources.caps]`). Values come from measured peaks with a margin (`scripts/task_resources.toml`, written by
-`normalize`). A monitor sidecar records usage; whether a limit is enforced is the runner's switch (`RCB_LIMITS_ENFORCE`,
-off by default). Derivation, enforcement and the reward fields: running.md "Resources".
+Every resource number of a task is an upper bound (a cap) for **one container**; there are no minimums and no soft
+limits. Each cap is written where Harbor or docker reads it:
+
+| Container | Where | Keys |
+|---|---|---|
+| `main` (the agent's) | `task.toml` `[environment]` | `cpus`, `memory_mb`, `storage_mb` (disk); `gpu_types` (a model list) only for a task that needs an RTX-class GPU; never `gpus` (Harbor's local docker refuses it: the GPU is a device reservation in the compose file) |
+| the separate verifier | `[verifier.environment]` `cpus`, `memory_mb` | absent: Harbor gives it `[environment]` |
+| every other service, and `main`'s processes and devices | `environment/docker-compose.yaml` | `cpus`, `mem_limit`, `pids_limit`, `shm_size`, the nvidia device reservation |
+| the service that holds a GPU | its compose service (`tests/docker-compose.yaml` for a separate verifier's) | `x-gpu-memory-gb`: its GPU-memory cap in GiB, the one field of our own (docker and Harbor cannot cap GPU memory) |
+
+Docker enforces CPU (a throttle), memory (the kernel's OOM killer: the process is killed) and processes. GPU memory and
+disk no runtime caps on our hosts: the resource monitor sidecar measures them, and enforces them only when the run sets
+`RCB_LIMITS_ENFORCE=1` (off by default). A machine needs, per phase, the sum of the caps of the containers running then;
+placing trials on machines is the runner's job. The agent reads its own container's caps in `## Resources` (§5) and in
+`/run/rcb-limits/usage.json`. The values are the rules of `scripts/task_resources.toml`, written by `normalize`;
+enforcement and the reward fields: running.md "Resources".
 
 ## 7. Versions
 
@@ -222,7 +232,7 @@ to a task by its digest; a changed file is a changed task. *CI:* `check-dataset-
 | §2.6 verifier | H.1 (isolation), §4 (fields) |
 | §2.7 solutions, oracle, nop | H.2, §4 |
 | §2.8 identity | H.8, §1 |
-| §2.9, §2.10 resources and limits | §6, running.md "Resources" |
+| §2.9, §2.10 resources and limits | §6 (caps per container), running.md "Resources" |
 | §2.11 external material, network | §5, H.6, running.md "Network" |
 | §2.12 cutoff | §2, §5, running.md "The agent's time" |
 | §2.13 seeds | §2, running.md "Seeds" |

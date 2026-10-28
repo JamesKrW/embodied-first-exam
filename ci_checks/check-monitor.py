@@ -4,12 +4,13 @@ the monitor sidecar that check-verifier-isolation.sh exempts is held to its own 
 the pinned image and its limits read-only, the beacons read-only in every other service, its seal the first sidecar collect hook), and tests/test.sh
 sanitizes /app/output before anything reads the agent's files, and the monitor image every task pins carries this
 repository's monitor code (images/monitor/rcb_monitor/inject.py CONTENTS = the sha256 of images/monitor/rcb_monitor/{monitor,rcb_limits,
-selftest}.py). ADVISORY (`--tier advisory`): the task's two copies of the limits, no copy of the code in the task, the
-verifier step's trap and COPY lines, and the monitor's own tests. Default: both.
+selftest}.py). ADVISORY (`--tier advisory`): the task's two copies of its caps (limits.json, tests/rcb_limits.json, format
+rcb-limits/2), no copy of the code in the task, the verifier step's trap and COPY lines, and the monitor's own tests.
+Default: both.
 
-PROTOCOL v1 §2.10 (v1.2): every task with `[metadata.resources.limits]` runs the resource monitor sidecar and the verifier
-step, wired exactly as images/monitor/rcb_monitor/inject.py writes them (task_conventions.py --check catches any drift from the
-generator; this check catches a task the generator never ran on, and hand edits that break the safety properties).
+PROTOCOL §6: every task runs the resource monitor sidecar and the verifier step, wired exactly as
+images/monitor/rcb_monitor/inject.py writes them (task_conventions.py --check catches any drift from the generator; this
+check catches a task the generator never ran on, and hand edits that break the safety properties).
 
     python3 ci_checks/check-monitor.py [--tier invariants|advisory|all] [task dirs]   # default: every task, both tiers
                                                         # (advisory: also runs images/monitor/rcb_monitor/selftest.py and test_monitor.py)
@@ -17,7 +18,6 @@ generator; this check catches a task the generator never ran on, and hand edits 
 import re
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,10 +31,6 @@ SRC = ROOT / "images" / "monitor" / "rcb_monitor"
 
 def check(task: Path) -> tuple[list[str], list[str]]:
     """(invariant errors, advisory errors)."""
-    cfg = tomllib.loads((task / "task.toml").read_text())
-    lim = ((cfg.get("metadata") or {}).get("resources") or {}).get("limits")
-    if not isinstance(lim, dict):
-        return [], []                                # check-resources.py requires the limits; nothing to wire without them
     err, inv = [], []
     comp = task / "environment" / "docker-compose.yaml"
     text = comp.read_text() if comp.is_file() else ""
@@ -47,6 +43,8 @@ def check(task: Path) -> tuple[list[str], list[str]]:
     a, b = task / "environment" / "rcb_monitor" / "limits.json", task / "tests" / "rcb_limits.json"
     if not (a.is_file() and b.is_file() and a.read_bytes() == b.read_bytes()):
         err.append("environment/rcb_monitor/limits.json and tests/rcb_limits.json differ (or are missing)")
+    elif f'"format": "{inject.FORMAT}"' not in a.read_text():
+        err.append(f"environment/rcb_monitor/limits.json is not format {inject.FORMAT} (run scripts/task_conventions.py)")
     # the monitor service and its safety properties
     m = re.search(rf"(?ms)^{re.escape(inject.BEGIN)}.*?^{re.escape(inject.END)}$", text)
     if not m:

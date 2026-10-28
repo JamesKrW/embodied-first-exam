@@ -94,28 +94,39 @@ episode's success, where that record applied the task's whole rule); the recorde
 without such a live verdict, started off the frozen instance (`instance_mismatch`) or re-graded under a stricter rule
 keeps the recorded one (benchmark docs name their fields where they differ).
 
-## Resources: limits and their enforcement
-Each task declares its minimum compute, `[metadata.resources]`, its limits `[metadata.resources.limits]` and the docker
-caps `[metadata.resources.caps]` (PROTOCOL §6; values from `scripts/task_resources.toml`, written by `normalize`,
-checked by `ci_checks/check-resources.py`).
-- **Minimum** = the smallest allocation on which one trial, alone on the machine, runs correctly. Derivation: memory,
-  the largest sum over the phase's containers of cgroup `anon + shmem` × 1.2, rounded up to a GB; GPU memory, the largest
-  `nvidia-smi` sum × 1.15, rounded up to 0.5 GB; CPU, the 90th percentile of 30-second samples, rounded up, at least
-  one core per simulator process plus one for the agent. Limits sit with a margin above measured peaks (e.g.
-  `max(1.5 × peak, peak + 4 GiB)`); the oracle passes within them.
-- **Scope**: `trial` (privileged: every container the agent drives) or `agent` (standard modes: the agent's container;
-  the `sim` sidecar is recorded, never a failure). Limits: `max_gpu_memory_gb` (NVML per process, summed),
-  `max_memory_gb` (cgroup `anon + shmem`), `max_processes`, `max_disk_gb` (growth under `disk_paths`), a violation =
-  above a limit for `sustain_sec` (60 s) within any `window_sec` (120 s), disk two measurements in a row; gaps never
-  count against the agent. CPU is only a cap. A CPU cap above the host's count means the host's count: the runner
-  clamps it in its copy (`scripts/clamp_cpus.py`); memory and pids caps are never clamped.
+## Resources: caps and their enforcement
+Every resource number of a task is an upper bound for one container (PROTOCOL §6): main's in `[environment]` (`cpus`,
+`memory_mb`, `storage_mb`, `gpu_types`), every other service's and main's processes in `environment/docker-compose.yaml`
+(`cpus`, `mem_limit`, `pids_limit`, `shm_size`, devices), and the GPU-memory cap `x-gpu-memory-gb` on the service that
+holds the GPU. Values from `scripts/task_resources.toml` (the last rule that matches a task, whole), written by
+`normalize`, checked by `ci_checks/check-resources.py`; the README's `## Resources` lists them with what they were
+measured from.
+- **What enforces what.** Memory: docker (cgroup); a process that goes over is killed by the kernel. Processes and
+  shared memory: docker. CPU: docker, a throttle only. A CPU cap above the host's count means the host's count: the
+  runner clamps it in its copy (`scripts/clamp_cpus.py`); memory and pids caps are never clamped. Disk: a cloud
+  backend applies `storage_mb`; local docker cannot (overlay2 on ext4), so the monitor measures it. GPU memory: no
+  runtime can cap it (no MIG on our cards, and a pool may share one card between trials): the monitor measures it, and
+  the agent is told its budget.
+- **Placing trials.** Harbor caps each container and does not check whether a machine has room (concurrency is `-n`).
+  A trial needs, in each phase (agent; verifier), the sum of the caps of the containers running then; GPU memory by
+  `x-gpu-memory-gb`, an RTX-class card where `gpu_types` is set.
 - **Monitor**: the `rcb_monitor` sidecar samples every few seconds into its own record (`rcb-monitor/1`), sealed in the
-  first collect hook, and shows current values in `/run/rcb-limits/usage.json`, with the agent's clock (`elapsed_s`,
-  `time_left_s`, `deadline_utc`: `[agent] timeout_sec` from the environment's start, so never more than the agent has);
-  the verifier recomputes violations from the raw samples with its own copy of the limits. A missing, unsealed or mostly
-  empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`. A runner whose container runtime
-  cannot run the monitor (no `pid: host`) runs the same service as `monitor.py beacon` (no pid / cgroup host, no record):
-  `usage.json` then has the clock and `"measured": false`.
+  first collect hook: GPU memory (NVML per process, summed), memory (cgroup `anon + shmem`), processes, disk (growth of
+  the files under `/app`, `/tmp`, `/root` of the agent's container), per container and summed over its scope (privileged:
+  every container the agent drives; standard modes: the agent's container; the `sim` sidecar and other benchmark-owned
+  services are recorded, never a failure). It writes `/run/rcb-limits/usage.json`: current use, the agent's own
+  container's caps (`caps`), the two caps it may enforce (`limits`: `gpu_memory_gb`, `disk_gb`, with the rule's
+  `sustain_sec` / `window_sec`) and the agent's clock (`elapsed_s`, `time_left_s`, `deadline_utc`: `[agent]
+  timeout_sec` from the environment's start, so never more than the agent has). Inside its container the agent can
+  also read its cgroup (`/sys/fs/cgroup/memory.max`, `cpu.max`, `pids.max`). The verifier recomputes violations from
+  the raw samples with its own copy of the caps (`tests/rcb_limits.json`, format `rcb-limits/2`). A missing, unsealed
+  or mostly empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`. A runner whose
+  container runtime cannot run the monitor (no `pid: host`) runs the same service as `monitor.py beacon` (no pid /
+  cgroup host, no record): `usage.json` then has the caps, the clock and `"measured": false`.
+- **Violations** (the protocol's rules, the same for every task): the scope's GPU memory above its cap (the sum of
+  `x-gpu-memory-gb` of the scope's GPU services) for 60 s within any 120 s, the agent's disk above `storage_mb` at two
+  measurements in a row (once a minute), or a kernel OOM kill in the scope at the container's own memory cap; gaps
+  never count against the agent.
 - **Session log**: the monitor copies the agent's `/app/output/rcb_session_log.jsonl` append-only into its record
   (`session_log/`); before the grader, the verifier step gives the grader that copy when the agent's file was removed or
   rewritten (`session_log_tampered`, `session_log_from_monitor` in `reward.json`). The log feeds cost fields only.
@@ -126,8 +137,11 @@ checked by `ci_checks/check-resources.py`).
 - **Out-of-memory kills**: a kill at a container's own cap in the scope is a violation (`over_oom`); a host OOM kill is
   never one (enforcement on: `infra_error = 1`, `resource_host_oom`); a benchmark-owned service killed for memory in an
   episode that did not succeed is `infra_error = 1` (`resource_service_oom`) in both settings. Host protection
-  (enforcement on): GPU memory above 1.5 × its limit kills the process holding the most; never a violation by itself.
+  (enforcement on): GPU memory above 1.5 × its cap kills the process holding the most; never a violation by itself.
   A trial a pool kills to protect its host is an operations abort (`killed_by_pool`), not a graded result.
+- **reward.json** (always): `resource_enforced`, `limits_violation_observed`, `resource_monitor_missing`,
+  `peak_gpu_memory_gb`, `peak_memory_gb`, `peak_processes`, `peak_disk_gb`, `resource_emergency_kills`,
+  `resource_oom_kills`, `resource_host_oom_kills`, `resource_service_oom_kills`, and `over_<metric> = 1` per violation.
 
 ## Agent logs and timelines
 Harbor keeps, per trial, `agent/codex.txt` (every message, command and output), `agent/trajectory.json` and the raw

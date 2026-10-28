@@ -87,15 +87,17 @@ def main(argv: list[str]) -> int:
     # the tasks it adds or changes
     shown = added + changed
     if shown:
-        out += ["", "### Tasks", "", "| Task | Status | Mode | Oracle | Cutoff | Minimum compute (CPU / GB / GPU GB, class) |",
+        out += ["", "### Tasks", "", "| Task | Status | Mode | Oracle | Cutoff | Caps of main (CPUs / GiB / GPU GiB; GPU types) |",
                 "|---|---|---|---|---|---|"]
         for n in shown[:60]:
             t = tc.task_dir(n)
             d = tomllib.loads((t / "task.toml").read_text())
             md = d.get("metadata", {})
-            r = md.get("resources") or {}
-            res = (f"{r.get('min_cpus', '?')} / {r.get('min_memory_gb', '?')} / {r.get('min_gpu_memory_gb', '?')}, "
-                   f"{r.get('gpu_class', '?')}") if r else "—"
+            caps = tc.task_caps(t)
+            m = caps["main"]
+            gpu = sum(float(c.get("gpu_memory_gb") or 0) for c in caps.values())
+            res = (f"{m.get('cpus') or '?'} / {m.get('memory_gb') or '?'} / {gpu:g}"
+                   f"{'; ' + ', '.join(d.get('environment', {}).get('gpu_types') or []) if d.get('environment', {}).get('gpu_types') else ''}")
             out.append(f"| `{n}` | {'added' if n in added else 'changed'} | {tc.mode_of(t)} | {md.get('oracle', '—')} | "
                        f"{cutoff(d)} s | {res} |")
         if len(shown) > 60:

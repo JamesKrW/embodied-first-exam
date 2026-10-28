@@ -70,13 +70,12 @@ Guide for maintainers. The contract is [protocol/README.md](protocol/README.md);
   the service's `time_left_s` counts from, a service that ends the episode itself)? A pull request that changes the
   cutoff of existing tasks (label `cutoff-change`): the author's decision (the owner steps in only where official
   results must stay comparable), old -> new and why in its description, the tasks normalized (their `DIGEST` files changed with them), nothing else changed.
-- Compute resources (PROTOCOL §6): are the minimums measured (what does `measured` cite?) rather than copied from the
-  `[environment]` caps? Does `gpu_class` match the simulator (Isaac Sim / Omniverse: `rtx`)? Would the oracle run on a
-  machine with exactly these values?
-- Resource limits (PROTOCOL §6, protocol/running.md "Resources"): would an honest agent stay inside them (one simulator at the task's defaults on the
-  largest card it runs on, the tooling's own replay checks, videos it is told to write)? Is the scope `trial` in
-  privileged mode and `agent` in standard modes, and does `instruction.md` have the rendered paragraph just before the closing `## Time limit`? Does
-  `measured` cite real peaks (and say where there are none)? Do the caps leave the margin protocol/running.md "Resources" names above the limits?
+- Resources (PROTOCOL §6, protocol/running.md "Resources"): every number is a cap for one container. Are the caps
+  measured with a margin (what do `measured` / `caps_measured` in `scripts/task_resources.toml` cite, and do they say
+  where there are no measurements)? Would an honest agent and the oracle stay inside them (one simulator at the
+  task's defaults on the largest card it runs on, the tooling's own replay checks, videos it is told to write)? Does
+  every GPU service have its `x-gpu-memory-gb`, and does `gpu_types` match the simulator (Isaac Sim / Omniverse: an
+  RTX-class GPU)? Does `instruction.md` have the rendered `## Resources` paragraph just before the closing `## Time limit`?
 
 ## Human review (oracle `partial` or `none`)
 Review per family (same scene template and predicate), at least two instances per family:

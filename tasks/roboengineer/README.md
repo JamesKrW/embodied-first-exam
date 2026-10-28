@@ -131,14 +131,14 @@ roboEngineer task except the eight `roboengineer-neuralfly-*` ones.
 Rules: `scripts/task_resources.toml` (`^roboengineer-`), measured on 2026-10-18 (Harbor 0.23 trials,
 docker stats, cgroup `memory.peak` and per-container `nvidia-smi` every 3-6 s). The verifier only reads JSON (~20 s).
 
-- **28 CPU tasks** (all but G1): the agent's container is capped at 2 CPUs / 6 GB (limit 4 GiB), the sidecar at 4 CPUs
+- **28 CPU tasks** (all but G1): the agent's container is capped at 2 CPUs / 6 GB, the sidecar at 4 CPUs
   / 6 GB. The sidecar uses 1.7-1.9 cores while a deployment runs (one worker, OSMesa), its full 4 cores while it
   finalizes (held-out cases twice on four single-threaded workers, then the video: 79-199 s) and, for Neural Landing,
   through the per-case reference search before the agent starts (~480 s); its peak memory is 0.6-2.1 GiB (go2-weave
-  the largest), 1.2 GiB for landing. The reference runs' agent containers stay below 0.25 GiB. Minimum: 4 CPUs (the
+  the largest), 1.2 GiB for landing. The reference runs' agent containers stay below 0.25 GiB. A trial needs 4 CPUs (the
   sidecar's 4 never coincide with the agent's work: the agent waits for the health check and is stopped before
   finalization; during a deployment the agent's 2-core cap + the sidecar's ~2) and 9 GB (landing 8 GB) = the agent's
-  6 GB cap (its 4 GiB limit is recorded, not enforced, by default) + the sidecar's peak x 1.2 + the monitor. The
+  6 GB cap + the sidecar's peak x 1.2 + the monitor. The
   verifier phase is the sidecar's collect hook: 4 CPUs, 3 GB. Timeouts: collection budgets 1740 s (compact laps
   5520 s, a worst-case bound) against 79-199 s measured; the verifier step 600 s against ~20 s.
 - **G1** (`g1-terrain-walk`): one NVIDIA GPU for the agent's container (`environment/docker-compose.yaml` reserves one
@@ -146,12 +146,11 @@ docker stats, cgroup `memory.peak` and per-container `nvidia-smi` every 3-6 s). 
   trainer: 1.8 GB of GPU memory at its default 256 environments, 4.7 GB at its cap of 1024, 16.5 GB at 4096 (the
   reference solution), about one CPU core (the PPO loop is bound by one Python thread); over the reference's 3.5 hours
   16.1 GiB of GPU memory, 5.6 GiB of memory, 1.6 cores at most. The sidecar: 2.2-2.6 cores during a deployment (four
-  rendered 20 s cases, ~3.6 min), its 4-CPU cap while finalizing (419-488 s), peak 2.1 GiB. Declared: `gpu_required`,
-  `min_gpu_memory_gb = 20` (16.1 GiB x 1.15 = 18.5, rounded up; any CUDA GPU by memory, but all measurements are on
+  rendered 20 s cases, ~3.6 min), its 4-CPU cap while finalizing (419-488 s), peak 2.1 GiB. Caps: 20 GiB of GPU memory
+  for `main` (`x-gpu-memory-gb`; 16.1 GiB x 1.15 = 18.5, rounded up; any CUDA GPU by memory, but all measurements are on
   the L40S: a 24 GB card fits only when otherwise free and trains slower, so fewer iterations fit the cutoff and
   results are comparable only on one GPU model; the trainer caps torch at 15 % of the card, which its 0.64 GB at
-  4096 environments stays under on 24 GB), 6 CPUs, 15 GB (the agent's 12 GB cap + the sidecar); limits 20 GiB of GPU memory and 10 GiB of memory for the
-  agent's container; caps `main` 4 CPUs / 12 GB, `sim` 4 CPUs / 6 GB. Hosts: a GPU host that holds the three
+  4096 environments stays under on 24 GB), `main` 4 CPUs / 12 GB, `sim` 4 CPUs / 6 GB. Hosts: a GPU host that holds the three
   control-transfer images (`-train`, `-nominal` is its base, the evaluator) and lists the `roboengineer` bench.
 
 ## Checks

@@ -55,26 +55,24 @@ A new benchmark's shared-files change adds its label to `scripts/task_convention
    3600 unless you justify another number, at most 14400, the same for a task's privileged and standard versions,
    and one number for all your benchmark's tasks of a mode unless you say why. There is no central table. `normalize`
    writes from it the standard modes' `RCB_WALL_CLOCK_S` and the README row, and ends `instruction.md` with the
-   `## Time limit` section, after `## External material` and `## Resource limits` ("You have N seconds to complete this
+   `## Time limit` section, after `## External material` and `## Resources` ("You have N seconds to complete this
    task. Do not cheat by using online solutions or hints specific to this task.", then what the cutoff means in the
    mode). Your own text never repeats the limit as a duration: say "the time limit (`## Time limit`)", and add what is
    particular to your benchmark (a simulator's start-up cost). Your service's `time_s` / `time_left_s` count from the
    agent's first request to it, never from the service's start, and a resumed service keeps that moment
    (docs/protocol/standard_mode.md, "The agent's clock": the shared layers do it for you; a test must show it).
-3. State the minimum compute (PROTOCOL §6): CPU cores, memory and GPU memory of the agent phase and the verifier
-   phase, the GPU class and a recommended GPU, derived from measured peaks (oracle or agent trials; `docker stats` /
-   cgroup `memory.stat` and `nvidia-smi` while they run). Add a rule to `scripts/task_resources.toml` (or write
-   `[metadata.resources]` yourself); `scripts/task_conventions.py` writes it into `task.toml` and renders the
-   README's `## Compute resources`.
-   Add the resource limits and caps too (PROTOCOL §6, docs/protocol/running.md "Resources"): a `[[limit]]` and a `[[cap]]` rule in the same file (scope
-   `trial` for privileged tasks, `agent` for standard ones; GPU memory, memory, processes, disk in GiB, the whole trial's
-   expected peak, `measured`; docker caps per compose service). `normalize` writes `[metadata.resources.limits]` /
-   `.caps` and writes the `## Resource limits` paragraph the agent reads into `instruction.md` (just before the closing
-   `## Time limit`). With enforcement on
-   (`RCB_LIMITS_ENFORCE=1`) exceeding a limit fails the trial, so set them a generous margin above measured peaks
-   (e.g. `max(1.5 x peak, peak + 4 GiB)`) and make sure the oracle stays inside them. The caps are the ones docker
-   applies: `normalize` sets `[environment].memory_mb` from `caps.main.memory_gb` and writes the other services' caps
-   into the compose file; a cap your compose file sets itself must be the declared value (`check-resources.py`).
+3. State the caps of every container (PROTOCOL §6, docs/protocol/running.md "Resources"): each number is an upper
+   bound for one container, never a minimum. Add a `[[cap]]` rule to `scripts/task_resources.toml`: per compose
+   service `cpus`, `memory_gb` (GiB) and `pids`, `gpu_memory_gb` on the service that holds the GPU, `disk_gb` for
+   `main`; `gpu_types` when the task needs an RTX-class GPU (Isaac Sim / Omniverse); for the README `recommended_gpu`,
+   `measured` (what the oracle or agent trials used: `docker stats` / cgroup `memory.stat` and `nvidia-smi` while they
+   run) and `caps_measured`. Set them a generous margin above measured peaks (e.g. `max(1.5 x peak, peak + 4 GiB)`) and
+   make sure the oracle stays inside them: memory over its cap is an OOM kill, and GPU memory or disk over theirs fails
+   the trial when a run enforces them (`RCB_LIMITS_ENFORCE=1`). `scripts/task_conventions.py` writes main's caps into
+   `[environment]` (`cpus`, `memory_mb`, `storage_mb`, `gpu_types`; never `gpus`), the others into
+   `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, `x-gpu-memory-gb`), and renders the
+   `## Resources` paragraph the agent reads into `instruction.md` (just before the closing `## Time limit`) and the
+   README's `## Resources`. A cap your compose file sets itself must be the rule's value (`check-resources.py`).
 4. Base images: `images/<sim>/Dockerfile`, versioned in `images/<sim>/VERSION`, built and pushed with
    `scripts/build_images.sh` / `scripts/push_images.sh`. Images that cannot be published carry `images/<sim>/BUILD_ONLY`
    and build instructions. A task on a private image builds it itself when the runner cannot pull it: its Dockerfile
@@ -96,7 +94,7 @@ bash ci_checks/run_invariants.sh tasks/<benchmark>/<your tasks>   # must pass (t
 bash ci_checks/run_all.sh tasks/<benchmark>/<your tasks>      # both tiers: fix the advisory findings or say why the task departs
 bash ci_checks/run_all.sh --changed               # what CI runs on your pull request (scope: ci_checks/ci_scope.py)
 python3 scripts/task_conventions.py --check tasks/<benchmark>/<your tasks>     # README, task.toml, test.sh in the standard layout
-python3 ci_checks/check-resources.py tasks/<benchmark>/<your tasks>             # [metadata.resources] + limits + README / instruction (PROTOCOL §6)
+python3 ci_checks/check-resources.py tasks/<benchmark>/<your tasks>             # the caps of every container + README / instruction (PROTOCOL §6)
 python3 ci_checks/check-cutoffs.py tasks/<benchmark>/<your tasks>               # the time cutoff: task.toml = instruction = README = sim service, twins equal, cap (PROTOCOL §2)
 python3 scripts/stamp_mtimes.py tasks             # before any image build from the checkout (below)
 harbor run -p tasks/<benchmark>/<task> -a oracle               # on a sample: >= 2 tasks per mode

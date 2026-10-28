@@ -570,13 +570,12 @@ Numbers are stable (task files cite them); closed items are removed.
 ## Compute resources
 CPU only. The sim sidecar holds one Embodied Safety Exam world and, at the finalize, one more for the video; the agent's container holds the harness and the
 client.
-`scripts/task_resources.toml`: minimum 4 CPUs and 6 GB for the agent phase, 1 CPU and 1 GB for the verifier phase
-(the finalize runs in the sim sidecar, not in the verifier); caps 4 CPUs and 8 GB for `main`, 6 CPUs and 8 GB for `sim`.
+Caps (`scripts/task_resources.toml`, PROTOCOL §6; each an upper bound for one container): 4 CPUs and 8 GB for `main`,
+6 CPUs and 8 GB for `sim` (the finalize runs in the sim sidecar, not in the verifier).
 Measured on a university HPC cluster (rootless podman on cgroups v1, where the caps are not applied): `/proc` PSS and
 CPU of each container's processes every 5 s: the sim sidecar at most about 3.2 GB PSS (the G1; under 2.9 GB on the
 other bodies), CPU p90 up to about 5.5 cores while it finalizes, hence its 6-CPU cap; a whole trial at most about 5.5
 GB; `main` under 1 GB. Run at most 10 Embodied Safety Exam trials at once per 32 free cores.
-The agent-phase limits (6 GiB for the agent's container, 14 GiB for the trial) remain an estimate.
 
 ## How to run
 Both sets run the same day with the same command, one Harbor job per task; nothing on the command line is

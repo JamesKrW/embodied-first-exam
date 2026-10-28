@@ -108,8 +108,7 @@ which was graded on an AMD workstation (with `instance_exact = 1`).
 - **Machine-readable:** a task bound to one vendor carries `host_cpu_vendor = "GenuineIntel"` in `[metadata]` of `task.toml`
   (a RoboWits field, docs/TAXONOMY.md; no task in the repository needs it now), and
   its README a `Host CPU` row. A scheduler runs such a task only on a host whose `/proc/cpuinfo` `vendor_id` equals
-  the value; a task without the key runs on either vendor. The key is not in `[metadata.resources]`, whose fields are
-  fixed by PROTOCOL §6.
+  the value; a task without the key runs on either vendor. It is not a resource cap (PROTOCOL §6 has caps only).
 - **A host that cannot rebuild the instance is an infrastructure error, never a result.** Privileged: the
   verifier writes `success = 0`, `instance_ok = 0`, `infra_error = 1` (and `instance_build_failed = 1` with
   `grader_error = 1` when the scene does not build at all). Standard: the service checks the rebuilt instance once, at

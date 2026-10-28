@@ -23,22 +23,25 @@ invariants of Appendix H bind and no task value overrides them), `docs/protocol/
 - `images/<sim>/Dockerfile`: simulator base images, tagged from `images/<sim>/VERSION` if present else
   `images/VERSION`; `scripts/build_images.sh`. MuJoCo tasks (`dextoolbench_*`, `mujoco_playground_*`) use `images/mujoco/`
   (run `prepare_assets.sh` first); notes in `tasks/<benchmark>/README.md`.
-- Every task declares its minimum compute (PROTOCOL §6): `[metadata.resources]` in `task.toml`, written by
-  `task_conventions.normalize` from the rules in `scripts/task_resources.toml`, and the README's `## Compute resources`
-  rendered from it; `ci_checks/check-resources.py` checks both.
-- Every task declares resource limits and docker caps (PROTOCOL §6, docs/protocol/running.md "Resources"): `[metadata.resources.limits]` / `.caps` from
-  the `[[limit]]` / `[[cap]]` rules in the same file; `normalize` writes the `## Resource limits` paragraph of `instruction.md`
-  (just before the closing `## Time limit`), rendered from them (edit the rules, never the paragraph). A monitor sidecar
-  (`images/monitor/rcb_monitor/`, in the pinned `ghcr.io/mll-lab-nu/efe:monitor-<version>` image; `normalize` wires it into every task, which keeps only its `limits.json`; `ci_checks/check-monitor.py` runs its tests) and the
-  verifier judge them; with `RCB_LIMITS_ENFORCE=1` a violation fails the trial (default 0: recorded only). Declared caps
-  are the applied ones: `normalize` sets `[environment].memory_mb` from `caps.main.memory_gb`. A CPU cap above the
+- Every resource number is a cap for one container (PROTOCOL §6, docs/protocol/running.md "Resources"); no minimums,
+  no soft limits, no `[metadata.resources]`. `normalize` writes them from the `[[cap]]` rules of
+  `scripts/task_resources.toml` (the last match, whole): main's into `[environment]` (`cpus`, `memory_mb`, `storage_mb`,
+  `gpu_types` for an RTX-class GPU; never `gpus`, which Harbor's local docker refuses: GPUs are compose device
+  reservations), every other service's and main's processes into `environment/docker-compose.yaml` (`cpus`, `mem_limit`,
+  `pids_limit`) and the one field of our own, `x-gpu-memory-gb`, on the service that holds the GPU; it renders the
+  agent's own container's caps into the `## Resources` paragraph of `instruction.md` (just before the closing `## Time
+  limit`; edit the rules, never the paragraph) and every container's into the README's `## Resources`;
+  `ci_checks/check-resources.py` checks them. A monitor sidecar (`images/monitor/rcb_monitor/`, in the pinned
+  `ghcr.io/mll-lab-nu/efe:monitor-<version>` image; `normalize` wires it into every task, which keeps only its
+  `limits.json`; `ci_checks/check-monitor.py` runs its tests) records usage and, with `RCB_LIMITS_ENFORCE=1`, enforces
+  the GPU-memory and disk caps (default 0: recorded only); memory, CPU and processes are docker's. A CPU cap above the
   host's CPU count is the runner's to clamp (docker refuses it); the values in `scripts/task_resources.toml` stay.
   The same step's `sanitize` line in every `tests/test.sh` removes links and special files from `/app/output` before
   the grader reads the agent's files.
 - The agent's time cutoff (PROTOCOL §2) is each task's own `[agent] timeout_sec` (as in Terminal-Bench): its author sets it in the pull request. There is no table and no apply script. `normalize` writes from it the standard
   modes' `RCB_WALL_CLOCK_S`, the README row and the last section of every `instruction.md`, `## Time limit` ("You have N
   seconds to complete this task. Do not cheat by using online solutions or hints specific to this task.", then what the
-  cutoff means in the mode), after `## External material` and `## Resource limits`: rendered like those two. A
+  cutoff means in the mode), after `## External material` and `## Resources`: rendered like those two. A
   benchmark's own text says "the time limit (`## Time limit`)", never a duration. `ci_checks/check-cutoffs.py` (per task):
   a whole number of seconds, at most 14400, and the instruction, README and sim service agree (advisory); the twins'
   equal number is an invariant (`ci_checks/check-twins.py`, Appendix H.7). To change a time (the author's decision): set the number, normalize, and state old -> new in the pull request (docs/protocol/running.md "The agent's time").
@@ -77,7 +80,7 @@ invariants of Appendix H bind and no task value overrides them), `docs/protocol/
 - A task's agent egress is the model APIs and the package registries by default (`[agent] network_mode = "allowlist"`, the
   hosts of `scripts/set_agent_egress.py`; Appendix H.6), unless its author declares `[metadata] network = "open"` (then
   the task's own `## External material` paragraph); `normalize` ends every `instruction.md` with `## External material`
-  (PROTOCOL §5, rendered like `## Resource limits`). Scene dynamics are each task's `[metadata] dynamics` (no
+  (PROTOCOL §5, rendered like `## Resources`). Scene dynamics are each task's `[metadata] dynamics` (no
   central table). A task needs no download at run time: bake it into the image or
   the task directory. Nothing an agent can read (image, tooling, instance metadata) names or locates a solution.
   Unattended batches: `scripts/run_agent_batch.sh` (lanes with per-job claims; configured by environment variables,

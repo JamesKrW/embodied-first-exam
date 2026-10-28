@@ -90,8 +90,8 @@ fi
 pargs=""; [ $explicit -eq 1 ] && pargs="$targs"
 add bash ci_checks/check-tooling-identity.sh                # D9 shared sources; the eai-standard/2.2 layer = embodied_first_exam/standard/
 add bash ci_checks/check-standard-client.sh                 # standard agent + verifier images: the pinned client base and pins
-# PROTOCOL §2.9 (v1.1.4): [metadata.resources] (minimum compute) in every task.toml, consistent with the GPU reservations and
-# caps, and the README's Compute resources section rendered from it
+# PROTOCOL §6: the caps of every container ([environment], the compose files, x-gpu-memory-gb), the rules of
+# scripts/task_resources.toml applied, and the instruction's and README's `## Resources` rendered from them
 add python3 ci_checks/check-resources.py"$pargs"
 # PROTOCOL §2: the agent's time cutoff, each task's own `[agent] timeout_sec` (no table): at most 14400 s, the closing
 # `## Time limit` section of instruction.md, the README row and the standard modes' sim service say it, nothing else states

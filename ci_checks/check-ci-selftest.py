@@ -262,16 +262,16 @@ MUTATIONS = [
     ("a privileged task with the standard modes' second paragraph",
      PRIV, "instruction.md", sub(r"only what is in `/app/output/` at that moment is\s+graded", "the episode is graded as it stands"),
      CUTOFFS, "does not end with the `## Time limit` section"),
-    ("the closing sections in another order (`## Time limit` before `## Resource limits`)",
+    ("the closing sections in another order (`## Time limit` before `## Resources`)",
      STD, "instruction.md",
-     lambda s: (lambda a, b, c: a + "\n## Time limit\n" + c.rstrip("\n") + "\n\n## Resource limits\n" + b.rstrip("\n") + "\n")(
-         s.split("\n## Resource limits\n")[0], *s.split("\n## Resource limits\n")[1].split("\n## Time limit\n")),
+     lambda s: (lambda a, b, c: a + "\n## Time limit\n" + c.rstrip("\n") + "\n\n## Resources\n" + b.rstrip("\n") + "\n")(
+         s.split("\n## Resources\n")[0], *s.split("\n## Resources\n")[1].split("\n## Time limit\n")),
      CUTOFFS, "does not end with the `## Time limit` section"),
     ("... which the resources check refuses too (the limits paragraph is the last thing before `## Time limit`)",
      STD, "instruction.md",
-     lambda s: (lambda a, b, c: a + "\n## Time limit\n" + c.rstrip("\n") + "\n\n## Resource limits\n" + b.rstrip("\n") + "\n")(
-         s.split("\n## Resource limits\n")[0], *s.split("\n## Resource limits\n")[1].split("\n## Time limit\n")),
-     RESOURCES, "does not end (before `## Time limit`) with the `## Resource limits` paragraph"),
+     lambda s: (lambda a, b, c: a + "\n## Time limit\n" + c.rstrip("\n") + "\n\n## Resources\n" + b.rstrip("\n") + "\n")(
+         s.split("\n## Resources\n")[0], *s.split("\n## Resources\n")[1].split("\n## Time limit\n")),
+     RESOURCES, "does not end (before `## Time limit`) with the `## Resources` paragraph"),
     ("the instruction states the limit a second time, in a benchmark's old words",
      STD, "instruction.md", sub(r"^(## External material)$", r"Your wall-clock budget is 4 h (14400 s); there is no step budget.\n\n\1"),
      CUTOFFS, "states the agent's limit a second time"),
@@ -364,13 +364,17 @@ MUTATIONS = [
      sidecar_drift(OPEN, "rcb_rfo.py"), IDENTITY, "embodied-olympics: 2 versions of rcb_rfo.py"),
     ("... a sidecar takes its shared files from an image other than the pinned files image", OPEN, "environment/sim/Dockerfile",
      sub(r"(efe:embodied-olympics-fun-files-\S+@sha256:)[0-9a-f]{64}", r"\g<1>" + "0" * 64), IDENTITY, "not the pinned"),
-    # ---- caps and minimums (PROTOCOL §2.10)
-    ("a sidecar's memory cap below the verifier phase's declared minimum (the kernel would kill it at a cap the task itself says is too low)",
-     HEAVY, None, {TOML: sub(r"^(sim = \{ cpus = [0-9.]+, memory_gb = )[0-9.]+", r"\g<1>20.0"),
-                   COMPOSE: sub(r"^    mem_limit: \d+m(   # rcb-monitor)$", r"    mem_limit: 20480m\1")},
-     RESOURCES, "verifier_min_memory_gb 22.0 > the memory cap of the sidecar"),
-    ("the CPU minimum above the CPU caps of all services together",
-     RT, TOML, sub(r"^min_cpus = [0-9.]+", "min_cpus = 9.0"), RESOURCES, "min_cpus 9.0 > the CPU caps of all services together 8"),
+    # ---- caps (PROTOCOL §6): every container's, where Harbor and docker read them, and only those
+    ("a GPU service without its GPU-memory cap", HEAVY, COMPOSE, sub(r"^    x-gpu-memory-gb: .*\n", ""), RESOURCES,
+     "reserves a GPU but sets no `x-gpu-memory-gb`"),
+    ("a separate verifier's GPU service without its GPU-memory cap", PRIV, TEST_COMPOSE, sub(r"^    x-gpu-memory-gb: .*\n", ""),
+     RESOURCES, "tests/docker-compose.yaml: service main reserves a GPU but sets no `x-gpu-memory-gb`"),
+    ("`[environment].gpus` (Harbor's local docker refuses it)", RT, TOML, sub(r"^(\[environment\]\n)", r"\1gpus = 1\n"),
+     RESOURCES, "[environment].gpus"),
+    ("the old minimums table brought back", RT, TOML, sub(r"^(\[metadata\.seeds\]\n)", r"[metadata.resources]\nmin_cpus = 2.0\n\n\1"),
+     RESOURCES, "task.toml has [metadata.resources]"),
+    ("a sidecar without a memory cap", RT, COMPOSE, sub(r"^(  sim:\n(?:    .*\n)*?)    mem_limit: \d+m   # rcb-monitor\n", r"\1"),
+     RESOURCES, "service sim: no `mem_limit`"),
     ("a declared cap that docker does not apply",
      STD, COMPOSE, sub(r"^    mem_limit: \d+m(   # rcb-monitor)$", r"    mem_limit: 1024m\1"), RESOURCES, "declare the cap that is applied"),
     # ---- seeds (PROTOCOL §2.13): the runner draws the seed; no other seed's instance where the agent's image is built

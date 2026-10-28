@@ -67,7 +67,7 @@ NOT_THE_LIMIT = (r"simulated time|robot time|of play\b|control steps?|physics|pe
 def own_text(instruction: str) -> str:
     """The instruction without the generated parts: the three closing sections (and cutoff paragraphs anywhere)."""
     s = tc.strip_cutoff(instruction)
-    for heading in (tc.EXTERNAL_HEADING, tc.LIMITS_HEADING):
+    for heading in (tc.EXTERNAL_HEADING, tc.RESOURCES_HEADING, *tc.OLD_RESOURCES_HEADINGS):
         s = re.sub(rf"(?ms)^{re.escape(heading)}[ \t]*(?:\n.*?)?(?=^## |\Z)", "", s)
     return s
 
