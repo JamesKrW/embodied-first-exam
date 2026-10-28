@@ -42,6 +42,24 @@ def capabilities():
 
 
 # --------------------------------------------------------------------------------------------------- self-test
+# limits.json exactly as inject.limits_json() writes it (test_monitor.py checks that it is that function's output for
+# these caps, so the self-test never runs on a shape inject.py does not write): a privileged task whose main holds a GPU
+# (TASK_COMPOSE_GPU, TASK_CFG), and the same task without the GPU
+TASK_CFG = {"environment": {"cpus": 4, "memory_mb": 8192, "storage_mb": 10240}, "agent": {"timeout_sec": 3600}}
+TASK_COMPOSE_GPU = ("services:\n  main:\n    pids_limit: 100\n    x-gpu-memory-gb: 4\n    deploy:\n      resources:\n"
+                    "        reservations:\n          devices:\n            - driver: nvidia\n              count: 1\n"
+                    "              capabilities: [gpu]\n")
+TASK_COMPOSE_NOGPU = "services:\n  main:\n    pids_limit: 100\n"
+LIMITS_GPU = {"format": "rcb-limits/2", "task": "selftest-gpu-i00-privileged", "mode": "privileged",
+              "caps": {"main": {"cpus": 4.0, "memory_gb": 8.0, "pids": 100, "gpu_memory_gb": 4.0, "disk_gb": 10.0}},
+              "scope_services": ["main"], "gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5, "disk_tick_sec": 60,
+              "gpu": True, "agent_timeout_sec": 3600}
+LIMITS_NOGPU = {"format": "rcb-limits/2", "task": "selftest-nogpu-i00-privileged", "mode": "privileged",
+                "caps": {"main": {"cpus": 4.0, "memory_gb": 8.0, "pids": 100, "disk_gb": 10.0}},
+                "scope_services": ["main"], "disk_gb": 10.0, "tick_sec": 5, "disk_tick_sec": 60, "gpu": False,
+                "agent_timeout_sec": 3600}
+
+
 def _check(cond, msg):
     if not cond:
         raise AssertionError(msg)
@@ -50,8 +68,7 @@ def _check(cond, msg):
 def test_rule():
     sys.path.insert(0, HERE)
     import rcb_limits as r
-    lim = {"format": "rcb-limits/2", "disk_gb": 10.0,
-           "caps": {"main": {"cpus": 4, "memory_gb": 8.0, "pids": 100, "gpu_memory_gb": 4.0, "disk_gb": 10.0, "gpu": True}}}
+    lim = LIMITS_GPU
 
     def sample(t, **c):
         base = {"kind": "scope", "role": "main", "service": "main", "cpu": 1.0, "memory_gb": 1.0, "pids": 10,
@@ -62,12 +79,15 @@ def test_rule():
     v = r.violations([sample(0, memory_gb=8.5), sample(5, memory_gb=9.0)], lim, tol=0.05)
     _check([x["metric"] for x in v] == ["memory_gb"] and v[0]["at"] == 0 and v[0]["peak"] == 9.0 and v[0]["samples"] == 2,
            f"memory over its cap at one sample is over: {v}")
-    _check([x["metric"] for x in r.violations([sample(0, pids=101)], lim, tol=0.5)] == ["pids"], "counts are exact")
+    _check([x["metric"] for x in r.violations([sample(0, pids=101), sample(5, pids=101)], lim, tol=0.5)] == ["pids"],
+           "counts are exact")
+    _check(r.violations([sample(0, pids=101), sample(5, pids=99), sample(10, pids=101)], lim) == [],
+           "a count over its cap in one sample alone is not over (rcb_limits.PIDS_RUN)")
     _check([x["metric"] for x in r.violations([sample(0, cpu=4.5)], lim)] == ["cpus"], "CPU over its cap")
     _check([x["metric"] for x in r.violations([sample(0, gpu_memory_gb=4.5)], lim)] == ["gpu_memory_gb"], "GPU memory")
     _check([x["metric"] for x in r.violations([sample(0, disk_gb=11.0)], lim)] == ["disk_gb"], "disk")
-    nogpu = dict(lim, caps={"main": dict(lim["caps"]["main"], gpu=False)})
-    _check(r.violations([sample(0, gpu_memory_gb=9.0)], nogpu) == [], "no GPU in the service: GPU memory is recorded only")
+    _check(r.violations([sample(0, gpu_memory_gb=9.0)], LIMITS_NOGPU) == [],
+           "no GPU in the service: GPU memory is recorded only")
     side = {"t": 0, "scope": {}, "containers": [{"kind": "observe", "role": "sidecar", "memory_gb": 99.0, "pids": 10 ** 6}]}
     _check(r.violations([side], lim) == [], "a benchmark-owned service is recorded only")
     _check(r.parse_tolerance("0.1") == (0.1, None) and r.parse_tolerance(None)[0] == r.TOLERANCE
@@ -77,8 +97,7 @@ def test_rule():
 def test_verify():
     sys.path.insert(0, HERE)
     import rcb_limits as r
-    lim = {"format": "rcb-limits/2", "gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5,
-           "caps": {"main": {"cpus": 4, "memory_gb": 8.0, "pids": 8192, "gpu_memory_gb": 4.0, "disk_gb": 10.0}}}
+    lim = LIMITS_GPU
     for enforce, gpu, want in ((1, 6.0, "over"), (0, 6.0, "over"), (1, 3.0, "pass")):
         with tempfile.TemporaryDirectory() as d:
             rec, tests, logs = (os.path.join(d, x) for x in ("rec", "tests", "logs"))
@@ -105,7 +124,7 @@ def test_verify():
             txt = open(os.path.join(logs, "reward.txt")).read().strip()
             if want == "over":
                 _check(out["success"] == 1 and out["limits_violation_observed"] == 1 and txt == "1"
-                       and out["over_gpu_memory_gb"] == 1 and "resource_limit_exceeded" not in out
+                       and out["over_gpu_memory_gb"] == 1 and out["resource_limit_exceeded"] == 0
                        and out.get("infra_error", 0) == 0, f"a cap exceeded is recorded, the grade stands: {out}")
             else:
                 _check(out["success"] == 1 and out["limits_violation_observed"] == 0 and out["resource_monitor_missing"] == 0,

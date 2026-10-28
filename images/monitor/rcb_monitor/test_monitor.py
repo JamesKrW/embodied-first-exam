@@ -17,8 +17,11 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 os.environ.setdefault("RCB_MONITOR_RECORD", tempfile.mkdtemp(prefix="rcb-monitor-test-"))
+import inject  # noqa: E402
 import monitor  # noqa: E402
 import rcb_limits  # noqa: E402
+import selftest  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 GIB = float(2 ** 30)
 
@@ -264,16 +267,29 @@ def test_disk_baseline():
         m.walk = (monitor.DiskWalk(croot, ["/app"], []), "mnt:[111]", f"{f.proc}/100", 1000)
         n = len(f.events("disk_partial"))
         check(m.disk_step(1300.0, groups) is None and len(f.events("disk_partial")) == n + 1, "a vanished container: a gap")
-        # 7. a restarted monitor keeps the baseline and the backstop's counts, and lets go of an open throttle
+        # 7. a restarted monitor keeps the baseline and the backstop's counts, and lets go of an open throttle: the
+        #    processes the previous instance throttled (same start time) get SIGCONT, a quota it wrote its old value
+        import signal
         base = m.disk_base
         for r in ("memory", "memory", "pids"):
             monitor.event("kill", resource=r, pid=7, value=2.0, cap=1.0)
         monitor.event("throttle_start", resource="cpu", value=3.0, cap=1.0)
+        quota = os.path.join(f.d, "cpu.max")
+        open(quota, "w").write("100000 100000")
+        f.pid(105, "mnt:[111]", croot, start=7000, ppid=100, nspid=12)
+        st = rcb_limits.read_json(os.path.join(f.rec, "state.json")) or {}
+        st["throttle"] = [{"procs": [[105, 7000], [106, 7001]]}, {"file": quota, "orig": "max 100000"}]
+        monitor.write_json(os.path.join(f.rec, "state.json"), st)
         m2 = f.monitor(lim)
         check(m2.disk_base is None, "a fresh monitor has no baseline")
-        m2.restore()
-        check(m2.disk_base == base and m2.killed == 3 and m2.kills["memory"] == 2 and m2.kills["pids"] == 1
-              and m2.resume_after_restart, f"restore() brings the state back: {m2.kills}")
+        with Kills() as k:
+            m2.restore()
+        check(m2.disk_base == base and m2.killed == 3 and m2.kills["memory"] == 2 and m2.kills["pids"] == 1,
+              f"restore() brings the state back: {m2.kills}")
+        check(k.calls == [(105, signal.SIGCONT)] and open(quota).read() == "max 100000"
+              and f.events("throttle_end")[-1]["processes"] == 1 and not m2.resume
+              and not (rcb_limits.read_json(os.path.join(f.rec, "state.json")) or {}).get("throttle"),
+              f"and lets go of the previous throttle (a PID no longer there is not signalled): {k.calls}")
     finally:
         monitor.DISK_SLICE_SEC, monitor.DISK_WALK_MAX_SEC = keep
         f.close()
@@ -309,11 +325,23 @@ class Kills:
         return [p for p, s in self.calls if s == signal.SIGKILL]
 
 
-LIM = {"format": rcb_limits.LIMITS_FORMAT, "tick_sec": 5, "disk_gb": 0.004, "gpu_memory_gb": 4.0,
-       "caps": {"main": {"cpus": 2.0, "memory_gb": 1.0, "pids": 5, "gpu_memory_gb": 4.0, "disk_gb": 0.004, "gpu": True},
-                "blenderkit": {"cpus": 1.0, "memory_gb": 0.5, "pids": 2},
-                "sim": {"cpus": 1.0, "memory_gb": 0.1, "pids": 1}},
-       "scope_services": ["main", "blenderkit"]}
+GPU_DEVICE = ("    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n"
+              "              count: 1\n              capabilities: [gpu]\n")
+
+
+def _limits(compose, cfg, task="test-i00-privileged"):
+    """limits.json exactly as inject.py writes it for a task (never a hand-written dict: the monitor must read the
+    shape the tasks really carry)."""
+    return inject.limits_json(Path(task), cfg, inject.applied_caps(cfg, compose))
+
+
+# main: 2 CPUs, 1 GiB, 5 processes, a GPU with a 4 GiB cap, 4 MiB of disk; blenderkit (a service the agent drives):
+# 1 CPU, 0.5 GiB, 2; scorer (the benchmark's own: observed)
+LIM_COMPOSE = ("services:\n  main:\n    pids_limit: 5\n    x-gpu-memory-gb: 4\n" + GPU_DEVICE +
+               "  blenderkit:\n    cpus: 1\n    mem_limit: 512m\n    pids_limit: 2\n"
+               "  scorer:\n    cpus: 1\n    mem_limit: 100m\n    pids_limit: 1\n")
+LIM_CFG = {"environment": {"cpus": 2, "memory_mb": 1024, "storage_mb": 4}, "agent": {"timeout_sec": 3600}}
+LIM = _limits(LIM_COMPOSE, LIM_CFG)
 MIB = 1024                                                     # kB
 
 
@@ -328,8 +356,9 @@ def _one(m, t=100.0, gpu_per=None, gpu_unknown=()):
 
 
 def test_backstop_memory():
-    """Memory over the container's cap (no kernel cap here: PSS): the process with the largest RSS is killed, again
-    while the container is still over; never PID 1 or its keepalive; 0 kills nothing; within the tolerance nothing."""
+    """Memory over the container's cap (no kernel cap here: PSS): the process with the largest PSS is killed, one per
+    tick (the next tick measures again); never PID 1 or its keepalive; nothing when what may be killed cannot cover the
+    excess, or holds next to nothing; 0 kills nothing; within the tolerance nothing."""
     f = Fake()
     try:
         per = {100: {"pss_kb": 50 * MIB, "rss_kb": 50 * MIB}, 103: {"pss_kb": MIB, "rss_kb": MIB},
@@ -351,17 +380,43 @@ def test_backstop_memory():
                 ev = f.events("kill")
                 check(k.killed() == [101] and len(ev) == 1 and ev[0]["resource"] == "memory" and ev[0]["pid"] == 101
                       and m.kills["memory"] == 1, f"1: the largest process, once (then under the cap): {k.calls} {ev}")
-        # still over after the largest: the next, and so on; PID 1's own memory is never a reason to kill it
-        per[100] = {"pss_kb": 1500 * MIB, "rss_kb": 1500 * MIB}
+        # still over after the largest: one kill per tick, the next one at the next tick, after measuring again
+        per = {100: {"pss_kb": 10 * MIB}, 103: {"pss_kb": MIB}, 101: {"pss_kb": 610 * MIB},
+               102: {"pss_kb": 605 * MIB}, 104: {"pss_kb": 600 * MIB}}         # 1826 MiB: 750 MiB over 1.05 GiB
+        _agent_container(f, per)
+        shutil.rmtree(f.rec)
+        os.makedirs(f.rec)
+        m = f.monitor(LIM, enforce="1")
+        with Kills() as k:
+            _one(m)
+        check(k.killed() == [101], f"one kill per tick, the largest: {k.killed()}")
+        f.gone(101)
+        with Kills() as k:
+            _one(m, 105.0)
+        check(k.killed() == [102], f"the next tick, measured again, the next largest: {k.killed()}")
+        f.gone(102)
+        with Kills() as k:
+            _one(m, 110.0)
+        check(k.calls == [] and m.kills["memory"] == 2, f"under the cap again: no more: {k.calls}")
+        # PID 1's own memory is never a reason to kill the others: what they hold does not cover the excess
+        per = {100: {"pss_kb": 1500 * MIB}, 103: {"pss_kb": MIB}, 101: {"pss_kb": 600 * MIB},
+               102: {"pss_kb": 300 * MIB}, 104: {"pss_kb": 200 * MIB}}
         _agent_container(f, per)
         shutil.rmtree(f.rec)
         os.makedirs(f.rec)
         with Kills() as k:
-            m = f.monitor(LIM, enforce="1")
-            _one(m)
-        check(k.killed() == [101, 102, 104] and 100 not in k.killed() and 103 not in k.killed(),
-              f"again while over, largest first, PID 1 and its keepalive spared: {k.killed()}")
-        check(len(f.events("no_victim")) == 1, "and what could not be freed is recorded")
+            _one(f.monitor(LIM, enforce="1"))
+        check(k.calls == [] and [e["resource"] for e in f.events("no_victim")] == ["memory"],
+              f"the killable processes cannot cover the excess: nothing is killed, recorded: {k.calls}")
+        # processes that hold next to nothing are never killed for memory (killing them frees nothing)
+        per = {100: {"pss_kb": 1100 * MIB}, 103: {"pss_kb": MIB}, 101: {"pss_kb": 5 * MIB},
+               102: {"pss_kb": 5 * MIB}, 104: {"pss_kb": 5 * MIB}}
+        _agent_container(f, per)
+        shutil.rmtree(f.rec)
+        os.makedirs(f.rec)
+        with Kills() as k:
+            _one(f.monitor(LIM, enforce="1"))
+        check(k.calls == [] and f.events("no_victim"), f"near-zero PSS: never a victim: {k.calls}")
         # within the tolerance (5 %): not over
         per = {p: {"pss_kb": 10 * MIB, "rss_kb": 10 * MIB} for p in (100, 103, 102, 104)}
         per[101] = {"pss_kb": 1030 * MIB, "rss_kb": 1030 * MIB}   # 1070 MiB = 1.045 GiB
@@ -376,7 +431,8 @@ def test_backstop_memory():
 
 
 def test_backstop_pids():
-    """Processes and threads over the cap: the newest processes are killed until the count is back at the cap."""
+    """Processes and threads over the cap in rcb_limits.PIDS_RUN samples in a row: the newest processes are killed
+    until the count is back at the cap; one sample over alone is not over (a fork burst between two samples)."""
     f = Fake()
     try:
         _agent_container(f, {101: {"threads": 3}})            # 1 + 1 + 3 + 1 + 1 = 7 of 5
@@ -386,6 +442,9 @@ def test_backstop_pids():
             with Kills() as k:
                 m = f.monitor(LIM, enforce=enforce)
                 _, ms = _one(m)
+                check(ms[0]["pids"] == 7 and k.calls == [] and not f.events("over"),
+                      f"one sample over: not yet: {ms[0]} {k.calls}")
+                _, ms = _one(m, 102.0)
             check(ms[0]["pids"] == 7, f"processes and threads counted: {ms[0]}")
             check([e["resource"] for e in f.events("over")] == ["pids"], f"over: {f.events('over')}")
             if enforce == "0":
@@ -399,10 +458,23 @@ def test_backstop_pids():
                     f.pid(p, None, None, start=start, state="Z", ppid=101)
                     f.thread(p, p, None, None, start=start)
                 with Kills() as k2:
-                    _, ms = _one(m, 105.0)
+                    _one(m, 105.0)
+                    _, ms = _one(m, 110.0)
                 check(ms[0]["pids"] == 7 and ms[0]["zombies"] == 2 and k2.calls == [],
                       f"its own victims' zombies: no second kill: {ms[0]} {k2.calls}")
                 _agent_container(f, {101: {"threads": 3}})
+        # over, under, over: never two samples in a row
+        _agent_container(f, {101: {"threads": 3}})
+        shutil.rmtree(f.rec)
+        os.makedirs(f.rec)
+        m = f.monitor(LIM, enforce="1")
+        with Kills() as k:
+            _one(m)
+            _agent_container(f, {101: {"threads": 1}})
+            _one(m, 105.0)
+            _agent_container(f, {101: {"threads": 3}})
+            _one(m, 110.0)
+        check(k.calls == [] and not f.events("over"), f"over, under, over: not over: {k.calls}")
     finally:
         f.close()
 
@@ -469,8 +541,12 @@ def test_backstop_cpu():
 
 
 def test_backstop_gpu():
-    """GPU memory over the container's cap: the process holding the most is killed, again while over; a container
-    whose GPU memory NVML does not tell is never killed for it (recorded); 0 kills nothing."""
+    """GPU memory over the container's cap: the process holding the most is killed (one per tick), when the processes
+    the backstop may kill can cover the excess; a container whose GPU memory NVML does not tell is never killed for it
+    (recorded); 0 kills nothing. The limits are inject.py's: the cap is there when the service holds a GPU (an older
+    monitor looked for a per-service `gpu` flag, which limits.json does not carry, and never killed)."""
+    check(LIM["caps"]["main"].get("gpu_memory_gb") == 4.0 and "gpu" not in LIM["caps"]["main"] and LIM["gpu"] is True,
+          f"limits.json as inject.py writes it: {LIM}")
     f = Fake()
     try:
         _agent_container(f)
@@ -489,8 +565,9 @@ def test_backstop_gpu():
             _one(f.monitor(LIM, enforce="1"), gpu_per={101: 3000, 102: 3000}, gpu_unknown={104})
         check(k.calls == [] and [e["resource"] for e in f.events("unobservable")] == ["gpu_memory"],
               f"not observable: nothing is killed, recorded: {k.calls}")
-        # a service without a GPU has no GPU-memory cap
-        lim = dict(LIM, caps=dict(LIM["caps"], main=dict(LIM["caps"]["main"], gpu=False)))
+        # a service without a GPU has no GPU-memory cap (inject.py writes none)
+        lim = _limits("services:\n  main:\n    pids_limit: 5\n", LIM_CFG)
+        check("gpu_memory_gb" not in lim["caps"]["main"] and lim["gpu"] is False, f"no GPU: no cap: {lim}")
         shutil.rmtree(f.rec)
         os.makedirs(f.rec)
         with Kills() as k:
@@ -500,37 +577,277 @@ def test_backstop_gpu():
         f.close()
 
 
+def _fd(f, pid, n, target, flags="0100001"):
+    """An open file of a fake process: /proc/<pid>/fd/<n> -> target (a path in its container), fdinfo flags (octal)."""
+    base = os.path.join(f.proc, str(pid))
+    os.makedirs(os.path.join(base, "fd"), exist_ok=True)
+    os.makedirs(os.path.join(base, "fdinfo"), exist_ok=True)
+    link = os.path.join(base, "fd", str(n))
+    if os.path.lexists(link):
+        os.remove(link)
+    os.symlink(target, link)
+    with open(os.path.join(base, "fdinfo", str(n)), "w") as fh:
+        fh.write(f"pos:\t0\nflags:\t{flags}\nmnt_id:\t1\n")
+
+
 def test_backstop_disk():
-    """Disk over the cap at a measurement: the process that wrote the most since the previous one is killed (one per
-    measurement); one that wrote nothing since is never chosen; 0 kills nothing."""
+    """Disk over the cap at a measurement: the process that holds the most bytes open for writing in files under the
+    measured paths is killed; PID 1, read-only and deleted files never count; no second kill until the disk grew since
+    the last one; nobody holding such a file (or fd tables that cannot be read): recorded only; 0 kills nothing."""
+    tag = "rcb-test-" + os.urandom(4).hex()            # paths that exist in the fake container only, never on the host
     f = Fake()
     try:
+        croot = _agent_container(f)
+        for name, mib in (("w102", 3), ("w101", 1), ("r104", 8), ("w100", 9), ("w103", 6)):
+            _fill(os.path.join(croot, "app", tag, name + ".bin"), mib)
+        _fd(f, 102, 3, f"/app/{tag}/w102.bin")
+        _fd(f, 102, 4, f"/app/{tag}/w102.bin", flags="0100002")                # the same file twice: once
+        _fd(f, 101, 3, f"/app/{tag}/w101.bin", flags="02")
+        _fd(f, 104, 3, f"/app/{tag}/r104.bin", flags="0100000")                # read only
+        _fd(f, 104, 4, f"/app/{tag}/w102.bin (deleted)")                       # deleted: not counted
+        _fd(f, 104, 5, f"/opt/{tag}/w100.bin")                                 # not under the measured paths
+        _fd(f, 100, 3, f"/app/{tag}/w100.bin")                                 # PID 1: spared
+        _fd(f, 103, 3, f"/app/{tag}/w103.bin")                                 # its keepalive: spared
         for enforce in ("0", "1"):
             shutil.rmtree(f.rec)
             os.makedirs(f.rec)
-            _agent_container(f, {p: {"write_bytes": 10 ** 6} for p in (100, 101, 102, 103, 104)})
             with Kills() as k:
                 m = f.monitor(LIM, enforce=enforce)
                 groups, _ = _one(m)
                 g = next(iter(groups.values()))
-                m.disk_backstop(g, 0.001)                      # under the cap: the io baseline
-                _agent_container(f, {100: {"write_bytes": 900 * 10 ** 6}, 103: {"write_bytes": 10 ** 6},
-                                       101: {"write_bytes": 50 * 10 ** 6}, 102: {"write_bytes": 80 * 10 ** 6},
-                                       104: {"write_bytes": 10 ** 6}})
-                groups, _ = _one(m, 160.0)
-                m.disk_backstop(next(iter(groups.values())), 0.2)
+                m.disk_backstop(g, 0.001)                      # under the cap: nothing
+                m.disk_backstop(g, 0.2)
             check([e["resource"] for e in f.events("over")] == ["disk"], f"over: {f.events('over')}")
             if enforce == "0":
-                check(k.calls == [], "0: nothing is killed")
-            else:
-                ev = f.events("kill")
-                check(k.killed() == [102] and ev[0]["resource"] == "disk" and m.kills["disk"] == 1,
-                      f"1: the top writer since the last measurement, PID 1 spared: {k.killed()} {ev}")
-        with Kills() as k:
-            m.disk_backstop(next(iter(groups.values())), 0.3)
-        check(k.calls == [] and f.events("no_victim"), "nobody wrote since: nobody is killed, recorded")
+                check(k.calls == [] and m.by[g["mnt"]]["disk"] == "none", "0: nothing is killed")
+                continue
+            ev = f.events("kill")
+            check(k.killed() == [102] and ev[0]["resource"] == "disk" and m.kills["disk"] == 1
+                  and 2.9 < ev[0]["held_gb"] * 1024 < 3.2 and m.disk_kill_at == 0.2,
+                  f"1: the largest writer, PID 1 and its keepalive spared: {k.killed()} {ev}")
+            with Kills() as k:
+                m.disk_backstop(g, 0.205)
+            check(k.calls == [] and f.events("no_victim")[0]["resource"] == "disk",
+                  f"no growth since the last kill: no second kill: {k.calls}")
+            f.gone(102)
+            with Kills() as k:
+                m.disk_backstop(g, 0.3)
+            check(k.killed() == [101], f"the disk grew again: the next writer: {k.killed()}")
+            check((rcb_limits.read_json(os.path.join(f.rec, "state.json")) or {}).get("disk_kill_at") == 0.3,
+                  "the last kill's value survives a restart")
+        # nobody holds a file there: recorded only
+        f2 = Fake()
+        try:
+            _agent_container(f2)
+            with Kills() as k:
+                m = f2.monitor(LIM, enforce="1")
+                groups, _ = _one(m)
+                m.disk_backstop(next(iter(groups.values())), 0.2)
+            check(k.calls == [] and [e["resource"] for e in f2.events("no_victim")] == ["disk"],
+                  f"no process holds a file open for writing: nobody is killed: {k.calls}")
+            # an fd table that cannot be read: the writer cannot be told
+            open(os.path.join(f2.proc, "101", "fd"), "w").close()
+            m.disk_kill_at = None
+            with Kills() as k:
+                m.disk_backstop(next(iter(groups.values())), 0.3)
+            check(k.calls == [] and [e["resource"] for e in f2.events("unobservable")] == ["disk"],
+                  f"unreadable open files: nothing is killed: {k.calls}")
+        finally:
+            f2.close()
     finally:
         f.close()
+
+
+def _cg_files(d, **files):
+    for name, v in files.items():
+        with open(os.path.join(d, name.replace("_", ".", 1)), "w") as fh:
+            fh.write(f"{v}\n")
+
+
+def test_runtime_first():
+    """A cap the container's own cgroup already holds (cpu.max, memory.max, pids.max at the cap or below: Docker's) is
+    the runtime's: the monitor only records it; a limit missing or higher than the cap is the monitor's to enforce.
+    Who enforces what is recorded (an `enforcement` event, `by` in `over`, usage.json `enforced_by`)."""
+    f = Fake()
+    keep_beacon = monitor.SCOPE_BEACON
+    try:
+        per = {100: {"pss_kb": 10 * MIB}, 101: {"pss_kb": 900 * MIB, "threads": 3}, 102: {"pss_kb": 300 * MIB},
+               103: {"pss_kb": MIB}, 104: {"pss_kb": 200 * MIB}}
+        _agent_container(f, per)                                             # 7 pids of 5
+        pids = [100, 101, 102, 103, 104]
+        d = f.cgroup("rt", pids=pids, anon_gb=1.5, max_gb=1.0)               # 1.5 GiB of 1 (an OOM kill is due)
+        _cg_files(d, cpu_max="200000 100000", pids_max=5)
+        m = f.monitor(LIM, enforce="1")
+        with Kills() as k:
+            m.tick_once(100.0)
+            m.tick_once(105.0)
+            monitor.SCOPE_BEACON = f.volume              # usage.json is written there (the beacon volume)
+            m.write_usage(105.0)
+            monitor.SCOPE_BEACON = keep_beacon
+        want = {"cpu": "runtime", "memory": "runtime", "pids": "runtime", "gpu_memory": "monitor", "disk": "monitor"}
+        g = next(iter(m.by))
+        check(k.calls == [] and m.by[g] == want, f"the runtime holds cpu, memory, pids: the monitor kills nothing: "
+                                                 f"{k.calls} {m.by}")
+        ev = f.events("enforcement")
+        check(len(ev) == 1 and ev[0]["by"] == want and ev[0]["runtime"] == {"cpus": 2.0, "memory_gb": 1.0, "pids": 5},
+              f"recorded once: {ev}")
+        over = {e["resource"]: e["by"] for e in f.events("over")}
+        check(over == {"memory": "runtime", "pids": "runtime"}, f"over, and who holds it: {over}")
+        u = rcb_limits.read_json(os.path.join(f.volume, "usage.json"))
+        check(u["enforced_by"] == want and u["violations"] == u["over"] and u["emergency_kills"] == 0,
+              f"usage.json: {u}")
+        # a runtime limit above the cap, or none: the monitor's
+        _cg_files(d, memory_max=2 * 2 ** 30, pids_max="max")
+        with Kills() as k:
+            m.tick_once(110.0)
+            m.tick_once(115.0)
+        check(m.by[g]["memory"] == "monitor" and m.by[g]["pids"] == "monitor" and m.by[g]["cpu"] == "runtime"
+              and 101 in k.killed() and len(f.events("enforcement")) == 2, f"now the monitor's: {m.by} {k.killed()}")
+        check(m.by_svc["main"] == m.by[g], f"per service: {m.by_svc}")
+        # CPU: no quota (cpu.max "max"), writable: the monitor writes the cap there, and puts back the old value
+        _cg_files(d, cpu_max="max 100000", memory_max=2 ** 30, pids_max=5)
+        m2 = f.monitor(LIM, enforce="1")
+        groups = m2.groups()
+        g2 = next(iter(groups.values()))
+        x = m2.measure(g2, {}, 100.0)
+        x["cpu"] = 4.0
+        with Kills() as k:
+            m2.backstop(g2, x, 100.0)
+            check(m2.throttle.active[g2["mnt"]]["method"] == "cgroup" and open(d + "/cpu.max").read() == "200000 100000",
+                  f"the cap is the cgroup's quota: {open(d + '/cpu.max').read()!r}")
+            x = m2.measure(g2, {}, 105.0)
+            x["cpu"] = 2.0
+            m2.backstop(g2, x, 105.0)
+            check(m2.throttle.throttled(g2["mnt"]) and m2.by[g2["mnt"]]["cpu"] == "monitor",
+                  "the monitor's own quota is not the runtime's: it stays")
+            st = rcb_limits.read_json(os.path.join(f.rec, "state.json"))
+            check(st["throttle"] == [{"file": d + "/cpu.max", "orig": "max 100000"}], f"state.json: {st['throttle']}")
+            m2.seal()
+        check(open(d + "/cpu.max").read() == "max 100000" and k.calls == [] and
+              f.events("throttle_start")[-1]["method"] == "cgroup", f"released at the seal: the old value, no signal: {open(d + '/cpu.max').read()!r} {k.calls}")
+    finally:
+        monitor.SCOPE_BEACON = keep_beacon
+        f.close()
+
+
+def test_throttle_signals():
+    """The SIGSTOP fallback: a process already stopped (state T: the agent's own) is never signalled, so never resumed;
+    a share too small for one run window runs every k-th period; a process that leaves the set gets SIGCONT."""
+    import signal
+    f = Fake()
+    try:
+        _agent_container(f, {102: {"state": "T"}})
+        m = f.monitor(LIM, enforce="1")
+        groups = m.groups()
+        g = next(iter(groups.values()))
+        mnt = g["mnt"]
+        x = m.measure(g, {}, 100.0)
+        x["cpu"] = 400.0                                       # share 0.005: 0.5 ms of a 100 ms period
+        with Kills() as k:
+            m.backstop(g, x, 100.0)
+            e = m.throttle.active[mnt]
+            check(e["method"] == "signal" and set(e["procs"]) == {101, 104} and {p for p, _ in e["foreign"]} == {102},
+                  f"the stopped process is not ours: {e['procs']} {e['foreign']}")
+            vt = [0.0]
+
+            def vsleep(dt):
+                vt[0] += dt
+            k_need = __import__("math").ceil(monitor.THROTTLE_MIN_RUN_SEC / (e["frac"] * monitor.THROTTLE_PERIOD_SEC))
+            conts = []
+            for i in range(2 * k_need):
+                n0 = len(k.calls)
+                m.throttle.cycle(sleep=vsleep, clock=lambda: vt[0])
+                conts.append(sum(1 for _, sg in k.calls[n0:] if sg == signal.SIGCONT))
+            check(conts == ([0] * (k_need - 1) + [2]) * 2, f"run every {k_need}th period: {conts}")
+            check(all(p != 102 for p, _ in k.calls), f"never the process stopped before: {k.calls}")
+            # 104 leaves the container (another mount namespace, no longer the trial's): continued, then dropped
+            del k.calls[:]
+            f.pid(104, "mnt:[999]", f.root("main"), start=6000, ppid=100, nspid=11)
+            m.throttle._refresh(mnt, e)
+            check(k.calls == [(104, signal.SIGCONT)] and set(e["procs"]) == {101}, f"dropped: {k.calls} {e['procs']}")
+            # 101's first thread exits, another runs on: still in the set, still let go at the end
+            root = f.root("main")
+            f.pid(101, None, None, start=5000, state="Z", ppid=77)
+            f.thread(101, 1011, "mnt:[111]", root, start=5000)
+            del k.calls[:]
+            m.throttle._refresh(mnt, e)
+            check(k.calls == [] and set(e["procs"]) == {101}, f"a dead leader with live threads stays: {e['procs']}")
+            m.throttle.release_all("test")
+        check(k.calls == [(101, signal.SIGCONT)], f"released: only what it stopped: {k.calls}")
+    finally:
+        f.close()
+
+
+def test_cgroup_container():
+    """A container is its cgroup when it has one of its own (docker-<id>.scope): a process of it in another mount
+    namespace (unshare -m, maybe pivoted away from the beacon) still counts and can be killed; two namespaces of one
+    container cgroup are one container. A kill needs the start time the process was measured with."""
+    f = Fake()
+    try:
+        root = _agent_container(f)
+        esc = f.root("escaped", beacon=False, main=False)
+        f.pid(150, "mnt:[555]", esc, start=9000, ppid=101, nspid=20)        # no beacon: found by its cgroup alone
+        f.pid(160, "mnt:[666]", f.root("unshared", main=False), start=9500, ppid=101, nspid=21)
+        name = "system.slice/docker-" + "ab" * 32 + ".scope"
+        f.cgroup(name, pids=[100, 101, 102, 103, 104, 150, 160], anon_gb=0.1)
+        other = f.root("other", beacon=False, main=False)
+        f.pid(170, "mnt:[777]", other, start=9600, nspid=1)                  # another container: not the trial's
+        f.cgroup("system.slice/docker-" + "cd" * 32 + ".scope", pids=[170], anon_gb=0.1)
+        m = f.monitor(LIM, enforce="1")
+        groups = m.groups()
+        check(len(groups) == 1, f"one container: {list(groups)}")
+        g = next(iter(groups.values()))
+        check(g["mnt"] == "mnt:[111]" and set(g["pids"]) == {100, 101, 102, 103, 104, 150, 160}
+              and g["mnts"] == {"mnt:[111]", "mnt:[555]", "mnt:[666]"} and g["role"] == "main",
+              f"named by its PID 1's namespace, every process of the cgroup: {g}")
+        check(m.in_trial(150) and not m.in_trial(170), "the cgroup is the trial's, the other one is not")
+        with Kills() as k:
+            _one(m)
+            _one(m, 105.0)
+        check(k.killed() == [160, 150], f"7 of 5 pids: the newest, in whatever namespace: {k.killed()}")
+        check(m.kill(g, 999, "pids", 7, 5) is False and m.kill(dict(g, info={}), 101, "pids", 7, 5) is False,
+              "no start time measured: never killed")
+    finally:
+        f.close()
+
+
+def test_runtime_while_starting():
+    """The runtime's limits are read from the container's own cgroup even while it holds a process the monitor does not
+    see yet (a container starting): its memory is then measured by PSS, its caps still the runtime's."""
+    f = Fake()
+    try:
+        _agent_container(f)
+        name = "system.slice/docker-" + "ef" * 32 + ".scope"
+        d = f.cgroup(name, pids=[100, 101, 102, 103, 104], anon_gb=0.1, max_gb=1.0)
+        with open(os.path.join(d, "cgroup.procs"), "a") as fh:
+            fh.write("999\n")                                  # not seen (yet)
+        _cg_files(d, cpu_max="200000 100000", pids_max=5)
+        m = f.monitor(LIM, enforce="1")
+        with Kills():
+            _, ms = _one(m)
+        check(ms[0]["cgroup"] == 0 and ms[0]["runtime"] == {"cpus": 2.0, "memory_gb": 1.0, "pids": 5}
+              and m.by["mnt:[111]"]["memory"] == "runtime", f"the runtime's limits: {ms[0]} {m.by}")
+    finally:
+        f.close()
+
+
+def test_bad_tolerance():
+    f = Fake()
+    try:
+        os.environ["RCB_LIMITS_TOLERANCE"] = "lots"
+        m = f.monitor(LIM, enforce="1")
+        check(m.enforce == 0 and "lots" in (m.switch_error or ""), f"a bad tolerance enforces nothing: {m.switch_error}")
+    finally:
+        os.environ.pop("RCB_LIMITS_TOLERANCE", None)
+        f.close()
+
+
+def test_selftest_fixtures():
+    """The self-test's limits.json fixtures are inject.limits_json's output for its task (so neither suite can test a
+    shape the tasks do not carry)."""
+    for compose, want in ((selftest.TASK_COMPOSE_GPU, selftest.LIMITS_GPU), (selftest.TASK_COMPOSE_NOGPU, selftest.LIMITS_NOGPU)):
+        got = _limits(compose, selftest.TASK_CFG, want["task"])
+        check(got == want, f"selftest fixture != inject.limits_json: {got} vs {want}")
 
 
 def test_backstop_services():
@@ -543,12 +860,13 @@ def test_backstop_services():
         f.pid(300, "mnt:[333]", broot, start=1000, nspid=1)
         f.pid(301, "mnt:[333]", broot, start=5000, ppid=300, nspid=5)
         f.pid(302, "mnt:[333]", broot, start=5001, ppid=300, nspid=6)   # 3 processes of a cap of 2
-        sroot = f.sidecar_root("sim")
+        sroot = f.sidecar_root("scorer")
         for p in (200, 201, 202):
             f.pid(p, "mnt:[222]", sroot, start=5000 + p, ppid=200, nspid=p - 199)
         with Kills() as k:
             m = f.monitor(LIM, enforce="1")
-            groups, ms = _one(m)
+            _one(m)
+            groups, ms = _one(m, 105.0)
         svc = sorted((x["kind"], x["role"], x["service"] or "") for x in ms)
         check(svc == [("observe", "sidecar", ""), ("scope", "main", "main"), ("scope", "sidecar", "blenderkit")], f"{svc}")
         check(k.killed() == [302] and f.events("kill")[0]["service"] == "blenderkit",
@@ -578,7 +896,7 @@ def test_backstop_record():
               and out["resource_memory_kills"] == 2 and out["resource_pids_kills"] == 1 and out["resource_monitor_kills"] == 3
               and out["resource_emergency_kills"] == 3 and out["resource_cpu_throttles"] == 1
               and out["resource_cpu_throttled_sec"] == 30.0 and out["over_memory_gb"] == 1 and out["over_pids"] == 1
-              and out["over_cpus"] == 1 and "resource_limit_exceeded" not in out, f"enforce={enforce}: {out}")
+              and out["over_cpus"] == 1 and out["resource_limit_exceeded"] == 0, f"enforce={enforce}: {out}")
         check(len(det["backstop_events"]) == 5 and "graded normally" in det["verdict"], f"detail: {det['verdict']}")
     c = {"kind": "scope", "role": "main", "service": "main", "memory_gb": 3.0, "pids": 10, "cpu": 1.0}
     samples = [dict(s, containers=[c]) for s in _samples()]
@@ -648,7 +966,7 @@ def test_verify_edges():
     ev = [{"t": 1010, "event": "kill", "resource": "gpu_memory", "service": "main", "pid": 5, "value": 9.0, "cap": 4.0}]
     out, txt, det = _verify(_samples(), ev, dict(ok, enforce=1))
     check(out["success"] == 1 and txt == "1" and out["resource_gpu_memory_kills"] == 1 and out["limits_violation_observed"] == 1
-          and out["over_gpu_memory_gb"] == 1 and "resource_limit_exceeded" not in out and out.get("infra_error", 0) == 0,
+          and out["over_gpu_memory_gb"] == 1 and out.get("resource_limit_exceeded", 0) == 0 and out.get("infra_error", 0) == 0,
           f"a backstop kill: {out}")
     check(len(det["backstop_events"]) == 1, "and listed in resource_limits.json")
     # the tolerance: unreadable -> not a result, like the switch
@@ -699,7 +1017,7 @@ def test_verify_edges():
     # R2 m1: an unusable record with enforcement on is not a result, and leaves no success beside the infra flag
     out, txt, _ = _verify(_samples(), [{"t": 1001, "event": "fatal", "why": "x"}], dict(ok, enforce=1))
     check(out["infra_error"] == 1 and out["success"] == 0 and out["success_before_limits"] == 1 and txt == "0"
-          and "resource_limit_exceeded" not in out, f"unusable record, enforced: {out}")
+          and out.get("resource_limit_exceeded", 0) == 0, f"unusable record, enforced: {out}")
     out, txt, _ = _verify(_samples(), [{"t": 1001, "event": "fatal", "why": "x"}], dict(ok, enforce=1),
                           reward={"success": 1, "reward": 1.0, "infra_error": 0})
     check(out["reward"] == 0 and out["success"] == 0 and out["infra_error"] == 1, f"... the reward field too: {out}")
@@ -834,7 +1152,7 @@ def test_oom_verdicts():
         # M2: the simulator sidecar was OOM-killed at its docker cap and the episode ended without success: not the agent's 0
         out, txt, det = _verify(_samples(), side, dict(ok, enforce=enforce), reward=agent0, txt="0")
         check(out["infra_error"] == 1 and out["resource_service_oom"] == 1 and out["resource_service_oom_kills"] == 3
-              and out["success"] == 0 and txt == "0" and "resource_limit_exceeded" not in out
+              and out["success"] == 0 and txt == "0" and out.get("resource_limit_exceeded", 0) == 0
               and out["limits_violation_observed"] == 0 and "benchmark-owned service" in det["verdict"],
               f"sidecar OOM, no success, enforce={enforce}: infrastructure, not the agent's failure: {out}")
         check(len(det["oom_kills"]) == 3, "the events are in resource_limits.json")
@@ -857,7 +1175,7 @@ def test_oom_verdicts():
     host = [{"t": 1100, "event": "oom", "role": "main", "scope": True, "count": 1, "cause": "host"}]
     out, txt, det = _verify(_samples(), host, dict(ok, enforce=1))
     check(out["infra_error"] == 1 and out["resource_host_oom"] == 1 and out["resource_host_oom_kills"] == 1
-          and "resource_limit_exceeded" not in out and "over_oom" not in out and out["limits_violation_observed"] == 0
+          and out.get("resource_limit_exceeded", 0) == 0 and "over_oom" not in out and out["limits_violation_observed"] == 0
           and out["success"] == 0 and out["success_before_limits"] == 1 and txt == "0",
           f"host OOM kill, enforced: not a result, never the agent's violation: {out}")
     out, txt, _ = _verify(_samples(), host, dict(ok, enforce=0))
@@ -868,7 +1186,7 @@ def test_oom_verdicts():
     for enforce in (0, 1):
         out, txt, _ = _verify(_samples(), cap, dict(ok, enforce=enforce))
         check(out["success"] == 1 and txt == "1" and out["limits_violation_observed"] == 1 and out["over_oom"] == 1
-              and out["resource_oom_kills"] == 1 and out.get("infra_error", 0) == 0 and "resource_limit_exceeded" not in out,
+              and out["resource_oom_kills"] == 1 and out.get("infra_error", 0) == 0 and out.get("resource_limit_exceeded", 0) == 0,
               f"OOM at the cap, enforce={enforce}: recorded, graded normally: {out}")
     # the agent's own OOM kill and the sidecar's in one episode without success: the sidecar's makes it not a result
     out, _, _ = _verify(_samples(), cap + side, dict(ok, enforce=1), reward=agent0, txt="0")
@@ -1205,7 +1523,8 @@ def test_stop_without_cgroup():
 
 def main():
     for t in (test_classify_race, test_dead_leader_and_zombies, test_disk_walk, test_disk_baseline, test_backstop_memory,
-              test_backstop_pids, test_backstop_cpu, test_backstop_gpu, test_backstop_disk, test_backstop_services,
+              test_backstop_pids, test_backstop_cpu, test_backstop_gpu, test_backstop_disk, test_runtime_first,
+              test_throttle_signals, test_cgroup_container, test_runtime_while_starting, test_bad_tolerance, test_selftest_fixtures, test_backstop_services,
               test_backstop_record, test_switch, test_verify_edges, test_oom_watch, test_oom_verdicts, test_sanitize, test_default_is_neutral,
               test_clock_and_beacon, test_session_log_copy, test_stop_without_cgroup):
         t()

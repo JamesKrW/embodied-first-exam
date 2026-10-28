@@ -138,7 +138,7 @@ re-graded under a stricter rule keeps the recorded one (benchmark docs name thei
 Where each cap is set and who enforces it on which host: PROTOCOL §6. This section is how a run uses it.
 - **The switches** (run-time environment; compose defaults, so they do not change the digest):
   `RCB_LIMITS_ENFORCE` — `0` (default) Docker / Harbor enforce what the host lets them, the monitor records; `1` the
-  monitor is also the backstop for every cap (PROTOCOL §6); any other value: nothing is enforced, `infra_error = 1`,
+  monitor is also the backstop for every cap the container's own runtime does not hold (PROTOCOL §6); any other value: nothing is enforced, `infra_error = 1`,
   `resource_switch_error = 1`. `RCB_LIMITS_TOLERANCE` — over a cap means above cap × (1 + this), default `0.05`, a
   number in [0, 1] (anything else is treated like a bad switch). Neither changes the grade.
 - **CPU caps above the host's count** mean the host's count: the runner clamps them in its copy (`scripts/clamp_cpus.py`);
@@ -150,15 +150,21 @@ Where each cap is set and who enforces it on which host: PROTOCOL §6. This sect
   `[verifier.environment]` lacks is no cap): PROTOCOL §6.
 - **The record**: the `rcb_monitor` sidecar samples every 5 s (disk once a minute) into its own record
   (`rcb-monitor/1`), sealed in the first collect hook: per container (`containers`: `service`, `cpu`, `memory_gb`,
-  `processes`, `threads`, `pids`, `gpu_memory_gb`) and summed over the scope (`scope`, with `disk_gb`). Events: `over`
-  (the first time a container is over a cap, per resource, in both settings), `kill` (`resource`: `memory`, `pids`,
-  `disk`, `gpu_memory`; `pid`, `value`, `cap`), `throttle_start` / `throttle_end` (CPU), `unobservable` and `no_victim`
-  (the backstop could not act), `oom` (a kernel OOM kill, `cause` `cap` or `host`). The verifier recomputes what was
+  `processes`, `threads`, `pids`, `gpu_memory_gb`) and summed over the scope (`scope`, with `disk_gb`). Each container's
+  `runtime` holds the limits its own cgroup set (`cpus`, `memory_gb`, `pids`; null: none). Events: `enforcement`
+  (who holds each cap of a container, `by`: `runtime`, `monitor` or `none`, written when it changes; also the
+  summary's `enforced_by` per service), `over` (the first time a container is over a cap, per resource, in both
+  settings, with `by`; a count of processes and threads over in two samples in a row), `kill` (`resource`: `memory`,
+  `pids`, `disk`, `gpu_memory`; `pid`, `value`, `cap`), `throttle_start` / `throttle_end` (CPU, `method`: `cgroup` or
+  `signal`), `unobservable` and `no_victim` (the backstop could not act), `oom` (a kernel OOM kill, `cause` `cap` or
+  `host`). The verifier recomputes what was
   over a cap from the raw samples with its own copy of the caps (`tests/rcb_limits.json`, format `rcb-limits/2`). A
   missing, unsealed or mostly empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`; with
   `RCB_LIMITS_ENFORCE=1` that is not a result (`infra_error = 1`: the backstop that was asked for did not run).
 - **usage.json** (`/run/rcb-limits/usage.json`, agent-visible): the agent's container's use (`own`) and caps (`caps`),
-  the scope's sums, `limits` (`gpu_memory_gb`, `disk_gb`, `tolerance`), `over`, `kills`, `cpu_throttled`, and the
+  the scope's sums, `limits` (`gpu_memory_gb`, `disk_gb`, `tolerance`), `over`, `kills`, `cpu_throttled`, `enforced_by` (the agent's
+  container; `violations` and `emergency_kills` are monitor 0.4's names of `over` and the sum of `kills`; 0.4's
+  `last_emergency_kill` and `limits.sustain_sec` / `window_sec` are gone: nothing waits for a sustained excess), and the
   agent's clock (`elapsed_s`, `time_left_s`, `deadline_utc`: `[agent] timeout_sec` from the environment's start, so never
   more than the agent has). Inside its container the agent can also read its cgroup (`/sys/fs/cgroup/memory.max`,
   `cpu.max`, `pids.max`). A runner whose container runtime cannot run the monitor (no `pid: host`) runs the same service
@@ -176,6 +182,7 @@ Where each cap is set and who enforces it on which host: PROTOCOL §6. This sect
   `cpus`, `gpu_memory_gb`, `disk_gb`, `oom`); the backstop: `resource_memory_kills`, `resource_pids_kills`,
   `resource_disk_kills`, `resource_gpu_memory_kills` (processes killed), `resource_monitor_kills` (their sum; also
   `resource_emergency_kills`, its name before monitor 0.5), `resource_cpu_throttles`, `resource_cpu_throttled_sec`;
+  `resource_limit_exceeded` is always `0` (monitor 0.4's field; a cap never fails a trial now);
   the kernel: `resource_oom_kills` (at the container's own cap), `resource_host_oom_kills`, `resource_service_oom_kills`.
   Details in `/logs/verifier/resource_limits.json`.
 

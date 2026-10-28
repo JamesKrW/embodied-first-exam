@@ -50,14 +50,14 @@ try:
 except ImportError:                      # run as a script from this directory
     import rcb_limits  # type: ignore[no-redef]
 CODE = ("monitor.py", "rcb_limits.py", "selftest.py")   # in the monitor image at /opt/rcb_monitor/ (images/monitor/Dockerfile)
-IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.5.0@sha256:69dcd5dd5dff08cfc35fc891e2563a374b6c4cc156be84ee88b9db456662f726"
+IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.5.0@sha256:935a38662d5158d6091473c718a3c4c83fa43656e3548d4f84008dfc02678987"
 # The sha256 of each CODE file in IMAGE (`inject.py verify-image` reads them back from the image; `inject.py contents`
 # prints them for this directory's files). A change to a CODE file needs a new image: build images/monitor/, bump its
 # VERSION, push it, then put the new digest in IMAGE and the new hashes here.
 CONTENTS = {
-    "monitor.py": "3694acb737122f0cdc4fe5791d6cb0ed63bee8df6058951550076fdef5ae7cbd",
-    "rcb_limits.py": "5e2e518066b3b927c9ee359c2846ddc20d81e91be1067812f6d7d7f793106433",
-    "selftest.py": "63257f6198dccebd419f83f83c4902c0dae04d4047bf1c9f797ee4d81f638048",
+    "monitor.py": "239335d20c1e450ab2d8dfb73a69ad18bee70aca61232bbc2a350bb170da7258",
+    "rcb_limits.py": "4eadc759714606651cc07493dc5e160930865d8a00d578431a396353ea04bc4b",
+    "selftest.py": "c9052986c2ad5d0dcbf8e87bd6a53e570bd36b26eb8bb2e07d199046210114b7",
 }
 CODE_DIR = "/opt/rcb_monitor"
 LIMITS_MOUNT = f"./rcb_monitor/limits.json:{CODE_DIR}/limits.json:ro"   # the task's limits, next to the image's code
@@ -321,7 +321,7 @@ def monitor_block(gpu: bool, observe: bool) -> list[str]:
          f"    cpus: {MONITOR_CAPS['cpus']}",
          f"    mem_limit: {MONITOR_CAPS['mem']}",
          f"    pids_limit: {MONITOR_CAPS['pids']}",
-         "    restart: on-failure:3",
+         "    restart: on-failure",   # no count: a monitor that dies mid-throttle always comes back to undo it
          "    working_dir: /var/rcb-monitor",
          "    volumes:",
          f"      - {LIMITS_MOUNT}",

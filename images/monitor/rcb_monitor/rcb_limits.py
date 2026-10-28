@@ -32,11 +32,12 @@ channel the agent cannot write), recomputes what was over a cap from the raw sam
             peak_pids; over_<metric>=1 for every metric over its cap (gpu_memory_gb, memory_gb, pids, cpus, disk_gb,
             oom); the monitor's backstop actions: resource_memory_kills, resource_pids_kills, resource_disk_kills,
             resource_gpu_memory_kills (processes killed per resource), resource_monitor_kills (their sum; also under its
-            0.4 name resource_emergency_kills), resource_cpu_throttles (times a container's CPU was duty-cycled) and
-            resource_cpu_throttled_sec; the kernel's OOM kills: resource_oom_kills (in the scope, at the container's
-            own memory cap), resource_host_oom_kills (in the scope, not at its cap: the host's OOM killer or an
-            enclosing cgroup's), resource_service_oom_kills (in a benchmark-owned service that is only recorded: the
-            simulator sidecar of standard modes, RoboPaint's scorer)
+            0.4 name resource_emergency_kills), resource_cpu_throttles (times the monitor throttled a container's CPU)
+            and resource_cpu_throttled_sec; resource_limit_exceeded=0 (0.4's field: a cap never fails a trial now);
+            the kernel's OOM kills: resource_oom_kills (in the scope, at the container's own memory cap),
+            resource_host_oom_kills (in the scope, not at its cap: the host's OOM killer or an enclosing cgroup's),
+            resource_service_oom_kills (in a benchmark-owned service that is only recorded: the simulator sidecar of
+            standard modes, RoboPaint's scorer)
   enforced (the record's mode, RCB_LIMITS_ENFORCE=1) and no usable record: infra_error=1 (the backstop that was asked
             for is not shown to have run: not a result). Not enforced (the default): a missing or unusable record is
             only reported (resource_monitor_missing=1); the grader's verdict stands.
@@ -66,6 +67,7 @@ METRICS = ("gpu_memory_gb", "memory_gb", "processes", "disk_gb", "cpus", "pids")
 # a container's measurement (the monitor's sample, `containers`) -> its cap in limits.json `caps.<service>`
 CAP_OF = {"cpus": "cpus", "memory_gb": "memory_gb", "pids": "pids", "gpu_memory_gb": "gpu_memory_gb"}
 RESOURCES = ("memory", "pids", "cpu", "disk", "gpu_memory")   # what the backstop acts on (kill / throttle events)
+PIDS_RUN = 2                 # samples in a row a count of processes and threads must be over its cap to be over
 TOLERANCE = 0.05             # RCB_LIMITS_TOLERANCE's default: over a cap = above cap x (1 + this); counts are exact
 DISK_PATHS, DISK_EXCLUDE = ("/app", "/tmp", "/root"), ()   # what disk counts in the agent's container: new files here
 MAX_GAP_FRACTION = 0.10      # more of the agent phase than this unobserved: the record is not usable
@@ -138,6 +140,7 @@ def violations(samples, limits, events=(), tol=TOLERANCE):
         if svc and svc not in e["services"]:
             e["services"].append(svc)
 
+    pids_prev = {}                                   # (service, role) -> (t, value) of its last sample over its pids cap
     for s in samples:
         if not isinstance(s, dict):
             continue
@@ -147,19 +150,30 @@ def violations(samples, limits, events=(), tol=TOLERANCE):
             add("disk_gb", limits.get("disk_gb"), t, sc.get("disk_gb"), "main")
         cs = [c for c in (s.get("containers") or []) if isinstance(c, dict) and c.get("kind") == "scope"]
         gpu_seen = False
+        pids_now = {}
         for c in cs:
             svc, caps = service_caps(limits, c)
             for m, k in CAP_OF.items():
-                if m == "gpu_memory_gb" and not caps.get("gpu"):
-                    continue                          # no GPU in this service: no GPU-memory cap (recorded only)
+                # GPU memory: only a service that holds a GPU has that cap (inject.py writes gpu_memory_gb for it alone)
                 v = c.get(m)
                 if m == "pids" and v is None and _num(c.get("threads")):
                     v = c["threads"] + (c.get("zombies") or 0)
                 if m == "cpus" and v is None:
                     v = c.get("cpu")
-                if over(v, caps.get(k), tol, exact=(m == "pids")):
-                    add(m, caps.get(k), t, v, svc)
-                    gpu_seen |= m == "gpu_memory_gb"
+                if not over(v, caps.get(k), tol, exact=(m == "pids")):
+                    continue
+                if m == "pids":
+                    # a count read from a /proc walk that is not atomic: over only in two samples in a row (PIDS_RUN)
+                    key = (svc, c.get("role"))
+                    pids_now[key] = (t, v, key in pids_prev)
+                    if key not in pids_prev:
+                        continue
+                    if not pids_prev[key][2]:
+                        add(m, caps.get(k), pids_prev[key][0], pids_prev[key][1], svc)
+                add(m, caps.get(k), t, v, svc)
+                gpu_seen |= m == "gpu_memory_gb"
+        if cs or "containers" in s:
+            pids_prev = pids_now
         if not cs and not gpu_seen and over(sc.get("gpu_memory_gb"), limits.get("gpu_memory_gb"), tol):
             add("gpu_memory_gb", limits.get("gpu_memory_gb"), t, sc.get("gpu_memory_gb"), None)
     metric_of = {"memory": "memory_gb", "pids": "pids", "cpu": "cpus", "disk": "disk_gb", "gpu_memory": "gpu_memory_gb"}
@@ -331,7 +345,8 @@ def verify(argv=()):
                                                                          "no_victim", "unobservable")][:200],
               "oom_kills": [e for e in events if e.get("event") == "oom"],
               "monitor": {k: (summary or {}).get(k) for k in ("started", "ended", "n_samples", "capabilities", "killed",
-                                                               "restarts", "disk_baseline_gb", "disk_partial_walks")}}
+                                                               "restarts", "disk_baseline_gb", "disk_partial_walks",
+                                                               "enforced_by")}}
     kills = sum(bs["kills"].values())
     add = {"resource_enforced": enforce, "limits_violation_observed": int(bool(viol)),
            "resource_monitor_missing": int(bool(problems)),
@@ -341,6 +356,8 @@ def verify(argv=()):
            "resource_memory_kills": bs["kills"]["memory"], "resource_pids_kills": bs["kills"]["pids"],
            "resource_disk_kills": bs["kills"]["disk"], "resource_gpu_memory_kills": bs["kills"]["gpu_memory"],
            "resource_monitor_kills": kills, "resource_emergency_kills": kills,
+           # monitor 0.4's field (a cap exceeded under enforcement failed the trial): a cap never changes the grade now
+           "resource_limit_exceeded": 0,
            "resource_cpu_throttles": bs["throttles"], "resource_cpu_throttled_sec": bs["throttled_sec"],
            "resource_oom_kills": oom["cap"], "resource_host_oom_kills": oom["host"],
            "resource_service_oom_kills": oom["service"]}
