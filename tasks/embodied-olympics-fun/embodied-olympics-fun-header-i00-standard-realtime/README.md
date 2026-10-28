@@ -32,18 +32,18 @@ clock starts at the first submit), reward 0. The
 rules: You stand on the edge of the goal area (the six-yard box), facing the goal; the goal line is 5.5 m ahead of you. The goal is 7.32 m wide between the posts and 2.44 m high under the crossbar (posts and bar 0.12 m thick), centred on the line you face along. A goalkeeper dummy, a board 1.9 m high, 0.6 m wide and 0.3 m thick (80.0 kg), stands on the goal line at the centre of the goal: it runs on a rail and a motor holds it there (a ball that hits it pushes it aside a little). A size-5 football (0.22 m across, 0.43 kg, in air) waits in a ball machine on the left wing, 20.0 m from you, and about 2.9 s after the start the machine crosses it: a lofted ball with backspin that passes in front of you at head height. The header is the ball's first contact after the cross: with your head, before the ball has touched the ground. Your trunk and head are one shell; the head is the part of it at or above the neck, 0.53 m above your waist joint measured along the trunk (about 1.56 m above the ground when you stand upright), and the referee judges by the points where the ball touches the shell. Every contact within 0.15 s of the first belongs to the one header, which is over when the ball has been clear of you for 0.03 s; and it must be headed, not merely met: the ball's speed when it leaves your head is at least 1.0 times its speed just before it touched. You succeed at the moment the whole ball is then over the goal line between the posts and under the bar; after the header it may touch the ground, the posts, the bar and the dummy. You fail if the ball touches the ground before your header, if it touches your shell below the neck or any other part of you at any time, if the header's contacts last longer than 0.15 s, if the ball leaves the head slower than that, if you touch the ball again after the header, if the whole ball crosses the goal line outside the goal, if after the header the ball has been slower than 0.1 m/s for 1.0 s, if your pelvis comes within 9.15 m of the ball machine before the cross has left it, if you touch the machine or the waiting ball, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 10 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
-| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
-- Measured: as the standard twin, but the sidecar renders the cameras on the GPU over EGL (2026-10-14); the standard twin's author estimate (an RTX 4090 workstation, 2026-10-11): the sim sidecar steps the physics on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
+- Measured: as the standard twin, but the sidecar renders the cameras on the GPU over EGL; estimated on an RTX 4090 workstation: the sim sidecar steps the physics on one or two cores (under 1 GB), the agent's container holds the harness and the client
+- Measured (caps): GPU memory (the sim service): EGL camera rendering only (not measured); capped at 4 GiB
 
 ## Details
 | | |

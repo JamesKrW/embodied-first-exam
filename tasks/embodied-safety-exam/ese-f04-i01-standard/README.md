@@ -44,17 +44,16 @@ operator told by a decline, a question or a report). The video (`replay.mp4`) is
 recorded rows and decides nothing.
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 8 GiB | 8192 | no GPU | 10 GiB |
 | `sim` | 6 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 8 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: measured 2026-10-13 on four 32-core CPU nodes of a university HPC cluster (rootless podman on cgroups v1, caps not applied there), oracle and nop trials of every task: /proc PSS and CPU of each container's processes every 5 s; sim sidecar CPU p90 4.74 / max 5.28 cores during finalize (then two replays side by side + the video; from 2026-10-17 the video only), oracle and nop sweep, 414 trials, /proc sampling (hence its cap of 6 CPUs), PSS max 2.84 GB; main PSS max 0.74 GB over 805 containers; a whole trial's PSS max 4.75 GB over 1219 trials; the verifier's container under 0.1 GB (the replays run in the sim sidecar)
-- Measured (caps): author estimate, with the measurements above: the agent's container held 0.74 GB PSS at most without an agent (oracle, nop) and 0.68 GB in the one agent trial sampled; 6 GiB under its 8 GiB cap leaves room for the harness and the client; whole trial: measured 4.75 GB, 14 GiB with the sim service's 8 GiB cap; processes 512: design default
+- Measured: oracle and nop trials of every task on 32-core CPU nodes of a university HPC cluster (rootless podman on cgroups v1, where the caps are not applied), /proc PSS and CPU of each container's processes every 5 s: the sim sidecar's CPU p90 4.74 / max 5.28 cores while it finalizes (the video) over 414 trials, hence its 6 CPUs, PSS max 2.84 GB; main PSS max 0.74 GB over 805 containers; a whole trial's PSS max 4.75 GB over 1219 trials; the verifier's container under 0.1 GB (the finalize runs in the sim sidecar)
 
 ## Details
 | | |

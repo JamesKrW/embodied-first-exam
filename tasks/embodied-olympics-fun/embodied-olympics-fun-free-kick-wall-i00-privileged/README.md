@@ -26,16 +26,16 @@ one sim row per control step until the referee ends the attempt). Pass iff the r
 and both end in the same state. The rules: A size-5 football (0.22 m across, 0.43 kg, in air) lies at rest on the grass in front of your right foot: its centre 0.32 m ahead of your pelvis and -0.13 m to your left (negative: to the right). The goal line is 20.0 m beyond the ball, square to the direction you face; the goal is 7.32 m wide between the posts and 2.44 m high under the crossbar (posts and bar 0.12 m thick), its centre 4.0 m to the left of the line straight ahead through the ball. A wall of 4 training mannequins stands between the ball and the goal, side by side, their faces 9.15 m from the ball, covering the near (right-hand) post (its outer edge 0.25 m outside the line from the ball to that post's inner edge): each 1.75 m tall and 0.5 m wide, 3.0 kg, standing free on a 13.0 kg rubber base (0.5 m wide, 0.4 m deep, 0.05 m high), so that a ball can knock one over. There is no goalkeeper. The kick is a contact of a foot of yours with the ball: the foot below the ankle, or your lower leg where it lies over the foot and no more than 0.12 m above the ankle joint; every such contact within 0.15 s of the first belongs to the one kick. You succeed at the moment the whole ball is over the goal line between the posts and under the bar; it may touch the mannequins, the posts, the bar and the ground on the way. You fail if any other part of you touches the ball at any time, if a foot touches the ball again later than 0.15 s after the first contact (a second touch), if the ball is not moving towards the goal line at the end of the kick, if the whole ball crosses the goal line outside the goal, if after the kick the ball has been slower than 0.1 m/s for 1.0 s, if you fall before the kick (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 30 s. A fall after the kick does not end the attempt (the Laws judge the ball once it is in play, not the kicker; the setting fall_after_kick_fails = 0, where 1 would make any fall a failure). No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
-| verifier | 4 | 8 GiB | — | no GPU | — |
+| verifier | 4 | 8 GiB | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Measured (caps): author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

@@ -56,17 +56,17 @@ more than 50,000 rows) is `bad_trajectory`; `grader_error = 1` (with `infra_erro
 or ran out of time, a frozen instance this host did not rebuild).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 30 GiB | 16384 | 30 GiB | 20 GiB |
-| verifier (as `main`) | 8 | 30 GiB | — | 30 GiB | — |
+| verifier | no cap | no cap | no cap | 30 GiB | — |
 
-- GPU: an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering; `gpu_types`: L40S, L4, RTX 4090, RTX 6000 Ada), held by `main`.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: one standard trial: sim anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU 3.6 GB 15 min in, live sampler (docker stats + cgroup anon + nvidia-smi every 30 s, 13 cloud GPU hosts + an RTX 4090 workstation, 10-10); GPU memory and CPU from BEHAVIOR-1K (same OmniGibson / Isaac Sim stack) until more trials are measured; verifier 15.8 GB docker memory, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10)
-- Measured (caps): GPU: 19.4 GiB on a 48 GB card, 18.1 on 24 GB (the evaluation pool's GPU profile (per-trial GPU peaks by card, 10-03..10); no texture budget in its tooling) -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: the [environment] cap 24 GiB, which every past trial ran under (no samples); processes 512 and disk 20 GiB: design defaults, not yet measured
+- Measured: one standard trial: sim anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s); GPU memory and CPU otherwise from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack); verifier 15.8 GB (a per-container memory sampler)
+- Measured (caps): GPU memory: per-trial peaks of 19.4 GiB on a 48 GB card and 18.1 GiB on a 24 GB card (no texture budget in its tooling) -> max(1.5 x peak, peak + 4), rounded up: 30 GiB
 
 ## Details
 | | |

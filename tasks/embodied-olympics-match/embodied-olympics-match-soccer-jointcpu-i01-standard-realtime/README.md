@@ -36,18 +36,17 @@ valid, finished match that the agent won. `tests/fexam_reward.py` adds the hub's
 `slowdown`, `opponent_level`, `gpu_tier`, `replay_video`). The replay video `replay.mp4` comes with every finished match.
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 6 | 16 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 6 | 8 GiB | 256 | no GPU | — |
 | `practice` | 4 | 8 GiB | 256 | no GPU | — |
-| verifier (as `main`) | 6 | 16 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: Embodied Olympics' joint-level soccer pilot v5 (two RTX 4090 workstations, 2026-10-15/17, docker stats): the agent's container uses its 6 cores (drills, CPU-parallel rollouts, practice matches), the sim up to its 6 cores (the world, the opponent, the cameras), the practice service up to 4 worlds on its 4 cores; CPU tier: no GPU
-- Measured (caps): the v5 pilot's seat caps (6 cores, 16 GB, processes 512: design default); whole trial: + the sim's and the practice service's 8 GB caps; provisional
+- Measured: Embodied Olympics' joint-level soccer pilot on two RTX 4090 workstations (docker stats): the agent's container uses its 6 cores (drills, CPU-parallel rollouts, practice matches), the sim up to its 6 cores (the world, the opponent, the cameras), the practice service up to 4 worlds on its 4 cores; CPU tier: no GPU
 
 ## Details
 | | |

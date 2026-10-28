@@ -28,17 +28,16 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 rules: A windmill revolution is counted on your torso. Its long axis (from your pelvis up to your neck) must turn once round the vertical (360 degrees of heading) and in the same time your torso must roll once about that axis (back, shoulder, chest, shoulder, back towards the floor: at least 0.85 of a full roll per revolution), both the same way round. The turning and the rolling are counted only while you lie on the floor: your torso's long axis within 30.0 degrees of horizontal and your pelvis at most 0.45 m above the floor (on your head or your hands, upside down, nothing is counted). Your back, chest or shoulders (your torso or upper arms; your head does not count for this) must touch the floor in each half of each revolution. While you are doing windmills only your torso (back, chest, shoulders; your head, which is fixed to it, counts with it), your upper arms, forearms and hands may touch the floor: your hips and your legs (thighs, shins, feet) may not. The count starts when you are down (your back, chest or shoulders touching the floor with no foot on it) and goes back to zero whenever your hips or a leg touch the floor or the rotation reverses. You succeed when 3 revolutions are counted without such a reset. How you get down from standing is free (any part may touch the floor then). You fail if any part of you touches the floor outside the 8.0 m x 8.0 m field of play, or after 30 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

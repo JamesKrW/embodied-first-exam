@@ -18,7 +18,6 @@
  "disk_tick_sec": 60,
  "format": "rcb-limits/2",
  "gpu": false,
- "gpu_memory_gb": 0.0,
  "mode": "standard",
  "scope_services": [
   "main"

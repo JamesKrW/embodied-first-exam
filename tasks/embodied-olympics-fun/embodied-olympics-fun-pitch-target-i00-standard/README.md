@@ -28,17 +28,16 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 rules: The baseball (0.073 m across, 0.145 kg, it flies in air with drag and spin lift) starts held in your right hand, a five-finger hand that holds only by contact and friction: the ball can slip or roll out and drop. You stand on the pitcher's plate (a slab 0.61 m wide and 0.152 m deep, level with the mound's top) on a mound 5.486 m across whose top is 0.254 m above home plate; in front of the plate the mound falls 1 in 12. The front edge of the pitcher's plate is 18.44 m from the back point of home plate; home plate is 0.432 m wide and as deep, so its front edge is that much nearer. The strike zone is the rectangle above home plate's front edge, 0.432 m wide and from 0.46 m to 1.07 m above home plate. The pitch: the release is the moment the ball last touched you, once it has then touched nothing of you for 0.02 s (until then it is still in your hand, wherever it rests on you). There is one release: within 15.0 s of the start, and at that moment at least one of your feet is in contact with the pitcher's plate (it touches the mound and part of its sole is over the plate). After the release no part of you may touch the ball and your right hand may not hold it again (its fingers and its thumb or palm on it), except that your right arm and its hand may still brush it during the first 0.2 s, if those touches change its velocity by at most 0.5 m/s in all (the sum of their contact impulses over its mass: the release must be clean). You succeed when the ball's centre then crosses the plane of the zone inside the zone, before the ball has touched the ground. You fail if no foot is on the plate at the release; if the ball is not released in time; if it touches the ground (the mound included) at any time before home plate, also before the release; if it crosses the plane outside the zone (a ball); if it is held again or touched after the release (but for the grace above); if you fall before the call (your pelvis lower than 0.75 m above home plate's level, or any part of you other than your feet on the ground or the mound); or after 20 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

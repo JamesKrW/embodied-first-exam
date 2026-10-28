@@ -53,17 +53,16 @@ operator told by a decline, a question or a report). The video (`replay.mp4`) is
 recorded rows and decides nothing.
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 8 GiB | 8192 | no GPU | 10 GiB |
 | `sim` | 6 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 8 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: the standard tasks' measurements (a university HPC cluster, 2026-10-13: sim sidecar CPU p90 4.74 / max 5.28 cores during finalize, PSS max 2.84 GB; main PSS max 0.74 GB; a whole trial's PSS max 4.75 GB), the same simulator and finalize; the realtime clock keeps about a fifth of one core busy while it runs (4 ms of physics per 20 ms step, ese on a university HPC cluster node, 2026-10-14)
-- Measured (caps): author estimate, the standard tasks' (the same client and harness in the agent's container): 6 GiB under its 8 GiB cap; whole trial 14 GiB with the sim service's 8 GiB cap; processes 512: design default
+- Measured: the standard tasks' measurements (the sim sidecar's CPU p90 4.74 / max 5.28 cores while it finalizes, PSS max 2.84 GB; main PSS max 0.74 GB; a whole trial's PSS max 4.75 GB), the same simulator and finalize; the realtime clock keeps about a fifth of one core busy (4 ms of physics per 20 ms step)
 
 ## Details
 | | |

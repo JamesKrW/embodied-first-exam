@@ -28,17 +28,16 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 rules: The tennis ball (0.067 m across, 0.0577 kg, it keeps 0.745 of its speed in a bounce, it flies in air with drag) starts held in your right hand. Both your hands are five-finger hands that hold things only by contact and friction; nothing else holds the ball, and it can slip or drop. A hand holds the ball while the ball touches its fingers and its thumb or palm, with the ball's centre on the palm's side of the hand and within 0.12 m of the hand's grasp point (between the closed fingers and the palm; not resting on the back of the hand or on the fingertips). A wall stands 5.0 m beyond the line you stay behind; the target is a circle 0.5 m across painted on it, its centre 1.5 m above the ground and 0.0 m to the left of the point straight ahead of you. The throw: the ball is released when it has touched no part of you for 0.05 s (it is released at its last touch; once). The first thing it touches after that must be the wall, at a point inside the target circle. Then catch the rebound: a hand holding the ball before it has touched the ground; either hand may catch, and before the catch the rebound may touch only your hands and forearms. You succeed when the ball has been held for 1.0 s from the catch, never losing the hold for more than 0.05 s. You fail if any part of you touches the ground on or beyond the line at any time; if the ball touches the ground at any time before the end; if it hits the wall outside the circle; if any part of you touches it after the release and before the wall (your right arm may still brush it during the first 0.15 s, but not hold it); if the rebound touches any part of you other than a hand or a forearm before the catch; if the ball goes unheld for more than 0.05 s after the catch; if you fall (your pelvis lower than 0.5 m above the ground, or any part of you other than your feet on the ground); or after 15 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

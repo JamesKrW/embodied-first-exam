@@ -26,16 +26,16 @@ one sim row per control step until the referee ends the attempt). Pass iff the r
 and both end in the same state. The rules: A handstand is: only your hands on the floor (nothing else of you touches it), your pelvis above your hands and your ankles above your pelvis, and both lines of your body, from the middle of where your hands touch the floor to your pelvis and from your pelvis to the middle of your ankles, within 45.0 degrees of vertical (the Code of Points does not recognise a handstand that deviates more), and your body extended: your knees bent at most 20.0 degrees (the knee joints' angle, 0 is straight) and your hips bent at most 25.0 degrees (the angle, towards your front, between the line from the middle of your shoulder joints to the middle of your hip joints and the line from each hip joint to its knee joint); a tucked or piked balance is not a handstand. Any part of your hand counts as the hand (you have fists, not fingers). The handstand is held while you stay in it with your pelvis slower than 0.15 m/s (a complete stop); it counts once it has been held without a break for 2.0 s. After that you come back down so that only your feet touch the floor (your hands off it), and then you stand for 1.0 s without a break: only your feet on the floor, your torso within 20.0 degrees of vertical, your pelvis slower than 0.35 m/s. You fail if any part of you other than your hands and feet touches the floor, or your pelvis is lower than 0.25 m (a fall); if any part of you touches the floor outside the 12.0 m x 12.0 m floor area (its lines are inside); or after 30 s. Your feet may leave the floor in a jump; nothing limits how you get onto your hands or back to your feet. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
-| verifier | 4 | 8 GiB | — | no GPU | — |
+| verifier | 4 | 8 GiB | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Measured (caps): author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

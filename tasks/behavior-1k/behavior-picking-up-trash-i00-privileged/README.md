@@ -7,7 +7,7 @@
 | Twin | `behavior-picking-up-trash-i00-standard` |
 | Simulator / robot | `behavior` / `r1pro` |
 | Family / instance | `picking_up_trash` / seed 301 |
-| Oracle | `partial` — Reference solution solution/oracle_picking_up_trash.py on the frozen task-level primitives solution/rcb_behavior_ref.py. Recorded Harbor oracle runs (laptop, pre-v1.0 uncommitted trees): 2026-09-24 behavior-picking-up-trash-i00__FKLU2nS (job behavior-picking-up-trash-i00-oracle-0924-230430) scored 1 (5115 control steps, deterministic 1, instance_exact 1); the run before it, behavior-picking-up-trash-i00__MjRvy7Y (an older placement routine), scored 0; the 2026-10-01 review counts 1 success in 3 runs of that version. Model trial behavior-picking-up-trash-i00__JRcB9fb (behavior-lunaxh-0925-2057) scored 1. The tooling and verifier files changed since; not re-run on this version (static validation only). Measured 2026-10-10 on main 332bf8080 (AWS 8-vCPU L40S host rcb-gpu9, Harbor oracle agent, twice): the reference solution's own run put 2 of the 3 cans in (the third grasp closed on nothing; q_score 0.667, 4390 control steps), the verifier replayed it faithfully (deterministic 1) and scored 0; both runs were bit-identical. The frozen scene rebuilt there within tolerance but not bit-exactly (instance_exact 0), so the solution's online planning took another path than on the recording host: this reference solution does not succeed on that host class. |
+| Oracle | `partial` — Reference solution solution/oracle_picking_up_trash.py on the frozen task-level primitives solution/rcb_behavior_ref.py. Recorded Harbor oracle runs (laptop, pre-v1.0 uncommitted trees): 2026-09-24 behavior-picking-up-trash-i00__FKLU2nS (job behavior-picking-up-trash-i00-oracle-0924-230430) scored 1 (5115 control steps, deterministic 1, instance_exact 1); the run before it, behavior-picking-up-trash-i00__MjRvy7Y (an older placement routine), scored 0; the 2026-10-01 review counts 1 success in 3 runs of that version. Model trial behavior-picking-up-trash-i00__JRcB9fb (behavior-lunaxh-0925-2057) scored 1. The tooling and verifier files changed since; not re-run on this version (static validation only). Measured 2026-10-10 on main 332bf8080 (an 8-vCPU cloud L40S host, Harbor oracle agent, twice): the reference solution's own run put 2 of the 3 cans in (the third grasp closed on nothing; q_score 0.667, 4390 control steps), the verifier replayed it faithfully (deterministic 1) and scored 0; both runs were bit-identical. The frozen scene rebuilt there within tolerance but not bit-exactly (instance_exact 0), so the solution's online planning took another path than on the recording host: this reference solution does not succeed on that host class. |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:behavior-0.1.2` |
 
@@ -44,17 +44,17 @@ instance that does not rebuild in the verifier (`instance_ok` 0), are `grader_er
 Oracle `partial`: the reference solution scored 1 on earlier versions of this task (`task.toml` `oracle_evidence`) and was not re-run on this one; the family is reviewed by a maintainer (PROTOCOL §2.7) in the pull request that adds it.
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 29 GiB | 16384 | 24 GiB | 20 GiB |
-| verifier (as `main`) | 8 | 29 GiB | — | 24 GiB | — |
+| verifier | no cap | no cap | no cap | 24 GiB | — |
 
-- GPU: an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering; `gpu_types`: L40S, L4, RTX 4090, RTX 6000 Ada), held by `main`.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: GPU 9 GB with RCB_TEXTURE_BUDGET=0.1 (evaluation-pool GPU-memory override; live sampler (docker stats + cgroup anon + nvidia-smi every 30 s, 13 cloud GPU hosts + an RTX 4090 workstation, 10-10): 8.3-9.0 GB); CPU 6-9 cores per trial (ps); author: 13-16 GB of RAM per Isaac process
-- Measured (caps): GPU: 15.1 GiB held for most of the episode by the reference solution alone on a 48 GB card (L40S) with RCB_TEXTURE_BUDGET=0.1, the tasks' default (the tasks' own monitor, three oracle runs of two tasks on two hosts, 10-10: 15.14-15.15 GiB; the 9.0 GiB of the live sampler (nvidia-smi every 30 s, 13 cloud GPU hosts + an RTX 4090 workstation) was below that; uncapped trials reached 29.0 GiB on 48 GB cards, the evaluation pool's GPU profile) -> max(1.5 x peak, peak + 4) rounded up to 24 (was 16: 5 % above the reference solution's own use); memory: the [environment] cap 24 GiB, which every past trial ran under (docker peak 23.8 GiB over 5 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 20 GiB: design defaults, not yet measured
+- Measured: GPU memory 8.3-9.0 GB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (a per-container sampler every 30 s, trials on 14 GPU hosts); CPU 6-9 cores per trial; 13-16 GB of memory per Isaac process
+- Measured (caps): GPU memory: the reference solution alone holds 15.1 GiB for most of the episode on a 48 GB card with RCB_TEXTURE_BUDGET=0.1, the tasks' default (three oracle runs of two tasks on two hosts; trials without the budget reached 29.0 GiB on 48 GB cards) -> max(1.5 x peak, peak + 4), rounded up: 24 GiB
 
 ## Details
 | | |

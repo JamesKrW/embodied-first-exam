@@ -35,17 +35,17 @@ A trajectory may have at most 45000 rows (`RCB_MAX_STEPS`: two replays must fit 
 `nop`: no record yet on this base (`harbor run -p tasks/roboarc-knot-untying-09-i01-privileged -a nop`).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 16 | 40 GiB | 8192 | 12 GiB | 10 GiB |
-| verifier (as `main`) | 16 | 40 GiB | — | 12 GiB | — |
+| verifier | no cap | no cap | no cap | 12 GiB | — |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer).
-- Measured: partial MuJoCo measurements of 2026-10-13 (rendering off) with the protocol's margin; calibration pending; GPU 2 GB: owner 10-17 (evaluation-pool trial peak 1.1 GB on 24 GB cards)
-- Measured (caps): partial MuJoCo measurements of 2026-10-13 (rendering off) with the protocol's margin; calibration pending
+- Measured: partial MuJoCo measurements (rendering off), to be calibrated; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards
+- Measured (caps): GPU memory: provisional, to be calibrated (a per-trial peak of 1.1 GiB on 24 GB cards)
 
 ## Details
 | | |

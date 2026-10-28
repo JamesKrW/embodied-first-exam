@@ -25,17 +25,16 @@ The agent has to find the fixtures and objects in the robot's camera images, dri
 The sim service judges the episode live (it ends at the first step after which the success check holds; `graded_by = live`, nothing is replayed), records every control step it ran, and after the agent's time writes `final.json`; `tests/grade.py` (separate sandbox, no network) passes iff the live episode succeeded and the scene was not solved at its start (the adapter's `live_verdict`). The first episode's start is checked against the frozen instance (`RCB_START_SHA`; a mismatch is an infrastructure failure, `instance_mismatch`). The video is rendered from the trajectory after the verdict and decides nothing. The clock's record (`stalls`, `max_lag_s`, ...) is copied into `reward.json` and decides nothing. `nop`: the episode never starts (its clock starts at the first submit), reward 0.
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 6 | 14 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 16 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: as the standard twin (the same service process and fresh-replay session); memory: sim p90 5.6 GB, privileged container p90 7.2 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU-only (OSMesa cameras); CPU author estimate
-- Measured (caps): as the standard twin; memory: agent container docker peak 3.9 GiB over 6 samples (mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)) -> max(1.5 x peak, peak + 4, 8), at most the 16 GiB cap; whole trial: + the sim service's 11 GiB (docker peak 6.4 GiB, 14 samples); processes 512 and disk 20 GiB: design defaults, not yet measured
+- Measured: as the standard twin (the same service process and fresh-replay session); memory: sim p90 5.6 GB, privileged container p90 7.2 GB; CPU only (OSMesa cameras); CPU: an estimate
 
 ## Details
 | | |

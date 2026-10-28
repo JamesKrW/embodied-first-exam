@@ -34,18 +34,18 @@ agent's calls, or the frozen start did not rebuild (`instance_mismatch`).
 No oracle; human review in PR #75 (PROTOCOL §2.7), on the official human demonstrations and a `nop` run per mode; until a positive example scores 1, its results are reported separately from the tasks with a verified solution (PROTOCOL §7, open item 4).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 24 GiB | 16384 | no GPU | 20 GiB |
 | `sim` | 12 | 50 GiB | 16384 | 16 GiB | — |
-| verifier (as `main`) | 8 | 24 GiB | — | no GPU | — |
+| verifier (as `main`) | 8 | 24 GiB | no cap | no GPU | — |
 
-- GPU: an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering; `gpu_types`: L40S, L4, RTX 4090, RTX 6000 Ada), held by `sim`.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: GPU 9 GB with RCB_TEXTURE_BUDGET=0.1 (evaluation-pool GPU-memory override; live sampler (docker stats + cgroup anon + nvidia-smi every 30 s, 13 cloud GPU hosts + an RTX 4090 workstation, 10-10): 8.3-9.0 GB); CPU 6-9 cores per trial (ps); author: 13-16 GB of RAM per Isaac process
-- Measured (caps): GPU: 9.0 GiB with RCB_TEXTURE_BUDGET=0.1, now the tasks' default (live sampler (cgroup anon, 13 cloud GPU hosts + an RTX 4090 workstation, 10-10); uncapped trials reached 29.0 GiB on 48 GB cards, the evaluation pool's GPU profile (per-trial GPU peaks by card, 10-03..10)) -> max(1.5 x peak, peak + 4), at least 16 for Isaac Sim; memory: agent container docker peak 2.5 GiB over 1 samples (mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)) -> max(1.5 x peak, peak + 4, 8), at most the 24 GiB cap; whole trial: + the sim service's 41 GiB (docker peak 27.0 GiB, 39 samples); processes 512 and disk 20 GiB: design defaults, not yet measured
+- Measured: GPU memory 8.3-9.0 GB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (a per-container sampler every 30 s, trials on 14 GPU hosts); CPU 6-9 cores per trial; 13-16 GB of memory per Isaac process
+- Measured (caps): GPU memory (the sim service): 9.0 GiB with RCB_TEXTURE_BUDGET=0.1, the tasks' default (trials without the budget reached 29.0 GiB on 48 GB cards) -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB
 
 ## Details
 | | |

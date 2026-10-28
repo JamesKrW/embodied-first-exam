@@ -2,7 +2,7 @@
 # sandbox rejects [environment].gpus, so the device is passed through by merging this onto the main service.
 services:
   main:
-    x-gpu-memory-gb: 6   # rcb-monitor GPU memory cap, GiB (docs/protocol/README.md §6)
+    x-gpu-memory-gb: 6   # GiB of GPU memory (docs/protocol/README.md §6)   # rcb-monitor
     shm_size: "8gb"
     deploy:
       resources:

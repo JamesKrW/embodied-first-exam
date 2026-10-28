@@ -38,18 +38,18 @@ is checked when the sidecar builds the scene, before the agent is served. `infra
 all inside the agent's calls, or the frozen start did not rebuild (`instance_mismatch`).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 16 GiB | 16384 | no GPU | 20 GiB |
 | `sim` | 12 | 32 GiB | 16384 | 9 GiB | — |
-| verifier (as `main`) | 8 | 16 GiB | — | no GPU | — |
+| verifier (as `main`) | 8 | 16 GiB | no cap | no GPU | — |
 
-- GPU: an RTX-class NVIDIA GPU (ray-tracing cores, for Isaac Sim / Omniverse RTX rendering; `gpu_types`: L40S, L4, RTX 4090, RTX 6000 Ada), held by `sim`.
+- GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: freezing the 14 instances (RTX 4090, 2026-10-14, docker stats and nvidia-smi every 20 s, four Isaac processes at once): one Isaac process with the robot's three 1080x1080 cameras holds 12-13 GiB of memory and 3.5-4.6 GiB of GPU memory, 4-7 cores while Isaac starts and the scene loads, about 1 core after; the sim service is one such process (plus the live video's encoder, 540 px at 10 fps, not measured), the collect hook replays nothing (graded live, 2026-10-17); the agent's container runs the client only
-- Measured (caps): freezing the 14 instances (RTX 4090, 2026-10-14, docker stats and nvidia-smi every 20 s, four Isaac processes at once): one Isaac process with the robot's three 1080x1080 cameras holds 12-13 GiB of memory and 3.5-4.6 GiB of GPU memory, 4-7 cores while Isaac starts and the scene loads, about 1 core after; the sim service is one such process (plus the live video's encoder, 540 px at 10 fps, not measured), the collect hook replays nothing (graded live, 2026-10-17); the agent's container runs the client only -> max(1.5 x peak, peak + 4) for the trial (GPU 4.6 GiB, memory 13.5 GiB with the agent's client); the agent's own memory, processes and disk: the standard modes' defaults
+- Measured: freezing the 14 instances on an RTX 4090 (docker stats and nvidia-smi every 20 s, four Isaac processes at once): one Isaac process with the robot's three 1080x1080 cameras holds 12-13 GiB of memory and 3.5-4.6 GiB of GPU memory, 4-7 cores while Isaac starts and the scene loads, about 1 core after; the sim service is one such process (plus the live video's encoder, 540 px at 10 fps, not measured), graded live (the collect hook replays nothing); the agent's container runs the client only
+- Measured (caps): GPU memory (the sim service): one Isaac process with three cameras, 3.5-4.6 GiB -> max(1.5 x peak, peak + 4), rounded up: 9 GiB
 
 ## Details
 | | |

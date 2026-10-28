@@ -28,17 +28,16 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 rules: A size-5 rugby ball (an oval 0.29 m long and 0.19 m across, 0.435 kg, in air) stands upright on a kicking tee (0.06 m high to its cup, 0.08 kg, standing free) on the grass in front of your right foot, on the 5-metre line: its centre 0.3 m ahead of your pelvis and -0.17 m to your left (negative: to the right). The goal line is 5.0 m beyond the ball, square to the direction you face; the goal posts stand on it, 5.6 m apart between their inner faces, centred on the line through the ball square to the goal line, 8.0 m high and 0.12 m thick, padded up to 2.0 m (the padding 0.25 m round each post's axis); the crossbar's top edge is 3.0 m above the ground. The kick is a contact of a foot of yours with the ball: the foot below the ankle, or your lower leg where it lies over the foot (from 0.08 m behind to 0.15 m ahead of the ankle joint) and no more than 0.12 m above the ankle joint; every such contact within 0.15 s of the first belongs to the one kick. You score when the ball's centre passes the goal line's vertical plane above the crossbar's top edge and between the posts' inner faces (extended upwards), and goes on 0.4 m beyond it; it may touch the bar or a post on the way. You fail if any other part of you touches the ball at any time, if you touch it again after the kick, if the ball touches the ground (not the tee) after the kick before it has scored, if it passes the goal line's plane under the bar or outside the posts, if you fall before the kick (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 60 s. A fall after the kick does not end the attempt (Law 8 judges the ball, not the kicker; the setting fall_after_kick_fails = 0, where 1 would make any fall a failure).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
+- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

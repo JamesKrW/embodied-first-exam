@@ -31,17 +31,16 @@ valid, finished match that the agent won. `tests/fexam_reward.py` adds the hub's
 `slowdown`, `opponent_level`; `realtime` = 0 for a turn-based match).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 2 | 6 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 256 | no GPU | — |
-| verifier (as `main`) | 2 | 6 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: vanilla Harbor 0.23.0 on an RTX 4090 workstation (32 cores), 2026-10-15, oracle and nop of both tasks, docker stats every 5 s: the sim peaks at 4.0 CPUs (its cap) and 0.71 GiB (the replay in a fresh process and the video after the bout; a bout is about 20 s of service time), the oracle's container under 0.1 GiB (a model's harness needs more: Embodied Olympics' agent default); turn-based, so fewer CPUs only slow it down; CPU only
-- Measured (caps): design defaults of Embodied Olympics' exported matches (the agent 4 GiB under its 6 GiB cap; whole trial: + the sim's 8 GiB cap); measured peaks 2026-10-15: sim 0.71 GiB, oracle container under 0.1 GiB
+- Measured: Harbor oracle and nop trials of both tasks on a 32-core RTX 4090 workstation, docker stats every 5 s: the sim peaks at 4.0 CPUs (its cap) and 0.71 GiB (the replay in a fresh process and the video after the bout; a bout is about 20 s of service time), the oracle's container under 0.1 GiB (a model's harness needs more); turn-based, so fewer CPUs only slow it down; CPU only
 
 ## Details
 

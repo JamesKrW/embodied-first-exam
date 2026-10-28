@@ -32,18 +32,18 @@ clock starts at the first submit), reward 0. The
 rules: Two rope-turning machines stand on the turners' spots, 3.6 m apart, one on each side of you (on the y axis, at y = -1.8 and +1.8 m); they turn a 6.0 m rope, 0.01 m thick, tied 1.4 m from each end to the tip of a crank arm, at a steady 1.0 revolutions per second: each tip goes round a vertical circle of 0.4 m radius, 1.0 m above the floor, 0.4 m in front of its machine's spot, driven by a motor of at most 10.0 N m. The rope goes over your head from behind you to the front, down in front of you and under you towards your back; it is already turning at the start. A jump counts when the rope passes under both your feet while nothing of you touches the ground (at the moment it passes under each foot), after it has passed over your head since the last counted jump (one jump per turn of the rope). You succeed when, after 10 counted jumps, the first contact with the floor is your feet only and you then stand still for 0.5 s (only your feet on the floor, your torso within about 20 degrees of vertical, your pelvis slower than 0.35 m/s): the turners keep turning, so this has to be done before the rope comes round again, and it must not touch you until then. You fail at once if the rope touches any part of you (a miss: the machines do not stop), if your pelvis leaves the centre zone (within 0.5 m of the rope's axis forwards and backwards and 0.5 m of the middle between the machines sideways), if the rope passes under a foot that is on the ground or through you, on a fall (your pelvis lower than 0.35 m, or any part of you other than your feet on the ground), on a landing that is not on the feet after the last jump, or after 20 s.
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
 | `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
-| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
+| verifier | no cap | no cap | no cap | no GPU | — |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
-- Measured: as the standard twin, but the sidecar renders the cameras on the GPU over EGL (2026-10-14); the standard twin's author estimate (an RTX 4090 workstation, 2026-10-11): the sim sidecar steps the physics on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
+- Measured: as the standard twin, but the sidecar renders the cameras on the GPU over EGL; estimated on an RTX 4090 workstation: the sim sidecar steps the physics on one or two cores (under 1 GB), the agent's container holds the harness and the client
+- Measured (caps): GPU memory (the sim service): EGL camera rendering only (not measured); capped at 4 GiB
 
 ## Details
 | | |

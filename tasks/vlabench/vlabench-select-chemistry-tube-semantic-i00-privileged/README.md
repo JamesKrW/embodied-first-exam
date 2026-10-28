@@ -36,16 +36,15 @@ end in the live state (hash `254f4fec0bf8…`) and succeed. `nop`: no trajectory
 the start (checked on every load).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 20 GiB | 8192 | no GPU | 10 GiB |
-| verifier | 4 | 16 GiB | — | no GPU | — |
+| verifier | 4 | 16 GiB | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: memory: sim p90 6.9 GB, privileged container p90 8.1 GB, verifier 4.7 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU-only; CPU author estimate
-- Measured (caps): memory: the [environment] cap 16 GiB, which every past trial ran under (docker peak 9.0 GiB over 5 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 10 GiB: design defaults, not yet measured
+- Measured: memory: sim p90 6.9 GB, privileged container p90 8.1 GB, verifier 4.7 GB (a per-container memory sampler); CPU only; CPU: an estimate
 
 ## Details
 | | |

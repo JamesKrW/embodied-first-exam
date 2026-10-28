@@ -34,17 +34,17 @@ The trajectory is the per-physics-step drive-target record (T, 34) captured by h
 instance is rebuilt from the RoboTwin seed and checked against the stored initial-state hash on every reset.
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 20 GiB | 8192 | 13 GiB | 10 GiB |
-| verifier (as `main`) | 4 | 20 GiB | — | 13 GiB | — |
+| verifier | no cap | no cap | no cap | 13 GiB | — |
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: RTX 4090 24GB / L4 24GB.
-- Measured: GPU 6.9 GB oracle peak on RTX 4090, 5.8 GB L4, evaluation-pool GPU profile (per-trial GPU peaks, 10-03..10); memory: sim p90 3.2 GB, privileged agent container p90 6.4 GB, verifier 4.2 GB, mem_guard (docker memory per container, an RTX 4090 workstation, 10-02..10); CPU author estimate
-- Measured (caps): GPU: 8.6 GiB on a 48 GB card, 6.9 on 24 GB (the evaluation pool's GPU profile (per-trial GPU peaks by card, 10-03..10)) -> max(1.5 x peak, peak + 4); memory: the [environment] cap 16 GiB, which every past trial ran under (docker peak 7.7 GiB over 13 samples, mem_guard (docker memory incl. page cache, top-4 containers every 10 min, an RTX 4090 workstation, 10-02..10)); processes 512 and disk 10 GiB: design defaults, not yet measured
+- Measured: GPU memory: the oracle's peak 6.9 GB on an RTX 4090, 5.8 GB on an L4 (per-trial peaks of past trials); memory: sim p90 3.2 GB, privileged agent container p90 6.4 GB, verifier 4.2 GB (a per-container memory sampler); CPU: an estimate
+- Measured (caps): GPU memory: per-trial peaks of 8.6 GiB on a 48 GB card and 6.9 GiB on a 24 GB card -> max(1.5 x peak, peak + 4), rounded up: 13 GiB
 
 ## Details
 

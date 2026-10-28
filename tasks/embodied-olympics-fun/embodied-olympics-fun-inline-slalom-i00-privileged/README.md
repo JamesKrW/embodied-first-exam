@@ -26,16 +26,16 @@ one sim row per control step until the referee ends the attempt). Pass iff the r
 and both end in the same state. The rules: You wear inline skates (rigid boots on your feet, four wheels in a line on each, the outer ones 0.064 m and the inner ones 0.062 m in diameter, 0.064 m apart). The course runs along +x on a level sports floor: the start line at x = 0 and a second line 0.4 m behind it (the start box), 20 cones on the line y = 0 every 0.8 m from x = 12.0 m, the end line 0.8 m beyond the last cone. The cones are free plastic cups 0.078 m high, 0.074 m across the base, 0.02 kg, standing on marking stickers. Time starts when any part of your body crosses the start line at the gate beam's height, 0.4 m above the ground; you must do that within 5.0 s of t = 0. The cone line begins at the front edge of the first cone: enter it on one foot (one skate's wheels on the ground, the other skate in the air), or the first cone counts as missed (a penalty); not being on one foot when your skate passes the second cone voids the run. From then on the free skate must not touch the ground until the end line (that voids the run; so does changing feet). Pass the cones alternately on the left and the right with the supporting skate: two consecutive cones on the same side are a missed interval. A cone whose marking centre is uncovered at the finish (its base centre moved more than 0.0335 m (the base's radius less the centre point's), or tilted more than 30.0 degrees) is kicked. Each kicked cone or missed interval adds 0.2 s; more than 4 penalties void the run. The run ends when the front wheel of your supporting skate crosses the end line with a wheel of that skate on the ground (crossing first with the free skate, or in the air, voids it); every cone must have been passed. Your time is the time from the beam to the end line plus the penalties. You succeed with a valid run that ends within 60 s of t = 0. You also fail if any part of you touches the ground (the skates' wheels and frames may) or your pelvis drops below 0.45 m (a fall). No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
 ## Resources
-Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
+Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
-| verifier | 4 | 8 GiB | — | no GPU | — |
+| verifier | 4 | 8 GiB | no cap | no GPU | — |
 
 - GPU: not needed.
-- Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Measured (caps): author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default
+- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
+- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |
