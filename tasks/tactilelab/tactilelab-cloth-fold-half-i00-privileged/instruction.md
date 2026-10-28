@@ -17,13 +17,15 @@ retry as many times as you want. Your deliverable is **one replayable trajectory
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed
-open-loop from the same initial state in one fresh process and scored 1 if the task is solved in the replay, else 0.
+open-loop from the same initial state in two fresh processes and scored 1 if the task is solved in both replays and both end in the same state, else 0.
 After the last row the replay holds that row for 60 more control steps (1 s) before the task is judged (`s.replay` does
 the same). Also leave the script that produced it at `/app/output/gen.py`. Save a working trajectory as soon as you have
 one and overwrite it as you improve it: whatever is in `/app/output/` when the time is up is graded. The file holds
-`task` and `actions`, a (T, 22) float array of at most **30,000 rows** (one per control step, 500 s of robot time);
-anything else (another shape, inf, NaN in a gripper column, more rows, a file that is not such an npz) scores 0. Each
-replay has max(1800 s, 900 s + 1 s per 4 rows) of wall clock.
+`task` and `actions`, a (T, 22) float array of 1 to **4,800 rows** (one per control step, 80 s of robot time);
+anything else (another shape, no rows, inf, NaN in a gripper column, more rows, a file that is not such an npz) scores
+0. Each replay has **5000 s** of wall clock, whatever the trajectory (Isaac Sim start included). From your first row on,
+a simulator error on your rows (an exception, a Newton sidecar failure, a replay process that dies or runs out of its
+time) is your result: it scores 0 (`sim_error`).
 
 ## Tooling (already installed; run `python` from any directory)
 ```python
@@ -49,7 +51,7 @@ Cameras (two wrist cameras): `Session(..., cameras=True)` then `s.render_frame("
 object's `Annotation/` folder holds grasp poses (`grasp_pose.json`: right end-effector poses `[x, y, z, qw, qx, qy, qz]` in
 the object's frame) and insertion geometry (`insertion_pose.json`).
 
-The grader replays in one fresh process, exactly this CLI (a fresh process, so run it to self-check):
+The grader replays in two fresh processes; each is exactly this CLI (a fresh process, so run it to self-check):
 `python /opt/tools/rcb_tactilelab.py replay --task cloth_fold_half --instance /app/instance.json --traj /app/output/trajectory.npz`
 
 ## Conventions
@@ -67,13 +69,15 @@ The grader replays in one fresh process, exactly this CLI (a fresh process, so r
 - The end-effector frame is the wrist link (`J1_6` right, `J2_6` left); the gel-pad centre is 0.1777 m along the wrist's +z
   axis. The right gripper opens to about 0.10 m between the gel faces; its width is 0.082 + q(J1_7) - q(J1_8) (m).
 - Control runs at 60 Hz (physics 1/120 s, decimation 2). There is no step budget: the time limit (`## Time limit`) is your
-  only budget (a runaway guard ends an episode after 30,000 control steps, the most a trajectory may hold).
+  only budget (a runaway guard ends an episode after 30,060 control steps).
 - One `Session` per process. Physics is PhysX on the **GPU**, as are rendering and the tactile raycast. Replaying the
   same rows in a fresh process (the CLI above, as the grader does) ends in the same state every time on a machine, but
   that state can differ slightly from the live run that recorded the rows, and after `s.reset()` the state is restored
   but not every PhysX internal. So check the final trajectory with the CLI replay, and leave a margin on the success
   thresholds rather than ending a hair past them. Deformable bodies (where a task has one) are simulated by a Newton
-  sidecar on the GPU, whose replays agree closely but not bit for bit.
+  sidecar on the GPU: cloth, cables and the soft plug with deterministic kernels (their replays end in the
+  same state too); the dough's MPM solver is not guaranteed to, so a dough task is graded on two replays that must
+  both succeed: leave a margin there too.
 
 The deformable bodies (cloth, cable, dough, plug) are simulated by Newton in a sidecar process started by the Session (the first start compiles GPU kernels, a few minutes once per trial); the gel pads and fingers act on them as kinematic colliders. `s.status()['metrics']` reports the task's measured quantities every step. Pad-gap thresholds below are distances between the two gel-pad box centres (the gel-face gap plus 4 mm). Ended early if a particle drops below z = 1.072 or the cable or cloth is pushed through the back of a gel pad (two or more of its samples inside the volume up to 40 mm behind a pad for 10 consecutive steps).
 

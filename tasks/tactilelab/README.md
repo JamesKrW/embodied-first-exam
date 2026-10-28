@@ -36,8 +36,14 @@ the pad against the touched meshes, rendered to 240 x 320 RGB with a Taxim look-
   once the fingers have opened 10 mm).
 - Every task is privileged-only for now (no standard twin: a TactileLab simulator service is not written yet).
 - Physics is PhysX on the GPU, as the tasks were developed: a rigid task is graded on two fresh-process replays that must
-  end in the same state (they do on one machine). Deformable bodies run in a Newton sidecar on the GPU, which replays closely but not bit for bit:
-  those tasks are graded on one fresh-process replay.
+  end in the same state (they do on one machine). Deformable bodies run in a Newton sidecar on the GPU. Cloth, cables and the
+  soft plug use Warp's run-to-run deterministic atomics and Newton's sorted contacts, so those tasks are graded the same
+  way. The dough's implicit MPM solver runs without them (they made it far too slow) and is not guaranteed to replay bit
+  for bit: a dough task is graded on two fresh-process replays that must both succeed, and their spread is reported.
+- Whose failure a 0 is: from the first trajectory row on, a simulator error (an exception, a Newton sidecar failure, a
+  replay process that dies or exceeds the task's fixed replay time limit) is the agent's 0 (`sim_error`); only a failure
+  before the first row (Isaac start, scene build, the instance check) is an infrastructure failure. The video is rendered
+  in one more replay after the verdict is written.
 - Tooling: `rcb_tactilelab.py` (`embodied_first_exam/benchmarks/tactilelab/`), with the `tactilelab_tasks` package as the agent may
   read it (scripted policies and expert parameters removed); both come from the files-only image `tactilelab-files`. The files over
   2 MB (the X-Trainer robot USD and five meshes, two calibration arrays) come from the data-only image `tactilelab-assets-files`

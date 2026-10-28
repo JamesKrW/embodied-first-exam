@@ -16,7 +16,7 @@ family = "lamp_bulb"
 mode = "privileged"               # privileged state, resets and primitives through the tooling (docs/protocol/README.md §3)
 dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
 oracle = "full"
-oracle_evidence = "solution/: the scripted demonstration policy of this task, recorded through the Session; graded 1 by the fresh-process replays."
+oracle_evidence = "solution/: the scripted demonstration policy of this task, recorded through the Session; graded 1 by two fresh-process replays on an L40S, which ended in the same state."
 instance_seed = 0                 # scene = environment/instance.json (the scene state after reset + its hash); identity = dataset.toml digest
 expert_time_estimate_hours = 1.0
 
@@ -61,8 +61,8 @@ allowed = [0]
 oracle = [0]
 
 [verifier]
-timeout_sec = 17400.0             # two fresh-process replays at tests/grade.py's limit for the longest accepted trajectory
-                                  # (replay_timeout(30,000 rows) = 900 s + rows / 4 = 8,400 s each) + 600 s
+timeout_sec = 14700.0             # 2 fresh-process replays (4700 s each, tests/test.sh --replay-limit-s), the video
+                                  # replay (4700 s) and 600 s; agent-independent: twice a 30,060-step replay at the slowest measured pace
 environment_mode = "separate"     # verifier runs in its own sandbox (tests/Dockerfile); the agent container is gone by then
 network_mode = "no-network"       # PROTOCOL H.6: the verifier has no network
 

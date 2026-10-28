@@ -17,13 +17,16 @@ retry as many times as you want. Your deliverable is **one replayable trajectory
 
 ## Deliverable
 Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below). It is replayed
-open-loop from the same initial state in one fresh process and scored 1 if the task is solved in the replay, else 0.
+open-loop from the same initial state in two fresh processes and scored 1 if the task is solved in both replays, else 0
+(the dough's MPM solver is not guaranteed to replay bit for bit, so their final states are not compared).
 After the last row the replay holds that row for 60 more control steps (1 s) before the task is judged (`s.replay` does
 the same). Also leave the script that produced it at `/app/output/gen.py`. Save a working trajectory as soon as you have
 one and overwrite it as you improve it: whatever is in `/app/output/` when the time is up is graded. The file holds
-`task` and `actions`, a (T, 22) float array of at most **30,000 rows** (one per control step, 500 s of robot time);
-anything else (another shape, inf, NaN in a gripper column, more rows, a file that is not such an npz) scores 0. Each
-replay has max(1800 s, 900 s + 1 s per 4 rows) of wall clock.
+`task` and `actions`, a (T, 22) float array of 1 to **4,800 rows** (one per control step, 80 s of robot time);
+anything else (another shape, no rows, inf, NaN in a gripper column, more rows, a file that is not such an npz) scores
+0. Each replay has **1000 s** of wall clock, whatever the trajectory (Isaac Sim start included). From your first row on,
+a simulator error on your rows (an exception, a Newton sidecar failure, a replay process that dies or runs out of its
+time) is your result: it scores 0 (`sim_error`).
 
 ## Tooling (already installed; run `python` from any directory)
 ```python
@@ -49,7 +52,7 @@ Cameras (two wrist cameras): `Session(..., cameras=True)` then `s.render_frame("
 object's `Annotation/` folder holds grasp poses (`grasp_pose.json`: right end-effector poses `[x, y, z, qw, qx, qy, qz]` in
 the object's frame) and insertion geometry (`insertion_pose.json`).
 
-The grader replays in one fresh process, exactly this CLI (a fresh process, so run it to self-check):
+The grader replays in two fresh processes; each is exactly this CLI (a fresh process, so run it to self-check):
 `python /opt/tools/rcb_tactilelab.py replay --task dough_fill_tray --instance /app/instance.json --traj /app/output/trajectory.npz`
 
 ## Conventions
@@ -67,13 +70,15 @@ The grader replays in one fresh process, exactly this CLI (a fresh process, so r
 - The end-effector frame is the wrist link (`J1_6` right, `J2_6` left); the gel-pad centre is 0.1777 m along the wrist's +z
   axis. The right gripper opens to about 0.10 m between the gel faces; its width is 0.082 + q(J1_7) - q(J1_8) (m).
 - Control runs at 60 Hz (physics 1/120 s, decimation 2). There is no step budget: the time limit (`## Time limit`) is your
-  only budget (a runaway guard ends an episode after 30,000 control steps, the most a trajectory may hold).
+  only budget (a runaway guard ends an episode after 30,060 control steps).
 - One `Session` per process. Physics is PhysX on the **GPU**, as are rendering and the tactile raycast. Replaying the
   same rows in a fresh process (the CLI above, as the grader does) ends in the same state every time on a machine, but
   that state can differ slightly from the live run that recorded the rows, and after `s.reset()` the state is restored
   but not every PhysX internal. So check the final trajectory with the CLI replay, and leave a margin on the success
   thresholds rather than ending a hair past them. Deformable bodies (where a task has one) are simulated by a Newton
-  sidecar on the GPU, whose replays agree closely but not bit for bit.
+  sidecar on the GPU: cloth, cables and the soft plug with deterministic kernels (their replays end in the
+  same state too); the dough's MPM solver is not guaranteed to, so a dough task is graded on two replays that must
+  both succeed: leave a margin there too.
 
 The dough is simulated by Newton in a sidecar process started by the Session; only the scraper acts on it (its reaction is fed back to the scraper).
 
@@ -81,7 +86,7 @@ The dough is simulated by Newton in a sidecar process started by the Session; on
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 
 ## Resource limits
-Limits for the whole trial, all its processes together (every simulator you start included): at most **24 GiB of GPU memory**, **24 GiB of memory**, **512 processes** and **20 GiB** of new files under `/app`, `/tmp` and `/root`. GPU memory counts what a process reserves (JAX, for example, reserves most of the card unless told not to). These limits may be enforced (from protocol v1.2 on): when enforcement is on, exceeding one for 60 s within any 2 minutes, or a process killed for lack of memory, ends the trial as a failure (reward 0), whatever the deliverable. A monitor outside your container measures every few seconds; the current values are in `/run/rcb-limits/usage.json`. When enforcement is on and GPU memory goes above 1.5 times its limit, the monitor also kills the process holding the most of it at once, to protect the machine; that alone does not fail the trial. CPU is capped at 8 cores for your container; the cap only slows you down.
+Limits for the whole trial, all its processes together (every simulator you start included): at most **36 GiB of GPU memory**, **24 GiB of memory**, **512 processes** and **20 GiB** of new files under `/app`, `/tmp` and `/root`. GPU memory counts what a process reserves (JAX, for example, reserves most of the card unless told not to). These limits may be enforced (from protocol v1.2 on): when enforcement is on, exceeding one for 60 s within any 2 minutes, or a process killed for lack of memory, ends the trial as a failure (reward 0), whatever the deliverable. A monitor outside your container measures every few seconds; the current values are in `/run/rcb-limits/usage.json`. When enforcement is on and GPU memory goes above 1.5 times its limit, the monitor also kills the process holding the most of it at once, to protect the machine; that alone does not fail the trial. CPU is capped at 8 cores for your container; the cap only slows you down.
 
 ## Time limit
 You have 3600 seconds to complete this task. Do not cheat by using online solutions or hints specific to this task.
