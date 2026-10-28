@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-long-jump-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `long_jump` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (at the board, 3.6 m/s forward and 2.5 m/s up: a mark of 1.50 m in the sand); negatives: running through, walking over the line, a foot over the line, short, beside the pit, beside the board, feet pulled up (no rise), into the sand without a flight, back out behind the mark. The sand follows a published resistive-force law of dry silica sand (2.02 N/cm^3, phi 34 deg): the G1 sinks 7.4 mm standing and 75 mm landing at 2.5 m/s, with a 0.10 m/s rebound. Nothing known jumps out of a run; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (at the board, 3.6 m/s forward and 2.5 m/s up: a mark of 1.50 m in the sand); negatives: running through, walking over the line, a foot over the line, short, beside the pit, beside the board, feet pulled up (no rise), into the sand without a flight, back out behind the mark. The sand follows a published resistive-force law of dry silica sand (2.02 N/cm^3, phi 34 deg): the G1 sinks 7.4 mm standing and 75 mm landing at 2.5 m/s, with a 0.10 m/s rebound. Nothing known jumps out of a run; human review in the pull request that adds the benchmark (PROTOCOL §4) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 

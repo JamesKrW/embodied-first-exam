@@ -19,9 +19,8 @@ task_type = "trajectory"
 simulator = "mujoco"
 robot = "ssl-robot"
 family = "soccer_ssl_match"
-mode = "standard-realtime"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-slowdown = 10                     # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §4b); RO_SLOWDOWN's default
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
+slowdown = 10                     # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RO_SLOWDOWN's default
 protocol = "eai-standard-realtime/1.0"
 instance_seed = 7
 opponent_level = 4
@@ -36,13 +35,6 @@ official = false
 expert_time_estimate_hours = 0.5
 oracle = "partial"
 oracle_evidence = "RLSSL 2026-10-16 (doc rlssl): L-RL against L3 25 W 5 D 10 L over 40 matches on fresh seeds (64 W 11 D 25 L over 100 with the screening), goals +1.7 per match; mirror match 29 W 5 D 46 L over 80 (two 40-match seed sets: 25 % and 48 %; L3 against itself on the first set 60 %); the truth reference against it 10 W of 20; replay identical; limits through World.execute (0.014 % of commands clipped, as L3). The oracle run checks the pipeline"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 7
-allowed = [7]
-oracle = [7]
 
 [verifier]
 timeout_sec = 3960.0

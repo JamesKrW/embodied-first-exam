@@ -26,7 +26,6 @@ task_type = "trajectory"
 simulator = "kinder"
 robot = "tidybot-plus-plus"
 family = "scoop-pour"
-mode = "standard"
 dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.1"
 instance_seed = 0
@@ -34,13 +33,6 @@ expert_time_estimate_hours = 8.0
 oracle = "none"
 validated = false
 oracle_evidence = "none yet: no positive example is known for this instance (human review pending)"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
 
 [verifier]
 timeout_sec = 1800.0

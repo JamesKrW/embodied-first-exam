@@ -9,7 +9,6 @@ task_type = "policy"
 simulator = "mujoco"
 robot = "franka-panda"
 family = "tabletennis_match"
-mode = "privileged"
 dynamics = "dynamic"
 verifier_wall_clock = true
 instance_seed = 12
@@ -23,13 +22,6 @@ expert_time_estimate_hours = 1.0
 oracle = "partial"
 oracle_evidence = "full-state reference program (solution/): the camera-only reference player's serve and stroke planner fed the true ball state; its wins on this instance and across levels 1-4 are in the Embodied Olympics privileged report; not reproduced in this repository: the owner waived the oracle runs on 2026-10-17 (validated = false)"
 validated = false
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 12
-allowed = [12]
-oracle = [12]
 
 [agent]
 timeout_sec = 7200.0

@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-picture-hang-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `picture_hang` |
+| Family / instance | `picture_hang` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz: 869 Sharpa Wave rows on the Marvin dual-arm robot (success after 669 controls, 200 rows of slack), recorded from the authoring controller through its arm layer (IK to arm joint targets; motor targets only). Two fresh-process replays end with identical state hashes; float32-rounded rows also succeed. Wave-3 port of the 2026-10-14 floating-stage oracle. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -76,6 +76,3 @@ and contact geometry unchanged. The robot is the Tianji Marvin dual-arm stand of
 the image), standing on a 0.10 m plinth in front of the console (which stands on its two rear legs so that the stand's base plate fits
 under its front half); each hand sits rigidly on its arm's flange. This is a
 simulated bimanual hanging task, not a zero-shot hardware claim.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

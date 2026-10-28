@@ -9,7 +9,7 @@
 | Family / instance | `d02_strike_catch_merge` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 3 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 3 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 3 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 3 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0` |
 
 ## Task
@@ -66,18 +66,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Images | the `sim` sidecar runs efe:pandadyn (`images/pandadyn/`); the agent container and the verifier run the shared client image with its pip pins (`embodied_first_exam/standard/client.env`) |
 | Crash recovery | the shared realtime layer's: a checkpoint every second of robot time, `restart: on-failure:6`, the service resumes the same episode, paused |
 | Benchmark notes | tasks/pandadyn/README.md |
-
-### Change Log
-- 2026-10-14 (owner): added. The family's scene is dynamic (PROTOCOL §2.14), so it gets a standard-realtime
-  twin with S = 3 and 10 resets.
-- 2026-10-17: reset budget 10 -> 3. Every reset restores the same frozen start, so the budget is the number of
-  times an agent can rerun and tune a plan on a deterministic scene; with 10, realtime trials succeeded far more often
-  than standard ones (no reset), mostly on a late episode (tasks/pandadyn/README.md, "Reset budget"). Instance,
-  scene, success check and S are unchanged; results under 10 resets are ranked separately.
-- 2026-10-17 (owner): graded by the live episode; no grading replay (until then: one fresh-process
-  replay, success = live ∧ replay ∧ deterministic); the frozen start is checked when the first episode begins; the video
-  is rendered from the graded episode's rows after the verdict. Instance, scene, success check, S and resets are unchanged.
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Configuration only: the balls' mass is the
-  `object_mass` parameter (same value); unused parameters are gone. Scene, physics and checks are unchanged. Frozen
-  instance: seed 0, `initial_sha` 5af2753df0137ee5; reference rows: 1755 control steps (the same start and reference
-  rows as before). Results from before are under the earlier digest and are not ranked with these.

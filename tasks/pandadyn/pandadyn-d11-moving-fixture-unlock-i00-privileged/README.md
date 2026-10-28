@@ -61,11 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D11`, frozen instance `D11-MovingFixtureUnlock-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Stricter check: the ball must leave the fixture
-  through its outlet while the outlet is lined up with the top of the chute. The ball is configured by parameters
-  (same values). The peg's adapter is now joined to the peg by a bridge. The tool's mass is unchanged; its centre of
-  mass and inertia shift slightly. Frozen instance: seed 0, `initial_sha` 184c99782af79830; reference rows: 1563
-  control steps (was seed 0, `initial_sha` 79aa206c52af2079). Results from before are under the earlier digest and are
-  not ranked with these.

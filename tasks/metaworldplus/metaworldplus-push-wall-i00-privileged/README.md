@@ -53,6 +53,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | deliverable | `(T, 4)` native actions `[dx, dy, dz, grip]`, 1 ≤ T ≤ 500 (Meta-World's `max_path_length`) |
 | success | Meta-World's own check (`evaluate_state`) on the state after the last action. The object's centre is within 7 cm of the target point. |
 | actions | no `joint_position`: Meta-World's Sawyer has no arm actuators (the hand is a mocap body, the arm follows it) |
-
-### Change Log
-- 2026-10-10 (review 0067): the instruction states this environment's success condition in words (it already pointed to `s.check()` and Meta-World's source, which this mode can read) and the limits on a hand-written `trajectory.npz`. Nothing in the verifier changed.

@@ -13,21 +13,14 @@ robot = "sharpa-wave-floating-bimanual"
 hands = ["sharpa", "wuji"]
 default_hand = "sharpa"
 family = "vacuum_bin_reseat"
-mode = "standard"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.2"
 oracle = "full"
 oracle_evidence = "solution/trajectory.npz: 1,331 two-hand Sharpa Wave control rows recorded from the closed-loop authoring controller (the left hand holds the vacuum by its handle, the right hand presses the release button, removes and reinstalls the bin); the replay ends at success after 1,181 controls (150 slack rows) in two fresh processes with identical state hashes, also with rows rounded to float32. The standard oracle submits the same rows as float64 through the public client."
+instance_seed = 0
 expert_time_estimate_hours = 3.0
 difficulty = "hard"
 release_status = "provisional"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 600.0

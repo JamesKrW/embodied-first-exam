@@ -61,9 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D01`, frozen instance `D01-ReciprocalCupRelay-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Stricter checks: the right cup must be moving
-  (0.15 m/s or more) when it catches the ball, and the throw-back must start from the second transfer region (within
-  35 mm). Frozen instance: seed 0, `initial_sha` ec90d1eba7de8aa0; reference rows: 1560 control steps (the same start;
-  new reference rows). Results from before are under the earlier digest and are not ranked with these.

@@ -9,7 +9,7 @@
 | Family / instance | `s03_clear_gate_hockey` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 2 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 3 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 2 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 3 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0` |
 
 ## Task
@@ -66,22 +66,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Images | the `sim` sidecar runs efe:pandadyn (`images/pandadyn/`); the agent container and the verifier run the shared client image with its pip pins (`embodied_first_exam/standard/client.env`) |
 | Crash recovery | the shared realtime layer's: a checkpoint every second of robot time, `restart: on-failure:6`, the service resumes the same episode, paused |
 | Benchmark notes | tasks/pandadyn/README.md |
-
-### Change Log
-- 2026-10-14 (owner): added. The family's scene is dynamic (PROTOCOL §2.14), so it gets a standard-realtime
-  twin with S = 2 and 10 resets.
-- 2026-10-17: reset budget 10 -> 3. Every reset restores the same frozen start, so the budget is the number of
-  times an agent can rerun and tune a plan on a deterministic scene; with 10, realtime trials succeeded far more often
-  than standard ones (no reset), mostly on a late episode (tasks/pandadyn/README.md, "Reset budget"). Instance,
-  scene, success check and S are unchanged; results under 10 resets are ranked separately.
-- 2026-10-17 (owner): graded by the live episode; no grading replay (until then: one fresh-process
-  replay, success = live ∧ replay ∧ deterministic); the frozen start is checked when the first episode begins; the video
-  is rendered from the graded episode's rows after the verdict. Instance, scene, success check, S and resets are unchanged.
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Harder, stricter checks: one of the two rails
-  is designated per instance (coloured green) and the final shot must bank off it and touch no other rail since its
-  last paddle contact; the blocker counts as hit only by a puck sliding free of the paddle for 0.15 s or more at 0.15
-  m/s or more (an earlier contact fails the task); the puck must slide back across the recovery line by itself; the
-  horizon is 35 s (was 25 s). The paddle's adapter is now joined to the paddle by a bridge. The tool's mass is
-  unchanged; its centre of mass and inertia shift slightly. Frozen instance: seed 0, `initial_sha` bcbfb438eec4fcea;
-  reference rows: 3025 control steps (was seed 0, `initial_sha` 449f78c9e8366697). Results from before are under the
-  earlier digest and are not ranked with these.

@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `robocasa-turn-on-microwave-i00-standard` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa/TurnOnMicrowave` |
+| Family / instance | `robocasa/TurnOnMicrowave` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa-0.1.0` |

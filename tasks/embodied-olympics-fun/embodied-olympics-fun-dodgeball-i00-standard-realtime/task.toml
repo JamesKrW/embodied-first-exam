@@ -29,23 +29,13 @@ simulator = "mujoco"
 robot = "unitree-g1"
 family = "dodgeball"
 category = "throwing-catching-striking"
-mode = "standard-realtime"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-slowdown = 1                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §4b); RCB_SLOWDOWN's default
-network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
+slowdown = 1                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RCB_SLOWDOWN's default
 protocol = "eai-standard/2.3"
 instance_seed = 0
-reset_budget = 5
 expert_time_estimate_hours = 6.0
 oracle = "full"
 oracle_evidence = "Reference: the G1 turns side-on and walks back and forth on the walking policy so that it is moving at each feed; five 14.2 m/s throws from turret-aimed machines all miss; 9 of 10 perturbations (feed times, speed, gap, aim height, machine distance) succeed, the machine at 2.8 m fails. In standard-realtime mode the privileged twin's reference rows, each run of one action type planned at the control step where it ran (`submit(..., at=step)`), succeed at the task's S."
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 900.0
@@ -77,9 +67,10 @@ timeout_sec = 900
 
 [agent]
 timeout_sec = 7200.0
-# Egress: open (Harbor's default), as `[metadata] network` declares. Embodied Olympics lets the agent search for and download
+# Egress: open, `network_mode = "public"` below (the author's choice). Embodied Olympics lets the agent search for and download
 # public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md). The agent's
 # container holds no simulator, no referee and no instance.
+network_mode = "public"        # open egress, the task author's choice (docs/protocol/README.md Appendix H.6)
 
 [environment]
 build_timeout_sec = 1800.0

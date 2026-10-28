@@ -24,8 +24,7 @@ task_type = "trajectory"
 simulator = "maniskill"
 robot = "franka-panda"
 family = "robopaint_lettering_business"
-mode = "standard"                  # camera RGB + proprioception only; no sheet readout, no score, no reset, no pen model
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.2"
 oracle = "partial"                # solution/: the privileged oracle's joint targets, streamed through the client
 oracle_evidence = "Reference solution in solution/ (streams the privileged reference's joint targets; the lettering family redesigned on 2026-10-09, generated with the current tooling on the native efe:robopaint-0.2.0 runtime): the same trajectory scores 1 under the process rules in the verifier (the graders' rcb_brush_strict.py, with which the sim service also scores the live sheet): path_mm 1240 and mark_width_mm 0.37, against the colouring-in limits 3730 mm and 0.10 mm. Harbor oracle and nop runs: tasks/robopaint/README.md (Lettering)."
@@ -40,13 +39,6 @@ regions = 54
 letters = 26
 stroke_count = 9
 pen_control = "press depth (shades) + wrist yaw"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 1200.0
@@ -72,8 +64,8 @@ command = "sh /srv/finalize.sh"   # end the episode: the service scores its live
 timeout_sec = 2820                # ending a service that is resuming (up to 1500 s) + one render pass of at most 72,000 control steps
 
 [agent]
-timeout_sec = 3600.0              # the agent's cutoff, this task's own (PROTOCOL §2.12)
-network_mode = "allowlist"      # model APIs and package registries (scripts/set_agent_egress.py); PROTOCOL §2.11
+timeout_sec = 3600.0              # the agent's cutoff, this task's own (PROTOCOL §2)
+network_mode = "allowlist"      # model APIs and package registries (scripts/set_agent_egress.py); PROTOCOL Appendix H.6
 allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.com", "*.openai.com", "api.anthropic.com", "*.anthropic.com", "openrouter.ai", "*.openai.azure.com", "*.cognitiveservices.azure.com", "pypi.org", "files.pythonhosted.org", "deb.debian.org", "security.debian.org", "archive.ubuntu.com", "security.ubuntu.com", "snapshot.ubuntu.com"]
 
 [environment]

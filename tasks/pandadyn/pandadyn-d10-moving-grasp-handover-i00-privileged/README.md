@@ -61,10 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D10`, frozen instance `D10-MovingGraspHandover-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Stricter checks: the part must keep moving
-  (above 0.04 m/s) through the two-hand overlap and the release, and the right hand must let it go into a moving slot
-  (above 0.02 m/s). Unused parameters are gone. Frozen instance: seed 0, `initial_sha` 3bb10643ceecda47; reference
-  rows: 1554 control steps (the same start; new reference rows). Results from before are under the earlier digest and
-  are not ranked with these.

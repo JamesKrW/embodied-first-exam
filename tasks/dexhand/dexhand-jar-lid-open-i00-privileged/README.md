@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-jar-lid-open-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `jar_lid_open` |
+| Family / instance | `jar_lid_open` / seed 0 |
 | Oracle | `full` — solution/ replays the validated Sharpa Wave episode on the Marvin right arm (1,159 controls, success after 1,009); it passes two fresh-process replays with identical state hashes, float32 rounding, and the Harbor oracle in both modes (standard: the same rows submitted through the public client). solution/wuji/trajectory.npz is a validated Wuji Hand 2.2 trajectory of this instance (1,242 controls, motor targets only, physical contact only); the oracle uses it when the run selects wuji (privileged: DEXHAND_HAND=wuji; standard: the sim service's hand), and it replays to success in two fresh processes with identical state hashes. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -82,6 +82,3 @@ pot_shelf_transfer rig: position servos kp 700, kv 48, no gravity compensation) 
 left arm stays parked. The scene keeps the T14 objects and their relation; the worktop stands at a table height for
 the robot (top at z = 0.75 m) with the jar 0.34 m in front of the robot's shoulders. This is single-arm lid-opening
 feasibility, not a bimanual or zero-shot claim.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

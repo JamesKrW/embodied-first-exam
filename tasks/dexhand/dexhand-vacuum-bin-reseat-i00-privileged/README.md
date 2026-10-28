@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-vacuum-bin-reseat-i00-standard` |
 | Simulator / robot | `mujoco` / `sharpa-wave-floating-bimanual` |
-| Family / instance | `vacuum_bin_reseat` |
+| Family / instance | `vacuum_bin_reseat` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz: 1,331 two-hand Sharpa Wave control rows recorded from the closed-loop authoring controller (the left hand holds the vacuum by its handle, the right hand presses the release button, removes and reinstalls the bin); the replay ends at success after 1,181 controls (150 slack rows) in two fresh processes with identical state hashes, also with rows rounded to float32. The standard oracle submits the same rows as float64 through the public client. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -73,6 +73,3 @@ MuJoCo Menagerie commit `0059d4335f8156206f63a35662313385f7ad6d74` (Apache-2.0);
 to wuji-technology/wuji-description commit `829c9aa27cb12c3a49d5b8d63c9869dd8f656702` (MIT), mounted on the same wrist
 stages (right and left). This is a feasibility task with two hands on floating wrist stages, not a full-arm or
 zero-shot claim.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

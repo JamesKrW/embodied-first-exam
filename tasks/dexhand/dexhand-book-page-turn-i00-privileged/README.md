@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-book-page-turn-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `book_page_turn` |
+| Family / instance | `book_page_turn` / seed 0 |
 | Oracle | `full` — solution/ replays the recorded Sharpa Wave episode on the Marvin arms in both modes (553 rows; success after 453 controls): two fresh-process replays with identical state hashes, float32 rows succeed. No Wuji reference solution. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -77,6 +77,3 @@ footprint; the 5 mm corner rounding is visual. Every board lies flat, as in the 
 the book keep the T39 source pose in front of the robot stand; the desk's front legs are set back to x = 0.43 m so they
 stand clear of the robot's base plate. This is a rigid-board / flexible-binding reduced
 model, not a paper continuum, damage or zero-shot claim.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

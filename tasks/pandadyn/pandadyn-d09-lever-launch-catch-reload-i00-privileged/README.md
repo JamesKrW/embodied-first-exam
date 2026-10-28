@@ -61,9 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D09`, frozen instance `D09-LeverLaunchCatchReload-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. The mallet's side adapter gains a riser to the
-  hand; the checks are unchanged. The tool's mass is unchanged; its centre of mass and inertia shift slightly. Frozen
-  instance: seed 0, `initial_sha` 7c84dee30e4f1c20; reference rows: 1625 control steps (was seed 0, `initial_sha`
-  7adb448e2610e681). Results from before are under the earlier digest and are not ranked with these.

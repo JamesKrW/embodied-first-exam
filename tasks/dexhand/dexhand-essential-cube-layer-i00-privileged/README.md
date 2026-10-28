@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-essential-cube-layer-i00-standard` |
 | Simulator / robot | `mujoco` / `sharpa-wave-floating` |
-| Family / instance | `essential_cube_layer` |
+| Family / instance | `essential_cube_layer` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz is the validated Sharpa Wave actuator trajectory of this frozen instance (450 controls at 50 Hz, physical contact only). The privileged oracle hands it in; the standard oracle submits the same rows as float64 through the client's request path (the service executes the validated targets bit for bit). Both replay to success in two fresh processes with identical final state hashes; float32-rounded copies of all six oracles also score 1. Human solvability review is pending; release status stays provisional. solution/wuji/trajectory.npz is a validated Wuji Hand 2.2 trajectory of this instance (940 controls, motor targets only, physical contact only); the oracle uses it when the run selects wuji (privileged: DEXHAND_HAND=wuji; standard: the sim service's hand), and it replays to success in two fresh processes with identical state hashes. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -53,8 +53,3 @@ modes use the identical frozen `instance.json`. The Sharpa Wave model and meshes
 from `wuji-technology/wuji-description` commit `829c9aa27cb12c3a49d5b8d63c9869dd8f656702` (MIT), mounted unchanged in
 the same wrist frame; its collision geoms are renamed to the predicate's finger/palm roles only. Object assets carry
 their own licenses and checksums under `object_assets/`. Renderer output is evidence; it never determines the verdict.
-
-### Change Log
-- 2026-10-14: two close-up cameras of the held object, `inhand_top` (above the palm) and `inhand_side` (thumb side), mounted on the locked hand like `palm`; the standard service returns `overview` and `inhand_top` by default. Before, the object was 40-60 px wide in the overview and the palm camera saw the back of the hand, so its in-hand pose could hardly be observed in standard mode.
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films every 2nd step but at most 1500 frames (a 640x480 OSMesa frame takes ~0.3 s). The verdict, the replays and `reward.json` are unchanged; earlier results stay valid.
-- 2026-10-14: the held object's rotation bound (invariant `body_rotation`) 0.24 -> 0.35 rad (20 degrees, both held-object families). The reference solution peaked at 0.2396 rad (joystick) and 0.218 rad (cube layer), within 0.0004 / 0.022 rad of the old bound, so the bound was effectively the reference's own peak; finger targets perturbed by +-0.001 rad peak at 0.25-0.30 rad. The task's intent (keep the held object steady) is unchanged.

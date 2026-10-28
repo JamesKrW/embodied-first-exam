@@ -21,19 +21,12 @@ task_type = "trajectory"
 simulator = "molmospaces"
 robot = "rainbow-rby1"
 family = "open-door"
-mode = "standard"                  # robot as a service: images + proprioception only; no object poses, no success check, no reset
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.2"
+instance_seed = 0
 expert_time_estimate_hours = 3.0
 oracle = "none"
 oracle_evidence = "no reference solution (MolmoSpaces' planners and grasp files are not shipped); positive example graded 1 by the separate verifier: molmospaces-open-door-i00-privil__EJchtFe (run codex-gpt6_1_sol-high, batch molmo-v2-sol-rby1, 2026-10-16); human review in PR #276"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
 
 [verifier]
 timeout_sec = 600.0

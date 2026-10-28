@@ -48,11 +48,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Instance | Playground's `reset` with `jax.random.PRNGKey(5)` (a drop; the 0.5 s settle runs in the task's own MuJoCo); chosen (seed 5; skipped 0: tilted less than 90 degrees after the settle; 1: tilted less than 90 degrees after the settle; 2: not dropped (starts standing); 3: tilted less than 90 degrees after the settle; 4: not dropped (starts standing)) |
 | Actions | 12 joint position targets per control step (0.02 s of simulated time); kp = 35 N m/rad, joint damping 0.5 N m s/rad |
 | Resources | 4 CPUs, no GPU (CPU physics, EGL or OSMesa rendering) |
-
-### Change Log
-- 2026-10-14 (review, B1-m2): `tests/grade.py` only. A replay process that died or ran out of time, a
-  rebuilt start that does not match the instance's hash (`instance_mismatch`) and an exception of the verifier itself
-  now write `infra_error = 1` beside `grader_error = 1`: no verdict on the agent. Before, they wrote `grader_error = 1`
-  alone, which counted as the agent's 0. Every `reward.json` now carries `infra_error`. The scene, the instance, the
-  pass rule and the reference are unchanged, so the task keeps its name; a past 0 with `grader_error = 1` was an
-  infrastructure failure.

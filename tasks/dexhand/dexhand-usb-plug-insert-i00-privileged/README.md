@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-usb-plug-insert-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `usb_plug_insert` |
+| Family / instance | `usb_plug_insert` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz replays the validated Sharpa Wave episode on the Marvin right arm (1,595 controls; success after 1,475, then 120 unexecuted hold rows of slack): pinch and lift as in the floating-stage episode, a planned joint-space change of the arm's IK branch while the plug is carried, closed-loop alignment in front of the desk edge, insertion into port 4, release and a 1 s released hold. Two fresh-process replays succeed with identical state hashes, and the rows rounded to float32 also succeed. The standard oracle submits the same rows through the public client. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -65,6 +65,3 @@ front of the desk (floor 0.10 m lower than in the source, so the desk top is 0.9
 legs set back under the top to clear the robot's base plate; both disclosed), the hub rests free on the desk (one hand; the hub is not held), each port is
 an open cavity with generous clearance, receptacle tongue and contacts are visual, retention springs are omitted, the
 hub's upstream cable is a visual rigidly attached to the hub, and the plug cable is a passive 20-link ball-joint rod.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

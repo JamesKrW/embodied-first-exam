@@ -9,7 +9,7 @@
 | Family / instance | `soccer_match` / seed 7 |
 | Oracle | `partial` — screening 2026-10-12 (soccer-2v2-9): our built-in camera reference does not beat level 2 (0/10; it cannot kick while walking); a model did (Astra 12:2 at level 2, camera only). The oracle run checks the pipeline (a valid, replayed match), not a win. S = 5 (an official match slowdown) so that 2 x 5 min of game time (3000 s of wall time) and the reviews fit the hub's 7200 s |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 5 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RO_SLOWDOWN`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 5 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RO_SLOWDOWN`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-soccer-0.1.0` |
 
 ## Task
@@ -50,6 +50,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 Source: Embodied Olympics task `soccer-match-wallclock-program-standard`, revision `soccer-2v2-10+core-0.2`. The rules, the referee, the scripted
 opponent, the observation, the review between points and the grader are ours, unchanged; only the seat is
 unmetered (Harbor records the model's usage) and the instance is frozen.
-
-### Change Log
-- 2026-10-16: the replay video only. The sim's spectator render (`core.spectator`, after the verdict) may take 1800 s (`RCB_VIDEO_TIMEOUT_S`, was 300 s) and the collect hook waits as long for `video.json`; `[[verifier.collect]]` `timeout_sec` 2580 s (was 1080 s), `[verifier]` `timeout_sec` 2760 s (was 1260 s). A full match (2 x 5 min, about 30,000 control steps) takes about 8-10 min to replay and draw on a 64-vCPU host, so every trial before this date ended without its video. The match, the replay check, the grader and the pass rule are unchanged (`core/` and `sport/`, the match's `source_sha`, are untouched): earlier results stand.

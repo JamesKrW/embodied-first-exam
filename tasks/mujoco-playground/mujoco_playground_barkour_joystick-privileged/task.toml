@@ -11,18 +11,10 @@ task_type = "trajectory"
 simulator = "mujoco"
 robot = "google-barkour-vb"
 family = "mujoco_playground/BarkourJoystick"
-mode = "privileged"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 oracle = "full"
 instance_seed = 2             # the PRNGKey of Playground's reset (and, for the joystick tasks, its command process)
 expert_time_estimate_hours = 3.0
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 2
-allowed = [2]
-oracle = [2]
 
 [verifier]
 timeout_sec = 1200.0

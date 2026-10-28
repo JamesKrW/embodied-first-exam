@@ -61,11 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D13`, frozen instance `D13-SupportedCubeFlipRelay-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Stricter check: the tray must be moving (0.08
-  m/s or more) through each flip. The cube's material and start spread are named parameters (same values). The
-  pusher's adapter is now joined to the pusher by a bridge. The tool's mass is unchanged; its centre of mass and
-  inertia shift slightly. Frozen instance: seed 0, `initial_sha` b4bcb558a8692075; reference rows: 883 control steps
-  (was seed 0, `initial_sha` b1830ad75e34ff61). Results from before are under the earlier digest and are not ranked
-  with these.

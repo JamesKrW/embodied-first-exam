@@ -13,21 +13,14 @@ robot = "sharpa-wave-floating"
 hands = ["sharpa", "wuji"]
 default_hand = "sharpa"
 family = "binder_page_load"
-mode = "privileged"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 
 oracle = "full"
 oracle_evidence = "solution/ replays the validated Sharpa Wave authoring trajectory (2,192 controls, success after 2,042; standard mode submits the same float64 rows through the public client). Two fresh-process replays succeed with identical state hashes; float32-rounded rows also succeed."
+instance_seed = 0
 expert_time_estimate_hours = 4.0
 difficulty = "hard"
 release_status = "provisional"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 3600.0

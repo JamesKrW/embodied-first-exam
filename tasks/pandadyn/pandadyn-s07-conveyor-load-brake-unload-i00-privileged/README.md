@@ -61,10 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `S07`, frozen instance `S07-ConveyorLoadBrakeUnload-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Stricter checks: the carriage must be braked by
-  a two-finger grip on its handle alone, and the carriage reaching the end of its rail before it is braked fails the
-  task. Unused parameters are gone; scene and start are unchanged. Frozen instance: seed 0, `initial_sha`
-  143b42d5a40897e6; reference rows: 1303 control steps (the same start; new reference rows). Results from before are
-  under the earlier digest and are not ranked with these.

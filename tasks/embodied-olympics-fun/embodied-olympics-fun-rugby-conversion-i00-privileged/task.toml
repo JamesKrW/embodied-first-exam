@@ -12,21 +12,12 @@ simulator = "mujoco"               # the Embodied Olympics simulator: MuJoCo 3.3
 robot = "unitree-g1"
 family = "rugby_conversion"
 category = "football-and-volleyball"
-mode = "privileged"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 # scene = environment/instance.json (the family's parameters + its t = 0 state hash); identity = the dataset.toml digest
 instance_seed = 0
 expert_time_estimate_hours = 6.0
 oracle = "full"
 oracle_evidence = "Reference, on Unitree's actuator data (rotor inertia, joint friction): a standing power kick through lowcmd, the hip and knee bursts at the G1's 88 / 139 N m; the wind-up pose, hip roll, crouch, ankle, knee-burst start, waist torque and wind-up length from CMA-ES, with a penalty for any arm passing into the robot's own body. The foot meets the ball above the rigid tee at 3.18 s and sends it through the goal plane at 5.66 m (the bar is at 3.0 m), 0.44 m right of the middle; success after 4.05 s. All 8 perturbations score (servo gains x0.97 / x1.03, the kick 10 ms earlier / later, the tee 1 cm nearer, farther, left, right; the ball crosses at 5.3-5.7 m). The deepest self-overlap is 1.2 mm (trunk and shoulder). The robot falls after the kick, which is allowed (Law 8 judges the ball). Measured: success after 4.05 s of the 60 s limit, live and in a fresh replay, ending in the same state."
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 900.0
@@ -48,8 +39,9 @@ memory_mb = 8192
 
 [agent]
 timeout_sec = 7200.0
-# Egress: open (Harbor's default), as `[metadata] network` declares. Embodied Olympics lets the agent search for and download
+# Egress: open, `network_mode = "public"` below (the author's choice). Embodied Olympics lets the agent search for and download
 # public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md).
+network_mode = "public"        # open egress, the task author's choice (docs/protocol/README.md Appendix H.6)
 
 [environment]
 build_timeout_sec = 1800.0

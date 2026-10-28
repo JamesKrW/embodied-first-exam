@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-coffee-stir-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `coffee_stir` |
+| Family / instance | `coffee_stir` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz replays the validated Sharpa Wave authoring trajectory on the Marvin right arm (1,882 controls; success after 1,802, then 80 unexecuted hold rows of slack). Two fresh-process replays succeed with identical state hashes, and the rows rounded to float32 also succeed. The standard oracle submits the same rows through the public client. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -76,6 +76,3 @@ flange with its vendor joints, actuators and contact geometry unchanged. The rob
 `tianji/manifest.json`) at the world origin, its plate on the floor; the left arm is parked. Each hand's start state
 (`task.json` `initial_qpos`) is a settled physical contact grasp produced by an authoring run (no weld). This is tool
 use with an arm-mounted hand, not a fluid-mixing claim.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

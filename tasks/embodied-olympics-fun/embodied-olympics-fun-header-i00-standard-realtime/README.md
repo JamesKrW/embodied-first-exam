@@ -7,9 +7,9 @@
 | Twin | `embodied-olympics-fun-header-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `header` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the robot teleported 0.40 m forward and the ball's velocity set at the head contact, in 11.6, out 12.5 m/s, then into the goal); the cross comes from a football machine on the left wing 20 m away (exit 15.3 m/s with backspin, apex 4.4 m) and passes 0.45 m in front of the head, at 1.65 m, at 11.7 m/s; the keeper is a physical 80 kg board on a rail, servo-held; negatives: a still head (at most 0.85 of the speed back), chest, hand, carry, wide, headed at the keeper (saved), a second touch, too close to the machine, touching the machine, a goal without a header, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the robot teleported 0.40 m forward and the ball's velocity set at the head contact, in 11.6, out 12.5 m/s, then into the goal); the cross comes from a football machine on the left wing 20 m away (exit 15.3 m/s with backspin, apex 4.4 m) and passes 0.45 m in front of the head, at 1.65 m, at 11.7 m/s; the keeper is a physical 80 kg board on a rail, servo-held; negatives: a still head (at most 0.85 of the speed back), chest, hand, carry, wide, headed at the keeper (saved), a second touch, too close to the machine, touching the machine, a goal without a header, a fall; human review in the pull request that adds the benchmark (PROTOCOL §4) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 5 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 5 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 
 ## Task

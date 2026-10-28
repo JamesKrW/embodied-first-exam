@@ -25,19 +25,11 @@ task_type = "trajectory"
 simulator = "vlabench"
 robot = "franka-panda"
 family = "vlabench/select_mahjong_spatial"
-mode = "standard"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.1"
 oracle = "full"
 instance_seed = 0
 expert_time_estimate_hours = 2.0
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 1200.0

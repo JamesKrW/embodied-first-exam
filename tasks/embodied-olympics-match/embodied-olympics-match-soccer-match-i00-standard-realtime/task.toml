@@ -19,9 +19,8 @@ task_type = "trajectory"
 simulator = "mujoco"
 robot = "booster-t1"
 family = "soccer_match"
-mode = "standard-realtime"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-slowdown = 5                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §4b); RO_SLOWDOWN's default
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
+slowdown = 5                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RO_SLOWDOWN's default
 protocol = "eai-standard-realtime/1.0"
 instance_seed = 7
 opponent_level = 2
@@ -36,13 +35,6 @@ official = false
 expert_time_estimate_hours = 0.5
 oracle = "partial"
 oracle_evidence = "screening 2026-10-12 (soccer-2v2-9): our built-in camera reference does not beat level 2 (0/10; it cannot kick while walking); a model did (Astra 12:2 at level 2, camera only). The oracle run checks the pipeline (a valid, replayed match), not a win. S = 5 (an official match slowdown) so that 2 x 5 min of game time (3000 s of wall time) and the reviews fit the hub's 7200 s"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 7
-allowed = [7]
-oracle = [7]
 
 [verifier]
 timeout_sec = 2760.0

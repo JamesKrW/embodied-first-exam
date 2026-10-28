@@ -29,23 +29,13 @@ simulator = "mujoco"
 robot = "unitree-h1-2"
 family = "tennis_return"
 category = "basketball-and-rackets"
-mode = "standard-realtime"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-slowdown = 1                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §4b); RCB_SLOWDOWN's default
-network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
+slowdown = 1                      # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RCB_SLOWDOWN's default
 protocol = "eai-standard/2.3"
 instance_seed = 0
-reset_budget = 5
 expert_time_estimate_hours = 14.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: The right hand is the H1-2's own Inspire five-finger hand at its default forces (20 N per fingertip, 30 N the thumb; no factor), the racket across the palm (tennis-serve's grip). With the racket square to the forearm, a parameter search over a backhand's poses, timing and spot found swings that pass the bounced ball within about 5 cm of the strings but none that meets it, so the positive is a declared magic action: real, the machine's 30.3 m/s serve and its bounce and a backhand swing with the racket held by the hand's own drives; injected, after the bounce the ball moved (its velocity kept) onto the strings' path 0.04 s ahead, and after the real hit its velocity set to (15, 1, 7) m/s; it clears the net by 3.2 m and lands at (20.1, 2.2); the racket stays in the hand through the 14.8 m/s impact; the same state hash twice. Negatives: nop (two bounces), the hand opened (the racket leaves the hand at 0.06 s), a volley, the ball onto the robot. Stress: random arm targets on the walking policy: the racket is shaken out of the hand, the handle at most 1.0 mm into the fingers. Realtime: physics RTF about 1.6 on the reference workstation (estimated from a same-process comparison on a slower host), just above 1.5.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
+oracle_evidence = "no reference solution; the referee is tested: The right hand is the H1-2's own Inspire five-finger hand at its default forces (20 N per fingertip, 30 N the thumb; no factor), the racket across the palm (tennis-serve's grip). With the racket square to the forearm, a parameter search over a backhand's poses, timing and spot found swings that pass the bounced ball within about 5 cm of the strings but none that meets it, so the positive is a declared magic action: real, the machine's 30.3 m/s serve and its bounce and a backhand swing with the racket held by the hand's own drives; injected, after the bounce the ball moved (its velocity kept) onto the strings' path 0.04 s ahead, and after the real hit its velocity set to (15, 1, 7) m/s; it clears the net by 3.2 m and lands at (20.1, 2.2); the racket stays in the hand through the 14.8 m/s impact; the same state hash twice. Negatives: nop (two bounces), the hand opened (the racket leaves the hand at 0.06 s), a volley, the ball onto the robot. Stress: random arm targets on the walking policy: the racket is shaken out of the hand, the handle at most 1.0 mm into the fingers. Realtime: physics RTF about 1.6 on the reference workstation (estimated from a same-process comparison on a slower host), just above 1.5.; human review in the pull request that adds the benchmark (PROTOCOL §4)"
 
 [verifier]
 timeout_sec = 900.0
@@ -77,9 +67,10 @@ timeout_sec = 900
 
 [agent]
 timeout_sec = 7200.0
-# Egress: open (Harbor's default), as `[metadata] network` declares. Embodied Olympics lets the agent search for and download
+# Egress: open, `network_mode = "public"` below (the author's choice). Embodied Olympics lets the agent search for and download
 # public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md). The agent's
 # container holds no simulator, no referee and no instance.
+network_mode = "public"        # open egress, the task author's choice (docs/protocol/README.md Appendix H.6)
 
 [environment]
 build_timeout_sec = 1800.0

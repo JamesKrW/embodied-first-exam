@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `robocasa-gr1-plate-to-pan-i00-standard` |
 | Simulator / robot | `robosuite` / `fourier-gr1` |
-| Family / instance | `robocasa-gr1/PosttrainPnPNovelFromPlateToPanSplitA` |
+| Family / instance | `robocasa-gr1/PosttrainPnPNovelFromPlateToPanSplitA` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa-gr1-0.1.0` |

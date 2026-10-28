@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `robocasa-gr1-bottle-to-cabinet-close-i00-standard` |
 | Simulator / robot | `robosuite` / `fourier-gr1` |
-| Family / instance | `robocasa-gr1/PnPBottleToCabinetClose` |
+| Family / instance | `robocasa-gr1/PnPBottleToCabinetClose` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa-gr1-0.1.0` |

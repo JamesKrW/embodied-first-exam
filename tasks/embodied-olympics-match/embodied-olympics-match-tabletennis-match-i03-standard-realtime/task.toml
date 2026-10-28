@@ -19,9 +19,8 @@ task_type = "trajectory"
 simulator = "mujoco"
 robot = "franka-panda"
 family = "tabletennis_match"
-mode = "standard-realtime"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-slowdown = 10                     # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §4b); RO_SLOWDOWN's default
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
+slowdown = 10                     # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RO_SLOWDOWN's default
 protocol = "eai-standard-realtime/1.0"
 instance_seed = 11
 opponent_level = 4
@@ -37,13 +36,6 @@ official = false
 expert_time_estimate_hours = 0.5
 oracle = "partial"
 oracle_evidence = "export-only top tier (sim/match.py TIERS top, 2026-10-16: level 4's serves, the strongest returns the real-limited arm makes, level 2's defence): our truth-state reference beat it in 12 of 40 seeds, our camera-only reference in 7 of 18 (D = 5), both on this seed (5:0 camera, 6:4 truth); every simple baseline lost all its matches; the live oracle run is in the export report"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 11
-allowed = [11]
-oracle = [11]
 
 [verifier]
 timeout_sec = 1260.0

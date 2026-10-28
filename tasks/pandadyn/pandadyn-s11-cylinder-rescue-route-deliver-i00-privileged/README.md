@@ -61,9 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `S11`, frozen instance `S11-CylinderRescueRouteDeliver-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Unused configuration parameters (`radius`,
-  `restitution`) are gone; scene, physics and checks are unchanged. Frozen instance: seed 0, `initial_sha`
-  eec08812e42872ec; reference rows: 1782 control steps (the same start and reference rows as before). Results from
-  before are under the earlier digest and are not ranked with these.

@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-pancake-serve-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `pancake_serve` |
+| Family / instance | `pancake_serve` / seed 0 |
 | Oracle | `full` — solution/ replays the validated Sharpa Wave authoring trajectory on the Marvin arm rig (1,167 controls; the turner is picked up from the counter, the replay ends at success after 1,017 controls) in both modes; it succeeds in two fresh processes with identical state hashes, also with float32-rounded rows. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -75,6 +75,3 @@ starts at rest on the counter at the source's pose (settled under physics) and m
 Not reproduced from the source: the other hand supporting and tilting the pan (about 8 degrees and 4 cm in the source
 film); here the pan stands free and the left arm stays parked. This is a physical tool-use task for an arm-mounted
 dexterous hand, not a zero-shot claim.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

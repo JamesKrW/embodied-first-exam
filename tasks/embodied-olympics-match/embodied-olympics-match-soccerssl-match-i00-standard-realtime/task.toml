@@ -19,9 +19,8 @@ task_type = "trajectory"
 simulator = "mujoco"
 robot = "ssl-robot"
 family = "soccer_ssl_match"
-mode = "standard-realtime"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-slowdown = 10                     # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §4b); RO_SLOWDOWN's default
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
+slowdown = 10                     # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RO_SLOWDOWN's default
 protocol = "eai-standard-realtime/1.0"
 instance_seed = 7
 opponent_level = 2
@@ -36,13 +35,6 @@ official = false
 expert_time_estimate_hours = 0.5
 oracle = "partial"
 oracle_evidence = "screening (soccer_ssl-1): the camera reference's result at level 2 is not established for this development seed; a model won level 2 (Opus 4:3, camera only). The oracle run checks the pipeline"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 7
-allowed = [7]
-oracle = [7]
 
 [verifier]
 timeout_sec = 3960.0

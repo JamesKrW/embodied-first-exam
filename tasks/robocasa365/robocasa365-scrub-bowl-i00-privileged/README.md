@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `robocasa365-scrub-bowl-i00-standard` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa365/ScrubBowl` |
+| Family / instance | `robocasa365/ScrubBowl` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0` |

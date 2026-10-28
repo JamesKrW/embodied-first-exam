@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexjoco-click-mouse-i00-standard` |
 | Simulator / robot | `dexjoco` / `franka-allegro` |
-| Family / instance | `click_mouse` |
+| Family / instance | `click_mouse` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexjoco-0.1.2` |
@@ -66,15 +66,3 @@ real-time sleep, episode cap and hanoi's wall-clock auto-reset are disabled in t
 
 ### Provenance
 Generated from the frozen instance (`environment/instance.npz`), restored from DexJoCo's demonstration of the task.
-
-### Change Log
-- 2026-10-14 (review, B-M3 and B6-3): `environment/instance.npz` and `tests/instance.npz` no longer name
-  the demonstration the scene was restored from: their `meta` entry had `source` (the dataset) and `demo` (the
-  demonstration's id), and the reference solution is that demonstration's own actions, so the agent could read at
-  `/app/instance.npz` where a solution was (PROTOCOL §2.7). Only `meta` changed: every array of the scene is the same
-  (instance sha `ad73bedaf42257f0`), so the scene, the pass rule and the reference are unchanged and the task keeps its
-  name. The tooling (`rcb_dexjoco.py`, both copies) refuses to save an instance whose `meta` says where its scene came
-  from. `tests/grade.py`: a rebuilt instance that does not match its recorded hash is now no verdict
-  (`instance_mismatch`, `grader_error`, `infra_error` = 1, nothing replayed); before, it was the agent's 0 with
-  `infra_error` = 0 and `instance_ok` = 0. Past results: the demonstration itself was out of reach under the egress
-  allowlist (Hugging Face is not on it); a past 0 with `instance_ok` = 0 was an infrastructure failure.

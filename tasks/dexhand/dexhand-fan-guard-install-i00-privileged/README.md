@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-fan-guard-install-i00-standard` |
 | Simulator / robot | `mujoco` / `sharpa-wave-floating` |
-| Family / instance | `fan_guard_install` |
+| Family / instance | `fan_guard_install` / seed 0 |
 | Oracle | `full` — solution/ replays the recorded Sharpa Wave episode in both modes (2,665 controls; success after 2,485; all four clips start open and are closed by the hand): two fresh-process replays with identical state hashes, float32 rows succeed. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -77,6 +77,3 @@ static decoration. The Sharpa Wave assets are pinned to MuJoCo Menagerie commit
 wuji-technology/wuji-description commit `829c9aa27cb12c3a49d5b8d63c9869dd8f656702` (MIT) and mounted on the same
 wrist stage with its vendor joints, actuators and contact geometry unchanged. This is a rigid-wire, rigid-clip
 assembly model on a floating wrist stage, not a model of wire or snap-leaf elasticity or a full-arm claim.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

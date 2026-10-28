@@ -9,7 +9,7 @@
 | Family / instance | `mujoco_playground/BarkourJoystick` / seed 2 |
 | Oracle | `full` |
 | Agent time budget | 1800 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:mujoco-0.1.3` |
 
 ## Task
@@ -62,16 +62,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Slowdown | S = 1 (`RCB_SLOWDOWN`'s default): measured RTF 31.6 (2026-10-14, an RTX 4090 workstation at load 44, the service capped at 4 CPUs: the reference's 1000 rows planned from step 0 with the clock flat out, RCB_SLOWDOWN = 0.01), far above 3, so S = 1. At S = 1 the reference succeeds live and in the fresh replay with no stall, also streamed one row per call with a camera image every 0.25 s (7.7 ms each over EGL) |
 | Service | the realtime layer of HumanoidBench, BiGym 2.0 and MyoSuite (`rcb_realtime.py`, `rcb_service.py`, unchanged) with `server.py`, which implements `rcb_service.Sim` on `rcb_quadruped.Session` (the standard twin's scene, schedule, pushes, termination rule and check); cameras `track` (follows the robot) and `realsense/rgb` (on its head) (320 x 240, EGL on the GPU) |
 | Resources | 4 CPUs and a GPU for rendering (the physics is on the CPU) |
-
-### Change Log
-- 2026-10-14 (owner): added. The family's scene is dynamic (PROTOCOL §2.14), so it gets a standard-realtime
-  twin with S = 1 and 10 resets; the cutoff is the standard twin's.
-- 2026-10-17 (owner, boards 0150 and 0151): **graded by the live episode, no grading replay** (`environment/sim/server.py`,
-  the shared layer `rcb_service.py` / `rcb_realtime.py`, `tests/grade.py`, `task.toml`). Success is the task's check on the
-  episode the service ran (`graded_by = "live"`, `replays = 0`); the service no longer replays it in a fresh simulator
-  (success was live ∧ that replay ∧ the same final state). The rule is the same: the replay ran the same rows through the
-  same check. The frozen start is checked when an episode begins (the instance's `state_sha`; a mismatch gets no
-  episode, `instance_mismatch`, infrastructure), the video is one render pass after the verdict, and the collect hook
-  waits 300 s for the verdict (was 840 s). The scene, the instance, the pass rule and what the agent sees are unchanged
-  (the instruction's grading sentence now says live), so the task keeps its name; `reward.json` no longer has
-  `replay_success` and `deterministic`.

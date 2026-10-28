@@ -6,7 +6,7 @@
 | Mode | standard (`eai-standard/2.2`) |
 | Twin | `abc-sim-spell-cat-i00-privileged` |
 | Simulator / robot | `mujoco` / `i2rt-yam-bimanual` |
-| Family / instance | `spell_cat` |
+| Family / instance | `spell_cat` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.1.0` |
@@ -49,6 +49,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 ### Provenance
 The frozen instance (`instance.npz`) and the reference solution (`solution/oracle.npy`) were made at generation time from
 an upstream validation demonstration; see `tasks/abc-sim/README.md`.
-
-### Change Log
-- 2026-10-21: first version.

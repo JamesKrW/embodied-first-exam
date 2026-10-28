@@ -11,18 +11,10 @@ task_type = "trajectory"
 simulator = "robosuite"
 robot = "franka-panda"
 family = "libero-max/libero_10/visual_theme_switch"
-mode = "privileged"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 oracle = "full"
 instance_seed = 195             # LIBERO-MAX's policy seed for the case (the scene is the frozen LIBERO-PRO initial state)
 expert_time_estimate_hours = 1.0
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 195
-allowed = [195]
-oracle = [195]
 
 [verifier]
 timeout_sec = 1800.0

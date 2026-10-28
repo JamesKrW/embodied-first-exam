@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `robocasa365-clear-sink-i00-standard` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa365/ClearSink` |
+| Family / instance | `robocasa365/ClearSink` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0` |

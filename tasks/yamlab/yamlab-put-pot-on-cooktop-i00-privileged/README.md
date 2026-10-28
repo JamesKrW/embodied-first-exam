@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `yamlab-put-pot-on-cooktop-i00-standard` |
 | Simulator / robot | `yamlab` / `i2rt-yam-bimanual` |
-| Family / instance | `put_pot_on_cooktop` |
+| Family / instance | `put_pot_on_cooktop` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe-private:yamlab-0.2.1` |
@@ -61,17 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 The frozen instance was chosen and frozen in `ghcr.io/mll-lab-nu/efe-private:yamlab-0.1.0`.
-
-### Change Log
-- 2026-10-10: grading robustness and time limits; the scene, the frozen instance and the pass rule are
-  unchanged, so the task keeps its name. `tests/grade.py`: each fresh-process replay has
-  max(1800 s, 1200 s + rows / 20) instead of a flat 1800 s and `[verifier] timeout_sec` is 13000 s (was 2400 s, less than two
-  replays at their limit), so a long trajectory is graded instead of the verifier being killed; a replay that still runs
-  out of time is `replay_timed_out` with `grader_error` = `infra_error` = 1; a file that is not a readable trajectory is
-  `bad_trajectory` (was `grader_error`); `instance_ok` = 0 (the rebuilt scene differs on this host) sets `grader_error` and
-  `infra_error`; every reward has `deterministic` and `infra_error`. Tooling: a failed replay video never voids the
-  replay, and the video of a trajectory longer than 18,000 rows is a time lapse (at most 9,000 frames).
-- 2026-10-10 (owner decision): the frozen instance file no longer names the recording it was made from
-  (`instance.json` had a `source` entry with the dataset, the file and the demonstration index, and the tooling's usage
-  text named such a file; the reference solution replays that demonstration). Nothing reads the entry: the scene, its
-  state hash, the tooling's behaviour and the pass rule are unchanged, so the task keeps its name.

@@ -27,22 +27,12 @@ simulator = "mujoco"
 robot = "unitree-g1"
 family = "free_kick_wall"
 category = "football-and-volleyball"
-mode = "standard"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 5
 expert_time_estimate_hours = 8.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by a real kick (a standing power kick through lowcmd: 14.8 m/s off the foot, in at the near post); a fall after the kick does not fail; but only 8 of 13 gain and ball-offset perturbations score (the ball rebounds off the wall into the fallen robot, or goes wide), below the 9 of 10 bar, so it is not shipped as a reference solution; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
+oracle_evidence = "no reference solution; the referee is tested: positive by a real kick (a standing power kick through lowcmd: 14.8 m/s off the foot, in at the near post); a fall after the kick does not fail; but only 8 of 13 gain and ball-offset perturbations score (the ball rebounds off the wall into the fallen robot, or goes wide), below the 9 of 10 bar, so it is not shipped as a reference solution; human review in the pull request that adds the benchmark (PROTOCOL §4)"
 
 [verifier]
 timeout_sec = 900.0
@@ -74,9 +64,10 @@ timeout_sec = 900
 
 [agent]
 timeout_sec = 7200.0
-# Egress: open (Harbor's default), as `[metadata] network` declares. Embodied Olympics lets the agent search for and download
+# Egress: open, `network_mode = "public"` below (the author's choice). Embodied Olympics lets the agent search for and download
 # public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md). The agent's
 # container holds no simulator, no referee and no instance.
+network_mode = "public"        # open egress, the task author's choice (docs/protocol/README.md Appendix H.6)
 
 [environment]
 build_timeout_sec = 1800.0

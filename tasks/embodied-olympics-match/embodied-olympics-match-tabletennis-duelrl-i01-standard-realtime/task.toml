@@ -19,9 +19,8 @@ task_type = "trajectory"
 simulator = "mujoco"
 robot = "franka-panda"
 family = "tabletennis_duel"
-mode = "standard-realtime"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-slowdown = 10                     # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §4b); RO_SLOWDOWN's default
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
+slowdown = 10                     # standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md §3); RO_SLOWDOWN's default
 protocol = "eai-standard-realtime/1.0"
 instance_seed = 8
 opponent_level = 0
@@ -37,13 +36,6 @@ official = false
 expert_time_estimate_hours = 0.5
 oracle = "partial"
 oracle_evidence = "screening (a CPU cluster, D = 5): the truth-state reference beats it 15/160 (9 %; it beats level 4 in 2/40), the camera-only reference 3/20 (seed 8, A first: 5:2); mirror RL vs RL 68/120 (57 %, Wilson 48-65 %); simple baselines vs RL: center 4/20, center_truth 3/20, fixed 2/20, random 2/20, short_serve 0/20, no_hit 0/20; same-seed reruns 3/3 identical; 0 refused / rejected commands, fewer joint-velocity reflexes than the reference (74 vs 166 per 40 matches). Realtime play varies run to run, hence partial"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 8
-allowed = [8]
-oracle = [8]
 
 [verifier]
 timeout_sec = 1260.0

@@ -27,22 +27,12 @@ simulator = "mujoco"
 robot = "unitree-g1"
 family = "jump_rope"
 category = "track-and-jumps"
-mode = "standard"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 5
 expert_time_estimate_hours = 16.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: Both handles held across the palms of the G1's own Dex3-1 hands at the device's torques (no weld); nop: the hands keep both handles for the full minute (time). Positive by a declared magic action: the rope's segments moved along a forward-turning loop round the robot (its ties off) and the robot kicked up 0.15 s before each pass; the rope passes under the airborne feet and over the head 17 times, the robot flies and lands: success after the 17th landing and 1 s of standing (12.3 s). The real rope turned by the arms for 4 s (injected start, kicked take-offs) keeps both handles in the hands but makes only 0.8 turns: no counted jump with this real rope (a search over arm circles found none that turns it with the handles across the palms). Negatives: a jump with the rope behind, letting go of a handle, the rope beside the body, under one foot, to and fro, backwards, under the standing feet, stepping over, a one-footed take-off, several hops on one turn (counted once), over a still rope (twice), a fall, a last jump that does not end standing. Determinism: the same state hash twice.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
+oracle_evidence = "no reference solution; the referee is tested: Both handles held across the palms of the G1's own Dex3-1 hands at the device's torques (no weld); nop: the hands keep both handles for the full minute (time). Positive by a declared magic action: the rope's segments moved along a forward-turning loop round the robot (its ties off) and the robot kicked up 0.15 s before each pass; the rope passes under the airborne feet and over the head 17 times, the robot flies and lands: success after the 17th landing and 1 s of standing (12.3 s). The real rope turned by the arms for 4 s (injected start, kicked take-offs) keeps both handles in the hands but makes only 0.8 turns: no counted jump with this real rope (a search over arm circles found none that turns it with the handles across the palms). Negatives: a jump with the rope behind, letting go of a handle, the rope beside the body, under one foot, to and fro, backwards, under the standing feet, stepping over, a one-footed take-off, several hops on one turn (counted once), over a still rope (twice), a fall, a last jump that does not end standing. Determinism: the same state hash twice.; human review in the pull request that adds the benchmark (PROTOCOL §4)"
 
 [verifier]
 timeout_sec = 900.0
@@ -74,9 +64,10 @@ timeout_sec = 900
 
 [agent]
 timeout_sec = 7200.0
-# Egress: open (Harbor's default), as `[metadata] network` declares. Embodied Olympics lets the agent search for and download
+# Egress: open, `network_mode = "public"` below (the author's choice). Embodied Olympics lets the agent search for and download
 # public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md). The agent's
 # container holds no simulator, no referee and no instance.
+network_mode = "public"        # open egress, the task author's choice (docs/protocol/README.md Appendix H.6)
 
 [environment]
 build_timeout_sec = 1800.0

@@ -22,20 +22,12 @@ task_type = "trajectory"
 simulator = "robolab"
 robot = "franka-robotiq-2f85"
 family = "block_stacking_order_agnostic"
-mode = "standard"                  # robot as a service: RGB, depth + proprioception only; no object poses, no success predicate, no reset
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.2"
 oracle = "none"
-oracle_evidence = "No reference solution: RoboLab ships no expert or planner. Positive examples graded 1 by the separate verifier: robolab-block-stacking-order-agn__kqJQMLf (robolab-block-stacking-order-agnostic-i00-privileged before 2026-10-14, run codex-gpt6_luna-xhigh, robolab-lunacx-0925-2038); robolab-block-stacking-order-agn__S6o3W3Z (robolab-block-stacking-order-agnostic-i00-standard before 2026-10-14, run codex-gpt6_luna-xhigh, robolab-lunaxh-limited-rerun-0928). The positives were graded before 2026-10-14 (one-finger gripper contact, no settle hold); not re-graded under the 2026-10-14 term unless stated here. Human review per family (PROTOCOL §2.7)."
+oracle_evidence = "No reference solution: RoboLab ships no expert or planner. Positive examples graded 1 by the separate verifier: robolab-block-stacking-order-agn__kqJQMLf (robolab-block-stacking-order-agnostic-i00-privileged before 2026-10-14, run codex-gpt6_luna-xhigh, robolab-lunacx-0925-2038); robolab-block-stacking-order-agn__S6o3W3Z (robolab-block-stacking-order-agnostic-i00-standard before 2026-10-14, run codex-gpt6_luna-xhigh, robolab-lunaxh-limited-rerun-0928). The positives were graded before 2026-10-14 (one-finger gripper contact, no settle hold); not re-graded under the 2026-10-14 term unless stated here. Human review per family (PROTOCOL §4)."
 instance_seed = 0
 expert_time_estimate_hours = 2.0
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
 
 [verifier]
 timeout_sec = 1200.0
@@ -64,7 +56,7 @@ timeout_sec = 3600                # = finalize.sh's HOOK_BUDGET_S (keep them equ
 
 [agent]
 timeout_sec = 3600.0              # RoboLab budget, both modes (tasks/robolab/README.md)
-network_mode = "allowlist"      # model APIs and package registries (scripts/set_agent_egress.py); PROTOCOL §2.11
+network_mode = "allowlist"      # model APIs and package registries (scripts/set_agent_egress.py); PROTOCOL Appendix H.6
 allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.com", "*.openai.com", "api.anthropic.com", "*.anthropic.com", "openrouter.ai", "*.openai.azure.com", "*.cognitiveservices.azure.com", "pypi.org", "files.pythonhosted.org", "deb.debian.org", "security.debian.org", "archive.ubuntu.com", "security.ubuntu.com", "snapshot.ubuntu.com"]
 
 [environment]

@@ -41,8 +41,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 - GPU: not needed.
 - Measured: memory: privileged container p90 2.8 GB (a per-container memory sampler); CPU only; CPU: an estimate
 - Measured (caps): processes and disk: defaults, not measured
-
-## Details
-
-### Change Log
-- 2026-10-16: agent time limit 3600 s -> 1800 s (`[agent] timeout_sec`, both twins; author decision, tasks/kinder/README.md). The scene, instance, pass rule and verifier logic are unchanged (`tests/rcb_limits.json` carries the new cutoff), so the task keeps its name; runs recorded before this date are reported separately.

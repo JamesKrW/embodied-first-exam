@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-drying-rack-unfold-i00-standard` |
 | Simulator / robot | `mujoco` / `sharpa-wave-floating` |
-| Family / instance | `drying_rack_unfold` |
+| Family / instance | `drying_rack_unfold` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz replays the recorded Sharpa Wave authoring episode (2,415 controls, success after 2,315). The rows are float32-exact, so the standard oracle submits the same rows through the client. Two fresh-process replays succeed with identical state hashes. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -72,6 +72,3 @@ Menagerie commit `0059d4335f8156206f63a35662313385f7ad6d74` (Apache-2.0), derive
 wuji-technology/wuji-description commit `829c9aa27cb12c3a49d5b8d63c9869dd8f656702` (MIT) and mounted on the same wrist
 stage with its vendor joints, actuators and contact geometry unchanged. This is mechanism-handling feasibility on a
 floating wrist stage, not a full-arm or zero-shot claim.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

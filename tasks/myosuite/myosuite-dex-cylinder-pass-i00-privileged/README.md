@@ -7,7 +7,7 @@
 | Twin | `myosuite-dex-cylinder-pass-i00-standard` |
 | Simulator / robot | `myosuite` / `myohand` |
 | Family / instance | `dex_cylinder_pass` / seed 0 |
-| Oracle | `none` — no positive example yet (two model attempts failed: Codex + GPT-6 Luna, effort high, run `codex-gpt6_luna-high` and Claude Code + Claude Opus 5.5 (run `claude_code-claude_opus_5_5-default`, 2026-10-06)); the task is reported separately until one exists (PROTOCOL §7, Open 4); human review in PR #65 |
+| Oracle | `none` — no positive example yet (two model attempts failed: Codex + GPT-6 Luna, effort high, run `codex-gpt6_luna-high` and Claude Code + Claude Opus 5.5 (run `claude_code-claude_opus_5_5-default`, 2026-10-06)); the task is reported separately until one exists (PROTOCOL §4); human review in PR #65 |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:myosuite-0.1.1` |
 
@@ -46,16 +46,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 The frozen instance (`environment/instance.npz`) and its scene facts were made at generation time; see `tasks/myosuite/README.md`.
-
-### Change Log
-- 2026-10-10 (review round 3): `tests/grade.py` only. A byte that is not valid UTF-8 in the session log
-  the agent's tools write (`/app/output/rcb_session_log.jsonl`, read only for the self-reported `agent_*` cost fields)
-  stopped the grader before it wrote a reward, so the trial had no verdict; the log is now read tolerantly and can no
-  longer decide anything. A trial whose log is valid is graded as before; the pass rule is unchanged.
-- 2026-10-10 (review round 3): `tests/grade.py`, whose failure a 0 is. The width of the rows is checked
-  against the instance's actuators before any replay (a file that is no trajectory for this instance is
-  `bad_trajectory`, as before). After that check a replay process that gives no result (out of time, killed for
-  memory, not started) is `replay_failed` with `grader_error = 1` and `infra_error = 1`; it was booked as the agent's
-  `bad_trajectory`. Every `reward.json` now carries `infra_error` (1 next to every `grader_error`, so also when the
-  verifier's host does not rebuild the frozen instance). The pass rule is unchanged; a trial graded `bad_trajectory`
-  before this date whose rows had the right shape was an infrastructure failure.

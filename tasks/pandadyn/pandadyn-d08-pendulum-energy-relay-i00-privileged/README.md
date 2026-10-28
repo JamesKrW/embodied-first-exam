@@ -61,12 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D08`, frozen instance `D08-PendulumEnergyRelay-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Stricter checks: the right arm must catch the
-  pendulum while it still swings at 1 rad/s or more and take at least 60 % of its swing energy out, and the final hold
-  must be without the right paddle; both arms use the default motion profile (was 20 % acceleration, 1 % jerk). The
-  blades' adapters are now joined to the blades by a bridge. The tool's mass is unchanged; its centre of mass and
-  inertia shift slightly. Frozen instance: seed 0, `initial_sha` 31ce63f7ddc669b0; reference rows: 565 control steps
-  (was seed 0, `initial_sha` b2c32c50362ed036). Results from before are under the earlier digest and are not ranked
-  with these.

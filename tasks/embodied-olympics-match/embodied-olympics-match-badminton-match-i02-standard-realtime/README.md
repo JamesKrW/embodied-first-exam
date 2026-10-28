@@ -9,7 +9,7 @@
 | Family / instance | `badminton_match` / seed 8 |
 | Oracle | `partial` — screening round 16 (2026-10-13, revision 12): the truth-state reference beat level 2 in 10 of 20 seeds, the camera-only version did not win level 2; a model did (Opus 11:8, 11:6); this development seed was not screened |
 | Agent time budget | 14400 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 20 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RO_SLOWDOWN`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 20 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RO_SLOWDOWN`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0` |
 
 ## Task
@@ -50,6 +50,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 Source: Embodied Olympics task `badminton-match-wallclock-program-standard`, revision `badminton-wallclock-12+duel-14+core-0.2`. The rules, the referee, the scripted
 opponent, the observation, the review between points and the grader are ours, unchanged; only the seat is
 unmetered (Harbor records the model's usage) and the instance is frozen.
-
-### Change Log
-- 2026-10-16: the replay video only. Badminton declares no spectator camera or scene, so `core.spectator` rendered nothing and every trial ended without a video. The collect hook now runs `environment/sim/spectator/sport_video.py` after the verdict: a fresh process replays `episode.jsonl` with the core's own replay and draws the players' two cameras (the sport's `Views`, its own MuJoCo data) at 10 frames per game second into `replay.mp4`, and `video.json` records whether that replay ended in the verdict replay's state. `RCB_RENDER_VIDEO` is 0 (the core's spectator step only recorded a misleading error), `RCB_SPORT_VIDEO` 1, `RCB_VIDEO_TIMEOUT_S` 1800 s; `[[verifier.collect]]` `timeout_sec` 2580 s (was 1080 s), `[verifier]` `timeout_sec` 2760 s (was 1260 s). `spectator/` is not part of the match's `source_sha` (`core/`, `sport/`): the match, the replay check, the grader and the pass rule are unchanged, and earlier results stand.

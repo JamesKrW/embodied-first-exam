@@ -11,19 +11,11 @@ task_type = "trajectory"
 simulator = "ispatialgym"
 robot = "r1pro"
 family = "alignment_vertical"
-mode = "privileged"                # the simulator in the agent's container; the goal and the success check only in the verifier
 dynamics = "static"               # objects move only by the robot or gravity (tasks/ispatialgym/README.md)
 oracle = "none"
 oracle_evidence = "upstream's goal image of this instance is the last frame of a successful replay of upstream's own demonstration of it (kmy17518/ispatialgym-eval-data@15cb9a7, ispatialgym-eval-instances/README.md, Goal images)"
 instance_seed = 0
 expert_time_estimate_hours = 1.0
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
 
 [verifier]
 timeout_sec = 5400               # two fresh-process replays (a scene load + at most 2272 steps each) with margin

@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-triple-jump-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `triple_jump` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (three take-offs, the legs swapped by the robot's own motors: hop 2.64 m, step 5.87 m, a mark of 8.65 m), in the same sand as long-jump; negatives: a foot over the line, a two-foot hop, the wrong feet, another part on the ground, travelling between phases, not into the sand. No single-leg take-off exists for this robot; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (three take-offs, the legs swapped by the robot's own motors: hop 2.64 m, step 5.87 m, a mark of 8.65 m), in the same sand as long-jump; negatives: a foot over the line, a two-foot hop, the wrong feet, another part on the ground, travelling between phases, not into the sand. No single-leg take-off exists for this robot; human review in the pull request that adds the benchmark (PROTOCOL §4) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 

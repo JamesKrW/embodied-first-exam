@@ -9,7 +9,7 @@
 | Family / instance | `table_tennis` / seed 0 |
 | Oracle | `none` — a successful episode of the privileged twin (GPT-6 Luna xhigh, trial `myosuite-table-tennis-i00-privil__SMNgbHk`, 82 rows) planned from step 0 in one `submit(..., at=0)` at S = 1 succeeds live and in the fresh replay, with no stall (2026-10-14); the standard twin's evidence holds for the same instance and rule; human review in PR #201 |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:myosuite-0.1.1` |
 
 ## Task
@@ -51,15 +51,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 ### Provenance
 The frozen instance (`environment/sim/instance.npz`) and its scene facts were made at generation time; the realtime
 service layer is the shared one (`embodied_first_exam/standard/realtime/`); see `tasks/myosuite/README.md`, "Standard-realtime".
-
-### Change Log
-- 2026-10-14 (owner): added. The family's scene is dynamic (PROTOCOL §2.14), so it gets a standard-realtime
-  twin with S = 1 and 10 resets.
-- 2026-10-17 (owner, boards 0150 and 0151): graded by the live episode; no grading replay. The service
-  (`environment/sim/rcb_service.py`, the shared layer, and `environment/sim/server.py`, which no longer has a fresh-replay
-  `verify()`) writes the live episode's verdict (`graded_by` = `live`, `replays` = 0) and renders `replay.mp4` from the
-  trajectory after it; it checks at the episode's start that the scene hashes to the frozen instance's recorded state
-  (`start_sha`; else `instance_mismatch`, an infrastructure failure). The collect hook waits 300 s for the verdict (was
-  840 s, which a replay needed), the video until 870 s as before. `tests/grade.py`: success = the live success. The
-  instruction says the episode is graded as it ran. The scene, the instance, the pass rule, the clock and the slowdown
-  are unchanged, so the task keeps its name; a result graded before passed only if the live episode succeeded too.

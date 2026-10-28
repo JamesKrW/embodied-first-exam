@@ -61,9 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D02`, frozen instance `D02-StrikeCatchMerge-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Configuration only: the balls' mass is the
-  `object_mass` parameter (same value); unused parameters are gone. Scene, physics and checks are unchanged. Frozen
-  instance: seed 0, `initial_sha` 5af2753df0137ee5; reference rows: 1755 control steps (the same start and reference
-  rows as before). Results from before are under the earlier digest and are not ranked with these.

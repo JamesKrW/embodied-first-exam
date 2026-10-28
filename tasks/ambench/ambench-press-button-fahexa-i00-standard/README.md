@@ -63,19 +63,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Images | the `sim` sidecar runs efe-private:ambench (BUILD_ONLY, `images/ambench/BUILD_ONLY`); the agent container and the verifier run the shared client image with its pip pins (`embodied_first_exam/standard/client.env`) |
 | Crash recovery | resume class `approx` (GPU PhysX replays the journal to the checkpointed state almost always; a rare race can leave the last bits different, so a resume's deviation is recorded, `resume_state_mismatch`, and the episode continues; the live state after it is graded): every control step journaled, a checkpoint with the state hash after every call; `restart: on-failure:6`, the service resumes the same episode (docs/protocol/standard_mode.md §13) |
 | Benchmark notes | tasks/ambench/README.md |
-
-### Change Log
-- 2026-10-17 (owner, boards 0150/0151; in place: a new DIGEST, PROTOCOL v2.0 §1 and H.8): standard modes graded by the live
-  episode; no grading replay; video by one film pass after the verdict (`replay.mp4`, the render worker drawing the recorded
-  rows; it never decides anything and is not run again). `success` is the live episode's success as the service judged it
-  (AM-Bench's check at a control step); it was live success ∧ two camera-free fresh-process replays that succeed ∧ agree on
-  the outcome (a task graded by verdict: the live success already, its replays recorded). The collect hook's limit 7200 s ->
-  4800 s. The start-state check is made by the service before it serves the agent: a rebuilt scene whose state hash is not
-  the frozen instance's ends the trial as an infrastructure failure (`instance_mismatch`, a give-up; before, the strict check
-  made the service crash and restart until the hook timed out, and the replays checked it again). GPU faults logged by the
-  live episode are an infrastructure failure for every task (before: for a task graded by verdict; for the others when the
-  live outcome differed from the replays' or the live episode failed). A collect hook on `main` (`kill -9 -1`) now stops
-  whatever the agent left running in its container before the service ends the episode (PROTOCOL H.4). reward.json:
-  `graded_by_live` = 1, `replays` = 0, no `replay_success` / `deterministic`. The scene, the frozen instance, AM-Bench's
-  success check, the agent's interface and the time limit are unchanged; a trial recorded before this date is re-scored by
-  its live episode (tasks/ambench/README.md, Grading).

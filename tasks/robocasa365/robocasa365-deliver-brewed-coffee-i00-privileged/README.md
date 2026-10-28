@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `robocasa365-deliver-brewed-coffee-i00-standard` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa365/DeliverBrewedCoffee` |
+| Family / instance | `robocasa365/DeliverBrewedCoffee` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0` |

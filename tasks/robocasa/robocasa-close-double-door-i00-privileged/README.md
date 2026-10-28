@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `robocasa-close-double-door-i00-standard` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa/CloseDoubleDoor` |
+| Family / instance | `robocasa/CloseDoubleDoor` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa-0.1.0` |

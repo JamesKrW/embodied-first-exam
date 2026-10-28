@@ -6,7 +6,7 @@
 | Mode | standard (`eai-standard/2.2`) |
 | Twin | `dexhand-tray-glass-carry-i00-privileged` |
 | Simulator / robot | `mujoco` / `sharpa-wave-floating-bimanual` |
-| Family / instance | `tray_glass_carry` |
+| Family / instance | `tray_glass_carry` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz replays the validated Sharpa Wave authoring trajectory (1,072 controls; the episode ends with success after 952, 120 hold rows of slack) in both modes; it passes two fresh-process replays with identical state hashes and still succeeds with rows rounded to float32. solution/wuji/trajectory.npz is a validated Wuji Hand 2.2 trajectory of this instance (1,148 controls, motor targets only, physical contact only); the oracle uses it when the run selects wuji (privileged: DEXHAND_HAND=wuji; standard: the sim service's hand), and it replays to success in two fresh processes with identical state hashes. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -78,8 +78,3 @@ rigid 0.275 kg body (glass plus 150 mL of water) and spilling is defined as a gl
 commit `829c9aa27cb12c3a49d5b8d63c9869dd8f656702`, MIT) replace them on the same stages with their vendor joints,
 actuators and contact geometry unchanged. This is a bimanual transport feasibility task on floating wrist stages, not
 an arm-reachability, liquid-sloshing or zero-shot claim.
-
-### Change Log
-- 2026-10-14 (before the first scored run): 20 resets in standard mode (owner; PROTOCOL §4.5, DexToolBench's value). `POST /reset` starts a new episode from the frozen start (the same state hash as a fresh process); only the last episode is graded, a success ends the trial; `reward.json` adds `resets` and `reset_budget`. Before, one trial was one episode.
-- 2026-10-16 (video only): the collect hook renders the replay video in its remaining time (timeout_sec minus 60 s, at most the video limit). The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.
-- 2026-10-17 (owner): standard mode graded by the live episode; no grading replay; video by one render pass from the trajectory after the verdict. `success` is the sim service's own verdict on the episode it ran (the same predicate a replay recomputed: the same rows through the same step, a success ending the episode); the collect hook no longer replays it twice in fresh processes, and `final.json` / `reward.json` drop `replay_success`, `deterministic` and `live_matches_replay` (`graded_by = "live"`, `replays = 0`). The service checks the frozen instance's files against the generator's record when an episode begins (`instance_mismatch`, an infrastructure error). A collect hook on `main` (`kill -9 -1`) stops whatever the agent left running before the service ends the episode. The agent's side (the instruction's grading sentence aside), the scene and the predicate are unchanged.

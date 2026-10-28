@@ -61,11 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D03`, frozen instance `D03-CooperativePuckCourse-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Configuration only: the puck's start and
-  material are named parameters (same values), and the new checks of the hard difficulty are off here. The paddles'
-  adapters are now joined to the paddles by a bridge. The tool's mass is unchanged; its centre of mass and inertia
-  shift slightly. Frozen instance: seed 0, `initial_sha` ee8fe5e580e4888c; reference rows: 2278 control steps (was
-  seed 0, `initial_sha` 5c3eeb99c4c93426). Results from before are under the earlier digest and are not ranked with
-  these.

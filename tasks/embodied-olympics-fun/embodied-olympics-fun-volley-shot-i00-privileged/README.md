@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-volley-shot-i00-standard` |
 | Simulator / robot | `mujoco` / `unitree-h1-2` |
 | Family / instance | `volley_shot` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the robot teleported 0.3 m forward and the ball's velocity set at the foot contact, in 11.9, out 19.4 m/s, then into the goal); the cross comes from a football machine on the left wing (exit 14.2 m/s with backspin, apex 4.5 m) and comes down knee-high 0.6 m in front at 11.7 m/s; the keeper is the physical board of header; negatives: a still leg (at most 0.89 of the speed back), a body contact, carried, wide, at the keeper (saved), a second touch, too close to the machine, touching the machine, a goal without a volley, a fall; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: positive by injection (the robot teleported 0.3 m forward and the ball's velocity set at the foot contact, in 11.9, out 19.4 m/s, then into the goal); the cross comes from a football machine on the left wing (exit 14.2 m/s with backspin, apex 4.5 m) and comes down knee-high 0.6 m in front at 11.7 m/s; the keeper is the physical board of header; negatives: a still leg (at most 0.89 of the speed back), a body contact, carried, wide, at the keeper (saved), a second touch, too close to the machine, touching the machine, a goal without a volley, a fall; human review in the pull request that adds the benchmark (PROTOCOL §4) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 

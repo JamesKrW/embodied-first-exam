@@ -61,13 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `S03`, frozen instance `S03-ClearGateHockey-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Harder, stricter checks: one of the two rails
-  is designated per instance (coloured green) and the final shot must bank off it and touch no other rail since its
-  last paddle contact; the blocker counts as hit only by a puck sliding free of the paddle for 0.15 s or more at 0.15
-  m/s or more (an earlier contact fails the task); the puck must slide back across the recovery line by itself; the
-  horizon is 35 s (was 25 s). The paddle's adapter is now joined to the paddle by a bridge. The tool's mass is
-  unchanged; its centre of mass and inertia shift slightly. Frozen instance: seed 0, `initial_sha` bcbfb438eec4fcea;
-  reference rows: 3025 control steps (was seed 0, `initial_sha` 449f78c9e8366697). Results from before are under the
-  earlier digest and are not ranked with these.

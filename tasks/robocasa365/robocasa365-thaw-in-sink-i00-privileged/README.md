@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `robocasa365-thaw-in-sink-i00-standard` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa365/ThawInSink` |
+| Family / instance | `robocasa365/ThawInSink` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0` |
@@ -42,6 +42,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Instance | the initial state of official demonstration episode 0 (`demo_0`); MuJoCo state, model arrays, task state and RNG frozen in `instance.npz` (SHA-256 `3c90b079e163…`, checked on load) |
 | Deliverable | `(T, 13)` native controller commands, 1 ≤ T ≤ 3000, 20 Hz |
 | Success | the environment's own check (`_check_success`) on the state after the last action: the orange is inside the sink and the water is on (the faucet handle's on / off hinge between 0.40 rad and π rad). The handle turns on two hinges at one pivot: the on / off hinge, whose range is 0 to 0.5 rad (so the water is on only over the last fifth of its travel), turns about the sink's front-to-back axis, so the handle swings sideways; the temperature hinge (about ±0.79 rad) tilts the handle toward or away from you and never turns the water on or off. |
-
-### Change Log
-- 2026-10-14: the success text now says that the faucet handle has two hinges at one pivot: the water on / off hinge (range 0 to 0.5 rad, about the sink's front-to-back axis, so the handle swings sideways) and a temperature hinge (about ±0.79 rad) that tilts it toward or away from you and never turns the water on; before, it named only "the handle joint" (every standard run of `turn-on-sink-faucet` and `thaw-in-sink` moved the temperature hinge). Text only: the scene, the frozen instance, the reference solution, the environment's success check and the verifier are unchanged, so the task keeps its name.

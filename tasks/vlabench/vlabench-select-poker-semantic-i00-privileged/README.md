@@ -59,6 +59,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 The instance (`environment/instance.json`, byte copy in `tests/`) and the
 reference come from PR #4 (closed without merging; commit ad3c510, still fetchable as `refs/pull/4/head`) and were re-verified in
 `ghcr.io/mll-lab-nu/efe-private:vlabench-0.1.0`.
-
-### Change Log
-- 2026-10-19 (in place: a new DIGEST, PROTOCOL H.8): the VLABench image is built by the task itself when the runner cannot pull it. Its Dockerfiles (`environment/`, `tests/`) start with its recipe (`images/vlabench/Dockerfile`, stage `vlabench-base`) and compose `build.cache_from` names `ghcr.io/mll-lab-nu/efe-private:vlabench-0.2.0`, the same recipe prebuilt (Debian packages from a dated snapshot, the same package versions as before); the environment's build time limit is 3600 s (was 1800 s). The scene, the frozen instance, VLABench's code and assets, the grading and the time limit are unchanged.

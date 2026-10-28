@@ -61,10 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D12`, frozen instance `D12-ReciprocalSlidingTransfer-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Stricter checks: each receiving scoop must be
-  moving in step with the donor (0.20 m/s or more, within 0.05 m/s) when the cube arrives, and brake to rest within
-  1.5 s. Unused parameters are gone. Frozen instance: seed 0, `initial_sha` 2a3820b2e18a91fc; reference rows: 1251
-  control steps (the same start; new reference rows). Results from before are under the earlier digest and are not
-  ranked with these.

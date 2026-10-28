@@ -22,8 +22,7 @@ task_type = "trajectory"
 simulator = "maniguard"
 robot = "franka-panda-longfinger"
 family = "lid_transport"
-mode = "standard"                  # robot as a service: RGB-D + proprioception, no object poses, no success or safety predicate, no reset
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.2"
 oracle = "full"
 instance_seed = 12
@@ -32,13 +31,6 @@ maniguard_task = "lid_transport/task_0012"
 constraint_class = "ordering"
 skill = "pick_and_place"
 grasping = "sticky"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 12
-allowed = [12]
-oracle = [12]
 
 [verifier]
 timeout_sec = 1200.0

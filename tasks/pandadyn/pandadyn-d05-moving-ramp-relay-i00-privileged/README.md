@@ -61,10 +61,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `D05`, frozen instance `D05-MovingRampRelay-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Stricter check: the channel's outlet must be
-  moving at 0.10 m/s or more when the ball leaves it (the threshold was 0). The ball's restitution is a named
-  parameter (same value); unused parameters are gone. Frozen instance: seed 0, `initial_sha` 211481317fc25fe9;
-  reference rows: 2393 control steps (the same start; new reference rows). Results from before are under the earlier
-  digest and are not ranked with these.

@@ -41,8 +41,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 - GPU: not needed.
 - Measured: memory: privileged container p90 2.8 GB (a per-container memory sampler); CPU only; CPU: an estimate
 - Measured (caps): processes and disk: defaults, not measured
-
-## Details
-
-### Change Log
-- 2026-10-16: first version, a new instance replacing `kinder-sweep-simple-i00-privileged` (upstream's o10 variant: ten cubes, the left side of the kitchen island): the scene changed, so the task has a new name (PROTOCOL §1, H.8). Agent time limit 1800 s.

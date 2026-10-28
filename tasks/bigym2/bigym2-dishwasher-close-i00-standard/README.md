@@ -50,19 +50,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Service | `environment/sim/server.py` (the BiGym 2.0 adapter) on `rcb_service.py` (eai-standard/2.1), `rcb_bigym2.py`, `instance.json` (= the privileged twin's) |
 | Observations | three onboard RGB cameras (`RCB_IMAGE_HW`, default 84 px square, as upstream renders them, 60° field of view); upstream's low-dimensional observation (joints, grippers, tracked pelvis pose) |
 | Horizon | 4650 control steps (93 s at 50 Hz) |
-
-### Change Log
-- 2026-10-11: `RCB_RESET_BUDGET`'s default 0 -> 10 (owner decision; PROTOCOL §4.5,
-  tasks/bigym2/README.md); the service already had `POST /reset`. The scene, instance, pass rule and verifier are
-  unchanged, so the task keeps its name; runs recorded before this date had no reset and are reported separately.
-- 2026-10-16: `RCB_RESET_BUDGET`'s default 10 -> 0 (author decision; PROTOCOL §2, the protocol's default,
-  tasks/bigym2/README.md): one episode, which the practice and the graded attempt share; the instruction says there
-  is no reset. The scene, instance, pass rule and verifier are unchanged, so the task keeps its name; runs recorded
-  with 10 resets are reported separately.
-- 2026-10-17 (owner): graded by the live episode: `success` = BiGym's own `is_success` in the episode
-  the sim service ran (the same rule, judged as it ran), and no grading replay runs (no `replay_success` /
-  `deterministic` any more; `final.json` has `graded_by = "live"`, `replays = 0`, `reward.json` `graded_by_live = 1`).
-  The video is one render pass over the trajectory after the verdict, as before. The scene's start is checked when an
-  episode begins: a scene that does not rebuild the frozen instance's starting state (exactly, or within upstream's
-  tolerance on another CPU) gives up as infrastructure (`instance_mismatch`). The scene, instance, pass rule and the
-  agent's interface are unchanged, so the task keeps its name; every archived verdict is the same under the live rule.

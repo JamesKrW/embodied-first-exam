@@ -27,22 +27,12 @@ simulator = "mujoco"
 robot = "unitree-g1"
 family = "round_off"
 category = "parkour-apparatus-balance"
-mode = "standard"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 5
 expert_time_estimate_hours = 22.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: positive by injection (a straight fist handstand placed with the chest facing +x, hand support with real contacts for 0.05 s, then 2.6 m/s up and 4.1 rad/s about the left-right axis: it flies, turns upright and lands on both feet facing -x, 0.64 s from the feet leaving the floor to the landing; the rotation removed at touchdown, the walk at zero command stands it). The round-off is one element through the handstand, not a held handstand (FIG CoP): the hand support, the landing and the hands after it are judged every 1 ms; a foot counts as down until it has been off for more than 0.03 s, the second foot within 0.10 s of the first; the first foot must be down at most 0.70 s after the feet left the floor for the hand support. Negatives: nop, landing facing +x (a tinsica), sideways, one foot then the other, hands down at the landing, a jumped half-turn without hands, a crouch hop on the hands (not inverted), a landing that falls, outside the area, 0.8 s on the hands (a held handstand); a model run's kick-up handstand held about 2 s, then a step down, one foot 0.15 s before the other, fails: 'not a round-off: the hand support lasted too long' at 4.34 s. Every rule above is judged in the family's own 1 ms substep hook.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
+oracle_evidence = "no reference solution; the referee is tested: positive by injection (a straight fist handstand placed with the chest facing +x, hand support with real contacts for 0.05 s, then 2.6 m/s up and 4.1 rad/s about the left-right axis: it flies, turns upright and lands on both feet facing -x, 0.64 s from the feet leaving the floor to the landing; the rotation removed at touchdown, the walk at zero command stands it). The round-off is one element through the handstand, not a held handstand (FIG CoP): the hand support, the landing and the hands after it are judged every 1 ms; a foot counts as down until it has been off for more than 0.03 s, the second foot within 0.10 s of the first; the first foot must be down at most 0.70 s after the feet left the floor for the hand support. Negatives: nop, landing facing +x (a tinsica), sideways, one foot then the other, hands down at the landing, a jumped half-turn without hands, a crouch hop on the hands (not inverted), a landing that falls, outside the area, 0.8 s on the hands (a held handstand); a model run's kick-up handstand held about 2 s, then a step down, one foot 0.15 s before the other, fails: 'not a round-off: the hand support lasted too long' at 4.34 s. Every rule above is judged in the family's own 1 ms substep hook.; human review in the pull request that adds the benchmark (PROTOCOL §4)"
 
 [verifier]
 timeout_sec = 900.0
@@ -74,9 +64,10 @@ timeout_sec = 900
 
 [agent]
 timeout_sec = 7200.0
-# Egress: open (Harbor's default), as `[metadata] network` declares. Embodied Olympics lets the agent search for and download
+# Egress: open, `network_mode = "public"` below (the author's choice). Embodied Olympics lets the agent search for and download
 # public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md). The agent's
 # container holds no simulator, no referee and no instance.
+network_mode = "public"        # open egress, the task author's choice (docs/protocol/README.md Appendix H.6)
 
 [environment]
 build_timeout_sec = 1800.0

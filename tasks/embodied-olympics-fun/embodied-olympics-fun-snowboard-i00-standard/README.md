@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-fun-snowboard-i00-privileged` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `snowboard` / seed 0 |
-| Oracle | `none` — no reference solution; the referee is tested: A parallel slalom run with the minimum vertical drop (80 m: 256 m at 33 %, 18 gates), a level start platform and a self-start. Positive by injection: pushed off the platform, straight runs re-aimed by hand 0.8 m outside each turning pole; sliding, crossings and finish are physics; deterministic. Negatives: did not start, a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §2.7) |
+| Oracle | `none` — no reference solution; the referee is tested: A parallel slalom run with the minimum vertical drop (80 m: 256 m at 33 %, 18 gates), a level start platform and a self-start. Positive by injection: pushed off the platform, straight runs re-aimed by hand 0.8 m outside each turning pole; sliding, crossings and finish are physics; deterministic. Negatives: did not start, a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §4) |
 | Agent time budget | 7200 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1` |
 

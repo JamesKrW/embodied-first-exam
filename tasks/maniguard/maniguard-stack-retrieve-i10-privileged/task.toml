@@ -11,8 +11,7 @@ task_type = "trajectory"          # trajectory | policy   (see docs/protocol/REA
 simulator = "maniguard"           # ManiGuard on BEHAVIOR-1K v3.7.2 (OmniGibson 3.7.2, Isaac Sim 4.5; PhysX on the CPU)
 robot = "franka-panda-longfinger"
 family = "stack_retrieve"
-mode = "privileged"               # privileged state, resets and thin primitives through the tooling (docs/protocol/README.md §3)
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 oracle = "full"
 instance_seed = 10                 # = the ManiGuard-Bench task index (stack_retrieve/task_0010/base); scene = environment/instance/; identity = dataset.toml digest
 expert_time_estimate_hours = 2.0
@@ -20,13 +19,6 @@ maniguard_task = "stack_retrieve/task_0010"
 constraint_class = "spatial"
 skill = "long_horizon"
 grasping = "sticky"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 10
-allowed = [10]
-oracle = [10]
 
 [verifier]
 timeout_sec = 23400.0             # two fresh-process replays, each at most max(3600, 900 + 0.2 x rows) s (tests/grade.py: an

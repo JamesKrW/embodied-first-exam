@@ -6,10 +6,10 @@
 | Mode | standard-realtime (`eai-standard/2.3`) |
 | Twin | `robocasa365-turn-on-toaster-oven-i00-privileged` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa365/TurnOnToasterOven` |
+| Family / instance | `robocasa365/TurnOnToasterOven` / seed 0 |
 | Oracle | `none` — the privileged reference planned from step 0 through this service at S = 2 succeeds live and in the fresh replay, deterministic, no stall (2026-10-14); human review in PR #205 |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 2 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 2 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 10 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0` |
 
 ## Task
@@ -45,7 +45,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Reset budget | 10 (`RCB_RESET_BUDGET`; PROTOCOL §4b); a reset rebuilds the scene (about 20 s) |
 | Action type | `joint_position` (13 channels, `control_dt` 0.05 s) |
 | Cameras | `robot0_agentview_center`, `robot0_agentview_left`, `robot0_agentview_right`, `robot0_eye_in_hand` (robot-mounted; poses in the proprioception) |
-
-### Change Log
-- 2026-10-14 (owner): added. The scene is dynamic (PROTOCOL §2.14), so the task gets a standard-realtime twin, S = 2, 10 resets.
-- 2026-10-17 (owner, boards 0150 and 0151): the verdict is the live episode's. The sim service no longer replays the graded episode in a fresh simulator: success = the live episode succeeded and the scene was not solved at its start (`graded_by = live`, `replays = 0`; `deterministic` and `replay_success` are gone). The first episode's start is checked against the frozen instance (`RCB_START_SHA`); a mismatch is an infrastructure failure. The video is rendered from the trajectory after the verdict and decides nothing. The scene, the success check, S, the resets and the agent's time are unchanged, so the task keeps its name.

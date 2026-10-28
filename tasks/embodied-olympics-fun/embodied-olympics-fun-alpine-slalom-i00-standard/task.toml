@@ -27,22 +27,12 @@ simulator = "mujoco"
 robot = "unitree-g1"
 family = "alpine_slalom"
 category = "track-and-jumps"
-mode = "standard"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
-network = "open"                 # the agent's egress (docs/protocol/README.md §2): open, the author's choice
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.1"
 instance_seed = 0
-reset_budget = 5
 expert_time_estimate_hours = 18.0
 oracle = "none"
-oracle_evidence = "no reference solution; the referee is tested: A slalom at ICR's gentlest gradient (33 %, ICR 802.1.1) with the U16-U14 minimum vertical drop (100 m: 320 m of course, 32 open gates), a level start platform and a self-start. Positive by injection: pushed off the platform, the robot holds a slight crouch and slides straight between waypoints just outside each turning pole, re-aimed by hand at each gate; the sliding, the gate crossings and the finish are physics; deterministic. The reference skier (a carving controller after its own drop-in) passes 2 of 32 gates and falls. Negatives: nothing done (did not start), a straddle (missed gate), a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = []
+oracle_evidence = "no reference solution; the referee is tested: A slalom at ICR's gentlest gradient (33 %, ICR 802.1.1) with the U16-U14 minimum vertical drop (100 m: 320 m of course, 32 open gates), a level start platform and a self-start. Positive by injection: pushed off the platform, the robot holds a slight crouch and slides straight between waypoints just outside each turning pole, re-aimed by hand at each gate; the sliding, the gate crossings and the finish are physics; deterministic. The reference skier (a carving controller after its own drop-in) passes 2 of 32 gates and falls. Negatives: nothing done (did not start), a straddle (missed gate), a stop on a flat course, a fall, a finish outside the posts.; human review in the pull request that adds the benchmark (PROTOCOL §4)"
 
 [verifier]
 timeout_sec = 900.0
@@ -74,9 +64,10 @@ timeout_sec = 900
 
 [agent]
 timeout_sec = 7200.0
-# Egress: open (Harbor's default), as `[metadata] network` declares. Embodied Olympics lets the agent search for and download
+# Egress: open, `network_mode = "public"` below (the author's choice). Embodied Olympics lets the agent search for and download
 # public tools, robot models and pretrained controllers (owner, 2026-10-11; tasks/embodied-olympics-fun/README.md). The agent's
 # container holds no simulator, no referee and no instance.
+network_mode = "public"        # open egress, the task author's choice (docs/protocol/README.md Appendix H.6)
 
 [environment]
 build_timeout_sec = 1800.0

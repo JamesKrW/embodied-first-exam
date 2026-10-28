@@ -67,24 +67,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Images | the `sim` sidecar runs efe:pandadyn (`images/pandadyn/`); the agent container and the verifier run the shared client image with its pip pins (`embodied_first_exam/standard/client.env`) |
 | Crash recovery | the shared service layer's: every control step journaled, a checkpoint with the state hash after every call; `restart: on-failure:6`, the service resumes the same episode |
 | Benchmark notes | tasks/pandadyn/README.md |
-
-### Change Log
-- 2026-10-17 (owner): standard mode graded by the live episode; no grading replay (until then: two
-  fresh-process replays, success = live ∧ replay ∧ deterministic); the frozen start is checked when the service builds
-  the scene; the video by one filming pass after the verdict; the collect hooks now stop the agent's programs first
-  (`kill -9 -1` in its container). Instance, scene, success check and the agent's side are unchanged.
-- 2026-10-17 (owner): aligned with the benchmark's standard-realtime twins: 3 resets (until then
-  none), and their adapter on the shared standard service layer (`eai-standard/2.1`, until then 2.2 with an adapter of its own), so
-  the two modes share the action, the control granularity (rows `dt` apart, a multiple of 0.01 s, up to 10 s per chunk;
-  watches up to 30 s; up to 30 frames per second) and the observations, and differ only in the clock. Gone with the 2.2
-  layer: `/kinematics` (FK / IK), per-frame camera poses and the depth modes, which the realtime twins never had. Instance,
-  scene, success check and cutoff are unchanged; results from before are a different configuration and are not ranked
-  with these.
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Harder, stricter checks: one of the two rails
-  is designated per instance (coloured green) and the final shot must bank off it and touch no other rail since its
-  last paddle contact; the blocker counts as hit only by a puck sliding free of the paddle for 0.15 s or more at 0.15
-  m/s or more (an earlier contact fails the task); the puck must slide back across the recovery line by itself; the
-  horizon is 35 s (was 25 s). The paddle's adapter is now joined to the paddle by a bridge. The tool's mass is
-  unchanged; its centre of mass and inertia shift slightly. Frozen instance: seed 0, `initial_sha` bcbfb438eec4fcea;
-  reference rows: 3025 control steps (was seed 0, `initial_sha` 449f78c9e8366697). Results from before are under the
-  earlier digest and are not ranked with these.

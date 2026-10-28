@@ -49,9 +49,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
 - Measured: GPU memory 1.2-1.3 GB (the oracle 1.2 GB on an RTX 4090; per-trial peaks of past trials); memory: sim 1.1 GB (a per-container memory sampler); CPU: an estimate
 - Measured (caps): GPU memory (the sim service): a per-trial peak of 1.3 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB; processes and disk: defaults, not measured
-
-## Details
-
-### Change Log
-- 2026-10-16: first version, a new instance replacing `kinder-sweep-simple-i00-standard` (upstream's o10 variant: ten cubes, the left side of the kitchen island): the scene changed, so the task has a new name (PROTOCOL §1, H.8). Agent time limit 1800 s; no reset.
-- 2026-10-17 (owner): graded by the live episode: `success` = KinDER's goal check reached during the episode the sim service ran (the same rule, judged as it ran), and no grading replay runs (no `replay_success` / `deterministic` any more; `final.json` has `graded_by = "live"`, `replays = 0`, `reward.json` `graded_by_live = 1`). The video is one render pass over the trajectory after the verdict, as before. The scene's start is checked when the episode begins: a scene that does not build to the frozen instance's recorded state (`scene_sha`) gives up as infrastructure (`instance_mismatch`). The scene, instance, pass rule and the agent's interface are unchanged, so the task keeps its name; every archived verdict is the same under the live rule.

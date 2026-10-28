@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `robocasa-turn-on-sink-faucet-i00-standard` |
 | Simulator / robot | `robosuite` / `franka-panda-omron` |
-| Family / instance | `robocasa/TurnOnSinkFaucet` |
+| Family / instance | `robocasa/TurnOnSinkFaucet` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:robocasa-0.1.0` |
@@ -42,6 +42,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Instance | the initial state of official demonstration episode 0 (`demo_1`, v0.1/single_stage/kitchen_sink/TurnOnSinkFaucet/2024-04-25); MuJoCo state, model arrays, task state and RNG frozen in `instance.npz` (SHA-256 `36053cc46ba6…`, checked on load) |
 | Deliverable | `(T, 12)` native controller commands, 1 ≤ T ≤ 3000, 20 Hz |
 | Success | the environment's own check (`_check_success`) on the state after the last action |
-
-### Change Log
-- 2026-10-14: the success text now says that the faucet handle has two hinges at one pivot: the water on / off hinge (range 0 to 0.52 rad) and a temperature hinge (about ±0.79 rad) that never turns the water on or off, and that "off" means turned back toward 0 on that hinge, not lowered (runs moved the temperature hinge or pressed the handle down). Text only: the scene, the frozen instance, the reference solution, the environment's success check and the verifier are unchanged, so the task keeps its name.

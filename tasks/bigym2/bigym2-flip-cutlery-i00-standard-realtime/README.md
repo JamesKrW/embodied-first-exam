@@ -9,7 +9,7 @@
 | Family / instance | `flip-cutlery` / seed 0 |
 | Oracle | `none` — no reference solution (BiGym 2.0 ships no expert or planner; its demonstrations and its agents' programs stay off the agent's network); positive example graded 1 by the separate verifier: bigym2-flip-cutlery-i00-privileg__GQkcmXU (run codex-gpt6_luna-medium, 2026-10-08, on an earlier text of the privileged task; regraded by its current verifier); human review in PR #123 |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 0 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §4b) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 0 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:bigym2-0.1.1` |
 
 ## Task
@@ -53,16 +53,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | Service | `environment/sim/rcb_realtime.py` (eai-standard/2.3) with the BiGym 2.0 adapter `server.py`, `rcb_bigym2.py`, `instance.json` (= the privileged twin's) |
 | Clock | real time (`RCB_SLOWDOWN`, default 1) from the first `submit` |
 | Horizon | 1950 control steps (39 s at 50 Hz) |
-
-### Change Log
-- 2026-10-17 (owner): graded by the live episode: `success` = BiGym's own `is_success` in the episode
-  the sim service ran (the same rule, judged as it ran), and no grading replay runs (no `replay_success` /
-  `deterministic` any more; `final.json` has `graded_by = "live"`, `replays = 0`, `reward.json` `graded_by_live = 1`).
-  The video is one render pass over the trajectory after the verdict, as before. The scene's start is checked when an
-  episode begins: a scene that does not rebuild the frozen instance's starting state (exactly, or within upstream's
-  tolerance on another CPU) gives up as infrastructure (`instance_mismatch`). The scene, instance, pass rule and the
-  agent's interface are unchanged, so the task keeps its name; every archived verdict is the same under the live rule.
-- 2026-10-17 (2; owner): after the agent's first command a simulator error raised by a control step is the agent's 0
-  (`sim_error = 1`, no longer `infra_error`), and so are simulator crashes with a fatal signal inside a control step (`sim_crashed_on_call`);
-  kills, failed resumes, a reset that does not rebuild the scene and failures before the first command stay
-  infrastructure.

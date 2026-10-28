@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-sweep-dustpan-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `sweep_dustpan` |
+| Family / instance | `sweep_dustpan` / seed 0 |
 | Oracle | `full` — solution/ (trajectory.json + parts) holds the accepted authoring episode's 132,521 Sharpa Wave control rows (2000 Hz, float64) plus 16,000 copies of the last row (8 s hold); replayed in the frozen scene the accepted rows reproduce the accepted run bit for bit and succeed after 132,392 steps in two fresh processes with identical state hashes. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -67,6 +67,3 @@ a documented mirror of the manufacturer right hand). The broom has 54 passive hi
 bristle-bundle capsules; the dustpan has a collision entrance ramp; the debris are rigid shape proxies of packaging
 pieces, caps, a wood chip and crumpled paper. Tools start pre-held: no pickup, fine dust, paper deformation or
 hardware identification is claimed. The arm and hand meshes are baked into the `efe:dexhand` image.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The verdict, the replays and `reward.json` are unchanged; earlier results stay valid.

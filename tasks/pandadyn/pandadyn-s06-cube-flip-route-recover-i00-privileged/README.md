@@ -63,10 +63,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 Scene description `S06`, frozen instance `S06-CubeFlipRouteRecover-i00`, chosen and frozen in `ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0`.
-
-### Change Log
-- 2026-10-23 (owner): pandadyn 0.2.0, base image `efe:pandadyn-0.2.0`. Unused configuration parameters are gone, and
-  the pusher's side adapter now meets the blade's end (it ended 45 mm beyond it); the checks are unchanged. The tool's
-  mass is unchanged; its centre of mass and inertia shift slightly. Frozen instance: seed 0, `initial_sha`
-  4511f6c2f6be99c4; reference rows: 1295 control steps (was seed 0, `initial_sha` a6d725da345513d2). Results from
-  before are under the earlier digest and are not ranked with these.

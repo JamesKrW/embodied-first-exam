@@ -59,19 +59,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 ### Provenance
 The case was chosen and frozen in `ghcr.io/mll-lab-nu/efe:libero-max-0.1.1`.
-
-### Change Log
-- 2026-10-08: image `efe:libero-max-0.1.1` (`OPENBLAS_CORETYPE=Zen`); the instance, its start-state hash, the reference
-  solution and the pass rule are unchanged, so the task keeps its name. With 0.1.0 the start state did not rebuild on
-  Intel Xeon 8488C hosts (the Session refused with a hash mismatch): the OpenBLAS 0.3.18 bundled with numpy and scipy
-  does not know that CPU and fell back to its generic Prescott kernels, while the instances were frozen with its Zen
-  kernels (AMD 7950X). 0.1.1 pins the Zen kernels; same Python packages and sources. The rebuild check
-  (start-state hash and reference replay of all 64 instances): 8488C 0/64 with 0.1.0, 64/64 with 0.1.1; 7950X 64/64.
-- 2026-10-10: `tests/grade.py` and `lmx_tool.py`; the instance, the reference solution and the pass rule are
-  unchanged, so the task keeps its name.
-  - `reward.json` always has `infra_error` (0/1). It is 1 (with `grader_error = 1`) when the verifier's host does not
-    rebuild the frozen start bit-exactly (a CPU without the frozen numeric kernels: the replay exits with code 3 before
-    it executes any action). Before, such a trial read as an agent failure with `grader_error = 1` only.
-  - A replay that records a video prints its verdict before it finishes the video, and a failing video no longer fails
-    the replay; `video_rendered` is 1 only when the video was finished.
-- 2026-10-14: the instruction adds a note after the task sentence, where the sentence alone misleads in this LIBERO-PRO variant: the target bowl is not where the sentence puts it, and which bowl is meant. Text only: the instance, the event, the reference solution, LIBERO's success check and the verifier are unchanged, so the task keeps its name.

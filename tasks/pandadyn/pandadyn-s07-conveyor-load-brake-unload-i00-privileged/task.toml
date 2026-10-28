@@ -11,18 +11,10 @@ task_type = "trajectory"
 simulator = "maniskill"           # Panda Dynamic Scenes on ManiSkill 3.0.1 / SAPIEN 3.0.3 (CPU PhysX at 1000 Hz, enhanced determinism)
 robot = "franka-panda"
 family = "s07_conveyor_load_brake_unload"
-mode = "privileged"
-dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 oracle = "full"
 instance_seed = 0
 expert_time_estimate_hours = 3.0
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 3000.0              # two fresh-process replays at tests/grade.py's limit (300 s + rows / 10: 650 s for the
@@ -43,7 +35,7 @@ cpus = 4
 memory_mb = 8192
 
 [agent]
-timeout_sec = 3600.0              # the agent's cutoff, this task's own (PROTOCOL §2.12)
+timeout_sec = 3600.0              # the agent's cutoff, this task's own (PROTOCOL §2)
 # The agent reaches the model APIs and the package registries, nothing else (scripts/set_agent_egress.py HOSTS).
 network_mode = "allowlist"
 allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.com", "*.openai.com", "api.anthropic.com", "*.anthropic.com", "openrouter.ai", "*.openai.azure.com", "*.cognitiveservices.azure.com", "pypi.org", "files.pythonhosted.org", "deb.debian.org", "security.debian.org", "archive.ubuntu.com", "security.ubuntu.com", "snapshot.ubuntu.com"]

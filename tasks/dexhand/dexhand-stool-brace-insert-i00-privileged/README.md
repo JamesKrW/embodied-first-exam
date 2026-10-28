@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-stool-brace-insert-i00-standard` |
 | Simulator / robot | `mujoco` / `sharpa-wave-floating` |
-| Family / instance | `stool_brace_insert` |
+| Family / instance | `stool_brace_insert` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz replays a Sharpa Wave authoring trajectory (3,006 controls; success after 2,806) in both modes: two fresh-process replays with identical state hashes, float32 rows succeed, Harbor oracle 1 in privileged and standard mode (standard: rows submitted through the public client, live hash = replay hash). |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -67,6 +67,3 @@ sectors; the dowel ends are rounded capsules); parts are free rigid bodies with 
 masses; the frames touch the table through thin skids under each leg face; the solver uses 5 noslip iterations (no
 frictional creep in held grasps); the seat and eight screws are static decor; glue, screws and the final upright turn
 of the source film are not part of the task.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

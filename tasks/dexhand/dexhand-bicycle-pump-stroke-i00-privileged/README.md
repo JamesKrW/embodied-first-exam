@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-bicycle-pump-stroke-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `bicycle_pump_stroke` |
+| Family / instance | `bicycle_pump_stroke` / seed 0 |
 | Oracle | `full` — solution/ replays the validated Sharpa Wave episode on the Marvin right arm (4,299 controls, success after 4,149: hose head pushed onto the valve and locked at control 306, 28 counted strokes to 210.64 kPa, lock opened and head pulled off at control 4,083, released hold); the standard oracle submits the same rows as float64 through the public client. Two fresh-process replays succeed with identical state hashes, and the rows rounded to float32 also succeed. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -86,6 +86,3 @@ wuji-technology/wuji-description commit `829c9aa27cb12c3a49d5b8d63c9869dd8f65670
 arm flanges with its vendor joints, actuators and contact geometry unchanged. The robot is the Tianji Marvin stand
 with two 7-DoF arms (the pot_shelf_transfer rig: position servos kp 700, kv 48, no gravity compensation) at the world
 origin of the T50 frame, a hand on each flange, the left arm parked.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

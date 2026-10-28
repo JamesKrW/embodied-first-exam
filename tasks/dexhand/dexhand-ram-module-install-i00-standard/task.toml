@@ -13,21 +13,14 @@ robot = "sharpa-wave-floating"
 hands = ["sharpa", "wuji"]
 default_hand = "sharpa"
 family = "ram_module_install"
-mode = "standard"
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.2"
 oracle = "full"
 oracle_evidence = "solution/trajectory.npz replays the validated Sharpa Wave authoring trajectory in both modes (1,529 rows; the episode ends at success after 1,379 controls, with the source's 1.66 mm socket throat). Two fresh-process replays give identical state hashes; Harbor 0.23 oracle trials score 1 in privileged and standard mode, nop trials 0."
+instance_seed = 0
 expert_time_estimate_hours = 4.0
 difficulty = "hard"
 release_status = "provisional"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 600.0

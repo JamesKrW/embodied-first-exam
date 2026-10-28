@@ -22,19 +22,11 @@ task_type = "trajectory"
 simulator = "ambench"             # AM-Bench @ 60bf5b7 on Isaac Lab @ f4aa17f / Isaac Sim 5.1 (PhysX on the GPU, RTX rendering)
 robot = "ambench-fahexa"
 family = "lemon_harvesting_fahexa"
-mode = "standard"                 # robot as a service: RGB, depth + proprioception only; no object poses, no success predicate, no reset
 dynamics = "static"               # scene dynamics (PROTOCOL §2): nothing but the robot does work on the scene
 protocol = "eai-standard/2.2"
 oracle = "full"
 instance_seed = 0
 expert_time_estimate_hours = 3.0
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 0
-allowed = [0]
-oracle = [0]
 
 [verifier]
 timeout_sec = 1200.0
@@ -63,7 +55,7 @@ timeout_sec = 4800                # = finalize.sh's HOOK_BUDGET_S (RCB_COLLECT_T
                                   # + a margin; graded by the live episode since 2026-10-17 (7200 s with two replays before)
 
 [agent]
-timeout_sec = 3600.0              # the agent's cutoff, this task's own (PROTOCOL §2.12)
+timeout_sec = 3600.0              # the agent's cutoff, this task's own (PROTOCOL §2)
 # AM-Bench's scripted experts are public upstream, so the agent reaches the model APIs and the package registries, nothing
 # else (scripts/set_agent_egress.py HOSTS).
 network_mode = "allowlist"

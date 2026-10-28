@@ -11,20 +11,12 @@ task_type = "policy"
 simulator = "mujoco"
 robot = "anycar"
 family = "roboengineer/anycar-tracking"
-mode = "standard"
 dynamics = "static"
 protocol = "eai-policy/1.1"
 oracle = "full"
 oracle_evidence = "Harbor 0.23.0 oracle agent on a cloud CPU host, 2026-10-18, image efe-private:control-transfer-0.2.0: the reference controller (solution/, three feedback rounds) succeeded on 10/10 held-out cases, mean engineering score 72.87; nop 0."
 instance_seed = 1
 expert_time_estimate_hours = 4.0
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 1
-allowed = [1]
-oracle = [1]
 
 [verifier]
 timeout_sec = 600.0

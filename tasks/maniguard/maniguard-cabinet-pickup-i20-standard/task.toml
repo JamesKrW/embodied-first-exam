@@ -22,8 +22,7 @@ task_type = "trajectory"
 simulator = "maniguard"
 robot = "franka-panda-longfinger"
 family = "cabinet_pickup"
-mode = "standard"                  # robot as a service: RGB-D + proprioception, no object poses, no success or safety predicate, no reset
-dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
+dynamics = "static"               # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard/2.2"
 oracle = "full"
 instance_seed = 20
@@ -32,13 +31,6 @@ maniguard_task = "cabinet_pickup/task_0020"
 constraint_class = "spatial"
 skill = "articulated"
 grasping = "sticky"
-
-[metadata.seeds]
-# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
-# from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
-default = 20
-allowed = [20]
-oracle = [20]
 
 [verifier]
 timeout_sec = 1200.0

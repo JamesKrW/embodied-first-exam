@@ -6,7 +6,7 @@
 | Mode | privileged |
 | Twin | `dexhand-paper-staple-i00-standard` |
 | Simulator / robot | `mujoco` / `marvin-bimanual-sharpa-wave` |
-| Family / instance | `paper_staple` |
+| Family / instance | `paper_staple` / seed 0 |
 | Oracle | `full` — solution/trajectory.npz replays the validated Sharpa Wave authoring trajectory on the Marvin right arm (942 controls; success after 742, then 200 unexecuted hold rows of slack). Two fresh-process replays succeed with identical state hashes. The standard oracle submits the same rows through the public client. |
 | Agent time budget | 3600 s; tokens: protocol default (PROTOCOL §5) |
 | Base image | `ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350` |
@@ -66,6 +66,3 @@ desk as in the source; a paper insertion stop behind the anvil (not part of the 
 staple position; the magazine is rigid with the base and the handle with its driver blade turns on one passive
 spring-returned hinge (about 10 N to start, 25 N at the bottom stop) with a bottom stop; staple piercing and clinching
 are not simulated. Paper-paper, paper-desk and paper-chrome friction are 0.4, 0.15 and 0.1.
-
-### Change Log
-- 2026-10-16 (video only): the verifier renders the replay video (`/logs/verifier/replay.mp4`) with a third fresh replay after `reward.json` is written, in its remaining time. Before, the privileged verifier rendered no video. The video films at most 300 steps (a longer episode at a larger stride; an OSMesa frame of an arm scene takes up to ~3.6 s on two cores), and the video, verifier and collect limits cover the longest archive the row limit allows. The verdict, the replays and `reward.json` are unchanged.

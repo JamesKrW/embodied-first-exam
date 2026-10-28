@@ -64,34 +64,3 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | knobs (compose env) | `RCB_RESET_BUDGET` (50: HumanoidBench's standard configuration, tasks/humanoidbench/README.md), `RCB_OBS_PROPRIO` (1), `RCB_OBS_IMU` (1), `RCB_OBS_ROOM_CAMERA` (1), `RCB_OBS_DEPTH` (0): the defaults are the standard configuration; a run that changes one (`RCB_RESET_BUDGET=0 harbor run ...`: one episode, no reset) is reported separately, and `episode.jsonl` records the `/spec` it ran under |
 | agent API | `environment/rcb_client.py` (its docstring is the reference); `instruction.md` lists the endpoints |
 | physics vs upstream | upstream's model (HumanoidBench cb11890) on MuJoCo 3.3.7, not the 3.1.6 upstream pins, whose convex collision reported wrong contacts; results on image 0.1.6 or earlier are other physics and are reported apart (tasks/humanoidbench/README.md, Physics). Also fixed here: **box feet**: a mesh foot on a box gets one contact point, which on 3.1.6 reported wrong depths (a robot with every joint locked slid off a stair tread) and on 3.3.7 never comes to rest; each foot is four boxes that follow the mesh's hull, the sole exactly (`images/humanoidbench/box_feet.py`). |
-
-### Change Log
-- 2026-10-07: `RCB_RESET_BUDGET`'s default 0 -> 50 (owner decision; PROTOCOL §4.5,
-  tasks/humanoidbench/README.md). The scene, instance, pass rule and verifier are unchanged, so the task
-  keeps its name; runs recorded before this date had no reset and are reported separately.
-- 2026-10-08: base image 0.1.6 -> 0.2.0: MuJoCo 3.3.7 instead of upstream's 3.1.6, and this task's own fix
-  (*Physics vs upstream*) (tasks/humanoidbench/README.md, Physics). The pass rule and verifier are
-  unchanged, so the task keeps its name; results recorded on 0.1.6 are other physics and are reported
-  separately.
-- 2026-10-10: the sim service marks `final.json` `finalized` the moment the verdict is written, before the
-  replay video is rendered (`video_pending` while it renders), and the collect hook's waits run on the clock,
-  inside its timeout: a slow, hung or killed video render no longer turns a graded episode into `infra_error`.
-  `reward.json` adds `sim_error` and carries `deterministic` in every branch. The scene, instance and pass
-  rule are unchanged, so the task keeps its name; every verdict that was reached before is the same now.
-- 2026-10-10 (2; second review round): the sim service refuses a negative `Content-Length` unread (400; it
-  read until the client hung up), and a simulator that fails inside `POST /reset` ends the episode as `error`
-  (`sim_error = 1`), not `reset`. The scene, instance, pass rule and every verdict reached before are
-  unchanged, so the task keeps its name.
-- 2026-10-10 (3; third review round): the sim service (`environment/sim/rcb_service.py`) renders and returns a
-  camera named more than once in `cameras` once (N copies of one name made it build N x N images within the
-  frame budget, which could exhaust its memory), and a service that has given up on the episode (it could not
-  resume it after its crashes) answers every request with 409 and the reason instead of not listening. The
-  scene, instance, pass rule and every verdict reached before are unchanged, so the task keeps its name.
-- 2026-10-17 (owner): graded by the live episode: `success` = the episode the sim service ran
-  reached the pass mark (the same rule, judged as it ran), and no grading replay runs (no `replay_success` /
-  `deterministic` any more; `final.json` has `graded_by = "live"`, `replays = 0`, `reward.json`
-  `graded_by_live = 1`). The video is one render pass over the trajectory after the verdict, as before. The
-  scene's start is checked when an episode begins: a scene that does not start at the frozen instance's
-  recorded state gives up as infrastructure (`instance_mismatch`). The scene, instance, pass rule and the
-  agent's interface are unchanged, so the task keeps its name; every archived verdict is the same under the
-  live rule.
