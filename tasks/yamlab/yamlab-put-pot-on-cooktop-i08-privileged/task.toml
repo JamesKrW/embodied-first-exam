@@ -24,7 +24,7 @@ timeout_sec = 13000.0             # two fresh-process replays at tests/grade.py'
 environment_mode = "separate"     # verifier runs in its own sandbox (tests/Dockerfile); the agent container is gone by then
 network_mode = "no-network"       # Isaac Sim starts and renders offline: every asset is in the image (images/yamlab/web_assets.txt)
 
-# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (PROTOCOL §6): seal the monitor's record first.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"

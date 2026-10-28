@@ -42,7 +42,7 @@ replayable) and `replay.mp4`, rendered from it in one pass after the verdict (a 
 verdict). The oracle (`solution/solve.sh`) scores 1; `nop` scores 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

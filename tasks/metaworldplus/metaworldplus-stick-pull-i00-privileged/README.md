@@ -36,7 +36,7 @@ live episode's state (hash `16d2898c4471…`) and succeed. `nop`: no trajectory,
 not solved at the start.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

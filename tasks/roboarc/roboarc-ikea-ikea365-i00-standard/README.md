@@ -43,7 +43,7 @@ the live episode succeeded (`graded_by_live` 1, `replays` 0). No grading replay 
 Before 2026-10-17 (graded then by the verifier's two replays; history, not re-run since): Harbor checks on workstation A (RTX 4090; shared, loaded) (oracle), workstation B (nop), Harbor 0.23.0, image 0.3.0 sha256:ed950d079b63 / -sim 0.4.0 (Nyx RGB; built per host from one context: B a466a594c463, C 53d8800bfa22, A 3f9218fb9864); the live, replay and settled hashes equal the 0.3.0 (EGL) run's (2026-10-16): `oracle` scored 1 (sim 0.4.0 (Nyx): live settled success at control step 88000 (22 calls), both replays pass final_check() and end in the live state (live_matches_replay 1, deterministic 1), live end hash = the 0.3.0 run's; live service time 480 s, verifier replays 417 s); `nop` scored 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

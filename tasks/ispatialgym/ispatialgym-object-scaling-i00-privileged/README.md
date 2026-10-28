@@ -35,7 +35,7 @@ tolerances x 3, held over the last 45 control steps with the task's objects and 
 does not rebuild is `infra_error` + `grader_error`. `/logs/verifier/replay.mp4`.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

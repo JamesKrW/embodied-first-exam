@@ -31,7 +31,7 @@ RoboLab's success term is instantaneous: it is checked after every control step 
 the episode (RoboLab's own termination; the replay stops there), so a goal state that holds at one control step counts.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

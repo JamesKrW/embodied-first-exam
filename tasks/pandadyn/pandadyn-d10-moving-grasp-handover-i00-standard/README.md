@@ -45,7 +45,7 @@ in the privileged oracle's final state (hash `d3dd4e96aa63d9a1`). `nop`: no cont
 the collect hook with no phase complete, reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

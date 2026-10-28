@@ -30,7 +30,7 @@ copy of the instance (`tests/instance.json`; the start state is checked against 
 succeed and end in the same state (`deterministic`). Oracle: success, worst segment errors 0.183 m/s and 0.136 rad/s. `nop`: no trajectory, reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

@@ -38,7 +38,7 @@ is checked when the sidecar builds the scene, before the agent is served. `infra
 all inside the agent's calls, or the frozen start did not rebuild (`instance_mismatch`).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

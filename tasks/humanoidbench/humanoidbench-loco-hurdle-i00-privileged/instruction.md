@@ -95,7 +95,7 @@ container has one, CPU software rendering (~130 ms/frame) otherwise.
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 
 ## Resources
-Your container: **16 CPUs** (a cap: more work only runs slower), **20 GiB of memory** (the kernel kills a process that goes over), **8192 processes and threads** and **10 GiB** of disk (new files under `/app`, `/tmp` and `/root`). Your container has no GPU. These caps may be enforced: when enforcement is on, going over the disk cap at two readings in a row (one a minute) or a process killed at your memory cap ends the trial as a failure (reward 0), whatever the deliverable. A monitor outside your container measures every few seconds; your current use and these caps are in `/run/rcb-limits/usage.json`.
+Your container: **16 CPUs**, **20 GiB of memory**, **8192 processes and threads** and **10 GiB** of disk (new files under `/app`, `/tmp` and `/root`). Your container has no GPU. CPU only slows you down; a process that goes over any other cap can be killed. Usage and caps: `/run/rcb-limits/usage.json`.
 
 ## Time limit
 You have 3600 seconds to complete this task. Do not cheat by using online solutions or hints specific to this task.

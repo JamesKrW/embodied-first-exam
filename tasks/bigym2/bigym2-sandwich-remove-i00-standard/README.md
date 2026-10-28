@@ -31,7 +31,7 @@ live episode succeeded. The video (`replay.mp4`) is rendered from `trajectory.np
 never changes it. Success condition: the sandwich lies flat (either face up, within 10 degrees of level) touching the chopping board. A finger of either gripper touching the sandwich ends the episode as a failure: move it with the spatula. No oracle; human review in PR #123 (PROTOCOL §4).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

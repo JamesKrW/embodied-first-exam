@@ -37,7 +37,7 @@ the episode's physics and at most about 600 frames of one camera, on the CPU; ty
 sim hook's 840 s.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

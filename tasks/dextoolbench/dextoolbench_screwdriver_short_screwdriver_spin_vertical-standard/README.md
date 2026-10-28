@@ -24,7 +24,7 @@ Same scene, instance and success rule as `dextoolbench_screwdriver_short_screwdr
 the live episode's verdict (`graded_by = "live"`, no grading replay): the last episode (every control step since the last reset) passes when the goal tracker, run on every executed control step, has reached every goal (`progress` = goals reached / goals in `reward.json`). The frozen start is checked when the episode begins (`RCB_START_SHA`)
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

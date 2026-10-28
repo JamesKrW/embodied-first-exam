@@ -24,7 +24,7 @@ MuJoCo Playground defines only a shaped RL reward; this task scores a binary suc
 Playground has only a shaped RL reward; defined here: handle within 1.5 cm of the target along x at the end
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

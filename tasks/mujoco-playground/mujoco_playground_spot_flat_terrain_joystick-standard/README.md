@@ -37,7 +37,7 @@ instance when it builds the scene: a start state that does not hash to the insta
 (`instance_mismatch`, `infra_error = 1`). Oracle: success, worst segment errors 0.155 m/s and 0.072 rad/s.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

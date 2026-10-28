@@ -48,7 +48,7 @@ at any substep while also falling faster than 0.2 m/s), or the 3,000-control bud
 review and full agent-trial calibration remain pending; report this task as provisional.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

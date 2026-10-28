@@ -48,7 +48,7 @@ before the agent is served) and a live sheet the service could not score (`grade
 out of time never changes the verdict. The collect hook has 2820 s.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

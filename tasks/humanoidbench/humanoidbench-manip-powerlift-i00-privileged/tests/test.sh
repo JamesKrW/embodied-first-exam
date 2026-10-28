@@ -3,7 +3,7 @@
 # Writes /logs/verifier/reward.txt (1/0) and reward.json (numeric fields, see docs/protocol/README.md §4).
 mkdir -p /logs/verifier
 rm -rf /logs/verifier/*
-trap 'p=$(command -v python3 || command -v python); "$p" /tests/rcb_limits.py verify' EXIT   # resource limits, after the grader (docs/protocol/README.md §6)
-p=$(command -v python3 || command -v python); "$p" /tests/rcb_limits.py sanitize /app/output || true   # the agent's files are untrusted input: no link out of /app/output, no FIFO or device (docs/protocol/README.md Appendix H.1)
+trap 'p=$(command -v python3 || command -v python); "$p" /tests/rcb_limits.py verify' EXIT   # resources, after the grader (PROTOCOL §6)
+p=$(command -v python3 || command -v python); "$p" /tests/rcb_limits.py sanitize /app/output || true   # untrusted agent files (PROTOCOL H.1)
 python /tests/grade.py --family powerlift --instance /tests/instance.npz --traj /app/output/trajectory.npz --repeat 2 \
   2> /logs/verifier/grade.log

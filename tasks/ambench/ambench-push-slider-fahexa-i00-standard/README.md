@@ -41,7 +41,7 @@ episode ended in the privileged oracle's end state (hash `01a85d356fead490`; und
 agent's time-out with the check never met, reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

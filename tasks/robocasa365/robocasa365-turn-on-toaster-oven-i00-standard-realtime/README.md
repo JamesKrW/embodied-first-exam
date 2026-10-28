@@ -25,7 +25,7 @@ The agent has to find the fixtures and objects in the robot's camera images, dri
 The sim service judges the episode live (it ends at the first step after which the success check holds; `graded_by = live`, nothing is replayed), records every control step it ran, and after the agent's time writes `final.json`; `tests/grade.py` (separate sandbox, no network) passes iff the live episode succeeded and the scene was not solved at its start (the adapter's `live_verdict`). The first episode's start is checked against the frozen instance (`RCB_START_SHA`; a mismatch is an infrastructure failure, `instance_mismatch`). The video is rendered from the trajectory after the verdict and decides nothing. The clock's record (`stalls`, `max_lag_s`, ...) is copied into `reward.json` and decides nothing. `nop`: the episode never starts (its clock starts at the first submit), reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

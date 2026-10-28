@@ -24,7 +24,7 @@ Same scene, instance and success rule as `mujoco_playground_aloha_hand_over-priv
 the live episode's verdict (`graded_by = "live"`, no grading replay): the task's check of the live final state. The frozen start is checked when the episode begins (instance `state_sha`)
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

@@ -31,7 +31,7 @@ live episode succeeded. The video (`replay.mp4`) is rendered from `trajectory.np
 never changes it. Success condition: the three blocks form one stack on the green pad: the lowest touching the pad, each of the others touching the block below it, at least 0.03 m higher and within 0.05 m of it horizontally; no block held by a gripper. A block touching the floor ends the episode as a failure. No oracle; human review in PR #123 (PROTOCOL §4).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

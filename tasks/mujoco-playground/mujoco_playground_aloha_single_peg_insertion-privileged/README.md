@@ -24,7 +24,7 @@ MuJoCo Playground defines only a shaped RL reward; this task scores a binary suc
 Playground has only a shaped RL reward; defined here from its insertion geometry: peg tip ≤ 5 mm from the socket axis and inside the cavity at least 12 mm from its open end (axial −0.875 ≤ t ≤ 0.75; t = 0 at the tube's centre, 1 at the entrance, −0.833 at the rear wall) at the end
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

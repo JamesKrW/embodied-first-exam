@@ -34,7 +34,7 @@ The trajectory is the per-physics-step drive-target record (T, 34) captured by h
 instance is rebuilt from the RoboTwin seed and checked against the stored initial-state hash on every reset.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

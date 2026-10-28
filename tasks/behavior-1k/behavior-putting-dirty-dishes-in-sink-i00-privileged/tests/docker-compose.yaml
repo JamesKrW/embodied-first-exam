@@ -4,7 +4,7 @@
 # could write must never reach the grader. The first replay compiles shaders into it, the second reuses it.
 services:
   main:
-    x-gpu-memory-gb: 24   # GiB of GPU memory (docs/protocol/README.md §6)   # rcb-monitor
+    x-gpu-memory-gb: 24   # GiB   # rcb-monitor
     environment:
       OMP_NUM_THREADS: "8"   # thread pools capped (PyTorch sizes its pool to the host: 128 on a 256-core
       MKL_NUM_THREADS: "8"   # host, spinning on every small tensor op); user 2026-09-27

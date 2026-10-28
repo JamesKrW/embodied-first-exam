@@ -45,7 +45,7 @@ gave up after crashes outside a call, never ended the episode or found the froze
 No oracle; human review in the pull request that adds this task (PROTOCOL §4: per task, this task and its twin, a positive example and the `nop` result).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|

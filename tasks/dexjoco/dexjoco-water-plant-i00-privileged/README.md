@@ -40,7 +40,7 @@ nothing and gives no verdict: `too_few_cpus`, `grader_error` and `infra_error` =
 Oracle: success after 307 control steps.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
