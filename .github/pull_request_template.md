@@ -23,7 +23,7 @@
 - [ ] Oracle `partial`/`none`: per-family table of positive examples (PROTOCOL §2.7)
 - [ ] Runs with Harbor's native agents (no custom runner, gateway or adapter)
 - [ ] Names `<base>-privileged` / `<base>-standard` / `<base>-standard-realtime`; README in the standard layout; no `results/`
-- [ ] A new benchmark: its label is in `scripts/task_conventions.py` `BENCHMARKS` (shared-files pull request), with a prefix of its own
+- [ ] A new benchmark: its row is in `scripts/task_conventions.py` `BENCHMARK_TABLE` (shared-files pull request), with a prefix of its own
 - [ ] The cutoff is each task's `[agent] timeout_sec`; `instruction.md` ends with the `## Time limit` section `normalize` renders from it and states the limit nowhere else (`ci_checks/check-cutoffs.py`; PROTOCOL §2.12)
 - [ ] The agent's egress is the allowlist (model APIs + package registries) and the oracle passes under it (the task itself downloads nothing at run time); no file the agent reads, in the task or its image, names or locates a solution, a demonstration or its dataset (PROTOCOL §2.7, §2.11)
 - [ ] The caps of every container (a `[[cap]]` rule in `scripts/task_resources.toml`) set from measured peaks with a margin; the oracle stays inside them; `instruction.md` and the README have the rendered `## Resources` (PROTOCOL §6)

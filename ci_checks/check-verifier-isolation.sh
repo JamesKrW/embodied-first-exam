@@ -5,7 +5,7 @@
 # task.toml: [verifier].environment_mode = "separate"; tests/Dockerfile exists and ships /tests/test.sh (image pins:
 # ci_checks/check-dockerfile.sh, advisory). Agent egress (H.6): a task is on the allowlist, whose hosts are those of
 # scripts/set_agent_egress.py (one list for every task; an empty one breaks the agent's model API), unless its author
-# declares open egress, `[metadata] network = "open"` (then [agent] sets no network policy, or `public`).
+# declares open egress, `[agent] network_mode = "public"` (and no allowed_hosts).
 # Appendix H.1 adds two rules, because Harbor mounts /logs/verifier read-write into the agent's container and some
 # simulators keep a cache of generated code:
 # - tests/test.sh empties /logs/verifier before anything else (a planted reward.json must not survive a grader crash):
@@ -42,15 +42,16 @@ def fail(m):
 d = tomllib.load(open(t / "task.toml", "rb"))
 if (d.get("verifier") or {}).get("environment_mode") != "separate": fail('[verifier].environment_mode must be "separate"')
 ag = d.get("agent") or {}
-# Appendix H.6: the default is the allowlist; open egress is the task author's own declaration, never a list kept here
-net = (d.get("metadata") or {}).get("network", "allowlist")
-if net not in ("allowlist", "open"):
-    fail(f'[metadata] network = {net!r}: "allowlist" (the default) or "open"')
-if net == "open":
-    if ag.get("network_mode", "public") != "public" or "allowed_hosts" in ag:
-        fail('[metadata] network = "open", but [agent] sets another network policy: leave network_mode / allowed_hosts out (or network_mode = "public"), or drop the declaration')
+# Appendix H.6: the default is the allowlist; open egress is the task author's own declaration in Harbor's own field,
+# `[agent] network_mode = "public"` (task_conventions.network_of), never a list kept here
+md = d.get("metadata") or {}
+if "network" in md:
+    fail(f'[metadata] network = {md["network"]!r}: the egress is declared by [agent] network_mode alone ("allowlist", or "public" for open egress; scripts/task_conventions.py normalize moves it)')
+if ag.get("network_mode") == "public":
+    if "allowed_hosts" in ag:
+        fail('[agent] network_mode = "public" (open egress) with allowed_hosts: drop the list, or put the task on the allowlist')
 elif ag.get("network_mode") != "allowlist":
-    fail('[agent].network_mode must be "allowlist" (PROTOCOL Appendix H.6: the model APIs and the package registries, unless the task declares `[metadata] network = "open"`; the generator writes it, scripts/set_agent_egress.py allowlist)')
+    fail('[agent].network_mode must be "allowlist" (PROTOCOL Appendix H.6: the model APIs and the package registries; the generator writes it, scripts/set_agent_egress.py allowlist), or "public" where the task\'s author chose open egress')
 elif not ag.get("allowed_hosts"):
     fail('[agent] allowlist without allowed_hosts (the agent could not reach its model API)')
 else:

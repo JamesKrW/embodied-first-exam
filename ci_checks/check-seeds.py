@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """ADVISORY. Seeds (docs/protocol/README.md §2): every task names the frozen instances it may run from. For every task:
-  - task.toml has `[metadata.seeds]` with `default` (an integer), `allowed` (a list of distinct integers, a range
-    `{ from = A, to = B }` with both ends included, or "any"; `default` among them; a range or "any" only with
-    `build = "runtime"`: the task builds a seed's instance itself, since they cannot all be committed) and `oracle` (the seeds the reference solution is for: a subset of `allowed`; empty when `oracle = "none"`, not
-    empty when it is "full" or "partial"); `instance_seed`, where the task has one, equals `default`;
+  - `[metadata] instance_seed` (an integer) is the default seed, the one field that names it; `[metadata.seeds]`, only
+    where they are not the defaults, has `allowed` (default [instance_seed]: a list of distinct integers, a range
+    `{ from = A, to = B }` with both ends included, or "any"; the default seed among them; a range or "any" only with
+    `build = "runtime"`: the task builds a seed's instance itself, since they cannot all be committed) and `oracle` (the
+    seeds the reference solution is for, default [instance_seed] with an oracle, else []: a subset of `allowed`; empty
+    when `oracle = "none"`, not empty when it is "full" or "partial"), and no `default` (a second copy of instance_seed);
   - (a standard or standard-realtime task has its privileged twin's seeds: ci_checks/check-twins.py, an invariant);
   - `build = "frozen"` (the default): every listed seed other than the default has its frozen instance under the verifier's files of the task that
     holds the pair's instance (the privileged twin; a task without one: itself): `tests/seeds/<seed>/instance.json` or
@@ -13,8 +15,8 @@
     agent's image, could reach it: the runner puts the drawn seed's instance in the usual place, scripts/task_seed.py).
 
     python3 ci_checks/check-seeds.py [task dirs]      # default: every task
-Fix: the generator writes `[metadata.seeds]` (scripts/task_conventions.py `normalize` completes it) and the seeds'
-instances. Standard library only.
+Fix: the generator writes `instance_seed` and, where a task allows more, `[metadata.seeds]` (scripts/task_conventions.py
+`normalize` keeps only the keys that are not the defaults) and the seeds' instances. Standard library only.
 """
 from __future__ import annotations
 
@@ -29,7 +31,7 @@ import task_conventions as tc  # noqa: E402  (mode_of, base_of)
 
 def seeds_table(task: Path) -> tuple[dict, dict]:
     md = tomllib.loads((task / "task.toml").read_text()).get("metadata", {})
-    return md, md.get("seeds")
+    return md, md.get("seeds", {})
 
 
 def holder(task: Path) -> Path:
@@ -45,13 +47,19 @@ def instance_kinds(d: Path) -> set[str]:
 def check(task: Path) -> list[str]:
     errs = []
     md, sd = seeds_table(task)
-    if not isinstance(sd, dict):
-        return ["task.toml has no [metadata.seeds] (run scripts/task_conventions.py on it)"]
-    default, allowed, oracle, build = sd.get("default"), sd.get("allowed"), sd.get("oracle"), sd.get("build", "frozen")
     isint = lambda x: isinstance(x, int) and not isinstance(x, bool)  # noqa: E731
     ints = lambda xs: isinstance(xs, list) and all(isint(x) for x in xs)  # noqa: E731
-    if not isint(default):
-        return ["seeds.default is not an integer"]
+    if not isinstance(sd, dict):
+        return ["[metadata.seeds] is not a table"]
+    if "instance_seed" not in md:
+        return ["task.toml has no `instance_seed` in [metadata] (the default seed; run scripts/task_conventions.py on it)"]
+    if not isint(md["instance_seed"]):
+        return ["instance_seed is not an integer"]
+    if "default" in sd:
+        return ["[metadata.seeds] has `default`: the default seed is `instance_seed` alone (run scripts/task_conventions.py on it)"]
+    default = md["instance_seed"]          # the defaults of the table's keys: scripts/task_conventions.py seeds_of
+    allowed, build = sd.get("allowed", [default]), sd.get("build", "frozen")
+    oracle = sd.get("oracle", [default] if md.get("oracle") in ("full", "partial") else [])
     if build not in ("frozen", "runtime"):
         errs.append(f'seeds.build is "{build}", not "frozen" or "runtime"')
     if isinstance(allowed, list):
@@ -72,7 +80,7 @@ def check(task: Path) -> list[str]:
         return errs
     ok = lambda x: tc.seed_allowed({"allowed": allowed}, x)  # noqa: E731
     if not ok(default):
-        errs.append(f"seeds.default {default} is not in seeds.allowed {allowed}")
+        errs.append(f"the default seed (instance_seed) {default} is not in seeds.allowed {allowed}")
     if not ints(oracle):
         errs.append("seeds.oracle is not a list of integers")
     elif not all(ok(x) for x in oracle):
@@ -81,8 +89,6 @@ def check(task: Path) -> list[str]:
         errs.append(f'oracle = "none" but seeds.oracle is {oracle}')
     elif md.get("oracle") in ("full", "partial") and not oracle:
         errs.append(f'oracle = "{md.get("oracle")}" but seeds.oracle is empty: name the seed(s) its solution is for')
-    if "instance_seed" in md and md["instance_seed"] != default:
-        errs.append(f"instance_seed {md['instance_seed']} differs from seeds.default {default}")
     if errs:
         return errs
     h = holder(task)     # the twins' equal seeds: ci_checks/check-twins.py (an invariant, PROTOCOL Appendix H.7)
@@ -107,7 +113,7 @@ def check(task: Path) -> list[str]:
         for d in sorted(env.rglob("seeds")):
             if d.is_dir():
                 errs.append(f"{d.relative_to(task)}: a `seeds` directory where the agent's image is built from "
-                            "(another seed's instance belongs under tests/seeds/, PROTOCOL §2.13)")
+                            "(another seed's instance belongs under tests/seeds/, PROTOCOL §2)")
     return errs
 
 
@@ -121,7 +127,7 @@ def main(argv: list[str]) -> int:
             print(f"FAIL {t}: {e}")
             bad += 1
     if not bad:
-        print(f"check-seeds: {len(dirs)} task(s) name their seeds (PROTOCOL §2.13)")
+        print(f"check-seeds: {len(dirs)} task(s) name their seeds (PROTOCOL §2)")
     return 1 if bad else 0
 
 

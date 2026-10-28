@@ -30,13 +30,13 @@ verifier decides internally) is the task's own business.
 | Recommended | Notes |
 |---|---|
 | `task.toml`, `instruction.md`, `README.md`, `environment/Dockerfile`, `tests/test.sh` (executable), `tests/Dockerfile`; `solution/solve.sh` when `oracle` is `full` or `partial` | `ci_checks/check-task-structure.sh` |
-| `[task].name = "embodied-first-exam/<folder>"`; `[metadata]` `task_type` (`trajectory` / `policy`), `simulator`, `robot` ([`TAXONOMY.md`](../TAXONOMY.md)), `family`, `mode`, `expert_time_estimate_hours`, `oracle` (+ `oracle_evidence`), `protocol` (sidecar modes), the settings of §2 | `check-task-fields.sh`, `check-protocol.py` |
+| `[task].name = "embodied-first-exam/<folder>"`; `[metadata]` `task_type` (`trajectory` / `policy`), `simulator`, `robot` ([`TAXONOMY.md`](../TAXONOMY.md)), `family`, `instance_seed`, `expert_time_estimate_hours`, `oracle` (+ `oracle_evidence`), `protocol` (sidecar modes), the settings of §2 | `check-task-fields.sh`, `check-protocol.py` |
 | The directory name `<base>-<mode>`, `<base>` = `<benchmark>-<family>-i<NN>` or the upstream name; no versions or durations in names | the mode is the whole suffix |
 | All task code in the directory, or in a pinned image its Dockerfiles take it from (the benchmark's base image; a files-only image built from `embodied_first_exam/benchmarks/<benchmark>/`, `COPY --from=<image@digest>`); base images hold the simulator and its assets; nothing imports repository code at run time | a task's identity is its directory (H.8) |
 | Every task is in the normal form `scripts/task_conventions.py` `normalize` writes (README layout, rendered sections, `DIGEST`) | `task_conventions.py --check` |
 | Base images `ghcr.io/mll-lab-nu/efe:<name>-<images/<name>/VERSION>` (one public package, a tag per image), or `efe-private:<name>-<VERSION>` when `images/<name>/BUILD_ONLY` (one private package); every `FROM` / `image:` pinned to a tag or digest | `check-dockerfile.sh` |
 | README in the standard layout (`# <dir>`, key table, Task, Difficulty, Reference solution, Verification, Resources, Details); no `results/` | rendered by `normalize` |
-| A change to a published task, its scene included, is made in place: same name, a new DIGEST, a README Change Log entry | H.8 |
+| A change to a published task, its scene included, is made in place: same name, a new DIGEST; the pull request says what changed and why (the README describes the current task, no history) | H.8 |
 
 **What a contribution delivers.** Tasks only: task directories under `tasks/<benchmark>/`. No task-generation code
 goes into the repository (generators, oracle searches, instance freezers, release builders stay with their authors), and
@@ -58,12 +58,12 @@ configuration (`config_key`; running.md "Results").
 |---|---|---|
 | Modes offered (§3): any subset; a task without its privileged twin says why in its README Twin row | the task directories it ships | — |
 | Cutoff: the agent's wall-clock time, decided by the task's author | `[agent] timeout_sec` (a whole number of seconds) | 3600 s; at most 14400 s; equal in a task's privileged and standard versions (H.7) |
-| Reset budget N (standard modes) | the `sim` service's `RCB_RESET_BUDGET` default (`/spec.budget.reset`), the instruction, `[metadata] reset_budget` | standard 0; standard-realtime 10 |
+| Reset budget N (standard modes) | the `sim` service's `RCB_RESET_BUDGET` default (`/spec.budget.reset`), the instruction | standard 0; standard-realtime 10 |
 | Slowdown S (standard-realtime) | `RCB_SLOWDOWN` default, `[metadata] slowdown`, the instruction (`S = <S>`) | S = 1 when the service's real-time factor is ≥ 3, else ⌈1.5 / RTF⌉ |
 | Observation and action extensions | `/spec`, the instruction, the benchmark doc | the `eai-standard` core |
 | Grading kind | the instruction, the frozen instance, `reward.json` (`replays`, `graded_by_live`) | privileged: two fresh replays, or one by the task's choice; standard modes: the live episode (H.4) |
-| Seeds | `[metadata.seeds]` `default`, `allowed` (list, `{from, to}`, `"any"`), `oracle`, `build` | the default seed only |
-| Network | `[metadata] network` | `"allowlist"`; `"open"` by the author's choice (H.6) |
+| Seeds | `[metadata] instance_seed` (the default seed); `[metadata.seeds]` `allowed` (list, `{from, to}`, `"any"`), `oracle`, `build`, only where they differ from the defaults | the default seed only (`allowed` = `oracle` = [the default seed], `oracle` = [] without a reference solution; `build = "frozen"`) |
+| Network | `[agent] network_mode` | `"allowlist"`; `"public"` (open) by the author's choice (H.6) |
 | Scene dynamics | `[metadata] dynamics` (`dynamic`: something other than the robot does work by a force other than the robot's and gravity; TAXONOMY.md "Dynamics") | none: declared by every task |
 | Validated | `[metadata] validated`, else `oracle = "full"` | a recorded marker, not part of the configuration: validated and unvalidated tasks are ranked together |
 | Stricter honour rules | `[metadata.honour] stricter` | none (never looser rules) |
@@ -230,8 +230,8 @@ voided attempt is moved aside and never counted. The rule is the runner's: `scri
 **H.6 Egress.** During the agent phase the agent's container, and every service in its network namespace, reaches only
 the allowlist `scripts/set_agent_egress.py` `HOSTS` (the model APIs and the package registries; `[agent] network_mode =
 "allowlist"` with exactly those hosts, no step with a policy of its own; an official run narrows it further to the usage
-gateway and the registries), unless the task's author declares open egress, `[metadata] network = "open"` (then
-`[agent]` sets no other policy). The runner applies what the task declares; open-network results are ranked apart.
+gateway and the registries), unless the task's author declares open egress, `[agent] network_mode = "public"` (with no
+host list). The runner applies what the task declares; open-network results are ranked apart.
 The verifier has no network (`[verifier] network_mode = "no-network"` in every task, written by `normalize`; no service
 of `tests/docker-compose.yaml` with a network setting other than `none`). *CI:* `check-verifier-isolation.sh`.
 
@@ -245,7 +245,7 @@ path and content hash of `task.toml`, `instruction.md`, `README.md` and every fi
 `solution/`), written last by `normalize` and equal to the digest of the task's current files. Results are attributed
 to a task by its digest; a changed file is a changed task. *CI:* `check-dataset-manifest.sh`.
 
-## v1 section numbers (cited by older tasks and code)
+## v1 section numbers (cited by some task READMEs, `tests/test.sh` and shared code)
 
 | v1 | Now |
 |---|---|

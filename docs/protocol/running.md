@@ -23,18 +23,58 @@ A result is official only when its run had all of these:
 - **The runner's seed, the task's network, at most one infrastructure retry** (the next three sections), and the
   effective configuration recorded with the result (Results).
 
-## Seeds: the runner chooses
-The seed is the runner's, never the agent's: it is one of the task's `[metadata.seeds] allowed` (a list, `{from, to}`,
-`"any"`), official batches draw one uniformly per trial, and a run on the default seed only records `default-only`.
-The verifier grades the drawn seed's instance from its own copy (`build = "runtime"`: from its own seed file). How to
-run a seed: "Seeds (which frozen instance a trial runs from)" below.
+## Seeds
+The seed is the runner's, never the agent's. A task's default seed is `[metadata] instance_seed`, the task directory as
+committed; the seeds a runner may draw from are `[metadata.seeds] allowed` (a list, a range `{ from = A, to = B }` or
+`"any"`; without the table, the default seed alone), and `oracle` names the ones the reference solution is for (PROTOCOL
+§2). Official batches draw one uniformly per trial; a run on the default seed only records `default-only`. The verifier
+grades the drawn seed's instance from its own copy (`build = "runtime"`: from its own seed file). To run another allowed
+seed, or one drawn from the allowed list, let the runner write a copy and run that:
 
-## Network: what the task declares
+```bash
+python3 scripts/task_seed.py list tasks/<benchmark>/<task>                      # {'default': 0, 'allowed': [0, ...], 'oracle': [...]}
+python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --seed draw --out /tmp/run1   # prints the copy and the seed
+harbor run -p /tmp/run1/<task> -a <agent> ...
+```
+
+The agent never chooses or sees the list: another seed's instance lives under the privileged task's `tests/seeds/`,
+and the copy carries only the drawn one. Every task allows its default seed only today, so
+`scripts/run_agent_batch.sh` runs each job from a stamped copy of the task as it is (with the gateway, the copy's
+egress is the gateway; with a CPU cap above the host's count, `HOST_CPUS`, the copy has that cap clamped, Resources
+below); it materializes a seed per trial once a benchmark allows more than one.
+
+## Network
 The default is the allowlist (PROTOCOL Appendix H.6); whether a task has open network is its author's decision,
-declared as `[metadata] network = "open"`. The runner applies the declaration: an allowlist task's copy is narrowed to
-the gateway and the package registries (`scripts/set_agent_egress.py only`), an open task's copy is left open (the
-gateway still records its usage). `python3 scripts/set_agent_egress.py network <task>` prints the declaration.
-`network` is part of the recorded configuration, so open-network results are never ranked with allowlist ones.
+declared in Harbor's own field, `[agent] network_mode = "public"`. The runner applies the declaration: an allowlist
+task's copy is narrowed to the gateway and the package registries (`scripts/set_agent_egress.py only`), an open task's
+copy is left open (the gateway still records its usage). `python3 scripts/set_agent_egress.py network <task>` prints the
+declaration. `network` is part of the recorded configuration, so open-network results are never ranked with allowlist
+ones.
+
+Every task's `[agent]` allowlist is one list, `HOSTS` in `scripts/set_agent_egress.py`: the model APIs and the package
+registries (PyPI: pypi.org, files.pythonhosted.org; apt: deb.debian.org, security.debian.org, archive.ubuntu.com,
+security.ubuntu.com, snapshot.ubuntu.com). So `pip install` (or `uv pip install` in the images without pip) and
+`apt-get update && apt-get install` work in every agent container, in both modes; GitHub, raw.githubusercontent.com,
+Hugging Face and the general web do not answer (PROTOCOL §5, Appendix H.6: the honour rule is the instruction's; the network keeps the
+places where solutions are published out of reach). Both installs work with and without the
+usage gateway (Debian 12 and 13, Ubuntu 22.04 images).
+In the Ubuntu images built on NVIDIA's CUDA base, `apt-get update` warns about NVIDIA's own repository
+(developer.download.nvidia.com is not on the list) and goes on; the Ubuntu archives answer.
+Before it applies an allowlist, Harbor checks the host kernel once per job by running a small alpine image, and gives
+the pull and run 30 s: a slower pull reads as "allowlist unsupported" for the whole job. On docker and podman this
+repository's `harbor run` (`scripts/efe.py`) pulls that image first when it is missing.
+
+The list is the one switch.
+- Another host for every task: add it to `HOSTS` (to `PACKAGE_HOSTS` too if a run through the gateway should reach it
+  directly), update the generators' copies of the list, `python3 scripts/set_agent_egress.py allowlist`,
+  `python3 scripts/task_conventions.py tasks/*/*/` (normalize refreshes each DIGEST).
+- A run with no restriction at all (the agent may reach anything): run a copy of the tasks, since CI keeps the list
+  in `tasks/`:
+  `cp -a tasks /some/dir/tasks && python3 scripts/set_agent_egress.py public /some/dir/tasks/*/*/`, then
+  `harbor run -p /some/dir/tasks/<benchmark> ...` (with `scripts/run_agent_batch.sh`: a copy of the repository with that `tasks/`,
+  and `GATEWAY_EGRESS=task`, or the runner narrows each job's copy again; the copies say `network_mode = "public"`, so
+  their results record `network` = open). The instructions' last sentence about the
+  network is then no longer true: change `EXTERNAL_TEXT` in `scripts/task_conventions.py` if that becomes the default.
 
 ## Infrastructure failures: one full retry
 The rule is PROTOCOL Appendix H.5; how the runner applies it:
@@ -302,26 +342,6 @@ append-only copy of every trial's `agent/` record that neither the agent nor the
 `scripts/account_failure_check.py` (structured evidence only: Codex's rate limits and last event, Claude Code's result
 event). `LOG_MIRROR=0` / `MEM_GUARD=0` skip starting the first two.
 
-## Seeds (which frozen instance a trial runs from)
-
-Every task names its seeds in `task.toml` (`[metadata.seeds]`: `default`, `allowed`, `oracle`; PROTOCOL §2). Each
-seed is an instance (`allowed`: a list, a range `{ from = A, to = B }` or `"any"`); the default one is the task
-directory as committed. To run another allowed seed, or one
-drawn from the allowed list (official batches draw one per trial), let the runner
-write a copy and run that:
-
-```bash
-python3 scripts/task_seed.py list tasks/<benchmark>/<task>                      # {'default': 0, 'allowed': [0, ...], 'oracle': [...]}
-python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --seed draw --out /tmp/run1   # prints the copy and the seed
-harbor run -p /tmp/run1/<task> -a <agent> ...
-```
-
-The agent never chooses or sees the list: another seed's instance lives under the privileged task's `tests/seeds/`,
-and the copy carries only the drawn one. Every task allows its default seed only today, so
-`scripts/run_agent_batch.sh` runs each job from a stamped copy of the task as it is (with the gateway, the copy's
-egress is the gateway; with a CPU cap above the host's count, `HOST_CPUS`, the copy has that cap clamped, Resources
-above); it materializes a seed per trial once a benchmark allows more than one.
-
 ## The agent's time (the cutoff)
 Every task gives the agent a fixed wall-clock time, its cutoff: Harbor's `[agent] timeout_sec` in the task's own
 `task.toml`, set by the task's author in the pull request that adds or changes the task  `ci_checks/check-cutoffs.py` checks per task: a whole number
@@ -370,31 +390,6 @@ for byte from the repository, so it has the digest the task Dockerfiles pin (`CO
 `files_image.py push` pushes those same bytes (`docker push` would recompress the layer). A private one built locally
 serves the tasks unchanged on Docker's containerd image store (Docker Engine 29's and Docker Desktop's default); the
 classic store resolves a digest only for a pulled image.
-
-## What an agent's container reaches
-Every task's `[agent]` allowlist is one list, `HOSTS` in `scripts/set_agent_egress.py`: the model APIs and the package
-registries (PyPI: pypi.org, files.pythonhosted.org; apt: deb.debian.org, security.debian.org, archive.ubuntu.com,
-security.ubuntu.com, snapshot.ubuntu.com). So `pip install` (or `uv pip install` in the images without pip) and
-`apt-get update && apt-get install` work in every agent container, in both modes; GitHub, raw.githubusercontent.com,
-Hugging Face and the general web do not answer (PROTOCOL §5, Appendix H.6: the honour rule is the instruction's; the network keeps the
-places where solutions are published out of reach). Both installs work with and without the
-usage gateway (Debian 12 and 13, Ubuntu 22.04 images).
-In the Ubuntu images built on NVIDIA's CUDA base, `apt-get update` warns about NVIDIA's own repository
-(developer.download.nvidia.com is not on the list) and goes on; the Ubuntu archives answer.
-Before it applies an allowlist, Harbor checks the host kernel once per job by running a small alpine image, and gives
-the pull and run 30 s: a slower pull reads as "allowlist unsupported" for the whole job. On docker and podman this
-repository's `harbor run` (`scripts/efe.py`) pulls that image first when it is missing.
-
-The list is the one switch.
-- Another host for every task: add it to `HOSTS` (to `PACKAGE_HOSTS` too if a run through the gateway should reach it
-  directly), update the generators' copies of the list, `python3 scripts/set_agent_egress.py allowlist`,
-  `python3 scripts/task_conventions.py tasks/*/*/` (normalize refreshes each DIGEST).
-- A run with no restriction at all (the agent may reach anything): run a copy of the tasks, since CI keeps the list
-  in `tasks/`:
-  `cp -a tasks /some/dir/tasks && python3 scripts/set_agent_egress.py public /some/dir/tasks/*/*/`, then
-  `harbor run -p /some/dir/tasks/<benchmark> ...` (with `scripts/run_agent_batch.sh`: a copy of the repository with that `tasks/`,
-  and `GATEWAY_EGRESS=task`, or the runner narrows each job's copy again). The instructions' last sentence about the
-  network is then no longer true: change `EXTERNAL_TEXT` in `scripts/task_conventions.py` if that becomes the default.
 
 ## No tool outside the container (web search off by default)
 `scripts/run_agent_batch.sh` turns the harness's web search off unless `WEB_SEARCH=allowed`: Codex gets

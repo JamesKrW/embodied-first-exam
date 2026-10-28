@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """The agent's network egress of tasks: `allowlist` (the model APIs and the package registries; what every task in
-tasks/ has, PROTOCOL §2.11), or, for a run's own copy of a task, `only <hosts>` / `public`.
+tasks/ has, PROTOCOL Appendix H.6), or, for a run's own copy of a task, `only <hosts>` / `public`.
 
     scripts/set_agent_egress.py allowlist    [task dirs...]     # default: all tasks/*/*
     scripts/set_agent_egress.py only <host>[,<host>]  <task dirs...>   # a run's copy: exactly these hosts
     scripts/set_agent_egress.py package-hosts                   # prints PACKAGE_HOSTS, comma-separated (for the runner)
     scripts/set_agent_egress.py network <task dir>              # prints the task's declared egress: allowlist or open
-    scripts/set_agent_egress.py public       <task dirs...>     # a run's copy with no restriction: Harbor's default, open
+    scripts/set_agent_egress.py public       <task dirs...>     # a run's copy with no restriction: network_mode = "public"
 
 HOSTS below is the one list, and the one switch: every task ships with it, ci_checks/check-verifier-isolation.sh requires
 exactly it of every task in tasks/, the generators and the usage gateway read it from this file's text. It is the model
@@ -16,12 +16,13 @@ PACKAGE_HOSTS, the package registries (owner, 2026-10-11: installing packages is
 distributions name in their sources (Debian: deb.debian.org; Ubuntu: archive / security / snapshot.ubuntu.com; plain
 HTTP, which Harbor's egress control allows by the request's Host). GitHub, Hugging Face and the general web stay closed:
 that is where the benchmarks' sources, demonstrations and trained policies are (with open egress agents downloaded them);
-registries mostly are not (the PyPI distributions that do carry a solution: PROTOCOL §2.11). To change what agents reach, edit the two lists, run `allowlist` (it rewrites the
+registries mostly are not (the PyPI distributions that do carry a solution: PROTOCOL §5). To change what agents reach, edit the two lists, run `allowlist` (it rewrites the
 `allowed_hosts` line of every task and leaves the other lines as the generators wrote them), update the generators'
 copies of the list, and `cd tasks && harbor add --scan .`.
 
-A task whose author chose open egress declares it, `[metadata] network = "open"` (PROTOCOL §2, Appendix H.6): `allowlist`
-leaves such a task alone, and a runner does not narrow its copy to the gateway (`network` prints the declaration).
+A task whose author chose open egress declares it in Harbor's own field, `[agent] network_mode = "public"` (PROTOCOL §2,
+Appendix H.6): `allowlist` leaves such a task alone, and a runner does not narrow its copy to the gateway (`network`
+prints the declaration).
 
 A run with no restriction at all: `public` on a copy of the task directories (never in tasks/: CI requires the list
 there), and run that copy (docs/protocol/running.md).
@@ -48,14 +49,15 @@ HOSTS = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.com", "*
 PACKAGE_HOSTS = ["pypi.org", "files.pythonhosted.org", "deb.debian.org", "security.debian.org", "archive.ubuntu.com",
                  "security.ubuntu.com", "snapshot.ubuntu.com"]
 assert not PACKAGE_HOSTS or HOSTS[-len(PACKAGE_HOSTS):] == PACKAGE_HOSTS
-COMMENT = "# model APIs and package registries (scripts/set_agent_egress.py); PROTOCOL §2.11"
+COMMENT = "# model APIs and package registries (scripts/set_agent_egress.py); PROTOCOL Appendix H.6"
 root = pathlib.Path(__file__).resolve().parents[1]
 
 
 def network_of(d: pathlib.Path) -> str:
-    """The egress the task declares (`[metadata] network`, default "allowlist"; scripts/task_conventions.py network_of)."""
-    m = re.search(r'(?m)^network\s*=\s*"([^"]*)"', (d / "task.toml").read_text().partition("[metadata]\n")[2].partition("\n[")[0])
-    return m.group(1) if m else "allowlist"
+    """The egress the task declares: "open" for `[agent] network_mode = "public"`, else "allowlist"
+    (scripts/task_conventions.py network_of; read without a TOML parser, for older runner hosts)."""
+    agent = re.split(r"(?m)^\[", (d / "task.toml").read_text().partition("\n[agent]\n")[2], maxsplit=1)[0]
+    return "open" if re.search(r'(?m)^network_mode\s*=\s*"public"', agent) else "allowlist"
 
 
 def main(argv: list) -> None:
@@ -102,9 +104,9 @@ def main(argv: list) -> None:
         if mode == "allowlist":          # already on an allowlist: only its host list (and this script's own comment) change
             m = re.search(r'(?m)^allowed_hosts[ \t]*=[ \t]*\[(.*)\][ \t]*$', block)
             if re.search(r'(?m)^network_mode\s*=\s*"allowlist"', block) and m:
-                if re.findall(r'"([^"]+)"', m.group(1)) != hosts or re.search(r"# model APIs (only|and PyPI) \(scripts", block):
+                if re.findall(r'"([^"]+)"', m.group(1)) != hosts or re.search(r"# model APIs (only|and PyPI) \(scripts|set_agent_egress\.py\); PROTOCOL §", block):
                     block2 = block[:m.start()] + "allowed_hosts = [" + ", ".join(f'"{h}"' for h in hosts) + "]" + block[m.end():]
-                    block2 = re.sub(r"# model APIs (?:only|and PyPI) \(scripts/set_agent_egress\.py\)(; PROTOCOL §[0-9.]+)?",
+                    block2 = re.sub(r"# model APIs (?:only|and PyPI|and package registries) \(scripts/set_agent_egress\.py\)(; PROTOCOL (?:§[0-9.]+|Appendix H\.6))?",
                                     lambda k: COMMENT if k.group(1) else COMMENT.split(";")[0], block2)
                     s2 = head + "[agent]\n" + block2 + (("\n[" + tail) if sep2 else "")
                     if tomllib is not None:
@@ -120,7 +122,7 @@ def main(argv: list) -> None:
             lines.append('network_mode = "allowlist"      # this run\'s copy: the usage gateway and the package registries (scripts/set_agent_egress.py only)')
             lines.append("allowed_hosts = [" + ", ".join(f'"{h}"' for h in hosts) + "]")
         else:
-            lines.append("# egress: Harbor default (public), in this copy only (scripts/set_agent_egress.py public).")
+            lines.append('network_mode = "public"        # this copy only: no restriction (scripts/set_agent_egress.py public); recorded as open')
         s2 = head + "[agent]\n" + "\n".join(lines) + "\n" + (("\n[" + tail) if sep2 else "")
         if tomllib is not None:
             tomllib.loads(s2)

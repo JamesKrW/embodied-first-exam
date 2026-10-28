@@ -114,10 +114,14 @@ add python3 ci_checks/check-monitor.py --tier advisory"$pargs"
 add python3 ci_checks/check-build-stamps.py
 # PROTOCOL §4: the core set (docs/core_set.toml) names existing task dirs, with their base, benchmark label and mode
 add python3 scripts/task_conventions.py core-set --check
-# every task dir has its benchmark label and sits in its benchmark's folder, tasks/<folder>/<task>/ (BENCHMARK_DIRS)
+# every task dir has its benchmark label and sits in its benchmark's folder, tasks/<folder>/<task>/ (BENCHMARK_TABLE)
 add python3 scripts/task_conventions.py benchmarks --check
+# the CI scope's table (ci_checks/ci_scope.py UNITS) names the benchmarks of BENCHMARK_TABLE and owns every images/ directory
+add python3 ci_checks/ci_scope.py --check
 # README.md's quick start is the one task_conventions.readme_quick_start() renders
 add python3 scripts/task_conventions.py readme --check
+# docs/TAXONOMY.md's protocol row is the one task_conventions.taxonomy_protocol_row() renders from the tasks
+add python3 scripts/task_conventions.py taxonomy --check
 # every files-only image's sources still hash to its FILES.json (the checks read the sources for what the pinned image holds)
 add python3 scripts/files_image.py check
 

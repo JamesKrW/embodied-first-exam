@@ -82,7 +82,7 @@ for t, tasks in task_dirs(tasks):
     if not os.path.isfile(tt):
         continue
     meta = tomllib.load(open(tt, "rb")).get("metadata", {})
-    if not (meta.get("mode") in tc.SIDECAR_MODES or t.endswith(tuple("-" + m for m in tc.SIDECAR_MODES))):
+    if not t.endswith(tuple("-" + m for m in tc.SIDECAR_MODES)):      # the mode: the directory's suffix
         continue
     probs, froms = [], []
     for sub in ("environment", "tests"):

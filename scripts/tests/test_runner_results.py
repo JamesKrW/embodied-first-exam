@@ -199,7 +199,7 @@ def test_config_and_attempts():
         copy = td / "copy" / TASK
         shutil.copytree(tc.task_dir(TASK), copy)
         s = (copy / "task.toml").read_text()
-        (copy / "task.toml").write_text(re.sub(r"(?m)^(\[metadata\.seeds\]\n(?:.*\n)*?default = )\d+", r"\g<1>4242", s, count=1))
+        (copy / "task.toml").write_text(re.sub(r"(?m)^instance_seed = \d+", "instance_seed = 4242", s, count=1))
         make_trial(jobs, "f", "s1", TASK, "2026-10-14T01:00:00Z", {"success": 0}, None, {"task": {"path": str(copy)}})
         write(jobs, "f", td / "out2")
         cfg = json.loads((td / "out2" / TASK / "codex-x-high" / "config.json").read_text())

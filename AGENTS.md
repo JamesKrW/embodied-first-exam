@@ -11,7 +11,7 @@ invariants of Appendix H bind and no task value overrides them), `docs/protocol/
   repository; `scripts/` holds only what running the benchmark needs. Every task is in the normal form of
   `scripts/task_conventions.py` (`normalize`): fields, protocol spelling, test.sh, graders, README layout, no `results/`. `python3 scripts/task_conventions.py --check tasks/<benchmark>/<task>` reports a task it would change.
 - Tasks are self-contained Harbor task dirs, one folder per benchmark: `tasks/<benchmark>/<task>/` (the folders:
-  `scripts/task_conventions.py` `BENCHMARK_DIRS`; find a task dir with `task_dir(name)` / `iter_tasks()`, never by
+  `scripts/task_conventions.py` `BENCHMARK_TABLE`; find a task dir with `task_dir(name)` / `iter_tasks()`, never by
   joining `tasks/` and a name). Nothing at run time imports repository code outside the task
   directory. Reference tasks: `tasks/robotwin-2/robotwin_2_0_stack_blocks_two-privileged/` and its
   standard-mode twin `tasks/robotwin-2/robotwin_2_0_stack_blocks_two-standard/`.
@@ -38,8 +38,9 @@ invariants of Appendix H bind and no task value overrides them), `docs/protocol/
   benchmark's own text says "the time limit (`## Time limit`)", never a duration. `ci_checks/check-cutoffs.py` (per task):
   a whole number of seconds, at most 14400, and the instruction, README and sim service agree (advisory); the twins'
   equal number is an invariant (`ci_checks/check-twins.py`, Appendix H.7). To change a time (the author's decision): set the number, normalize, and state old -> new in the pull request (docs/protocol/running.md "The agent's time").
-- Every task names its seeds (PROTOCOL §2, docs/protocol/running.md "Seeds"): `[metadata.seeds]` `default` / `allowed` / `oracle` in
-  `task.toml`, completed by `normalize` (default = `instance_seed`, else 0); `allowed` is a list, `{ from, to }` or "any"
+- Every task names its seeds (PROTOCOL §2, docs/protocol/running.md "Seeds"): `[metadata] instance_seed` is the default
+  seed; `[metadata.seeds]` `allowed` / `oracle` / `build` only where they are not the defaults (`normalize` drops the
+  rest); `allowed` is a list, `{ from, to }` or "any"
   (the last two only with `build = "runtime"`: the task builds a seed's instance from a file `seed`); committed
   non-default instances under the privileged task's `tests/seeds/<seed>/` (never under `environment/`); reference solutions
   are per seed. The runner picks the seed (`scripts/task_seed.py materialize`); `ci_checks/check-seeds.py` checks it.
@@ -71,7 +72,7 @@ invariants of Appendix H bind and no task value overrides them), `docs/protocol/
   outside the container in official runs: the harness's web search is off (`run_agent_batch.sh` default
   `WEB_SEARCH=disabled`), as are account connectors, apps and plugins.
 - A task's agent egress is the model APIs and the package registries by default (`[agent] network_mode = "allowlist"`, the
-  hosts of `scripts/set_agent_egress.py`; Appendix H.6), unless its author declares `[metadata] network = "open"` (then
+  hosts of `scripts/set_agent_egress.py`; Appendix H.6), unless its author declares `[agent] network_mode = "public"` (then
   the task's own `## External material` paragraph); `normalize` ends every `instruction.md` with `## External material`
   (PROTOCOL §5, rendered like `## Resources`). Scene dynamics are each task's `[metadata] dynamics` (no
   central table). A task needs no download at run time: bake it into the image or
@@ -79,8 +80,7 @@ invariants of Appendix H bind and no task value overrides them), `docs/protocol/
   Unattended batches: `scripts/run_agent_batch.sh` (lanes with per-job claims; configured by environment variables,
   docs/protocol/running.md); its runner-side tools (`log_mirror.py`, `mem_guard.py`, `scan_secrets.py`, `account_failure_check.py`)
   are not task code.
-- `eai-standard/2.2` (docs/protocol/standard_mode.md Part 2), served by the BEHAVIOR-1K, RoboLab, RoboWits, RoboPaint and
-  MolmoSpaces standard tasks: its layer (`rcb_limited.py` with in-trial crash recovery, an implementation detail; the protocol's rule is the
+- `eai-standard/2.2` (docs/protocol/standard_mode.md Part 2; which benchmarks serve it: docs/TAXONOMY.md `protocol`): its layer (`rcb_limited.py` with in-trial crash recovery, an implementation detail; the protocol's rule is the
   runner's one infrastructure retry, Appendix H.5, `rcb_client.py`, `rcb1.py`, `run.sh`) has one source,
   `embodied_first_exam/standard/`, copied unchanged into every 2.2 task (`check-tooling-identity.sh`); each benchmark adds
   only its adapter `environment/sim/server.py` (`embodied_first_exam/standard/toy_server.py` is the smallest one).

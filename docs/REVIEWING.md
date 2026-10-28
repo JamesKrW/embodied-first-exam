@@ -56,7 +56,7 @@ Guide for maintainers. The contract is [protocol/README.md](protocol/README.md);
   and standard one number? A standard or standard-realtime task without a twin: does it carry its own frozen instance,
   and does its README's Twin row say why (`— (none: <reason>)`; the advisory check `check-task-structure.sh` warns
   otherwise: a deleted or misnamed twin must not pass silently)?
-- A new mode (PROTOCOL §3): does the pull request have everything §3 lists: the name / suffix and `mode` value,
+- A new mode (PROTOCOL §3): does the pull request have everything §3 lists: the name (the directory suffix),
   its own PROTOCOL section (what the agent gets, what is graded, the time and reset rules, which failures are
   infrastructure and which the agent's), the `MODE_REGISTRY` entry and `CUTOFF_NOTE`, CI support keyed on the registry
   (no new hard-coded list of mode names anywhere) with a self-test case, at least one benchmark using it, the TAXONOMY

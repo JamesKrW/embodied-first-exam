@@ -106,7 +106,7 @@ def first_success(rw, mode):
 def trial_config(trial, task, r):
     """The trial's effective configuration (task_conventions.effective_config) with how its seed is known. The seed: the
     runner's copy of the task the trial ran from (scripts/task_seed.py materialize writes the chosen seed as its
-    `[metadata.seeds] default`), else the task's default seed (`seed_source = "default"`). Run-time overrides: the trial's
+    `instance_seed`), else the task's default seed (`seed_source = "default"`). Run-time overrides: the trial's
     recorded environment. A trial of another version of the task (the digest in its lock.json is not the task's DIGEST now, nor that of the
     runner's copy of it, <jobs>/<job>.copies.json) keeps
     only what its name says; the rest is "legacy"."""

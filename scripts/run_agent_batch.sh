@@ -374,13 +374,13 @@ src_of() {  # <task dir name>: its directory in the repository (no such task: a 
   printf '%s' "$R/tasks/.none/$1"
 }
 
-gateway_copy() {  # <dir> <harbor -i args...>: <dir>/tasks/<task> = the task with the gateway and the package registries as its only egress (PROTOCOL §2.11)
+gateway_copy() {  # <dir> <harbor -i args...>: <dir>/tasks/<task> = the task with the gateway and the package registries as its only egress (PROTOCOL Appendix H.6)
   local dir="$1" a; shift
   rm -rf "$dir" && mkdir -p "$dir/tasks" || return 1
   while [ $# -gt 0 ]; do
     a="$1"; shift
     if [ "$a" = -i ] && [ $# -gt 0 ]; then
-      if [ "$(python3 "$R/scripts/set_agent_egress.py" network "$(src_of "$1")")" = open ]; then    # the task declares open egress (`[metadata] network = "open"`, PROTOCOL §2): the copy keeps it
+      if [ "$(python3 "$R/scripts/set_agent_egress.py" network "$(src_of "$1")")" = open ]; then    # the task declares open egress (`[agent] network_mode = "public"`, PROTOCOL §2): the copy keeps it
         cp -a "$(src_of "$1")" "$dir/tasks/$1" || return 1; shift; continue
       fi
       cp -a "$(src_of "$1")" "$dir/tasks/$1" && python3 "$R/scripts/set_agent_egress.py" only "$GATEWAY_ONLY" "$dir/tasks/$1" >/dev/null || return 1

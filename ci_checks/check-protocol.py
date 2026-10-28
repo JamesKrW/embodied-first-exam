@@ -96,15 +96,14 @@ def image_refs(task: Path) -> list[str]:
 def check_task(task: Path) -> None:
     name = task.name
     meta = tomllib.loads((task / "task.toml").read_text()).get("metadata", {})
-    mode = meta.get("mode")
-    if mode is None:
-        warn("missing `mode` (" + " | ".join(tc.MODES) + ")", name)
-    # whole suffixes only (`-standard-realtime` does not end in `-standard`), and `mode` is compared exactly
+    # the mode is the directory's whole suffix (`-standard-realtime` does not end in `-standard`)
     try:
         named = tc.mode_of(task)
     except ValueError:
         named = None
-    if name.endswith("-realtime") and not name.endswith("-standard-realtime") or mode == "realtime":
+        warn("the directory name ends in no mode (" + " | ".join(tc.MODES) + ")", name)
+    mode = named
+    if name.endswith("-realtime") and not name.endswith("-standard-realtime"):
         warn("mode name `realtime` / `-realtime` (the third mode is `standard-realtime`, PROTOCOL D12)", name)
     proto = meta.get("protocol")
     if proto is not None and proto in own_protocols(name, mode):

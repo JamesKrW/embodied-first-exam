@@ -71,32 +71,46 @@ TEXT_REPLACEMENTS = [  # (old, new), applied to task text files in order
       (("PROTOCOL", "README.md"), ("STANDARD_MODE", "standard_mode.md"), ("RUNNING", "running.md"), ("LEAKAGE", "leakage.md"),
        ("rcb/PROTOCOL", "README.md"), ("rcb/STANDARD_MODE_2_2", "standard_mode.md"))),   # (rcb/: RoboARC's released texts)
 ]
-BENCHMARKS = [  # (directory prefix, label)
-    ("robotwin_2_0_", "RoboTwin 2.0"), ("dextoolbench_", "DexToolBench"), ("mujoco_playground_", "MuJoCo Playground"),
-    ("kinder-", "KinDER"), ("humanoidbench-", "HumanoidBench"),
-    ("metaworldplus-", "MetaWorld+"),
-    ("robowits-", "RoboWits"), ("robopaint-", "RoboPaint"), ("robolab-", "RoboLab"),
-    ("behavior-", "BEHAVIOR-1K"), ("maniguard-", "ManiGuard"),
-    ("molmospaces-", "MolmoSpaces"), ("myosuite-", "MyoSuite"), ("dexjoco-", "DexJoCo"), ("dexhand-", "DexHand"),
-    ("vlabench-", "VLABench"),
-    ("robocasa-gr1-", "RoboCasa-GR1"),  # before "robocasa-": the first matching prefix wins
-    ("robocasa-", "RoboCasa"), ("robocasa365-", "RoboCasa365"),
-    ("libero-max-", "LIBERO-MAX"),
-    ("roboarc-", "RoboARC"),   # with its IKEA furniture-assembly suite, roboarc-ikea-<item>-i00 (tasks/roboarc/README.md)
-    ("bigym2-", "BiGym 2.0"),
-    ("yamlab-", "YAMLab"),
-    ("robodojo-", "RoboDojo"),
-    ("embodied-olympics-fun-", "Embodied Olympics - Fun"),      # the single-humanoid sports families
-    ("embodied-olympics-match-", "Embodied Olympics - Match"),  # the matches Embodied Olympics exports with its own service, and their twins
-    ("ese-", "Embodied Safety Exam"),
-    ("pandadyn-", "Panda Dynamic Scenes"),
-    ("ambench-", "AM-Bench"),
-    ("ispatialgym-", "iSpatialGym"),
-    ("roboengineer-", "roboEngineer"),   # its own multi-round runtime eai-policy/1.x (ci_checks/benchmarks/roboengineer/exported.toml)
-    ("labutopia-", "LabUtopia"),
-    ("autobio-", "AutoBio"),
-    ("abc-sim-", "ABC Sim"),
+# The benchmarks, one row each: (task directory name prefix, label, folder). The folder is tasks/<folder>/ and the
+# benchmark's embodied_first_exam/benchmarks/<folder>/; BENCHMARKS and BENCHMARK_DIRS below are views of this table, and
+# ci_checks/ci_scope.py --check holds its UNITS / FILES_IMAGE to it. A new benchmark adds one row here.
+BENCHMARK_TABLE = [
+    ("robotwin_2_0_", "RoboTwin 2.0", "robotwin-2"),
+    ("dextoolbench_", "DexToolBench", "dextoolbench"),
+    ("mujoco_playground_", "MuJoCo Playground", "mujoco-playground"),
+    ("kinder-", "KinDER", "kinder"),
+    ("humanoidbench-", "HumanoidBench", "humanoidbench"),
+    ("metaworldplus-", "MetaWorld+", "metaworldplus"),
+    ("robowits-", "RoboWits", "robowits"),
+    ("robopaint-", "RoboPaint", "robopaint"),
+    ("robolab-", "RoboLab", "robolab"),
+    ("behavior-", "BEHAVIOR-1K", "behavior-1k"),
+    ("maniguard-", "ManiGuard", "maniguard"),
+    ("molmospaces-", "MolmoSpaces", "molmospaces"),
+    ("myosuite-", "MyoSuite", "myosuite"),
+    ("dexjoco-", "DexJoCo", "dexjoco"),
+    ("dexhand-", "DexHand", "dexhand"),
+    ("vlabench-", "VLABench", "vlabench"),
+    ("robocasa-gr1-", "RoboCasa-GR1", "robocasa-gr1"),  # before "robocasa-": the first matching prefix wins
+    ("robocasa-", "RoboCasa", "robocasa"),
+    ("robocasa365-", "RoboCasa365", "robocasa365"),
+    ("libero-max-", "LIBERO-MAX", "libero-max"),
+    ("roboarc-", "RoboARC", "roboarc"),  # with its IKEA furniture-assembly suite, roboarc-ikea-<item>-i00 (tasks/roboarc/README.md)
+    ("bigym2-", "BiGym 2.0", "bigym2"),
+    ("yamlab-", "YAMLab", "yamlab"),
+    ("robodojo-", "RoboDojo", "robodojo"),
+    ("embodied-olympics-fun-", "Embodied Olympics - Fun", "embodied-olympics-fun"),  # the single-humanoid sports families
+    ("embodied-olympics-match-", "Embodied Olympics - Match", "embodied-olympics-match"),  # the matches Embodied Olympics exports with its own service, and their twins
+    ("ese-", "Embodied Safety Exam", "embodied-safety-exam"),
+    ("pandadyn-", "Panda Dynamic Scenes", "pandadyn"),
+    ("ambench-", "AM-Bench", "ambench"),
+    ("ispatialgym-", "iSpatialGym", "ispatialgym"),
+    ("roboengineer-", "roboEngineer", "roboengineer"),  # its own multi-round runtime eai-policy/1.x (ci_checks/benchmarks/roboengineer/exported.toml)
+    ("labutopia-", "LabUtopia", "labutopia"),
+    ("autobio-", "AutoBio", "autobio"),
+    ("abc-sim-", "ABC Sim", "abc-sim"),
 ]
+BENCHMARKS = [(p, label) for p, label, _ in BENCHMARK_TABLE]   # (directory prefix, label): the first matching prefix wins
 # Modes (PROTOCOL §3, owner 2026-10-14): a benchmark ships any subset of the modes. A standard or standard-realtime
 # task without a privileged twin says why in its README's Twin row ("— (none: ...)"), the task's own declaration:
 # no_twin_reason() reads it back, so no list of such tasks is kept here.
@@ -116,7 +130,7 @@ def _ro_exported_tasks() -> tuple[str, ...]:
 
 RO_EXPORTED_TASKS = _ro_exported_tasks()
 # PROTOCOL §2.16 (owner, 2026-10-14): THE registry of modes. A mode's name is the whole suffix of its task directories
-# (`<base>-<mode>`) and its `[metadata] mode`; everything that parses or branches on a mode reads this table (mode_of,
+# (`<base>-<mode>`; task.toml keeps no copy of it); everything that parses or branches on a mode reads this table (mode_of,
 # base_of, the twins' equal cutoffs, the limits' scope, the checks under ci_checks/, which get it once per run through
 # `python3 scripts/task_conventions.py modes`). A new mode is one entry here plus its protocol section, by a mode
 # pull request (PROTOCOL §2.16 lists what it must contain). Fields:
@@ -187,7 +201,7 @@ EXTERNAL_TEXT = (
     "or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and "
     "the package registries (PyPI, Debian / Ubuntu archives) only.")
 # Open network (PROTOCOL §2, Appendix H.6; owner 2026-10-14): the task author's choice, declared as
-# `[metadata] network = "open"` in task.toml. Such a task carries its own `## External material` paragraph (the author
+# `[agent] network_mode = "public"` in task.toml (network_of). Such a task carries its own `## External material` paragraph (the author
 # says what may be used); normalize keeps it, and writes EXTERNAL_TEXT_OPEN where it has none.
 EXTERNAL_TEXT_OPEN = (
     "The network is open. You may install packages (pip, apt), and you may search for, download and use public tools, "
@@ -263,21 +277,11 @@ CUTOFF_NOTE_START = "This is wall-clock time from the start of your session;"   
 WALL_CLOCK_ENV = "RCB_WALL_CLOCK_S"              # the standard modes' sim service: what its /spec budget and time_left_s report
 CUTOFF_CAP = 14400                               # PROTOCOL D8 / §2.3, no benchmark excepted (ci_checks/check-cutoffs.py)
 # The repository's task tree: one folder per benchmark, tasks/<folder>/<task>/ (a task dir's name says its benchmark,
-# bench_of; GitHub lists at most 1000 entries of a folder). The folder of each BENCHMARKS label, the same slug as the
-# benchmark's embodied_first_exam/benchmarks/ folder. Everything that finds a task dir in the repository goes through task_dir() /
-# iter_tasks() (and the pool reads this table); `benchmarks --check` holds the tree to it.
+# bench_of; GitHub lists at most 1000 entries of a folder). The folder of each label: BENCHMARK_TABLE's third column.
+# Everything that finds a task dir in the repository goes through task_dir() / iter_tasks(); `benchmarks --check` holds
+# the tree to it.
 TASKS_DIR = Path(__file__).resolve().parents[1] / "tasks"
-BENCHMARK_DIRS = {
-    "RoboTwin 2.0": "robotwin-2", "DexToolBench": "dextoolbench", "MuJoCo Playground": "mujoco-playground",
-    "KinDER": "kinder", "HumanoidBench": "humanoidbench", "MetaWorld+": "metaworldplus", "RoboWits": "robowits",
-    "RoboPaint": "robopaint", "RoboLab": "robolab", "BEHAVIOR-1K": "behavior-1k", "ManiGuard": "maniguard",
-    "MolmoSpaces": "molmospaces", "MyoSuite": "myosuite", "DexJoCo": "dexjoco", "DexHand": "dexhand",
-    "VLABench": "vlabench", "RoboCasa-GR1": "robocasa-gr1", "RoboCasa": "robocasa", "RoboCasa365": "robocasa365",
-    "LIBERO-MAX": "libero-max", "RoboARC": "roboarc", "BiGym 2.0": "bigym2", "YAMLab": "yamlab", "RoboDojo": "robodojo",
-    "Embodied Olympics - Fun": "embodied-olympics-fun", "Embodied Olympics - Match": "embodied-olympics-match", "Embodied Safety Exam": "embodied-safety-exam",
-    "Panda Dynamic Scenes": "pandadyn", "AM-Bench": "ambench", "iSpatialGym": "ispatialgym",
-    "roboEngineer": "roboengineer", "LabUtopia": "labutopia", "AutoBio": "autobio", "ABC Sim": "abc-sim",
-}
+BENCHMARK_DIRS = {label: folder for _, label, folder in BENCHMARK_TABLE}
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -497,10 +501,14 @@ def normalize_toml(task: Path) -> None:
     mode = mode_of(task)
     s = re.sub(r'^name = "embodied-first-exam/[^"]*"', f'name = "embodied-first-exam/{task.name}"', s, count=1, flags=re.M)
     s = re.sub(r'(?m)^tier = .*\n', "", s)
-    if re.search(r'(?m)^mode = ', s):
-        s = re.sub(r'(?m)^mode = "[^"]*"', f'mode = "{mode}"', s)
-    else:
-        s = re.sub(r'(?m)^(family = .*\n)', rf'\1mode = "{mode}"\n', s, count=1)
+    # Copies of what another source says are not kept in [metadata]: the mode is the directory's suffix (mode_of), the
+    # reset budget the sim service's RCB_RESET_BUDGET default (reset_budget_of), the agent's egress [agent] network_mode
+    # (network_of: an open task's `network = "open"` becomes `network_mode = "public"` there)
+    open_net = re.search(r'(?m)^network = "open"', metadata_body(s)) is not None
+    s = metadata_sub(s, r'(?m)^(mode|reset_budget) = .*\n', "")
+    s = metadata_sub(s, r'(?m)^network = "(open|allowlist)".*\n', "")
+    if open_net:
+        s = set_open_egress(s, task.name)
     if mode == "standard":
         s = re.sub(r'(?m)^protocol = "rcb-limited/(2\.\d)"', r'protocol = "eai-standard/\1"', s)
     lvl = oracle_level(task)
@@ -508,10 +516,67 @@ def normalize_toml(task: Path) -> None:
     if lvl and "oracle" not in meta:
         o, ev = lvl
         line = f'oracle = "{o}"\n' + (f'oracle_evidence = "{ev}"\n' if ev else "")
-        s = re.sub(r'(?m)^(mode = .*\n(?:protocol = .*\n)?)', lambda m: m.group(1) + line, s, count=1)
+        s = metadata_insert(s, line)
     s = replace_words(s)
     s = s.replace('"limited-mode"', '"standard-mode"').replace('"unlimited"', '"privileged"')
     write_if_changed(p, s)
+
+
+def _metadata_span(s: str) -> tuple[int, int]:
+    """The body of task.toml's `[metadata]` table: (start, end) offsets, up to the next table header."""
+    m = re.search(r"(?m)^\[metadata\]\n", s)
+    if not m:
+        raise RuntimeError("task.toml has no [metadata] table")
+    h = re.search(r"(?m)^\[", s[m.end():])
+    return m.end(), (m.end() + h.start() if h else len(s))
+
+
+def metadata_body(s: str) -> str:
+    a, b = _metadata_span(s)
+    return s[a:b]
+
+
+def metadata_sub(s: str, pattern: str, repl, count: int = 0) -> str:
+    """re.sub inside the `[metadata]` table only."""
+    a, b = _metadata_span(s)
+    return s[:a] + re.sub(pattern, repl, s[a:b], count=count) + s[b:]
+
+
+def metadata_insert(s: str, line: str, after: str = "") -> str:
+    """Inserts `line` (ending in a newline) into `[metadata]`: after the `<after> = ...` line when there is one, else
+    before `expert_time_estimate_hours`, else after the table's last key."""
+    a, b = _metadata_span(s)
+    body = s[a:b]
+    m = re.search(rf"(?m)^{re.escape(after)} = .*\n", body) if after else None
+    if m:
+        at = m.end()
+    else:
+        m = re.search(r"(?m)^expert_time_estimate_hours = ", body)
+        at = m.start() if m else len(body.rstrip("\n")) + 1
+    body = body[:at] + line + body[at:]
+    return s[:a] + body + s[b:]
+
+
+OPEN_EGRESS_LINE = 'network_mode = "public"'
+OPEN_EGRESS_COMMENT = "# open egress, the task author's choice (docs/protocol/README.md Appendix H.6)"
+
+
+def set_open_egress(s: str, task_name: str = "") -> str:
+    """An open task's [agent] egress: `network_mode = "public"` (Harbor's own field; network_of reads it), replacing
+    the table's network policy lines (an `allowed_hosts` has no meaning there)."""
+    m = re.search(r"(?m)^\[agent\]\n", s)
+    if not m:
+        raise RuntimeError(f"{task_name}: task.toml has no [agent] table")
+    h = re.search(r"(?m)^\[", s[m.end():])
+    b = m.end() + h.start() if h else len(s)
+    body = re.sub(r"(?m)^(network_mode|allowed_hosts)\s*=.*\n", "", s[m.end():b])
+    body = body.replace("Egress: open (Harbor's default), as `[metadata] network` declares.",
+                        'Egress: open, `network_mode = "public"` below (the author\'s choice).')
+    rest = body.rstrip("\n")
+    body = (rest + "\n" if rest else "") + OPEN_EGRESS_LINE + " " * 8 + OPEN_EGRESS_COMMENT + "\n" + body[len(rest):].lstrip("\n")
+    if not body.endswith("\n\n") and h:
+        body += "\n"
+    return s[:m.end()] + body + s[b:]
 
 
 def _rules() -> list[dict]:
@@ -833,7 +898,8 @@ def external_paragraph(text: str) -> str | None:
 
 def render_external(task: "Path | str" = "") -> str:
     """instruction.md's `## External material` (PROTOCOL §5): the same words in every allowlist task (EXTERNAL_TEXT); a
-    task that declares `[metadata] network = "open"` keeps its own paragraph (EXTERNAL_TEXT_OPEN when it has none)."""
+    task with open egress (`[agent] network_mode = "public"`, network_of) keeps its own paragraph (EXTERNAL_TEXT_OPEN
+    when it has none)."""
     text = EXTERNAL_TEXT
     if isinstance(task, Path) and network_of(task) == "open":
         text = external_paragraph(read_text(task / "instruction.md") or "") or EXTERNAL_TEXT_OPEN
@@ -1158,25 +1224,25 @@ def render_readme(task: Path) -> str:
     rows = [(k, v) for k, v in rows if k not in HEADER_KEYS and k.lower() not in DROP_ROWS]
     rowd = {k.lower(): v for k, v in rows}
     secd = {t: b for t, b in sections}
-    mode = md.get("mode", mode_of(task))
+    mode = mode_of(task)
     twin = base_of(task) + ("-privileged" if mode in SIDECAR_MODES else "-standard")
     if mode not in SIDECAR_MODES and not task.with_name(twin).is_dir():   # a privileged twin of a realtime task
         twin = next((base_of(task) + f"-{m}" for m in SIDECAR_MODES if task.with_name(base_of(task) + f"-{m}").is_dir()),
                     twin)
-    seed = md.get("instance_seed")
     sd = seeds_of(md)
+    seed = sd["default"]
     oracle = md.get("oracle", "")
     ev = md.get("oracle_evidence", "")
     head = [("Benchmark", bench_of(task) or "—"),
             ("Mode", mode + (f" (`{md['protocol']}`)" if mode in SIDECAR_MODES and md.get("protocol") else ""))]
-    # a standard or realtime task has its privileged twin unless no_twin_reason() says why not (PROTOCOL §2.15), even
+    # a standard or realtime task has its privileged twin unless no_twin_reason() says why not (PROTOCOL §3), even
     # when a generator renders it first (an exempted name whose twin still exists, e.g. before a removal lands, keeps it)
     no_twin = None if task.with_name(twin).is_dir() else no_twin_reason(task)
     head.append(("Twin", no_twin or (f"`{twin}`" if mode in SIDECAR_MODES or task.with_name(twin).is_dir()
                                      else "— (privileged only)")))
     head += [("Simulator / robot", f"`{md.get('simulator', '')}` / `{md.get('robot', '')}`"),
-             ("Family / instance", f"`{md.get('family', '')}`" + (f" / seed {seed}" if seed is not None else "")
-              + (f" (allowed seeds: {seeds_text(sd['allowed'])}; §2.13)" if sd["allowed"] != [sd["default"]] else "")),
+             ("Family / instance", f"`{md.get('family', '')}` / seed {seed}"
+              + (f" (allowed seeds: {seeds_text(sd['allowed'])}; PROTOCOL §2)" if sd["allowed"] != [sd["default"]] else "")),
              ("Oracle", f"`{oracle}`" + (f" — {ev}" if ev else "") if oracle else "—"),
              ("Agent time budget", f"{int(float(ag.get('timeout_sec', 0)))} s; tokens: protocol default (PROTOCOL §5)")]
     rt = realtime_of(task)
@@ -1184,7 +1250,7 @@ def render_readme(task: Path) -> str:
         head.append(("Real time", f"slowdown S = {slowdown_text(rt[0])} (the world runs at 1/S of real speed: one control "
                                   f"step every S x control_dt s of wall time; `{slowdown_var(task)}`'s default)"
                                   + (f"; reset budget {rt[1]} (`RCB_RESET_BUDGET`'s default)" if rt[1] is not None else "")
-                                  + " (PROTOCOL §4b)"))
+                                  + " (PROTOCOL §3)"))
     head.append(("Base image", f"`{image_of(task)}`"))
     used = set()
     task_text = intro or meta.get("task", {}).get("description", "")
@@ -1201,7 +1267,8 @@ def render_readme(task: Path) -> str:
     ref = ref or "See `solution/`."
     ver = ver or "See `tests/grade.py`."
     extra_rows = [(k, v) for k, v in rows if k.lower() not in used]
-    extra_secs = [(t, b) for t, b in sections if t not in ("Difficulty", "Reference solution", "Verification") and b]
+    # (a task's history is not kept in its README: git log and the pull requests have it; docs describe the current state)
+    extra_secs = [(t, b) for t, b in sections if t not in ("Difficulty", "Reference solution", "Verification", "Change Log") and b]
     out = [f"# {task.name}", "", "| | |", "|---|---|"] + [f"| {k} | {v} |" for k, v in head]
     out += ["", "## Task", task_text.strip(), "", "## Difficulty", difficulty.strip(), "",
             "## Reference solution", ref.strip(), "", "## Verification", ver.strip()]
@@ -1231,13 +1298,14 @@ def assert_converted(task: Path) -> None:
 
 
 def seeds_of(md: dict) -> dict:
-    """`[metadata.seeds]` (PROTOCOL §2.13) as the generator wrote it, completed: `default` = the generator's, else
-    `instance_seed`, else 0 (then 0 names the task's one frozen instance); `allowed` = [default] unless given (a list,
+    """The task's seeds (PROTOCOL §2): `default` = `[metadata] instance_seed` (the one field that names it; a
+    `[metadata.seeds] default` of an older task.toml is read when it is missing), else 0 (then 0 names the task's one
+    frozen instance); from `[metadata.seeds]`, written only where they are not the defaults: `allowed` = [default] unless given (a list,
     a range `{from, to}` with both ends included, or "any"); `oracle` = the seeds the reference solution is for: the
     generator's (else [default]) for an `oracle` of "full" or "partial", [] for "none"; `build` = "frozen" (every
     allowed seed a committed instance) unless the generator says "runtime" (the task builds a seed's instance itself)."""
     given = md.get("seeds") if isinstance(md.get("seeds"), dict) else {}
-    default = int(given.get("default", md.get("instance_seed", 0)))
+    default = int(md.get("instance_seed", given.get("default", 0)))
     allowed = given.get("allowed", [default])
     if isinstance(allowed, list):
         allowed = [int(x) for x in allowed]
@@ -1268,27 +1336,57 @@ def seeds_text(allowed) -> str:
     return "[" + ", ".join(str(x) for x in allowed) + "]"
 
 
-def normalize_seeds(task: Path) -> None:
-    """Writes `[metadata.seeds]` (PROTOCOL §2.13) after the `[metadata]` keys, replacing an earlier block; the values a
-    generator wrote are kept."""
+def seeds_nondefault(md: dict) -> dict:
+    """The keys of `[metadata.seeds]` whose value is not what seeds_of() gives when the key is left out."""
+    sd = seeds_of({k: v for k, v in md.items() if k != "seeds"})
+    full = seeds_of(md)
+    return {k: full[k] for k in ("allowed", "oracle", "build") if full[k] != sd[k]}
+
+
+# task.toml comments and values that cite a section number of protocol v1, repointed to the current section (the v1
+# table at the end of docs/protocol/README.md maps the rest, cited by READMEs and shared code): (pattern, replacement).
+V1_REFS = [
+    (r"(honour rule \(PROTOCOL )§2\.11\)", r"\1§5)"),
+    (r"(set_agent_egress\.py\); PROTOCOL )§2\.11\b", r"\1Appendix H.6"),
+    (r"(every MyoSuite task \(PROTOCOL )§2\.11\)", r"\1Appendix H.6)"),
+    (r"(public on Hugging Face \(PROTOCOL )§2\.7\)", r"\1Appendix H.2)"),
+    (r"([Hh]uman review[^\n\"]*?\((?:PROTOCOL|protocol) )§2\.7\)", r"\1§4)"),
+    (r"(\((?:PROTOCOL|protocol|docs/protocol/README\.md) )§2\.6\)", r"\1Appendix H.1)"),
+    (r"(\((?:PROTOCOL|protocol|docs/protocol/README\.md) )§2\.1[2-4]\)", r"\1§2)"),
+    (r"(\((?:PROTOCOL|protocol|docs/protocol/README\.md) )§(?:2\.1[56]|4b)\)", r"\1§3)"),
+    (r"(\(PROTOCOL )§7, Open 4\)", r"\1§4)"),
+]
+
+
+def normalize_v1_refs(task: Path) -> None:
     p = task / "task.toml"
     s = p.read_text()
-    sd = seeds_of(tomllib.loads(s).get("metadata", {}))
+    for a, b in V1_REFS:
+        s = re.sub(a, b, s)
+    write_if_changed(p, s)
+
+
+def normalize_seeds(task: Path) -> None:
+    """The seeds (PROTOCOL §2): `instance_seed = <default>` in `[metadata]` (kept where it is, with its comment; else
+    written before `expert_time_estimate_hours`), and a `[metadata.seeds]` table only with the keys that are not the
+    defaults (`allowed`, `oracle`, `build`: seeds_nondefault); the values a generator wrote are kept."""
+    p = task / "task.toml"
+    s = p.read_text()
+    md = tomllib.loads(s).get("metadata", {})
+    sd, extra = seeds_of(md), seeds_nondefault(md)
     s = re.sub(r"(?ms)^\[metadata\.seeds\]\n.*?(?=^\[|\Z)", "", s)
-    m = re.search(r"(?m)^\[metadata\]\n", s)
-    if not m:
-        raise RuntimeError(f"{task.name}: task.toml has no [metadata] table")
-    at = len(s)
-    h = re.search(r"(?m)^\[", s[m.end():])
-    if h:
-        at = m.end() + h.start()
-    block = ("[metadata.seeds]\n# the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a "
-             "runner may draw\n# from (a list, { from = A, to = B } or \"any\"), and the ones the reference solution under "
-             "solution/ is for\n"
-             f"default = {sd['default']}\nallowed = {seeds_text(sd['allowed'])}\noracle = {seeds_text(sd['oracle'])}\n"
-             + (f'build = "{sd["build"]}"\n' if sd["build"] != "frozen" else ""))
-    head = s[:at].rstrip("\n") + "\n\n"
-    s = head + block + ("\n" + s[at:] if at < len(s) else "")
+    if re.search(r"(?m)^instance_seed = ", metadata_body(s)):
+        s = metadata_sub(s, r"(?m)^instance_seed = -?\d+", f"instance_seed = {sd['default']}", count=1)
+    else:
+        s = metadata_insert(s, f"instance_seed = {sd['default']}\n")
+    if extra:
+        a, b = _metadata_span(s)
+        block = ("[metadata.seeds]\n# the seeds a runner may draw from (a list, { from = A, to = B } or \"any\") and the ones the "
+                 "reference solution\n# under solution/ is for, where they are not the default seed alone (docs/protocol/README.md §2)\n"
+                 + "".join(f"{k} = " + (f'"{v}"' if k == "build" else seeds_text(v)) + "\n" for k, v in extra.items()))
+        s = s[:b].rstrip("\n") + "\n\n" + block + ("\n" + s[b:] if b < len(s) else "")
+    else:
+        s = re.sub(r"\n{3,}(?=\[)", "\n\n", s)
     write_if_changed(p, s)
 
 
@@ -1315,7 +1413,7 @@ def committed_line(task: Path, key: str) -> str | None:
 
 def normalize_dynamics(task: Path) -> None:
     """`[metadata] dynamics` (static / dynamic; PROTOCOL §2) is the task's own declaration and is kept as written. A
-    task.toml without it (a generator's fresh render) gets the committed task's line back, right after `mode`; a new task
+    task.toml without it (a generator's fresh render) gets the committed task's line back, right after `family`; a new task
     declares it itself (ci_checks/check-task-fields.sh warns when it is missing)."""
     p = task / "task.toml"
     s = p.read_text()
@@ -1324,10 +1422,8 @@ def normalize_dynamics(task: Path) -> None:
     line = committed_line(task, "dynamics")
     if line is None:
         return
-    line = replace_words(line)
-    s, n = re.subn(r'(?m)^(mode = "[^"]*".*\n)', lambda m: m.group(1) + line, s, count=1)
-    if n == 1:
-        write_if_changed(p, s)
+    line = replace_words(line).replace("(docs/protocol/README.md §2.14)", "(docs/protocol/README.md §2)")
+    write_if_changed(p, metadata_insert(s, line, after="family"))
 
 
 def realtime_of(task: Path) -> tuple[float, int | None] | None:
@@ -1354,7 +1450,7 @@ def slowdown_text(S: float) -> str:
 
 
 def normalize_slowdown(task: Path) -> None:
-    """Writes `slowdown = S` (PROTOCOL §4b) right after `dynamics` (else `mode`) in `[metadata]` of a standard-realtime
+    """Writes `slowdown = S` (PROTOCOL §3) right after `dynamics` (else `family`) in `[metadata]` of a standard-realtime
     task, from its sim service's `RCB_SLOWDOWN` default, replacing an earlier line."""
     rt = realtime_of(task)
     p = task / "task.toml"
@@ -1362,12 +1458,11 @@ def normalize_slowdown(task: Path) -> None:
     if rt is not None:
         line = f"slowdown = {slowdown_text(rt[0])}"
         line += " " * max(1, 34 - len(line)) + ("# standard-realtime: the world runs at 1/S of real speed (docs/protocol/README.md "
-                                                 f"§4b); {slowdown_var(task)}'s default\n")
-        s, n = re.subn(r'(?m)^(dynamics = "[^"]*".*\n)', lambda m: m.group(1) + line, s, count=1)
-        if n != 1:
-            s, n = re.subn(r'(?m)^(mode = "[^"]*".*\n)', lambda m: m.group(1) + line, s, count=1)
-        if n != 1:
-            raise RuntimeError(f"{task.name}: task.toml has no `mode` line in [metadata]")
+                                                 f"§3); {slowdown_var(task)}'s default\n")
+        body = metadata_body(s)
+        if not re.search(r"(?m)^(dynamics|family) = ", body):
+            raise RuntimeError(f"{task.name}: task.toml has no `dynamics` or `family` line in [metadata]")
+        s = metadata_insert(s, line, after="dynamics" if re.search(r"(?m)^dynamics = ", body) else "family")
     write_if_changed(p, s)
 
 
@@ -1384,22 +1479,19 @@ def metadata_of(task: Path) -> dict:
 
 
 def network_of(task: Path) -> str:
-    """The agent's egress the task declares: `[metadata] network`, "allowlist" (the default: the model APIs and the
-    package registries) or "open" (the author's choice, PROTOCOL Appendix H.6). Anything else is returned as written
-    (ci_checks/check-verifier-isolation.sh fails it)."""
-    return str(metadata_of(task).get("network", "allowlist"))
+    """The agent's egress the task declares, from Harbor's own field, `[agent] network_mode`: "open" for "public" (the
+    author's choice, PROTOCOL Appendix H.6), else "allowlist" (the default: the model APIs and the package registries;
+    ci_checks/check-verifier-isolation.sh fails a task whose [agent] is not on it)."""
+    return "open" if (task_toml(task).get("agent") or {}).get("network_mode") == "public" else "allowlist"
 
 
 def reset_budget_of(task: Path) -> int | None:
-    """The reset budget N a standard-mode task declares (its sim service's `RCB_RESET_BUDGET` default, else
-    `[metadata] reset_budget`, else 0: no reset); None for a mode without a sim service (privileged: resets are free)."""
+    """The reset budget N a standard-mode task declares (its sim service's `RCB_RESET_BUDGET` default, else 0: no
+    reset); None for a mode without a sim service (privileged: resets are free)."""
     if not MODE_REGISTRY[mode_of(task)]["sidecar"]:
         return None
     m = RESET_DECL_RE.search(read_text(task / "environment/docker-compose.yaml") or "")
-    if m:
-        return int(m.group(1) or m.group(2))
-    v = metadata_of(task).get("reset_budget")
-    return int(v) if isinstance(v, int) and not isinstance(v, bool) else 0
+    return int(m.group(1) or m.group(2)) if m else 0
 
 
 def slowdown_of(task: Path) -> float | None:
@@ -1647,6 +1739,40 @@ def readme_quick_start(tasks_dir: Path | None = None) -> str:
     ])
 
 
+TAXONOMY_FILE = Path(__file__).resolve().parents[1] / "docs/TAXONOMY.md"
+TAXONOMY_PROTOCOL_ROW = re.compile(r"(?m)^\| `protocol` \| .* \|$")
+# what a protocol value adds to its row in docs/TAXONOMY.md (the benchmarks that serve it come from the tasks)
+PROTOCOL_NOTES = {"eai-standard/2.4": "the operations capability",
+                  "eai-policy/1.0": "a benchmark's own runtime", "eai-policy/1.1": "a benchmark's own runtime",
+                  "eai-standard-turn/1.0": "a benchmark's own runtime", "eai-standard-realtime/1.0": "a benchmark's own runtime"}
+
+
+def taxonomy_protocol_row(tasks_dir: Path | None = None) -> str:
+    """docs/TAXONOMY.md's `protocol` row, from the tasks: per sidecar mode, each value of `[metadata] protocol` and the
+    benchmarks whose tasks declare it (BENCHMARK_TABLE order; "some tasks" where a benchmark's tasks of that mode
+    declare more than one)."""
+    use: dict = {}
+    for t in iter_tasks(tasks_dir):
+        m = mode_of(t)
+        if m in SIDECAR_MODES:
+            use.setdefault(m, {}).setdefault(str(metadata_of(t).get("protocol", "")), set()).add(bench_of(t))
+    order = {lab: i for i, (_, lab, _) in enumerate(BENCHMARK_TABLE)}
+    parts = []
+    for m in SIDECAR_MODES:
+        per = use.get(m, {})
+        vals = []
+        for proto in sorted(per, key=lambda p: (p.startswith("eai-standard/") is False, p)):
+            benches = sorted(per[proto], key=lambda b: order.get(b, len(order)))
+            names = [b + (" (some tasks)" if sum(b in bs for bs in per.values()) > 1 else "") for b in benches]
+            note = PROTOCOL_NOTES.get(proto)
+            vals.append(f"`{proto}` ({(note + ': ') if note else ''}{', '.join(names)})")
+        parts.append(f"{m[0].upper() + m[1:]}: " + " · ".join(vals))
+    return ("| `protocol` | standard and standard-realtime modes only; the benchmarks that serve each value (generated: "
+            "`python3 scripts/task_conventions.py taxonomy --write`). " + ". ".join(parts) + ". The `eai-standard` "
+            "versions are specified in [protocol/standard_mode.md](protocol/standard_mode.md); a benchmark's own runtime "
+            "names its protocol (PROTOCOL §3) |")
+
+
 def check_core_set(tasks_dir: Path | None = None, path: Path = CORE_SET_FILE) -> list[str]:
     """What is wrong with the core set: no file, an unknown top-level key or field, a task that is not a plain task name
     without a mode suffix, a default_mode that is not a mode, or no task dir of the task in its default_mode."""
@@ -1740,6 +1866,7 @@ def normalize(task: Path) -> None:
     normalize_cutoff(task)
     normalize_resources(task)
     normalize_seeds(task)
+    normalize_v1_refs(task)
     normalize_verifier_network(task)
     caps = rule_caps(task)
     rcb_monitor_inject.write_compose(task, caps)   # the caps first: the instruction and the README show them
@@ -1817,6 +1944,16 @@ def main(argv: list[str]) -> int:
         if q.group(2) != want_q:
             print("FAIL README.md: the quick start is stale (python3 scripts/task_conventions.py readme --write)"); return 1
         print("ok README.md quick start"); return 0
+    if argv[:1] == ["taxonomy"]:       # `taxonomy --check` / `--write`: docs/TAXONOMY.md's protocol row (taxonomy_protocol_row())
+        text = TAXONOMY_FILE.read_text(encoding="utf-8")
+        row, want = TAXONOMY_PROTOCOL_ROW.search(text), taxonomy_protocol_row()
+        if not row:
+            print("FAIL docs/TAXONOMY.md: no `protocol` row"); return 1
+        if "--write" in argv:
+            TAXONOMY_FILE.write_text(text[:row.start()] + want + text[row.end():], encoding="utf-8"); return 0
+        if row.group(0) != want:
+            print("FAIL docs/TAXONOMY.md: the protocol row is stale (python3 scripts/task_conventions.py taxonomy --write)"); return 1
+        print("ok docs/TAXONOMY.md protocol row"); return 0
     if argv[:1] == ["core-set"]:       # `core-set --check`: docs/core_set.toml (PROTOCOL §4); `core-set [--<mode>...]`:
         if "--check" in argv:            # list the core tasks' default-mode dirs, or their dirs of those modes (core_tasks())
             bad = check_core_set()

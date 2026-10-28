@@ -56,7 +56,7 @@ DTB, DTB_P = "dextoolbench_hammer_claw_hammer_swing_down-standard", "dextoolbenc
 MJ = "mujoco_playground_aloha_hand_over-standard"              # serves DexToolBench's service (server_mj.py)
 MWP, MWP_P = "metaworldplus-coffee-button-i00-standard", "metaworldplus-coffee-button-i00-privileged"
 TWIN_P = "robotwin_2_0_grab_roller-privileged"
-OPEN = "embodied-olympics-fun-sprint-i00-standard"                      # declares open egress, `[metadata] network = "open"` (Appendix H.6)
+OPEN = "embodied-olympics-fun-sprint-i00-standard"                      # declares open egress, `[agent] network_mode = "public"` (Appendix H.6)
 FUN_P = "embodied-olympics-fun-sprint-i00-privileged"                   # its tooling and grader from a files-only image (COPY --from)
 RP = "robopaint-acrylic-applesoranges-i00-privileged"           # a benchmark with its own leak hook (ci_checks/benchmarks/*/invariant-*)
 
@@ -89,6 +89,16 @@ def in_service(service: str, lines: str, after: str = ""):
 
 def append(text: str):
     return lambda s: s + text
+
+
+def seeds_block(allowed: str):
+    """A `[metadata.seeds]` table with `allowed = [<allowed>]`, where `{d}` is the task's default seed (instance_seed)."""
+    def f(s: str) -> str:
+        m = re.search(r"(?m)^instance_seed = (-?\d+)", s)
+        if not m:
+            raise AssertionError("mutation does not apply: no instance_seed")
+        return s + "\n[metadata.seeds]\nallowed = [" + allowed.format(d=m.group(1)) + "]\n"
+    return f
 
 
 def sidecar_drift(name: str, file: str, text: str = "# drift\n") -> dict:
@@ -180,17 +190,16 @@ MUTATIONS = [
     ("... `network_mode: bridge`", HEAVY, COMPOSE, in_service("main", "    network_mode: bridge"), ISOLATION, "service main: `network_mode` is not allowed"),
     ("a sidecar on a network of its own", STD, COMPOSE, in_service("sim", "    networks: [default]"), ISOLATION, "service sim: `networks` is not allowed"),
     ("a top-level networks block", STD, COMPOSE, append("networks:\n  default:\n    driver: bridge\n"), ISOLATION, "top-level `networks` is not allowed"),
-    ("a task drops its allowlist (PROTOCOL §2.11: one host list, in every task)",
+    ("a task drops its allowlist (PROTOCOL Appendix H.6: one host list, in every task)",
      HEAVY, TOML, sub(r'^network_mode = "allowlist".*\nallowed_hosts = .*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
     ("... a task of a benchmark that was open until 2026-10-10",
      TWIN_P, TOML, sub(r'^network_mode = "allowlist".*\nallowed_hosts = .*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
-    ("a task that declares open egress but sets an allowlist of its own in [agent]",
-     OPEN, TOML, sub(r'^\[agent\]\n', '[agent]\nnetwork_mode = "allowlist"\nallowed_hosts = ["pypi.org"]\n'), ISOLATION,
-     "sets another network policy"),
+    ("a task that declares open egress but keeps a host list in [agent]",
+     OPEN, TOML, sub(r'^(network_mode = "public".*\n)', r'\1allowed_hosts = ["pypi.org"]\n'), ISOLATION, "with allowed_hosts"),
     ("a task without an allowlist that does not declare open egress (the default is the allowlist)",
-     OPEN, TOML, sub(r'^network = "open".*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
-    ("a network declaration that is neither the allowlist nor open",
-     OPEN, TOML, sub(r'^network = "open"', 'network = "any"'), ISOLATION, "[metadata] network = 'any'"),
+     OPEN, TOML, sub(r'^network_mode = "public".*\n', ""), ISOLATION, '[agent].network_mode must be "allowlist"'),
+    ("a copy of the egress in [metadata] (it is [agent] network_mode's alone)",
+     OPEN, TOML, sub(r'^(\[metadata\]\n)', r'\1network = "open"\n'), ISOLATION, "[metadata] network = 'open'"),
     # ---- Appendix H.6, the verifier has no network: without [verifier] network_mode Harbor leaves the
     # separate verifier on its environment's baseline, public
     ("a privileged verifier with the network (no [verifier] network_mode)",
@@ -371,28 +380,37 @@ MUTATIONS = [
      RESOURCES, "tests/docker-compose.yaml: service main reserves a GPU but sets no `x-gpu-memory-gb`"),
     ("`[environment].gpus` (Harbor's local docker refuses it)", RT, TOML, sub(r"^(\[environment\]\n)", r"\1gpus = 1\n"),
      RESOURCES, "[environment].gpus"),
-    ("the old minimums table brought back", RT, TOML, sub(r"^(\[metadata\.seeds\]\n)", r"[metadata.resources]\nmin_cpus = 2.0\n\n\1"),
+    ("the old minimums table brought back", RT, TOML, sub(r"^(\[verifier\]\n)", r"[metadata.resources]\nmin_cpus = 2.0\n\n\1"),
      RESOURCES, "task.toml has [metadata.resources]"),
     ("a sidecar without a memory cap", RT, COMPOSE, sub(r"^(  sim:\n(?:    .*\n)*?)    mem_limit: \d+m   # rcb-monitor\n", r"\1"),
      RESOURCES, "service sim: no `mem_limit`"),
     ("a declared cap that docker does not apply",
      STD, COMPOSE, sub(r"^    mem_limit: \d+m(   # rcb-monitor)$", r"    mem_limit: 1024m\1"), RESOURCES, "declare the cap that is applied"),
-    # ---- seeds (PROTOCOL §2.13): the runner draws the seed; no other seed's instance where the agent's image is built
+    # ---- seeds (PROTOCOL §2): the runner draws the seed; no other seed's instance where the agent's image is built
     ("the default seed is not among the allowed ones",
-     TWIN_P, TOML, sub(r"^allowed = \[.*\]$", "allowed = [12345]"), SEEDS, "is not in seeds.allowed"),
+     TWIN_P, TOML, seeds_block("12345"), SEEDS, "is not in seeds.allowed"),
     ("an allowed seed without its frozen instance",
-     TWIN_P, TOML, sub(r"^allowed = \[(.*)\]$", r"allowed = [\1, 12345]"), SEEDS, "has no frozen instance"),
+     TWIN_P, TOML, seeds_block("{d}, 12345"), SEEDS, "has no frozen instance"),
+    ("a second copy of the default seed (it is instance_seed alone)",
+     TWIN_P, TOML, append("\n[metadata.seeds]\ndefault = 0\n"), SEEDS, "[metadata.seeds] has `default`"),
+    ("a task.toml without instance_seed",
+     TWIN_P, TOML, sub(r"^instance_seed = .*\n", ""), SEEDS, "no `instance_seed`"),
     ("another seed's instance in the agent's build context",
      TWIN_P, "+environment/seeds/7/instance.json", append("{}"), SEEDS, "a `seeds` directory where the agent's image"),
     # PROTOCOL §2: scene dynamics, the task's own declaration (no table)
     ("a task.toml without dynamics",
      TWIN_P, TOML, sub(r'^dynamics = .*\n', ""), FIELDS, "[metadata].dynamics must be declared"),
+    # copies of what another source says (the mode: the directory's suffix; the reset budget: the sim service's default)
+    ("a copy of the mode in [metadata]",
+     TWIN_P, TOML, sub(r'^(dynamics = .*\n)', r'\1mode = "privileged"\n'), FIELDS, "[metadata].mode"),
+    ("a copy of the reset budget in [metadata]",
+     STD, TOML, sub(r'^(dynamics = .*\n)', r'\1reset_budget = 0\n'), FIELDS, "[metadata].reset_budget"),
     # ---- Appendix H.7: twins share cutoff, seeds and frozen instance; H.3: no simulator in the agent's image; H.1: the
     # monitor's own isolation and the sanitize step; H.8: DIGEST; H.2: a benchmark's own leak hook
     ("a standard task whose cutoff is not its privileged twin's", STD, TOML,
      sub(r"(^\[agent\]\n(?:(?!\[).*\n)*?timeout_sec = )[0-9.]+", r"\g<1>1234.0"), TWINS, "the twins have the same cutoff"),
     ("a standard task whose allowed seeds are not its privileged twin's", STD, TOML,
-     sub(r"^allowed = \[(.*)\]$", r"allowed = [\1, 12345]"), TWINS, "differ from its privileged twin's"),
+     seeds_block("{d}, 12345"), TWINS, "differ from its privileged twin's"),
     ("the verifier's frozen instance is not the one the task runs from", PRIV, "tests/instance.json",
      sub(r"^\{", '{"x": 1, ', count=1, flags=0), INSTANCE, "differ, or one is missing"),
     ("a standard task's agent image takes the sidecar's code", STD, "environment/Dockerfile",

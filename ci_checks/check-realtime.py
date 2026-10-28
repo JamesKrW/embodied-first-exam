@@ -8,7 +8,7 @@ factor, 10 resets); this check holds no per-benchmark list. For every task whose
     `S = <S>` (or, for S = 1, says the robot runs "in real time");
   - reset budget: an `eai-standard/2.3` service declares it, `RCB_RESET_BUDGET` with a whole-number default
     (`"${RCB_RESET_BUDGET:-N}"`, or a fixed `"N"`); a §4c service may declare none (then it has no reset: N = 0);
-    `[metadata] reset_budget`, where the task keeps one, is N; every "K resets" the instruction states is N; with
+    task.toml keeps no copy of it (`[metadata] reset_budget`); every "K resets" the instruction states is N; with
     N > 0 the instruction states N or points to `spec()["budget"]["reset"]`; with a declared N = 0 it says "no reset".
 
     python3 ci_checks/check-realtime.py [task dirs]      # default: every task
@@ -62,8 +62,8 @@ def check(task: Path) -> list[str]:
         return errs
     declared = r is not None
     n = int(r.group(1) or r.group(2)) if declared else 0
-    if "reset_budget" in md and int(md["reset_budget"]) != n:
-        errs.append(f"{task.name}: [metadata] reset_budget = {md['reset_budget']}, but its service's default is {n}")
+    if "reset_budget" in md:
+        errs.append(f"{task.name}: [metadata] reset_budget copies its service's default ({n}): drop it (scripts/task_conventions.py normalize)")
     stated = {int(k) for k in STATED.findall(text)}
     if stated - {n}:
         errs.append(f"{task.name}: instruction.md states {', '.join(f'{k} resets' for k in sorted(stated - {n}))}, "

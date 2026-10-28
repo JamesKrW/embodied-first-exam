@@ -40,9 +40,9 @@ Open a benchmark-proposal issue first (or e-mail the proposal to embodiedfirstex
 It also states the oracle source (PROTOCOL §4), the caps of each container of a trial (CPU cores, memory, processes, GPU memory
 and GPU type: RTX-class, any or none; §6), image size, whether the images can be published, and
 the expected size of the pull request.
-A new benchmark's shared-files change adds its label to `scripts/task_conventions.py` `BENCHMARKS` (task-directory prefix
--> name) and its row to `ci_checks/ci_scope.py` `UNITS`; every benchmark has its own prefix
-(`task_conventions.py benchmarks --check`).
+A new benchmark's shared-files change adds its row to `scripts/task_conventions.py` `BENCHMARK_TABLE` (task-directory
+prefix, label, folder), and to `ci_checks/ci_scope.py` `UNITS` only for image directories of other names; every benchmark
+has its own prefix (`task_conventions.py benchmarks --check`, `ci_scope.py --check`).
 
 ## Authoring a task
 1. Copy the closest existing pair (`tasks/robotwin-2/robotwin_2_0_stack_blocks_two-privileged/` and `-standard/`), or
@@ -168,8 +168,8 @@ The checklist is in PROTOCOL §4.
 
 ## Rules that apply to every contribution
 - A published task may be changed in place, its scene included: it keeps its name and gets a new `DIGEST` (PROTOCOL
-  H.8), and results are attributed by digest. Recommended: say what changed and why in the pull request and the README's
-  Change Log.
+  H.8), and results are attributed by digest. Say what changed and why in the pull request; the README describes the
+  task as it is.
 - To change a time cutoff (the task author's decision; owner involvement only where official results must stay
   comparable), set the new `[agent] timeout_sec` in the tasks concerned, in both twins, run `python3 scripts/task_conventions.py` on them
   and say old -> new and why in the pull request (docs/protocol/running.md "The agent's time"). The task keeps its name and gets
@@ -186,7 +186,7 @@ The checklist is in PROTOCOL §4.
 - Pin everything (`FROM` tags or digests, pip versions); no network access during verification.
 - The agent's egress is the model APIs and the package registries (PyPI, the Debian / Ubuntu apt archives) by default
   (`[agent] network_mode = "allowlist"` with the hosts of `scripts/set_agent_egress.py`; PROTOCOL Appendix H.6); a task
-  whose author chooses open egress declares `[metadata] network = "open"` and writes its own `## External material`
+  whose author chooses open egress declares `[agent] network_mode = "public"` and writes its own `## External material`
   paragraph, and its results are ranked apart. Bake
   what the task itself needs at run time into the image or the task directory (an agent may install packages; a task
   must not depend on it). `normalize` writes the `## External material` paragraph, an honour rule, into
