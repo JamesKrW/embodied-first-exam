@@ -223,7 +223,7 @@ def test_disk_baseline():
     f = Fake()
     keep = (monitor.DISK_SLICE_SEC, monitor.DISK_WALK_MAX_SEC)
     try:
-        lim = {"disk_paths": ["/app"], "max_disk_gb": 0.004, "disk_tick_sec": 60, "tick_sec": 5}
+        lim = {"disk_gb": 0.004, "disk_tick_sec": 60, "tick_sec": 5}
         m = f.monitor(lim)
         m.disk_tick = 60.0
         croot = f.root("main")
@@ -249,7 +249,7 @@ def test_disk_baseline():
         # 5. ... but one that has already seen more than baseline + limit proves the violation
         _fill(os.path.join(croot, "app", "big.bin"), 8)                        # in the first directory read
         v = m.disk_step(1240.0, groups)
-        check(v is not None and v > lim["max_disk_gb"], f"a lower bound over the limit counts: {v}")
+        check(v is not None and v > lim["disk_gb"], f"a lower bound over the limit counts: {v}")
         # 6. the container's process ends during the walk: nothing is measured
         monitor.DISK_SLICE_SEC, monitor.DISK_WALK_MAX_SEC = keep
         f.pid(100, "mnt:[111]", croot, start=9999, nspid=1)                    # another process under the same PID
@@ -277,9 +277,9 @@ def test_emergency():
     real_kill = os.kill
     try:
         os.kill = lambda pid, sig: killed.append(pid)
-        lim = {"scope": "trial", "max_gpu_memory_gb": 4.0, "max_memory_gb": 21.0, "max_processes": 512,
-               "sustain_sec": 60, "window_sec": 120, "tick_sec": 5,
-               "caps": {"main": {"cpus": 8, "memory_gb": 20.0, "pids": 8192}, "extra": {"cpus": 2, "memory_gb": 7.0, "pids": 8192},
+        lim = {"gpu_memory_gb": 4.0, "tick_sec": 5,
+               "caps": {"main": {"cpus": 8, "memory_gb": 20.0, "pids": 8192, "gpu_memory_gb": 4.0},
+                        "extra": {"cpus": 2, "memory_gb": 7.0, "pids": 8192},
                         "scorer": {"cpus": 2, "memory_gb": 7.0, "pids": 8192}},
                "scope_services": ["main", "extra"]}      # a benchmark-owned service (scorer) is not in the scope
         croot = f.root("main")
@@ -343,9 +343,9 @@ def test_kill_path():
     real_kill = os.kill
     try:
         os.kill = lambda pid, sig: killed.append(pid)
-        lim = {"scope": "agent", "max_gpu_memory_gb": 0.0, "max_memory_gb": 21.0, "max_processes": 512,
-               "sustain_sec": 60, "window_sec": 120, "tick_sec": 5,
-               "caps": {"main": {"cpus": 8, "memory_gb": 29.0, "pids": 8192}, "sim": {"cpus": 8, "memory_gb": 16.0, "pids": 8192}},
+        lim = {"gpu_memory_gb": 21.0, "tick_sec": 5,      # a GPU-memory cap of 21 GiB (the rule: 60 s within 120 s)
+               "caps": {"main": {"cpus": 8, "memory_gb": 29.0, "pids": 8192, "gpu_memory_gb": 21.0},
+                        "sim": {"cpus": 8, "memory_gb": 16.0, "pids": 8192}},
                "scope_services": ["main"]}
         croot, sroot = f.root("main"), f.sidecar_root("sim")
         f.pid(100, "mnt:[111]", croot, start=1000, nspid=1)                    # the agent container's PID 1
@@ -358,7 +358,7 @@ def test_kill_path():
         agent, never = {101, 102, 104}, {100, 103, 200, 201}
 
         def feed(enforce, values, step=5.0):
-            """Monitor.check on one sample per value (GiB of memory, `step` seconds apart): (monitor, {sample index: pids killed})."""
+            """Monitor.check on one sample per value (GiB of GPU memory, `step` seconds apart): (monitor, {sample index: pids killed})."""
             del killed[:]
             shutil.rmtree(f.rec)
             os.makedirs(f.rec)
@@ -371,18 +371,18 @@ def test_kill_path():
             at = {}
             for i, v in enumerate(values):
                 n = len(killed)
-                m.check(100.0 + step * i, {"gpu_memory_gb": 0.0, "memory_gb": v, "processes": 5, "disk_gb": None}, groups)
+                m.check(100.0 + step * i, {"gpu_memory_gb": v, "memory_gb": 1.0, "processes": 5, "disk_gb": None}, groups)
                 if len(killed) > n:
                     at[i] = sorted(killed[n:])
             return m, at
 
-        over = [25.0] * 30                                    # 150 s over the 21 GiB limit, under the 29 GiB cap
+        over = [25.0] * 30                                    # 150 s over the 21 GiB cap, under 1.5 x it (no emergency kill)
         m, at = feed("0", over)
-        check(list(m.confirmed) == ["memory_gb"] and len(f.events("violation")) == 1, f"not enforced: confirmed and recorded: {m.confirmed}")
+        check(list(m.confirmed) == ["gpu_memory_gb"] and len(f.events("violation")) == 1, f"not enforced: confirmed and recorded: {m.confirmed}")
         check(at == {} and killed == [] and m.killed == 0 and not f.events("kill") and not f.events("emergency_kill"),
               f"not enforced: a confirmed violation kills nothing: {at}")
         m, at = feed("1", over)
-        check(list(m.confirmed) == ["memory_gb"] and len(f.events("violation")) == 1, f"enforced: confirmed once: {m.confirmed}")
+        check(list(m.confirmed) == ["gpu_memory_gb"] and len(f.events("violation")) == 1, f"enforced: confirmed once: {m.confirmed}")
         # sample i lasts until sample i + 1: 60 s over the limit are reached with the 13th sample (index 12), not before
         check(at and min(at) == 12, f"enforced: the first kill is at the confirmation, not before: {sorted(at)}")
         check(set(at[12]) == agent and len(at[12]) == len(agent), f"enforced: every agent process of the scope, once: {at[12]}")
@@ -395,15 +395,18 @@ def test_kill_path():
         spikes = ([25.0] * 5 + [1.0] * 12) * 12               # 25 s over, 60 s under, for 17 minutes: 300 s over in all,
         m, at = feed("1", spikes)                             # at most 50 s of it inside any 120 s
         check(not m.confirmed and killed == [] and not f.events("violation"), f"spikes spread over more than window_sec: {m.confirmed} {at}")
-        rec = [{"t": 100.0 + 5 * i, "scope": {"gpu_memory_gb": 0.0, "memory_gb": v, "processes": 5, "disk_gb": None}}
+        rec = [{"t": 100.0 + 5 * i, "scope": {"gpu_memory_gb": v, "memory_gb": 1.0, "processes": 5, "disk_gb": None}}
                for i, v in enumerate(spikes)]
         check(rcb_limits.violations(rec, lim) == [], "the verifier's rule on the whole record agrees: no violation")
+        mem = [{"t": 100.0 + 5 * i, "scope": {"gpu_memory_gb": 1.0, "memory_gb": 500.0, "processes": 100000, "disk_gb": None}}
+               for i in range(60)]
+        check(rcb_limits.violations(mem, lim) == [], "memory and processes are docker's caps: no rule of the monitor's")
         dense = ([25.0] * 7 + [1.0] * 4) * 6                  # 35 s over, 20 s under: 70 s over inside 120 s
         m, at = feed("1", dense)
-        check(list(m.confirmed) == ["memory_gb"] and at and set(killed) == agent,
+        check(list(m.confirmed) == ["gpu_memory_gb"] and at and set(killed) == agent,
               f"going under for a moment does not reset the time: {m.confirmed} {sorted(set(killed))}")
         m, at = feed("0", dense)
-        check(list(m.confirmed) == ["memory_gb"] and killed == [], "... and not enforced, nothing is killed")
+        check(list(m.confirmed) == ["gpu_memory_gb"] and killed == [], "... and not enforced, nothing is killed")
     finally:
         os.kill = real_kill
         f.close()
@@ -426,8 +429,7 @@ def test_switch():
 
 def _verify(samples=None, events=(), summary=None, env=None, limits=None, reward=None, no_limits=False, txt="1"):
     """Run the verifier step on a made-up record; returns (reward.json, reward.txt, resource_limits.json)."""
-    lim = limits if limits is not None else {"max_gpu_memory_gb": 4.0, "max_memory_gb": 8.0, "max_processes": 100,
-                                             "max_disk_gb": 10.0, "sustain_sec": 60, "window_sec": 120, "tick_sec": 5}
+    lim = limits if limits is not None else {"gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5}
     with tempfile.TemporaryDirectory() as d:
         rec, tests, logs = (os.path.join(d, x) for x in ("rec", "tests", "logs"))
         for x in (tests, logs):
@@ -491,7 +493,7 @@ def test_verify_edges():
           f"GPU memory not measured, enforced: {out}")
     out, _, _ = _verify(blind, (), dict(ok, enforce=0))
     check(out.get("infra_error", 0) == 0 and out["resource_monitor_missing"] == 1, f"GPU memory not measured, observed: {out}")
-    nogpu = {"max_gpu_memory_gb": 0.0, "max_memory_gb": 8.0, "max_processes": 100, "max_disk_gb": 10.0}
+    nogpu = {"gpu_memory_gb": 0.0, "disk_gb": 10.0}
     out, _, _ = _verify(blind, (), dict(ok, enforce=1), limits=nogpu)
     check(out["resource_monitor_missing"] == 0, "no GPU limit: nothing was missed")
     # the step itself fails (a broken limits file): reported in reward.json, as infra only when enforcement was asked for
@@ -524,7 +526,7 @@ def test_oom_watch():
     f = Fake()
     keep = monitor.OOM_CAP_WINDOW_SEC
     try:
-        m = f.monitor({"max_memory_gb": 24.0, "tick_sec": 5})
+        m = f.monitor({"caps": {"main": {"memory_gb": 24.0}}, "tick_sec": 5})
         f.pid(100, "mnt:[111]", f.root("main"), nspid=1)
         f.pid(101, "mnt:[111]", f.root("main"), start=5000, ppid=77, nspid=9)
         f.pid(200, "mnt:[222]", f.sidecar_root("sim"), nspid=1)
@@ -755,8 +757,7 @@ def _step_in_process(reward_json, reward_txt, record, switch):
         rec, tests, logs = (os.path.join(d, x) for x in ("rec", "tests", "logs"))
         for x in (tests, logs):
             os.makedirs(x)
-        json.dump({"max_gpu_memory_gb": 4.0, "max_memory_gb": 8.0, "max_processes": 100, "max_disk_gb": 10.0,
-                   "sustain_sec": 60, "window_sec": 120, "tick_sec": 5}, open(os.path.join(tests, "rcb_limits.json"), "w"))
+        json.dump({"gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5}, open(os.path.join(tests, "rcb_limits.json"), "w"))
         shutil.copy(os.path.join(HERE, "rcb_limits.py"), tests)
         if reward_json is not None:
             open(os.path.join(logs, "reward.json"), "w").write(reward_json)
@@ -892,15 +893,18 @@ def test_clock_and_beacon():
         monitor.SCOPE_BEACON, monitor.REC = beacon_dir, os.path.join(beacon_dir, "rec")
         monitor.LIMITS = os.path.join(beacon_dir, "limits.json")
         with open(monitor.LIMITS, "w") as fh:
-            json.dump({"max_memory_gb": 8.0, "tick_sec": 5, "agent_timeout_sec": 600}, fh)
+            json.dump({"caps": {"main": {"cpus": 4.0, "memory_gb": 8.0, "pids": 8192, "disk_gb": 20.0}}, "disk_gb": 20.0,
+                       "gpu_memory_gb": 0.0, "tick_sec": 5, "agent_timeout_sec": 600}, fh)
         monitor.beacon(rounds=1)
         u = rcb_limits.read_json(os.path.join(beacon_dir, "usage.json"))
-        check(u["measured"] is False and u["enforced"] == 0 and u["limits"]["max_memory_gb"] == 8.0, f"beacon: {u}")
+        check(u["measured"] is False and u["enforced"] == 0 and u["caps"]["memory_gb"] == 8.0 and u["caps"]["cpus"] == 4.0
+              and u["caps"]["gpu_memory_gb"] is None and u["limits"]["disk_gb"] == 20.0 and u["limits"]["sustain_sec"] == 60,
+              f"beacon: the agent's caps and the enforceable ones: {u}")
         check(u["time_limit_s"] == 600 and 590 <= u["time_left_s"] <= 600, f"beacon clock: {u}")
         started = rcb_limits.read_json(os.path.join(monitor.REC, "beacon.json"))["started"]
         monitor.beacon(rounds=1)                       # a restarted beacon keeps the first start
         check(rcb_limits.read_json(os.path.join(monitor.REC, "beacon.json"))["started"] == started, "beacon restart")
-        m = Fake().monitor({"max_memory_gb": 8.0, "tick_sec": 5, "agent_timeout_sec": 600})
+        m = Fake().monitor({"caps": {"main": {"memory_gb": 8.0}}, "tick_sec": 5, "agent_timeout_sec": 600})
         m.clock_t0 = monitor.now() - 100
         m.write_usage(monitor.now())                   # before any sample (or after a failed tick): the clock still runs
         u = rcb_limits.read_json(os.path.join(beacon_dir, "usage.json"))
@@ -989,7 +993,7 @@ def test_stop_without_cgroup():
         check(not monitor.own_cgroup(), "the parent's cgroup: none of its own")
         os.unlink(os.path.join(monitor.PROC, "self", "cgroup"))
         check(monitor.own_cgroup(), "unreadable: the runtime's stop is trusted")
-        m = Fake().monitor({"max_memory_gb": 8.0, "tick_sec": 5})
+        m = Fake().monitor({"caps": {"main": {"memory_gb": 8.0}}, "tick_sec": 5})
         t = monitor.now()
         m.linger(0.6)
         check(0.5 <= monitor.now() - t < 5, "no seal hook: it ends after the wait")

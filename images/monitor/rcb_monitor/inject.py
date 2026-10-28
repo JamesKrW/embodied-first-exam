@@ -1,27 +1,36 @@
 #!/usr/bin/env python3
-"""Wires the resource-limits monitor into a task directory (docs/protocol/README.md §2.10, v1.2), from its task.toml
-`[metadata.resources.limits]` and `[metadata.resources.caps]`. Called by scripts/task_conventions.py `normalize`, so every
-generator's output already has it and `task_conventions.py --check` keeps it in step; idempotent.
+"""Wires the resource monitor into a task directory (docs/protocol/README.md §6) and writes the caps docker applies to
+every compose service but main's CPU and memory (Harbor writes those from task.toml `[environment]`). Called by
+scripts/task_conventions.py `normalize` with the caps of the task's rule in scripts/task_resources.toml (or, for a task no
+rule matches, the caps its compose file already has), so `task_conventions.py --check` keeps it in step; idempotent.
+
+Every number is an upper bound for one container. Docker enforces CPU (a throttle), memory (the kernel's OOM killer) and
+processes; it cannot cap GPU memory (`x-gpu-memory-gb`, the one field of our own, on the compose service that holds the
+GPU) or, on overlay2 / ext4, disk (`[environment].storage_mb`). The monitor measures both and, with
+RCB_LIMITS_ENFORCE=1, enforces them (rcb_limits.violations: the protocol's rules, the same for every task).
 
 What it writes (every generated line ends in `# rcb-monitor`, or sits between the `# >>> rcb_monitor` and
 `# <<< rcb_monitor` markers, so a re-run first removes what an earlier run wrote):
-- environment/rcb_monitor/limits.json (the limits, the caps and the agent's time limit, `[agent] timeout_sec`, for the
-  clock in usage.json). The monitor's code (monitor.py, rcb_limits.py, selftest.py, CODE) is not copied into tasks: it is in
+- environment/rcb_monitor/limits.json (format rcb-limits/2: the caps of every service as applied, the GPU-memory and disk
+  caps of the services the monitor's scope covers, and the agent's time limit, `[agent] timeout_sec`, for the clock in
+  usage.json). The monitor's code (monitor.py, rcb_limits.py, selftest.py, CODE) is not copied into tasks: it is in
   the pinned monitor image (IMAGE) at /opt/rcb_monitor/, built from this directory (images/monitor/; CONTENTS below holds
   the sha256 of every file the image carries, so a change here without a new image fails ci_checks/check-monitor.py).
 - environment/docker-compose.yaml (created when the task had none):
   - the `rcb_monitor` service (pid: host, cgroup: host, network_mode: none, CAP_SYS_PTRACE, the task's GPU reservation,
     its code from the image, its limits.json mounted read-only, RCB_LIMITS_ENFORCE from the run-time environment, default 0);
-  - the beacon volumes: `rcb_limits` read-only at /run/rcb-limits in every service the limits bind (kind_of: main, and
-    in privileged mode every service the agent drives), `rcb_observe` at /run/rcb-observe in the ones only recorded
-    (the benchmark's own services: the simulator sidecar of standard modes, RoboPaint's privileged `scorer`);
-  - the caps (`[metadata.resources.caps]`): pids_limit on main (Harbor writes main's cpus and memory from
-    [environment]; scripts/task_conventions.py sets [environment].memory_mb to caps.main.memory_gb); cpus, mem_limit and
-    pids_limit on every other service, unless the service sets one itself (ci_checks/check-resources.py then requires
-    the declared cap to be that value).
+  - the beacon volumes: `rcb_limits` read-only at /run/rcb-limits in every service in the monitor's scope (kind_of:
+    main, and in privileged mode every service the agent drives), `rcb_observe` at /run/rcb-observe in the ones only
+    recorded (the benchmark's own services: the simulator sidecar of standard modes, RoboPaint's privileged `scorer`);
+  - the caps: pids_limit on main (Harbor writes main's cpus and memory from [environment], which
+    scripts/task_conventions.py writes from the same rule); cpus, mem_limit and pids_limit on every other service, and
+    `x-gpu-memory-gb` on every service that holds a GPU, unless the service sets one itself
+    (ci_checks/check-resources.py then requires the rule's value to be that one).
+- tests/docker-compose.yaml (a separate verifier with a GPU): `x-gpu-memory-gb` on its GPU services, main's value (Harbor
+  gives the verifier main's `[environment]` too, unless `[verifier.environment]` says otherwise).
 - task.toml: the record as an artifact of service rcb_monitor, the first `[[verifier.collect]]` hook (seals the record
   before any other sidecar ends the episode), `[verifier.env] RCB_LIMITS_ENFORCE`.
-- tests/: rcb_limits.json (the verifier's own copy of the limits); tests/Dockerfile COPYs it, and rcb_limits.py from the
+- tests/: rcb_limits.json (the verifier's own copy of limits.json); tests/Dockerfile COPYs it, and rcb_limits.py from the
   pinned monitor image (`COPY --from=IMAGE`), into /tests/; a
   `trap` in tests/test.sh that runs the verifier step after the grader, whatever the grader does, and before the grader
   the line that removes links and special files from the agent's /app/output (rcb_limits.py sanitize).
@@ -35,15 +44,19 @@ import tomllib
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parent
+try:
+    from rcb_monitor import rcb_limits   # imported as a package (scripts/task_conventions.py, the checks)
+except ImportError:                      # run as a script from this directory
+    import rcb_limits  # type: ignore[no-redef]
 CODE = ("monitor.py", "rcb_limits.py", "selftest.py")   # in the monitor image at /opt/rcb_monitor/ (images/monitor/Dockerfile)
-IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.3.1@sha256:dd6eacbf8886a62365d53bd0b3832d09749ea0e10b098b3442bb0cd26cbfd35d"
+IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.4.0@sha256:76b33f25e81b0e58f7c1f0b0e1e7e031e067b11da79dc5bc832a82ac53b4f7a2"
 # The sha256 of each CODE file in IMAGE (`inject.py verify-image` reads them back from the image; `inject.py contents`
 # prints them for this directory's files). A change to a CODE file needs a new image: build images/monitor/, bump its
 # VERSION, push it, then put the new digest in IMAGE and the new hashes here.
 CONTENTS = {
-    "monitor.py": "31426a43a478ff47a07ad8046a4ce91f73a18c106ed80caeb17c00f64f1f2f49",
-    "rcb_limits.py": "c666af695c71d5c5991279282d76ca4ffefe56196c54a4b00385b0cb1806d74a",
-    "selftest.py": "da38094402e9c9c83d69fbaf7e723e1d227ff440cafb30c7830e758179e03ab5",
+    "monitor.py": "ec191dee91257d0fa63e0d055c4eb0a58d522b3bb054b7960963674bcbb32dd5",
+    "rcb_limits.py": "a24273f279f3a8d369b7ed7bf093f382e56e9cfd6d9d0054b6166ea6a4a8f834",
+    "selftest.py": "fceaad39a57c9f0974dd1082cbbcaeccea5749a0a16accc493131dfff344aa39",
 }
 CODE_DIR = "/opt/rcb_monitor"
 LIMITS_MOUNT = f"./rcb_monitor/limits.json:{CODE_DIR}/limits.json:ro"   # the task's limits, next to the image's code
@@ -53,7 +66,7 @@ GEN_HEADER = "# Generated by images/monitor/rcb_monitor/inject.py (the task has 
 RECORD = "/var/rcb-monitor/"
 TICK, DISK_TICK = 5, 60
 ARTIFACT = f'{{ source = "{RECORD}", service = "rcb_monitor" }}'
-HOOK = ('# Resource limits (docs/protocol/README.md §2.10): seal the monitor\'s record first, before any other sidecar ends the episode.\n'
+HOOK = ('# Resources (docs/protocol/README.md §6): seal the monitor\'s record first, before any other sidecar ends the episode.\n'
         '[[verifier.collect]]\n'
         'service = "rcb_monitor"\n'
         'command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"\n'
@@ -80,6 +93,9 @@ SIDECAR_MODES = ("standard", "standard-realtime")
 # size them): recorded, never part of the scope the limits bind. Today RoboPaint's scoring service.
 BENCHMARK_SERVICES = ("scorer",)
 MONITOR_CAPS = {"cpus": 0.5, "mem": "256m", "pids": 64}
+GPU_KEY = "x-gpu-memory-gb"   # the GPU-memory cap of the service that holds the GPU (GiB): docker ignores x- keys
+FORMAT = "rcb-limits/2"
+CAP_FIELDS = ("cpus", "memory_gb", "pids", "gpu_memory_gb", "disk_gb")   # a service's caps in limits.json (disk: main only)
 
 
 def _num(v) -> str:
@@ -113,44 +129,42 @@ def write_if_changed(p: Path, s: str | bytes) -> None:
 
 
 # --------------------------------------------------------------------------------------------------- limits.json
-def limits_json(task: Path, cfg: dict, gpu: bool) -> dict | None:
-    res = (cfg.get("metadata") or {}).get("resources") or {}
-    lim = res.get("limits")
-    if not isinstance(lim, dict):
-        return None
-    out = {"format": "rcb-limits/1", "task": task.name, "mode": mode_of(task)}
-    for k, v in lim.items():
-        if k != "measured":
-            out[k] = v
-    out.setdefault("disk_exclude", [])
-    out.setdefault("sustain_sec", 60.0)
-    out.setdefault("window_sec", 2 * float(out["sustain_sec"]))
-    out["caps"] = caps_of(task, cfg)
-    # the services the limits bind (the monitor sums their memory caps where it must stand in for the kernel's)
-    out["scope_services"] = [n for n in out["caps"] if n != "*" and kind_of(out["mode"], n) == "scope"]
-    # gpu: NVML must work (a fatal record otherwise) when the limits count GPU memory
-    out.update(tick_sec=TICK, disk_tick_sec=DISK_TICK, gpu=bool(gpu and float(out.get("max_gpu_memory_gb") or 0) > 0))
-    # the agent's time limit (PROTOCOL §2.12, the task's own `[agent] timeout_sec`): the monitor shows the agent its
+def applied_caps(cfg: dict, compose: str | None) -> dict[str, dict]:
+    """{service: {cpus, memory_gb, pids, gpu_memory_gb, disk_gb, gpu}} as docker and Harbor apply them: main's CPU,
+    memory and disk from task.toml `[environment]` (cpus, memory_mb, storage_mb), everything else from the compose file
+    (cpus, mem_limit, pids_limit, x-gpu-memory-gb; `gpu`: the service reserves an NVIDIA device). A cap that is not set
+    is None. The monitor service itself is left out."""
+    out = {k: v for k, v in (service_caps(compose) if compose else {}).items() if k != "rcb_monitor"}
+    main = out.setdefault("main", {f: None for f in CAP_FIELDS[:4]} | {"gpu": False})
+    env = cfg.get("environment") or {}
+    main["cpus"] = float(env["cpus"]) if isinstance(env.get("cpus"), (int, float)) else main.get("cpus")
+    main["memory_gb"] = (float(env["memory_mb"]) / 1024 if isinstance(env.get("memory_mb"), (int, float))
+                         else main.get("memory_gb"))
+    main["disk_gb"] = float(env["storage_mb"]) / 1024 if isinstance(env.get("storage_mb"), (int, float)) else None
+    return out
+
+
+def limits_json(task: Path, cfg: dict, caps: dict[str, dict]) -> dict:
+    """limits.json (rcb-limits/2): what the monitor and the verifier step check, from the applied caps."""
+    mode = mode_of(task)
+    out = {"format": FORMAT, "task": task.name, "mode": mode,
+           "caps": {n: {k: c[k] for k in CAP_FIELDS if c.get(k) is not None} for n, c in caps.items()}}
+    # the services whose use the monitor sums (main, and in privileged mode every service the agent drives)
+    out["scope_services"] = [n for n in caps if kind_of(mode, n) == "scope"]
+    # the two caps docker cannot apply, enforced by the monitor when RCB_LIMITS_ENFORCE=1: the scope's GPU memory and
+    # the agent's disk (growth under rcb_limits.DISK_PATHS in main)
+    gpu = sum(float(caps[n].get("gpu_memory_gb") or 0) for n in out["scope_services"] if caps[n].get("gpu"))
+    out["gpu_memory_gb"] = round(float(gpu), 3)
+    if caps["main"].get("disk_gb"):
+        out["disk_gb"] = caps["main"]["disk_gb"]
+    # gpu: NVML must work (a fatal record otherwise) when a GPU-memory cap is enforceable
+    out.update(tick_sec=TICK, disk_tick_sec=DISK_TICK, gpu=gpu > 0)
+    # the agent's time limit (PROTOCOL §2, the task's own `[agent] timeout_sec`): the monitor shows the agent its
     # clock in /run/rcb-limits/usage.json (elapsed_s, time_left_s, deadline_utc)
     timeout = (cfg.get("agent") or {}).get("timeout_sec")
     if isinstance(timeout, (int, float)) and timeout > 0:
         out["agent_timeout_sec"] = int(timeout)
     return out
-
-
-def caps_of(task: Path, cfg: dict) -> dict:
-    """Per-service docker caps: `[metadata.resources.caps]` (memory_gb in GiB). Without it: only pids limits (by simulator:
-    Isaac Sim's Kit runs thousands of threads); a sidecar's memory and CPU stay uncapped until the task declares them."""
-    res = (cfg.get("metadata") or {}).get("resources") or {}
-    caps = res.get("caps")
-    if isinstance(caps, dict) and caps:
-        return {k: dict(v) for k, v in caps.items()}
-    env = cfg.get("environment") or {}
-    isaac = str((cfg.get("metadata") or {}).get("simulator", "")).lower().startswith(("isaac", "omni")) or \
-        task.name.startswith(("behavior-", "robolab-", "maniguard-", "yamlab-"))
-    pids = 16384 if isaac else 8192
-    return {"main": {"cpus": float(env.get("cpus", 4)), "memory_gb": round(float(env.get("memory_mb", 8192)) / 1024, 2),
-                     "pids": pids}, "*": {"pids": pids}}
 
 
 # --------------------------------------------------------------------------------------------------- compose
@@ -217,17 +231,23 @@ def _mem_gb(v: str) -> float:
     return float(m.group(1)) * {"": 1.0, "b": 1.0, "k": 2.0 ** 10, "m": 2.0 ** 20, "g": 2.0 ** 30}[m.group(2)] / 2.0 ** 30
 
 
+GPU_DEVICE_RE = re.compile(r"^\s*-?\s*driver:\s*(nvidia|cdi)\b")
+
+
 def service_caps(text: str) -> dict[str, dict]:
-    """{service: {"cpus", "memory_gb", "pids"}} as the compose file sets them (None: not set there): the caps docker
-    really applies to every service but main, whose cpus and memory come from task.toml [environment] (Harbor)."""
+    """{service: {"cpus", "memory_gb", "pids", "gpu_memory_gb", "gpu"}} as the compose file sets them (None: not set
+    there; `gpu`: the service reserves an NVIDIA device): the caps docker really applies to every service but main,
+    whose cpus and memory come from task.toml [environment] (Harbor)."""
     lines = text.splitlines(keepends=True)
     i, j = services_span(lines)
     out = {}
     for name, k0, k1 in service_blocks(lines, i, j):
         got = {}
-        for key, field, conv in (("cpus", "cpus", float), ("mem_limit", "memory_gb", _mem_gb), ("pids_limit", "pids", int)):
+        for key, field, conv in (("cpus", "cpus", float), ("mem_limit", "memory_gb", _mem_gb), ("pids_limit", "pids", int),
+                                 (GPU_KEY, "gpu_memory_gb", float)):
             k = has_key(lines, k0, k1, key)
             got[field] = None if k is None else conv(lines[k].split(":", 1)[1].split("#", 1)[0].strip().strip("'\""))
+        got["gpu"] = any(GPU_DEVICE_RE.match(ln) for ln in lines[k0:k1])
         out[name] = got
     return out
 
@@ -261,7 +281,7 @@ def monitor_block(gpu: bool, observe: bool) -> list[str]:
 
 
 def cap_lines(name: str, caps: dict, present: set[str]) -> list[str]:
-    c = caps.get(name) or caps.get("*") or {}
+    c = caps.get(name) or {}
     out = []
     if name != "main":
         if "cpus" not in present and c.get("cpus"):
@@ -270,7 +290,20 @@ def cap_lines(name: str, caps: dict, present: set[str]) -> list[str]:
             out.append(f"    mem_limit: {int(round(float(c['memory_gb']) * 1024))}m   {MARK}\n")
     if "pids_limit" not in present and c.get("pids"):
         out.append(f"    pids_limit: {int(c['pids'])}   {MARK}\n")
+    if GPU_KEY not in present and c.get("gpu_memory_gb"):
+        out.append(f"    {GPU_KEY}: {_num(c['gpu_memory_gb'])}   {MARK} GPU memory cap, GiB (docs/protocol/README.md §6)\n")
     return out
+
+
+def current_caps(text: str | None) -> dict[str, dict]:
+    """The caps a compose file sets now (generated lines included): what a task no rule matches keeps."""
+    if not text or is_generated(text):
+        return {}
+    try:
+        return {n: {k: v for k, v in c.items() if k != "gpu" and v is not None}
+                for n, c in service_caps(text).items() if n != "rcb_monitor"}
+    except ValueError:
+        return {}
 
 
 def is_generated(text: str) -> bool:
@@ -299,7 +332,7 @@ def render_compose(text: str | None, mode: str, caps: dict) -> str:
         kind = kind_of(mode, name)
         observe_any |= kind == "observe"
         beacon = "rcb_limits:/run/rcb-limits:ro" if kind == "scope" else "rcb_observe:/run/rcb-observe:ro"
-        present = {key for key in ("cpus", "mem_limit", "pids_limit") if has_key(lines, k0, k1, key) is not None}
+        present = {key for key in ("cpus", "mem_limit", "pids_limit", GPU_KEY) if has_key(lines, k0, k1, key) is not None}
         vk = has_key(lines, k0, k1, "volumes")
         if vk is not None:
             if lines[vk].split(":", 1)[1].strip() and not lines[vk].split(":", 1)[1].strip().startswith("#"):
@@ -325,10 +358,26 @@ def render_compose(text: str | None, mode: str, caps: dict) -> str:
     return "".join(lines)
 
 
+def render_test_compose(text: str, gpu_gb: float | None) -> str:
+    """tests/docker-compose.yaml (a separate verifier's own services): `x-gpu-memory-gb` on every service that reserves
+    a GPU and sets none itself, `gpu_gb` (main's cap); the generated lines of an earlier run removed first."""
+    lines = strip_generated(text.splitlines(keepends=True))
+    if lines and not lines[-1].endswith("\n"):
+        lines[-1] += "\n"
+    try:
+        i, j = services_span(lines)
+    except ValueError:
+        return "".join(lines)
+    for name, k0, k1 in reversed(service_blocks(lines, i, j)):
+        if gpu_gb and any(GPU_DEVICE_RE.match(ln) for ln in lines[k0:k1]) and has_key(lines, k0, k1, GPU_KEY) is None:
+            lines[k0 + 1:k0 + 1] = cap_lines(name, {name: {"gpu_memory_gb": gpu_gb}}, {"pids_limit"})
+    return "".join(lines)
+
+
 # --------------------------------------------------------------------------------------------------- task.toml / tests
 def render_toml(s: str) -> str:
     s = s.replace(ARTIFACT + ", ", "").replace("artifacts = [" + ARTIFACT + "]\n", "")
-    s = re.sub(r"(?ms)^# Resource limits \(docs/(?:PROTOCOL|protocol/README)\.md §2\.10\): seal the monitor's record first.*?\ntimeout_sec = \d+\n\n?", "", s)
+    s = re.sub(r"(?ms)^# Resource(?: limit)?s \(docs/(?:PROTOCOL|protocol/README)\.md §(?:2\.10|6)\): seal the monitor's record first.*?\ntimeout_sec = \d+\n\n?", "", s)
     s = re.sub(r'(?m)^RCB_LIMITS_ENFORCE = .*\n', "", s)
     s = re.sub(r"(?m)^\[verifier\.env\]\n(?=\n|\[|\Z)", "", s)
     # 1. the record, an artifact of the rcb_monitor service (first in the list)
@@ -376,21 +425,34 @@ def render_dockerfile(s: str) -> str:
 
 
 # --------------------------------------------------------------------------------------------------- entry point
-def apply(task: Path) -> None:
+def write_compose(task: Path, caps: dict[str, dict] | None = None) -> str:
+    """Writes the caps (and the monitor's service) into the task's compose file; returns its new text."""
     task = Path(task)
-    cfg = tomllib.loads((task / "task.toml").read_text())
     comp = task / "environment" / "docker-compose.yaml"
     old = comp.read_text() if comp.is_file() else None
-    gpu = bool(old and re.search(r"(?m)^\s*- driver: (nvidia|cdi)", old))
-    lim = limits_json(task, cfg, gpu)
-    if lim is None:
-        return                                   # no limits declared: nothing to enforce
-    mode = mode_of(task)
+    new = render_compose(old, mode_of(task), current_caps(old) if caps is None else caps)
+    write_if_changed(comp, new)
+    tc = task / "tests" / "docker-compose.yaml"
+    if tc.is_file():   # a separate verifier with services of its own: main's GPU-memory cap on its GPU services
+        applied = applied_caps(tomllib.loads((task / "task.toml").read_text()), new)
+        main_gpu = applied["main"].get("gpu_memory_gb") or max(
+            (float(c.get("gpu_memory_gb") or 0) for c in applied.values()), default=0.0)
+        write_if_changed(tc, render_test_compose(tc.read_text(), main_gpu or None))
+    return new
+
+
+def apply(task: Path, caps: dict[str, dict] | None = None) -> None:
+    """Wires the monitor into `task` and writes `caps` ({service: {cpus, memory_gb, pids, gpu_memory_gb}}, from the
+    task's rule in scripts/task_resources.toml) into its compose file; None: the caps the compose file has now."""
+    task = Path(task)
+    cfg = tomllib.loads((task / "task.toml").read_text())
     for f in CODE:                               # the code is the image's (IMAGE); no copy in the task
         (task / "environment" / "rcb_monitor" / f).unlink(missing_ok=True)
+    new = write_compose(task, caps)
+    applied = applied_caps(cfg, new)
+    lim = limits_json(task, cfg, applied)
     js = json.dumps(lim, indent=1, sort_keys=True) + "\n"
     write_if_changed(task / "environment" / "rcb_monitor" / "limits.json", js)
-    write_if_changed(comp, render_compose(old, mode, lim["caps"]))
     write_if_changed(task / "task.toml", render_toml((task / "task.toml").read_text()))
     tests = task / "tests"
     (tests / "rcb_limits.py").unlink(missing_ok=True)   # the verifier's copy comes from IMAGE (DOCKER_COPY)
