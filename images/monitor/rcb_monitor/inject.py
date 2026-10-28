@@ -26,8 +26,9 @@ What it writes (every generated line ends in `# rcb-monitor`, or sits between th
     scripts/task_conventions.py writes from the same rule); cpus, mem_limit and pids_limit on every other service, and
     `x-gpu-memory-gb` on every service that holds a GPU, unless the service sets one itself
     (ci_checks/check-resources.py then requires the rule's value to be that one).
-- tests/docker-compose.yaml (a separate verifier with a GPU): `x-gpu-memory-gb` on its GPU services, main's value (Harbor
-  gives the verifier main's `[environment]` too, unless `[verifier.environment]` says otherwise).
+- tests/docker-compose.yaml (a separate verifier with a GPU): `x-gpu-memory-gb` on its GPU services, main's value, a cap
+  recorded for the reader (the monitor does not run in the verifier phase). The verifier's CPU and memory are Harbor's:
+  `[verifier.environment]` alone when the table exists (a key it lacks is no cap), main's `[environment]` otherwise.
 - task.toml: the record as an artifact of service rcb_monitor, the first `[[verifier.collect]]` hook (seals the record
   before any other sidecar ends the episode), `[verifier.env] RCB_LIMITS_ENFORCE`.
 - tests/: rcb_limits.json (the verifier's own copy of limits.json); tests/Dockerfile COPYs it, and rcb_limits.py from the
@@ -49,13 +50,13 @@ try:
 except ImportError:                      # run as a script from this directory
     import rcb_limits  # type: ignore[no-redef]
 CODE = ("monitor.py", "rcb_limits.py", "selftest.py")   # in the monitor image at /opt/rcb_monitor/ (images/monitor/Dockerfile)
-IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.4.0@sha256:76b33f25e81b0e58f7c1f0b0e1e7e031e067b11da79dc5bc832a82ac53b4f7a2"
+IMAGE = "ghcr.io/mll-lab-nu/efe:monitor-0.4.0@sha256:9d09fa2fe44ee6af5ccdff49827f005934c053f5dce34044e036c9facc3b343a"
 # The sha256 of each CODE file in IMAGE (`inject.py verify-image` reads them back from the image; `inject.py contents`
 # prints them for this directory's files). A change to a CODE file needs a new image: build images/monitor/, bump its
 # VERSION, push it, then put the new digest in IMAGE and the new hashes here.
 CONTENTS = {
-    "monitor.py": "ec191dee91257d0fa63e0d055c4eb0a58d522b3bb054b7960963674bcbb32dd5",
-    "rcb_limits.py": "a24273f279f3a8d369b7ed7bf093f382e56e9cfd6d9d0054b6166ea6a4a8f834",
+    "monitor.py": "c96d6575500bca1da4f2b31b6c741810bc6a65b623296f737b24abe7b937b924",
+    "rcb_limits.py": "02eec0a1b5ba202bc364a014bff8d31f7d5978ffe5e35bf7c4c04079faddc035",
     "selftest.py": "fceaad39a57c9f0974dd1082cbbcaeccea5749a0a16accc493131dfff344aa39",
 }
 CODE_DIR = "/opt/rcb_monitor"
@@ -72,12 +73,12 @@ HOOK = ('# Resources (docs/protocol/README.md §6): seal the monitor\'s record f
         'command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"\n'
         'timeout_sec = 120\n')
 TRAP = ("trap 'p=$(command -v python3 || command -v python); \"$p\" /tests/rcb_limits.py verify' EXIT   "
-        "# resource limits, after the grader (docs/protocol/README.md §2.10)")
+        "# resource limits, after the grader (docs/protocol/README.md §6)")
 # Before the grader: what the agent left under /app/output is untrusted input (rcb_limits.sanitize).
 GUARD = ("p=$(command -v python3 || command -v python); \"$p\" /tests/rcb_limits.py sanitize /app/output || true   "
          "# the agent's files are untrusted input: no link out of /app/output, no FIFO or device (docs/protocol/README.md §2.6)")
 DOCKER_COPY = ("# resource limits: the verifier step (from the monitor image) and its copy of the limits "
-               "(docs/protocol/README.md §2.10) " + MARK + "\n"
+               "(docs/protocol/README.md §6) " + MARK + "\n"
                f"COPY --from={IMAGE} {CODE_DIR}/rcb_limits.py /tests/rcb_limits.py\n"
                "COPY rcb_limits.json /tests/rcb_limits.json")
 
@@ -111,7 +112,7 @@ def mode_of(task: Path) -> str:
 
 
 def kind_of(mode: str, name: str) -> str:
-    """"scope": the limits bind the service; "observe": it is recorded only (PROTOCOL §2.10). The agent's container
+    """"scope": the limits bind the service; "observe": it is recorded only (PROTOCOL §6). The agent's container
     always counts. In standard modes every other service is the benchmark's (the simulator sidecar); in privileged mode
     the agent drives the simulators itself, so every service counts except the benchmark's own (BENCHMARK_SERVICES)."""
     if name == "main":
@@ -153,8 +154,11 @@ def limits_json(task: Path, cfg: dict, caps: dict[str, dict]) -> dict:
     out["scope_services"] = [n for n in caps if kind_of(mode, n) == "scope"]
     # the two caps docker cannot apply, enforced by the monitor when RCB_LIMITS_ENFORCE=1: the scope's GPU memory and
     # the agent's disk (growth under rcb_limits.DISK_PATHS in main)
+    # (a scope holds at most one GPU service, ci_checks/check-resources.py; no GPU in the scope: no GPU-memory cap, the
+    # key is absent, and GPU memory seen anyway is recorded, never a violation)
     gpu = sum(float(caps[n].get("gpu_memory_gb") or 0) for n in out["scope_services"] if caps[n].get("gpu"))
-    out["gpu_memory_gb"] = round(float(gpu), 3)
+    if gpu > 0:
+        out["gpu_memory_gb"] = round(float(gpu), 3)
     if caps["main"].get("disk_gb"):
         out["disk_gb"] = caps["main"]["disk_gb"]
     # gpu: NVML must work (a fatal record otherwise) when a GPU-memory cap is enforceable
@@ -181,7 +185,7 @@ def strip_generated(lines: list[str]) -> list[str]:
             if ln.rstrip() == END:
                 skip = False
             continue
-        if ln.rstrip().endswith(MARK):
+        if ln.rstrip().endswith(MARK) or f"{MARK} GPU memory cap" in ln:   # the latter: 0.4.0's first x-gpu lines
             continue
         out.append(ln)
     return out
@@ -231,7 +235,15 @@ def _mem_gb(v: str) -> float:
     return float(m.group(1)) * {"": 1.0, "b": 1.0, "k": 2.0 ** 10, "m": 2.0 ** 20, "g": 2.0 ** 30}[m.group(2)] / 2.0 ** 30
 
 
-GPU_DEVICE_RE = re.compile(r"^\s*-?\s*driver:\s*(nvidia|cdi)\b")
+GPU_DEVICE_RE = re.compile(r"^\s*-?\s*driver:\s*[\"']?(nvidia|cdi)\b")
+# other ways compose gives a container a GPU (ci_checks/check-resources.py refuses them: a task reserves its GPU as a
+# deploy device), counted as a GPU here so that no GPU goes unseen
+GPU_OTHER_RE = re.compile(r"^    (gpus:|runtime:\s*[\"']?nvidia\b)")
+
+
+def holds_gpu(block: list[str]) -> bool:
+    """A compose service's lines reserve an NVIDIA GPU (a deploy device, `gpus:` or `runtime: nvidia`)."""
+    return any(GPU_DEVICE_RE.match(ln) or GPU_OTHER_RE.match(ln) for ln in block)
 
 
 def service_caps(text: str) -> dict[str, dict]:
@@ -247,13 +259,13 @@ def service_caps(text: str) -> dict[str, dict]:
                                  (GPU_KEY, "gpu_memory_gb", float)):
             k = has_key(lines, k0, k1, key)
             got[field] = None if k is None else conv(lines[k].split(":", 1)[1].split("#", 1)[0].strip().strip("'\""))
-        got["gpu"] = any(GPU_DEVICE_RE.match(ln) for ln in lines[k0:k1])
+        got["gpu"] = holds_gpu(lines[k0:k1])
         out[name] = got
     return out
 
 
 def monitor_block(gpu: bool, observe: bool) -> list[str]:
-    b = [BEGIN + " (resource limits monitor, docs/protocol/README.md §2.10; generated by images/monitor/rcb_monitor/inject.py)",
+    b = [BEGIN + " (resource monitor, docs/protocol/README.md §6; generated by images/monitor/rcb_monitor/inject.py)",
          "  rcb_monitor:",
          f"    image: {IMAGE}",
          "    pid: host                  # sees every container's processes (and NVML's host PIDs); the agent never sees it",
@@ -291,13 +303,13 @@ def cap_lines(name: str, caps: dict, present: set[str]) -> list[str]:
     if "pids_limit" not in present and c.get("pids"):
         out.append(f"    pids_limit: {int(c['pids'])}   {MARK}\n")
     if GPU_KEY not in present and c.get("gpu_memory_gb"):
-        out.append(f"    {GPU_KEY}: {_num(c['gpu_memory_gb'])}   {MARK} GPU memory cap, GiB (docs/protocol/README.md §6)\n")
+        out.append(f"    {GPU_KEY}: {_num(c['gpu_memory_gb'])}   # GiB of GPU memory (docs/protocol/README.md §6)   {MARK}\n")
     return out
 
 
 def current_caps(text: str | None) -> dict[str, dict]:
     """The caps a compose file sets now (generated lines included): what a task no rule matches keeps."""
-    if not text or is_generated(text):
+    if not text:
         return {}
     try:
         return {n: {k: v for k, v in c.items() if k != "gpu" and v is not None}
@@ -325,7 +337,7 @@ def render_compose(text: str | None, mode: str, caps: dict) -> str:
         lines.insert(i + 1, "  main:   " + MARK + "\n")
         i, j = services_span(lines)
         blocks = service_blocks(lines, i, j)
-    gpu = any(re.search(r"driver: (nvidia|cdi)", ln) for ln in lines[i:j])
+    gpu = any(holds_gpu(lines[k0:k1]) for _, k0, k1 in blocks)
     observe_any = False
     # edit the blocks bottom-up, so earlier indices stay valid
     for name, k0, k1 in reversed(blocks):
@@ -360,7 +372,8 @@ def render_compose(text: str | None, mode: str, caps: dict) -> str:
 
 def render_test_compose(text: str, gpu_gb: float | None) -> str:
     """tests/docker-compose.yaml (a separate verifier's own services): `x-gpu-memory-gb` on every service that reserves
-    a GPU and sets none itself, `gpu_gb` (main's cap); the generated lines of an earlier run removed first."""
+    a GPU and sets none itself, `gpu_gb` (main's cap: a recorded cap, nothing measures it in the verifier phase); the
+    generated lines of an earlier run removed first."""
     lines = strip_generated(text.splitlines(keepends=True))
     if lines and not lines[-1].endswith("\n"):
         lines[-1] += "\n"
@@ -369,7 +382,7 @@ def render_test_compose(text: str, gpu_gb: float | None) -> str:
     except ValueError:
         return "".join(lines)
     for name, k0, k1 in reversed(service_blocks(lines, i, j)):
-        if gpu_gb and any(GPU_DEVICE_RE.match(ln) for ln in lines[k0:k1]) and has_key(lines, k0, k1, GPU_KEY) is None:
+        if gpu_gb and holds_gpu(lines[k0:k1]) and has_key(lines, k0, k1, GPU_KEY) is None:
             lines[k0 + 1:k0 + 1] = cap_lines(name, {name: {"gpu_memory_gb": gpu_gb}}, {"pids_limit"})
     return "".join(lines)
 

@@ -4,11 +4,14 @@ step, and the verifier step itself.
 
 Every resource number of a task is an upper bound for one container. Docker enforces CPU (a throttle), memory (the
 kernel's OOM killer at the container's own cap) and processes. GPU memory (`x-gpu-memory-gb` of the service that holds
-the GPU) and disk (`[environment].storage_mb`) no runtime caps on our hosts: the monitor measures them, and with
-RCB_LIMITS_ENFORCE=1 a use above either cap is a violation. The rules are the protocol's, the same for every task:
+the GPU) and disk (`[environment].storage_mb`): Docker caps neither on a local host (a cloud backend may apply
+storage_mb); the monitor measures both and, only when the run sets RCB_LIMITS_ENFORCE=1 (off by default), a use above
+either cap is a violation. A scope without a GPU has no GPU-memory cap (the key is absent from limits.json): GPU memory
+seen there anyway is recorded, never a violation. The rules are the protocol's, the same for every task:
 GPU memory above its cap for SUSTAIN_SEC within any WINDOW_SEC, disk (the growth of the files under DISK_PATHS in the
 agent's container) above its cap at two measurements in a row, or a kernel OOM kill in the scope at the container's own
-memory cap. The caps come from the task's limits.json (format rcb-limits/2, written by inject.py).
+memory cap. The caps come from the task's limits.json (format rcb-limits/2, written by inject.py; any other format is
+an unusable record, and with enforcement on not a result).
 
 The pinned monitor image carries it at /opt/rcb_monitor/ (inject.py IMAGE and CONTENTS), and every task's tests/Dockerfile
 copies it from there to /tests/ (ci_checks/check-monitor.py). Python 3.8+, standard library only: it runs inside
@@ -39,7 +42,7 @@ channel the agent cannot write), recomputes every violation from the raw samples
             infra_error=1, resource_host_oom=1 (not a result: another trial's or the host's doing, never the agent's)
   RCB_LIMITS_ENFORCE neither 0/1/true/false: infra_error=1, resource_switch_error=1 (nobody knows what was asked for)
   in both modes: the kernel OOM-killed a benchmark-owned service and the grader's verdict is not a success:
-            infra_error=1, resource_service_oom=1 (PROTOCOL §2.10: such a service is recorded, never a failure; an
+            infra_error=1, resource_service_oom=1 (PROTOCOL §6: such a service is recorded, never a failure; an
             episode that ended without success after its simulator was killed for memory is not the agent's 0). A
             success stands: the service recovered and the grader accepted the episode.
 Wherever this step says "not a result" (infra_error=1) it also sets success=0 and reward.txt 0 and keeps the grader's
@@ -58,6 +61,7 @@ import stat
 import sys
 
 FORMAT = "rcb-monitor/1"
+LIMITS_FORMAT = "rcb-limits/2"   # limits.json / rcb_limits.json (inject.py FORMAT)
 RECORD = os.environ.get("RCB_MONITOR_RECORD", "/var/rcb-monitor")
 METRICS = ("gpu_memory_gb", "memory_gb", "processes", "disk_gb")     # recorded (peaks); memory and processes: docker's
 LIMIT_KEY = {"gpu_memory_gb": "gpu_memory_gb", "disk_gb": "disk_gb"}   # the caps the monitor enforces (limits.json keys)
@@ -144,7 +148,7 @@ def violations(samples, limits, events=()):
     The GPU-memory cap exceeded for SUSTAIN_SEC within WINDOW_SEC, the disk cap at two measurements in a row, or a kernel OOM kill in the
     scope at the container's own memory cap (cause "cap": the cgroup's own `oom` counter rose with the kill). A kill
     by the host's OOM killer (any other cause) is not the trial's doing and never a violation: oom_kills() counts it.
-    The monitor's own `emergency_kill` events protect the host and are not violations (PROTOCOL §2.10)."""
+    The monitor's own `emergency_kill` events protect the host and are not violations (PROTOCOL §6)."""
     tick = float(limits.get("tick_sec", 5))
     sustain = float(limits.get("sustain_sec", SUSTAIN_SEC))      # the protocol's (a test may pass another)
     window = float(limits.get("window_sec", WINDOW_SEC))
@@ -227,6 +231,8 @@ def record_problems(summary, samples, events, limits):
         why.append("no sealed record (/var/rcb-monitor/summary.json missing: the monitor did not run, crashed, or was not collected)")
     elif summary.get("format") != FORMAT:
         why.append(f"record format {summary.get('format')!r}, expected {FORMAT}")
+    if (limits or {}).get("format") != LIMITS_FORMAT:
+        why.append(f"limits format {(limits or {}).get('format')!r}, expected {LIMITS_FORMAT}: the caps cannot be read")
     if not samples:
         why.append("no samples")
     fatal = [e for e in events if e.get("event") == "fatal"]
@@ -337,7 +343,7 @@ def verify(argv=()):
                              f"killed {oom['host']} process(es) of the trial")
     elif oom["service"] and have_grade and not reward.get("success"):
         # in both modes: the kernel killed a benchmark-owned service (the simulator sidecar, a scorer) for memory and
-        # the episode did not end in a success. Such a service is recorded, never a failure (PROTOCOL §2.10): whatever
+        # the episode did not end in a success. Such a service is recorded, never a failure (PROTOCOL §6): whatever
         # the grader made of the crash, this is not the agent's 0.
         add["resource_service_oom"] = 1
         add["infra_error"] = 1

@@ -433,7 +433,7 @@ class OomWatch:
       oom_kill  processes of the cgroup killed by any OOM killer (its own limit's, an enclosing cgroup's, the host's)
     A kill whose `oom` counter rose with it (or within OOM_CAP_WINDOW_SEC before) happened at the container's own cap
     (`cause: "cap"`); one without is the host's or an enclosing cgroup's OOM killer (`cause: "host"`), which the
-    container did not cause by its own use (PROTOCOL §2.10: nothing another trial does can fail a trial).
+    container did not cause by its own use (PROTOCOL §6: nothing another trial does can fail a trial).
 
     The counters live and die with the cgroup, and a container whose main process is killed is gone (and restarted by
     compose with fresh counters) within milliseconds. So the files are read by this object's own thread, every
@@ -919,7 +919,7 @@ class Monitor:
                     self.kill_until = t + 60
         if self.enforce and t <= self.kill_until:
             self.kill_scope(groups, ",".join(sorted(self.confirmed)))
-        # Host protection (enforced runs only; PROTOCOL §2.10). An emergency kill is never a violation by itself: the
+        # Host protection (enforced runs only; PROTOCOL §6). An emergency kill is never a violation by itself: the
         # trial fails only by the rules above (GPU memory or disk over its cap) or a kernel OOM kill at its own memory
         # cap. These are the trial's own doing (its scope's use against its own caps), never the state of a card or host it
         # shares with other trials.
@@ -980,6 +980,9 @@ class Monitor:
             event("start", enforce=self.enforce, capabilities=self.caps)
         if self.switch_error:
             event("fatal", why=self.switch_error + " (nothing is enforced; the trial is not a result)")
+        if self.lim.get("format") != rcb_limits.LIMITS_FORMAT:
+            event("fatal", why=f"limits.json format {self.lim.get('format')!r}, expected {rcb_limits.LIMITS_FORMAT}: "
+                               "no cap can be read, nothing is enforced")
         if not self.beacon["scope"]:
             event("fatal", why="no scope beacon mounted at /run/rcb-limits")
         if self.lim.get("gpu") and not self.nvml:

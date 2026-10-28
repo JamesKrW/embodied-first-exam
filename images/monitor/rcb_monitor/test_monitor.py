@@ -429,7 +429,8 @@ def test_switch():
 
 def _verify(samples=None, events=(), summary=None, env=None, limits=None, reward=None, no_limits=False, txt="1"):
     """Run the verifier step on a made-up record; returns (reward.json, reward.txt, resource_limits.json)."""
-    lim = limits if limits is not None else {"gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5}
+    lim = limits if limits is not None else {"format": rcb_limits.LIMITS_FORMAT, "gpu_memory_gb": 4.0, "disk_gb": 10.0,
+                                             "tick_sec": 5}
     with tempfile.TemporaryDirectory() as d:
         rec, tests, logs = (os.path.join(d, x) for x in ("rec", "tests", "logs"))
         for x in (tests, logs):
@@ -493,9 +494,20 @@ def test_verify_edges():
           f"GPU memory not measured, enforced: {out}")
     out, _, _ = _verify(blind, (), dict(ok, enforce=0))
     check(out.get("infra_error", 0) == 0 and out["resource_monitor_missing"] == 1, f"GPU memory not measured, observed: {out}")
-    nogpu = {"gpu_memory_gb": 0.0, "disk_gb": 10.0}
+    nogpu = {"format": rcb_limits.LIMITS_FORMAT, "disk_gb": 10.0}   # no GPU in the scope: no GPU-memory cap (key absent)
     out, _, _ = _verify(blind, (), dict(ok, enforce=1), limits=nogpu)
     check(out["resource_monitor_missing"] == 0, "no GPU limit: nothing was missed")
+    out, _, det = _verify(_samples(gpu=9.0), (), dict(ok, enforce=1), limits=nogpu)
+    check(out["limits_violation_observed"] == 0 and out["success"] == 1 and out["peak_gpu_memory_gb"] == 9.0,
+          f"GPU memory seen in a scope without a GPU cap: recorded, never a violation: {out}")
+    # limits of another format: no cap can be read -> an unusable record (not a result when enforced)
+    old = {"gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5}
+    out, _, det = _verify(_samples(), (), dict(ok, enforce=1), limits=old)
+    check(out["infra_error"] == 1 and out["resource_monitor_missing"] == 1
+          and "limits format" in " ".join(det["record_problems"]), f"limits without rcb-limits/2, enforced: {out}")
+    out, _, _ = _verify(_samples(), (), dict(ok, enforce=0), limits=old)
+    check(out.get("infra_error", 0) == 0 and out["resource_monitor_missing"] == 1 and out["success"] == 1,
+          f"limits without rcb-limits/2, observed: {out}")
     # the step itself fails (a broken limits file): reported in reward.json, as infra only when enforcement was asked for
     out, txt, det = _verify(_samples(), (), dict(ok, enforce=0), limits=["broken"], env={"RCB_LIMITS_ENFORCE": "1"})
     check(out["resource_step_error"] == 1 and out["infra_error"] == 1 and out["success"] == 0 and txt == "0"
@@ -757,7 +769,8 @@ def _step_in_process(reward_json, reward_txt, record, switch):
         rec, tests, logs = (os.path.join(d, x) for x in ("rec", "tests", "logs"))
         for x in (tests, logs):
             os.makedirs(x)
-        json.dump({"gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5}, open(os.path.join(tests, "rcb_limits.json"), "w"))
+        json.dump({"format": rcb_limits.LIMITS_FORMAT, "gpu_memory_gb": 4.0, "disk_gb": 10.0, "tick_sec": 5},
+                  open(os.path.join(tests, "rcb_limits.json"), "w"))
         shutil.copy(os.path.join(HERE, "rcb_limits.py"), tests)
         if reward_json is not None:
             open(os.path.join(logs, "reward.json"), "w").write(reward_json)
@@ -893,12 +906,13 @@ def test_clock_and_beacon():
         monitor.SCOPE_BEACON, monitor.REC = beacon_dir, os.path.join(beacon_dir, "rec")
         monitor.LIMITS = os.path.join(beacon_dir, "limits.json")
         with open(monitor.LIMITS, "w") as fh:
-            json.dump({"caps": {"main": {"cpus": 4.0, "memory_gb": 8.0, "pids": 8192, "disk_gb": 20.0}}, "disk_gb": 20.0,
-                       "gpu_memory_gb": 0.0, "tick_sec": 5, "agent_timeout_sec": 600}, fh)
+            json.dump({"format": rcb_limits.LIMITS_FORMAT, "disk_gb": 20.0, "tick_sec": 5, "agent_timeout_sec": 600,
+                       "caps": {"main": {"cpus": 4.0, "memory_gb": 8.0, "pids": 8192, "disk_gb": 20.0}}}, fh)
         monitor.beacon(rounds=1)
         u = rcb_limits.read_json(os.path.join(beacon_dir, "usage.json"))
         check(u["measured"] is False and u["enforced"] == 0 and u["caps"]["memory_gb"] == 8.0 and u["caps"]["cpus"] == 4.0
-              and u["caps"]["gpu_memory_gb"] is None and u["limits"]["disk_gb"] == 20.0 and u["limits"]["sustain_sec"] == 60,
+              and u["caps"]["gpu_memory_gb"] is None and u["limits"]["gpu_memory_gb"] is None
+              and u["limits"]["disk_gb"] == 20.0 and u["limits"]["sustain_sec"] == 60,
               f"beacon: the agent's caps and the enforceable ones: {u}")
         check(u["time_limit_s"] == 600 and 590 <= u["time_left_s"] <= 600, f"beacon clock: {u}")
         started = rcb_limits.read_json(os.path.join(monitor.REC, "beacon.json"))["started"]
