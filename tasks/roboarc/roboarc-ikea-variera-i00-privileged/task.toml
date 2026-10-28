@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/roboarc-ikea-variera-i00-privileged"
 description = "IKEA MuJoCo VARIERA shelf insert (dual Franka Panda + Menagerie Panda hand, MuJoCo 3.14.0 CPU): produce one replayable trajectory. Assemble the VARIERA shelf insert: place the two side frames, lower the shelf onto them, and drive the four screws through the shelf holes into the frames' receivers until they seat. Frozen scene (the scene's keyframe 'home'); physical grasps, no assist."
-authors = [{ name = "Xiaoyu" }]
 keywords = ["robotics", "roboarc", "ikea", "furniture-assembly", "mujoco", "panda", "bimanual", "code-as-policy", "trajectory"]
 
 [metadata]
-author_name = "Xiaoyu"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "mujoco"              # plain MuJoCo 3.14.0, CPU float64, the scene's own runtime and mechanism
 robot = "franka-panda-bimanual"            # both arms (docs/TAXONOMY.md)

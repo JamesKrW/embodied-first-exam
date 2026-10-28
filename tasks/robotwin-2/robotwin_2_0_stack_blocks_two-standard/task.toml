@@ -17,11 +17,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 [task]
 name = "embodied-first-exam/robotwin_2_0_stack_blocks_two-standard"
 description = "STANDARD MODE (robot as a service, eai-standard/2.1): RoboTwin 2.0 stack_blocks_two on the same frozen instance as the privileged task (seed 60417). The agent only gets a client: /observe (RGB-D video, camera calibration, proprioception) and /submit (joint_position or ee_pose action chunks). No reset, no privileged state; the sim service records the episode as a trajectory and grades it."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "robotwin", "sapien", "aloha-agilex", "dual-arm", "standard-mode", "trajectory", "stack_blocks_two"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"
 simulator = "robotwin"
 robot = "aloha-agilex"

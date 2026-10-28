@@ -4,7 +4,6 @@ Known values; a new value is added by pull request. See [protocol/README.md](pro
 
 | Field | Values |
 |---|---|
-| `author_name` | the author's name (an organization may go in `author_org`) |
 | `task_type` | `trajectory` · `policy` |
 | `mode` | `privileged` · `standard` · `standard-realtime` (PROTOCOL §3); the list is `MODE_REGISTRY` in `scripts/task_conventions.py`, and a new mode is added by pull request |
 | `protocol` | standard and standard-realtime mode only. Standard-realtime: `eai-standard/2.3`. Standard: `eai-standard/2.1` · `eai-standard/2.2` (BEHAVIOR-1K, RoboLab, RoboWits, RoboPaint, ManiGuard, MolmoSpaces, MyoSuite, DexJoCo, DexHand, MuJoCo Playground's quadruped tasks, YAMLab, RoboDojo, AM-Bench, iSpatialGym, LabUtopia, AutoBio) · `eai-standard/2.4` (the operations capability: RoboARC, its IKEA suite included), all specified in [protocol/standard_mode.md](protocol/standard_mode.md); tasks a benchmark exports with its own runtime name its protocol (Embodied Olympics - Match: `eai-standard-realtime/1.0`, `eai-standard-turn/1.0`, PROTOCOL §3) |
@@ -31,7 +30,7 @@ Benchmark-specific fields (optional, PROTOCOL §1):
 | ManiGuard | `constraint_class` | `spatial` (an invariant: upright, not dropped, no contact) · `ordering` (one thing before another) |
 | ManiGuard | `skill` | `pick_and_place` · `articulated` · `long_horizon` (ManiGuard's family classes) |
 | ManiGuard | `grasping` | `assisted` · `sticky` (the grasping mode ManiGuard's evaluator uses for the family) |
-| roboEngineer | `collection`, `embodiment`, `author_org` | `roboEngineer`; `drone` · `racing-car` · `quadruped` (· `humanoid`, not shipped) |
+| roboEngineer | `collection`, `embodiment` | `roboEngineer`; `drone` · `racing-car` · `quadruped` (· `humanoid`, not shipped) |
 | RoboARC | `difficulty` | `very_easy` · `easier` · `easy` · `medium` · `hard` (the owner's rating of the task within its family; task names carry no difficulty) |
 | RoboARC | `grasp` | `assisted (<model> grasp regions on <parts>)` · `physical (no assisted grasping)` |
 | RoboARC | `success_rule`, `tooling_version` | the task-native success rule and its terminal revision; the tooling generation (text) |

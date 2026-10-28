@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/roboarc-blanket-flatten-01-i01-privileged"
 description = "RoboARC blanket_flatten (ALOHA 2, MuJoCo): produce one replayable trajectory. Unfold and spread the blanket flat on the table without overlaps or excessive stretching, then release it and withdraw. Frozen scene instance (variation very_easy, seed 0)."
-authors = [{ name = "Jianwen Lyu" }]
 keywords = ["robotics", "roboarc", "mujoco", "aloha", "code-as-policy", "trajectory", "blanket_flatten"]
 
 [metadata]
-author_name = "Jianwen Lyu"
 tooling_version = "19"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU physics, CUDA cloth step, Nyx RGB)

@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-skateboard-ollie-i00-privileged"
 description = "Embodied Olympics skateboard-ollie (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Ollie the skateboard from a standstill: pop the tail, take the board up with your feet until all of it is at least 0.05 m off the ground, land on it and stand still on it for 1.0 s. A referee of events, geometry and contact rules decides the success."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "skateboard-ollie"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"
 simulator = "mujoco"               # the Embodied Olympics simulator: MuJoCo 3.3.7 on the CPU with Embodied Olympics' robot library
 robot = "unitree-g1"

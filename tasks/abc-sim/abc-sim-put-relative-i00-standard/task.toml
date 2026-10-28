@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, { source
 [task]
 name = "embodied-first-exam/abc-sim-put-relative-i00-standard"
 description = "ABC Sim put relative (two I2RT YAM arms, MuJoCo): Follow the directive 'put the soap dispenser to the right of the boxed food'. Directions are as the arms face the table: left = +y, right = -y, behind = +x (farther from the arms), in front = -x (nearer to them). The robot as a service (eai-standard/2.2); graded by the live episode."
-authors = [{ name = "Changhe Chen" }]
 keywords = ["robotics", "abc-sim", "mujoco", "yam", "bimanual", "put_relative", "standard"]
 
 [metadata]
-author_name = "Changhe Chen"
 task_type = "trajectory"
 simulator = "mujoco"                # ABC Sim (abc_sim, amazon-far/abc @ d0832d1) on MuJoCo 3.6.0
 robot = "i2rt-yam-bimanual"

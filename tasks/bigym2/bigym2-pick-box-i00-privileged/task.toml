@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/bigym2-pick-box-i00-privileged"
 description = "BiGym 2.0 pick-box (Unitree G1 with GR00T-WBC, MuJoCo 3.8.1) in privileged mode: produce one replayable trajectory. Pick the cardboard box up from the side table and gently set it down on the kitchen counter. Frozen instance: upstream task pick_box, seed 0."
-authors = [{ name = "pingyue" }]
 keywords = ["robotics", "bigym2", "mujoco", "unitree-g1", "humanoid", "loco-manipulation", "trajectory", "pick-box"]
 
 [metadata]
-author_name = "pingyue"
 task_type = "trajectory"
 simulator = "bigym2"               # BiGym 2.0 (bigym 1.0.0 at 93ad4b3): MuJoCo 3.8.1 + NVIDIA GR00T-WBC, CPU physics
 robot = "unitree-g1-dex1"

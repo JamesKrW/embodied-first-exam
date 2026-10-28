@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/robotwin_2_0_stamp_seal-privileged"
 description = "RoboTwin 2.0 stamp_seal (ALOHA-AgileX dual arm, SAPIEN): produce one replayable trajectory. Grab the stamp and stamp onto the specific color mat. Frozen scene instance (RoboTwin seed 91573)."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "robotwin", "sapien", "aloha-agilex", "dual-arm", "code-as-policy", "trajectory", "stamp_seal"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "robotwin"            # RoboTwin 2.0 = SAPIEN 3 / PhysX + CuRobo
 robot = "aloha-agilex"

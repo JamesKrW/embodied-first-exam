@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/abc-sim-sweep-i00-privileged"
 description = "ABC Sim sweep paper scraps (two I2RT YAM arms, MuJoCo): Get the paper scraps into the trash can: sweep them into the dustpan with the brush and empty it into the can, or any other way. Frozen scene instance; one replayable trajectory, graded by two fresh-process replays."
-authors = [{ name = "Changhe Chen" }]
 keywords = ["robotics", "abc-sim", "mujoco", "yam", "bimanual", "sweep", "privileged"]
 
 [metadata]
-author_name = "Changhe Chen"
 task_type = "trajectory"
 simulator = "mujoco"                # ABC Sim (abc_sim, amazon-far/abc @ d0832d1) on MuJoCo 3.6.0
 robot = "i2rt-yam-bimanual"

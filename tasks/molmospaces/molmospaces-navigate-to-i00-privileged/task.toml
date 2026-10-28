@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/molmospaces-navigate-to-i00-privileged"
 description = "MolmoSpaces navigate-to (a Rainbow Robotics RB-Y1 mobile manipulator, MuJoCo 3.5.0) in privileged mode: produce one replayable trajectory. Navigate to any tablelamp (2 available). Frozen episode: upstream benchmark holodeck-objaverse/NavToObjDataGenConfig/NavToObjHolodeckBench_20260115_json_benchmark, episode 237."
-authors = [{ name = "pingyue" }]
 keywords = ["robotics", "molmospaces", "mujoco", "rainbow-rby1", "code-as-policy", "trajectory", "navigate-to"]
 
 [metadata]
-author_name = "pingyue"
 task_type = "trajectory"
 simulator = "molmospaces"          # MolmoSpaces (molmo-spaces 0.2.9) on MuJoCo 3.5.0, CPU physics
 robot = "rainbow-rby1"

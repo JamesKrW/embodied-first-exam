@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/robotwin_2_0_rotate_qrcode-privileged"
 description = "RoboTwin 2.0 rotate_qrcode (ALOHA-AgileX dual arm, SAPIEN): produce one replayable trajectory. Use arm to catch the qrcode board on the table, pick it up and rotate to let the qrcode face towards the robot. Frozen scene instance (RoboTwin seed 28831)."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "robotwin", "sapien", "aloha-agilex", "dual-arm", "code-as-policy", "trajectory", "rotate_qrcode"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "robotwin"            # RoboTwin 2.0 = SAPIEN 3 / PhysX + CuRobo
 robot = "aloha-agilex"

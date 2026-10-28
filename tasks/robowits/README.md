@@ -42,7 +42,7 @@ every task goes through the human review in PR #3.
   frozen instance and predicate).
 
 **Not in the repository: 11 families** without a valid positive. A later PR can add one once it
-has a positive; their frozen instances are in dev/qineng 9eb18edf.
+has a positive; their frozen instances are in dev branch 9eb18edf.
 - No graded positive: balance_board, ball_into_jar, differentiate_cubes, pinch_card, place_book, retrieve_roll,
   round_dough_sheet, seal_colander, water_into_mug. place_book can pass only with the thin book stood on its edge: the book
   (22 x 19 cm) is larger than the mat (12 x 20 cm), so a flat book has at most about 57 % of its footprint over the mat,

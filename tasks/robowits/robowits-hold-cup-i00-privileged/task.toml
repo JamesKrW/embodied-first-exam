@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/robowits-hold-cup-i00-privileged"
 description = "RoboWits hold_cup (bimanual Marvin, Genesis): produce one replayable trajectory. Put the cup on the green target area on the slope without sliding down. Frozen scene instance (RoboWits evaluation scene 0 of task 9)."
-authors = [{ name = "qineng" }]
 keywords = ["robotics", "robowits", "genesis", "marvin-bimanual", "dual-arm", "code-as-policy", "trajectory", "hold_cup"]
 
 [metadata]
-author_name = "qineng"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "robowits"            # RoboWits @ 9cc30ae on Genesis 0.4.7 (CPU physics backend, EGL rendering)
 robot = "marvin-bimanual"

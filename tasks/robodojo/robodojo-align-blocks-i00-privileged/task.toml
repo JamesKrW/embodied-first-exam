@@ -4,12 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/robodojo-align-blocks-i00-privileged"
 description = "RoboDojo align_blocks (Open; two ARX X5 arms with parallel grippers, Isaac Sim 5.1 / Isaac Lab): produce one replayable trajectory of RoboDojo's 14-D joint actions. Task: Use the set square (triangular prism) to push three blocks (cubes) into a straight, aligned row on the table, without picking any block up, then return the robot arm to its start pose. Frozen scene instance: RoboDojo's own evaluation layout arx_x5/0/align_blocks_0.json; graded by RoboDojo's own reward check."
-authors = [{ name = "Changhe Chen" }]
 keywords = ["robotics", "robodojo", "isaac-lab", "isaac-sim", "bimanual", "arx-x5", "code-as-policy", "trajectory", "privileged"]
 
 [metadata]
-author_name = "Changhe Chen"
-author_org = "MLL Lab"
 task_type = "trajectory"
 simulator = "robodojo"            # RoboDojo @ cb2a37d on its Isaac Lab 2.3 fork / Isaac Sim 5.1 (PhysX, RTX rendering)
 robot = "arx-x5-bimanual"

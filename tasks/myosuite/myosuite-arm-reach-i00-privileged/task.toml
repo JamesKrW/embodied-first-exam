@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/myosuite-arm-reach-i00-privileged"
 description = "MyoSuite arm_reach (MyoArm, 34 muscles, MuJoCo): produce one replayable trajectory of actuator commands. Bring the index fingertip to the target point in space: its distance below 0.0125 m for 50 consecutive control steps (1.0 s). Frozen scene instance (myoArmReachFixed-v0, reset seed 0); graded by two fresh-process replays."
-authors = [{ name = "Chi Gui" }]
 keywords = ["robotics", "myosuite", "mujoco", "musculoskeletal", "myoarm", "code-as-policy", "trajectory", "arm_reach", "privileged"]
 
 [metadata]
-author_name = "Chi Gui"
 task_type = "trajectory"
 simulator = "myosuite"            # MyoSuite 2.12.2 on MuJoCo 3.6.0 (CPU)
 robot = "myoarm"

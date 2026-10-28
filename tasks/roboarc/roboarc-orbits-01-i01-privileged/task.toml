@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/roboarc-orbits-01-i01-privileged"
 description = "RoboARC orbits (ALOHA 2, MuJoCo): produce one replayable trajectory. Separate and place the entire cord and wooden handle together inside the green dashed goal region. Keep the fixed post, stopper ball and base on the puzzle/system side. Frozen scene instance (variation orbits_very_easy, seed 0)."
-authors = [{ name = "Jianwen Lyu" }]
 keywords = ["robotics", "roboarc", "mujoco", "aloha", "code-as-policy", "trajectory", "orbits"]
 
 [metadata]
-author_name = "Jianwen Lyu"
 tooling_version = "19"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU float64 physics, Nyx RGB)

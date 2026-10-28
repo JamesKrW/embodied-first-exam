@@ -3,11 +3,8 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, { source
 [task]
 name = "embodied-first-exam/roboengineer-go2-weave-i01-standard"
 description = "Execute a predeclared body velocity command schedule to pass four alternating poles without contact; no global-position feedback."
-authors = [{name = "Robotic Engineering Bench contributors"}]
 keywords = ["robotics", "policy", "adaptation", "mujoco"]
 [metadata]
-author_name = "Robotic Engineering Bench contributors"
-author_org = "Robotic Engineering Bench"
 collection = "roboEngineer"
 embodiment = "quadruped"
 task_type = "policy"

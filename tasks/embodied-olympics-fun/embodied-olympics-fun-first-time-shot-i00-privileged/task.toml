@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/embodied-olympics-fun-first-time-shot-i00-privileged"
 description = "Embodied Olympics first-time-shot (one Unitree G1 on the Embodied Olympics simulator, MuJoCo 3.3.7, CPU) in privileged mode: produce one replayable trajectory. Shoot first time: the football rolls down a ramp and across in front of you; with one touch of a foot send it into the official goal 11 m away. A referee of events, geometry and contact rules decides the success."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "embodied-olympics", "sports", "mujoco", "unitree-g1", "humanoid", "trajectory", "first-time-shot"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"
 simulator = "mujoco"               # the Embodied Olympics simulator: MuJoCo 3.3.7 on the CPU with Embodied Olympics' robot library
 robot = "unitree-g1"

@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/behavior-can-meat-i00-privileged"
 description = "BEHAVIOR-1K v3.9.2 (2026 BEHAVIOR Challenge) can_meat (R1Pro mobile manipulator, OmniGibson / Isaac Sim): produce one replayable trajectory. Can the sausages. The four cooked bratwursts lie on the chopping board on the kitchen countertop, and the two hinged jars are inside the kitchen cabinet. Put exactly two bratwursts into each jar, close both jars, have both jars inside that cabinet at the end, and leave the cabinet closed. Frozen scene instance (challenge public_test instance 301)."
-authors = [{ name = "qineng" }]
 keywords = ["robotics", "behavior", "omnigibson", "isaac-sim", "r1pro", "mobile-manipulation", "code-as-policy", "trajectory", "can_meat"]
 
 [metadata]
-author_name = "qineng"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "behavior"            # BEHAVIOR-1K v3.9.2 = OmniGibson 3.9.2 on Isaac Sim (the 2026 challenge stack)
 robot = "r1pro"

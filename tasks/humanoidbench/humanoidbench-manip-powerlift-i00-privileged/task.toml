@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/humanoidbench-manip-powerlift-i00-privileged"
 description = "HumanoidBench powerlift: produce one replayable trajectory that lifts a dumbbell overhead with the Unitree H1, frozen scene instance 00."
-authors = [{ name = "pingyue" }]
 keywords = ["robotics", "humanoidbench", "code-as-policy", "trajectory", "h1hand", "manipulation", "powerlift"]
 
 [metadata]
-author_name = "pingyue"
 # trajectory | policy (see docs/protocol/README.md)
 task_type = "trajectory"
 simulator = "humanoidbench"

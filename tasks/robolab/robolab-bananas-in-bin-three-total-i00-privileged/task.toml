@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/robolab-bananas-in-bin-three-total-i00-privileged"
 description = "NVIDIA RoboLab bananas_in_bin_three_total (Franka + Robotiq 2F-85, Isaac Lab 2.3 / Isaac Sim 5.1): produce one replayable trajectory. Make sure there are 3 (three) bananas in the grey bin. Frozen scene instance (the state after RoboLab's canonical seed-0 reset)."
-authors = [{ name = "qineng" }]
 keywords = ["robotics", "robolab", "isaac-lab", "isaac-sim", "franka", "code-as-policy", "trajectory", "bananas_in_bin_three_total"]
 
 [metadata]
-author_name = "qineng"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "robolab"             # NVIDIA RoboLab v0.3.1 on Isaac Lab 2.3.2 / Isaac Sim 5.1 (PhysX on the CPU, RTX rendering)
 robot = "franka-robotiq-2f85"

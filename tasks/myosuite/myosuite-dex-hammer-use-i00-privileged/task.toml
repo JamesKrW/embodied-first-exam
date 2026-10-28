@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/myosuite-dex-hammer-use-i00-privileged"
 description = "MyoSuite dex_hammer_use (MyoHand, 39 muscles, MuJoCo): produce one replayable trajectory of actuator commands. Move the hammer along MyoDex's recorded use (grasp it and swing it) motion: a reference of the object's pose over 99 control steps (1.98 s), from GRAB motion capture (TCDM / MyoDex). Frozen scene instance (MyoHandHammerUse-v0, reset seed 0); graded by two fresh-process replays."
-authors = [{ name = "Chi Gui" }]
 keywords = ["robotics", "myosuite", "mujoco", "musculoskeletal", "myohand", "code-as-policy", "trajectory", "dex_hammer_use", "privileged"]
 
 [metadata]
-author_name = "Chi Gui"
 task_type = "trajectory"
 simulator = "myosuite"            # MyoSuite 2.12.2 on MuJoCo 3.6.0 (CPU)
 robot = "myohand"

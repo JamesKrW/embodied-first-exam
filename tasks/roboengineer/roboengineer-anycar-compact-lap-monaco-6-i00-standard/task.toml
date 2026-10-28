@@ -3,11 +3,8 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, { source
 [task]
 name = "embodied-first-exam/roboengineer-anycar-compact-lap-monaco-6-i00-standard"
 description = "Track a complete compact F1-inspired lap, targeted at 28 seconds within a 30-second episode, avoiding collisions/offtrack."
-authors = [{name = "Robotic Engineering Bench contributors"}]
 keywords = ["robotics", "policy", "adaptation", "mujoco"]
 [metadata]
-author_name = "Robotic Engineering Bench contributors"
-author_org = "Robotic Engineering Bench"
 collection = "roboEngineer"
 embodiment = "racing-car"
 task_type = "policy"

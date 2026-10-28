@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/robotwin_2_0_place_shoe-privileged"
 description = "RoboTwin 2.0 place_shoe (ALOHA-AgileX dual arm, SAPIEN): produce one replayable trajectory. Use one arm to grab the shoe from the table and place it on the mat. Frozen scene instance (RoboTwin seed 28831)."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "robotwin", "sapien", "aloha-agilex", "dual-arm", "code-as-policy", "trajectory", "place_shoe"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "robotwin"            # RoboTwin 2.0 = SAPIEN 3 / PhysX + CuRobo
 robot = "aloha-agilex"

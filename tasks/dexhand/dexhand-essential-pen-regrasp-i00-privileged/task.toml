@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/dexhand-essential-pen-regrasp-i00-privileged"
 description = "Advance and reorient a real pen mesh with a fitted shaft, physical writing tip and tail into a marked three-finger grip."
-authors = [{ name = "Embodied Exam contributors" }]
 keywords = ["robotics", "dexterous-hand", "mujoco", "sharpa-wave", "wuji-hand-2.2", "in_hand"]
 
 [metadata]
-author_name = "Embodied Exam contributors"
 task_type = "trajectory"
 simulator = "mujoco"
 robot = "sharpa-wave-floating"

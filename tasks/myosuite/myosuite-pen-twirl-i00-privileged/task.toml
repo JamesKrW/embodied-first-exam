@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/myosuite-pen-twirl-i00-privileged"
 description = "MyoSuite pen_twirl (MyoHand, 39 muscles, MuJoCo): produce one replayable trajectory of actuator commands. Rotate the pen in the hand until its axis points along the target orientation: the cosine between the pen's axis (bottom to top) and the target's axis above 0.95, with the pen within 0.075 m of its desired position, for 100 consecutive control steps (1.0 s). Frozen scene instance (myoHandPenTwirlFixed-v0, reset seed 0); graded by two fresh-process replays."
-authors = [{ name = "Chi Gui" }]
 keywords = ["robotics", "myosuite", "mujoco", "musculoskeletal", "myohand", "code-as-policy", "trajectory", "pen_twirl", "privileged"]
 
 [metadata]
-author_name = "Chi Gui"
 task_type = "trajectory"
 simulator = "myosuite"            # MyoSuite 2.12.2 on MuJoCo 3.6.0 (CPU)
 robot = "myohand"

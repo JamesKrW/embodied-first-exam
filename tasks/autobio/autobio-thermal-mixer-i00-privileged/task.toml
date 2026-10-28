@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/autobio-thermal-mixer-i00-privileged"
 description = "AutoBio thermal_mixer (Operate thermal mixer panel; a biology laboratory bench on MuJoCo): produce one replayable trajectory of joint position targets. Set the thermal mixer by pressing the buttons of its panel: time 30 s, temperature 33 °C, mixing speed 600 rpm. Frozen scene instance (AutoBio's reset, seed 0); graded by two fresh-process replays with AutoBio's own check."
-authors = [{ name = "Canyu Chen" }]
 keywords = ["robotics", "autobio", "mujoco", "laboratory", "biology", "ur5e-robotiq-2f85", "code-as-policy", "trajectory", "thermal_mixer", "privileged"]
 
 [metadata]
-author_name = "Canyu Chen"
 task_type = "trajectory"
 simulator = "autobio"             # AutoBio @ 0850421 on MuJoCo 3.3.0 (CPU)
 robot = "ur5e-robotiq-2f85"

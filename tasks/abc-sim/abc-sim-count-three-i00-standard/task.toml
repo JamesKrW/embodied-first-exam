@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, { source
 [task]
 name = "embodied-first-exam/abc-sim-count-three-i00-standard"
 description = "ABC Sim count into a box: exactly 3 (two I2RT YAM arms, MuJoCo): Follow the directive 'put exactly 3 objects in the box'. The robot as a service (eai-standard/2.2); graded by the live episode."
-authors = [{ name = "Changhe Chen" }]
 keywords = ["robotics", "abc-sim", "mujoco", "yam", "bimanual", "count_three", "standard"]
 
 [metadata]
-author_name = "Changhe Chen"
 task_type = "trajectory"
 simulator = "mujoco"                # ABC Sim (abc_sim, amazon-far/abc @ d0832d1) on MuJoCo 3.6.0
 robot = "i2rt-yam-bimanual"

@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/labutopia-heat-liquid-i00-privileged"
 description = "LabUtopia heat_liquid (HeatLiquid; a chemistry laboratory with a Franka Panda on Isaac Sim): produce one replayable trajectory of joint targets. Put the beaker on the heater's plate and press the heater's button. Frozen scene instance (LabUtopia's reset, seed 1); graded by two fresh-process replays with a copy of LabUtopia's own success check."
-authors = [{ name = "Canyu Chen" }]
 keywords = ["robotics", "labutopia", "isaac-sim", "laboratory", "chemistry", "franka-panda", "code-as-policy", "trajectory", "heat_liquid", "privileged"]
 
 [metadata]
-author_name = "Canyu Chen"
 task_type = "trajectory"
 simulator = "labutopia"           # LabUtopia @ 8df7278 on NVIDIA Isaac Sim 6.1.0 (PhysX on the CPU, RTX cameras)
 robot = "franka-panda"

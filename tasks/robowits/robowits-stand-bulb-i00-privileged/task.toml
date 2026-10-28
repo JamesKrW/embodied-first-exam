@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/robowits-stand-bulb-i00-privileged"
 description = "RoboWits stand_bulb (bimanual Marvin, Genesis): produce one replayable trajectory. Stand the tall object with curved bottom stably within the green target area. Frozen scene instance (RoboWits evaluation scene 0 of task 16)."
-authors = [{ name = "qineng" }]
 keywords = ["robotics", "robowits", "genesis", "marvin-bimanual", "dual-arm", "code-as-policy", "trajectory", "stand_bulb"]
 
 [metadata]
-author_name = "qineng"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "robowits"            # RoboWits @ 9cc30ae on Genesis 0.4.7 (CPU physics backend, EGL rendering)
 robot = "marvin-bimanual"

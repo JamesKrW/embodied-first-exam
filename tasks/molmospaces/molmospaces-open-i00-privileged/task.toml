@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/molmospaces-open-i00-privileged"
 description = "MolmoSpaces open (a Franka FR3 arm with a Robotiq 2F-85 gripper on a fixed base, MuJoCo 3.5.0) in privileged mode: produce one replayable trajectory. Open the dishwasher. Frozen episode: upstream benchmark ithor/FrankaOpenHardBench/FrankaOpenHardBench_20260206_json_benchmark, episode 52."
-authors = [{ name = "pingyue" }]
 keywords = ["robotics", "molmospaces", "mujoco", "franka-robotiq-2f85", "code-as-policy", "trajectory", "open"]
 
 [metadata]
-author_name = "pingyue"
 task_type = "trajectory"
 simulator = "molmospaces"          # MolmoSpaces (molmo-spaces 0.2.9) on MuJoCo 3.5.0, CPU physics
 robot = "franka-robotiq-2f85"

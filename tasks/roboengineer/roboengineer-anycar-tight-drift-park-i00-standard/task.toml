@@ -3,11 +3,8 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, { source
 [task]
 name = "embodied-first-exam/roboengineer-anycar-tight-drift-park-i00-standard"
 description = "Follow the ordered U-bend, then execute a 180-degree drifting turn into a tight inside parallel-parking space between two stationary cars and hold a precise stop."
-authors = [{name = "Robotic Engineering Bench contributors"}]
 keywords = ["robotics", "policy", "adaptation", "mujoco"]
 [metadata]
-author_name = "Robotic Engineering Bench contributors"
-author_org = "Robotic Engineering Bench"
 collection = "roboEngineer"
 embodiment = "racing-car"
 task_type = "policy"

@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/roboarc-cast-coil-05-i01-privileged"
 description = "RoboARC cast_coil (ALOHA 2, MuJoCo): produce one replayable trajectory. Assemble the gold and silver Cast Coil pieces into their matching interlocking configuration, then release both. Frozen scene instance (variation cast_coil_hard, seed 0)."
-authors = [{ name = "Jianwen Lyu" }]
 keywords = ["robotics", "roboarc", "mujoco", "aloha", "code-as-policy", "trajectory", "cast_coil"]
 
 [metadata]
-author_name = "Jianwen Lyu"
 tooling_version = "19"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU float64 physics, Nyx RGB)

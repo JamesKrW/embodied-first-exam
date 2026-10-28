@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/abc-sim-chess-i00-privileged"
 description = "ABC Sim set up chess pieces (two I2RT YAM arms, MuJoCo): Put the 6 pieces that stand next to the board (3 black pawns, a black bishop, the black king, the black queen) on their starting squares: the squares of the standard starting position left empty. Frozen scene instance; one replayable trajectory, graded by two fresh-process replays."
-authors = [{ name = "Changhe Chen" }]
 keywords = ["robotics", "abc-sim", "mujoco", "yam", "bimanual", "chess", "privileged"]
 
 [metadata]
-author_name = "Changhe Chen"
 task_type = "trajectory"
 simulator = "mujoco"                # ABC Sim (abc_sim, amazon-far/abc @ d0832d1) on MuJoCo 3.6.0
 robot = "i2rt-yam-bimanual"

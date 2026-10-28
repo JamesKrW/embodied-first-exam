@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/mujoco_playground_panda_pick_cube_orientation-privileged"
 description = "MuJoCo Playground PandaPickCubeOrientation in plain MuJoCo: Franka Panda; produce one replayable trajectory that picks up the box and holds it at the target position and orientation, frozen instance (seed 60417)."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "mujoco", "mujoco-playground", "franka-panda", "pick-place", "orientation", "code-as-policy", "trajectory"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"
 simulator = "mujoco"
 robot = "franka-panda"

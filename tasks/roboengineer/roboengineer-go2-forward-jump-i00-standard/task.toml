@@ -3,11 +3,8 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, { source
 [task]
 name = "embodied-first-exam/roboengineer-go2-forward-jump-i00-standard"
 description = "Jump a commanded 0.70–1.00 m forward distance with verified flight and stable touchdown; walking to the goal is rejected."
-authors = [{name = "Robotic Engineering Bench contributors"}]
 keywords = ["robotics", "policy", "adaptation", "mujoco"]
 [metadata]
-author_name = "Robotic Engineering Bench contributors"
-author_org = "Robotic Engineering Bench"
 collection = "roboEngineer"
 embodiment = "quadruped"
 task_type = "policy"

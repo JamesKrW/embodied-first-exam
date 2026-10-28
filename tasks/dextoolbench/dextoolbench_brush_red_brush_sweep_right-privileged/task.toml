@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/dextoolbench_brush_red_brush_sweep_right-privileged"
 description = "DexToolBench (SimToolReal) red_brush / sweep_right in MuJoCo: KUKA iiwa 14 + Sharpa HA4 hand; produce one replayable joint-target trajectory that carries the red brush through the 38 demonstrated goal poses in order."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "dextoolbench", "simtoolreal", "mujoco", "dexterous", "tool-use", "iiwa", "sharpa", "code-as-policy", "trajectory"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"
 simulator = "mujoco"
 robot = "kuka-iiwa14-sharpa-ha4"

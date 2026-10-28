@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/roboarc-ikea-svallet-i00-privileged"
 description = "IKEA MuJoCo SVALLET work lamp (dual ViperX 300 s (Menagerie ALOHA), MuJoCo 3.14.0 CPU): produce one replayable trajectory. Press the lamp shade's key down into the socket on top of the stand column until the spring jaw snaps over it, then screw the E12 bulb up into the shade's socket until it seats. Frozen scene (the scene's keyframe 'home'); physical grasps, no assist."
-authors = [{ name = "Xiaoyu" }]
 keywords = ["robotics", "roboarc", "ikea", "furniture-assembly", "mujoco", "viperx", "bimanual", "code-as-policy", "trajectory"]
 
 [metadata]
-author_name = "Xiaoyu"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "mujoco"              # plain MuJoCo 3.14.0, CPU float64, the scene's own runtime and mechanism
 robot = "aloha-2"            # both arms (docs/TAXONOMY.md)

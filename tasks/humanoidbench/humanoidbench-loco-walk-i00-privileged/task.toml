@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/humanoidbench-loco-walk-i00-privileged"
 description = "HumanoidBench walk: produce one replayable trajectory that walks the Unitree H1 forward and keeps it walking, frozen scene instance 00."
-authors = [{ name = "pingyue" }]
 keywords = ["robotics", "humanoidbench", "code-as-policy", "trajectory", "h1", "locomotion", "walk"]
 
 [metadata]
-author_name = "pingyue"
 # trajectory | policy (see docs/protocol/README.md)
 task_type = "trajectory"
 simulator = "humanoidbench"

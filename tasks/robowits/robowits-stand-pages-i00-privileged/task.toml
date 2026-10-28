@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/robowits-stand-pages-i00-privileged"
 description = "RoboWits stand_pages (bimanual Marvin, Genesis): produce one replayable trajectory. Stand the two pages up on the table so that they brace each other. They start joined like an open book: the stabilizing bar already runs through the eyelets of both pages as a hinge pin, so nothing has to be inserted. Frozen scene instance (RoboWits evaluation scene 0 of task 7)."
-authors = [{ name = "qineng" }]
 keywords = ["robotics", "robowits", "genesis", "marvin-bimanual", "dual-arm", "code-as-policy", "trajectory", "stand_pages"]
 
 [metadata]
-author_name = "qineng"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "robowits"            # RoboWits @ 9cc30ae on Genesis 0.4.7 (CPU physics backend, EGL rendering)
 robot = "marvin-bimanual"

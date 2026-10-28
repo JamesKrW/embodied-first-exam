@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/dexhand-essential-cube-layer-i00-standard"
 description = "Keep a free cube body steady while independently turning its top layer through an ordered quarter-turn reversal."
-authors = [{ name = "Embodied Exam contributors" }]
 keywords = ["robotics", "dexterous-hand", "mujoco", "sharpa-wave", "wuji-hand-2.2", "essential_articulated"]
 
 [metadata]
-author_name = "Embodied Exam contributors"
 task_type = "trajectory"
 simulator = "mujoco"
 robot = "sharpa-wave-floating"

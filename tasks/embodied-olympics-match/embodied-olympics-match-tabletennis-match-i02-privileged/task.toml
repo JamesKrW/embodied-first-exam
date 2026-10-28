@@ -3,10 +3,8 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/embodied-olympics-match-tabletennis-match-i02-privileged"
 description = "PRIVILEGED (Embodied Olympics / Embodied Agent Olympics): table tennis, one match against the scripted opponent at level 3 on the frozen instance of embodied-olympics-match-tabletennis-match-i02-standard-realtime (seed 12). Full simulator in development (read and change any state, reset the whole match); the deliverable is a closed-loop Python program that plays a fresh unmodified match in the verifier, on the original S = 10 clock, seeing the full state instead of camera images."
-authors = [{ name = "Embodied Olympics (CHIGUI0)" }]
 keywords = ["robotics", "mujoco", "fullsim", "policy", "tabletennis"]
 [metadata]
-author_name = "Embodied Olympics"
 task_type = "policy"
 simulator = "mujoco"
 robot = "franka-panda"

@@ -4,12 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/metaworldplus-plate-slide-back-side-i00-privileged"
 description = "MetaWorld+ (Meta-World v3 plate-slide-back-side, Sawyer arm): Slide the plate out sideways to the target position. Produce one replayable trajectory of Meta-World's native actions on a frozen instance; graded on the state after the last action."
-authors = [{ name = "Changhe Chen" }]
 keywords = ["robotics", "mujoco", "metaworld", "sawyer", "code-as-policy", "trajectory", "privileged"]
 
 [metadata]
-author_name = "Changhe Chen"
-author_org = "MLL Lab"
 task_type = "trajectory"
 simulator = "mujoco"
 robot = "sawyer"

@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/myosuite-baoding-i00-privileged"
 description = "MyoSuite baoding (MyoHand, 39 muscles, MuJoCo): produce one replayable trajectory of actuator commands. Baoding balls: rotate the two balls around each other in the palm so that each follows its moving target (the targets circle the palm once every 5 s). Frozen scene instance (myoChallengeBaodingP1-v1, reset seed 0); graded by two fresh-process replays."
-authors = [{ name = "Chi Gui" }]
 keywords = ["robotics", "myosuite", "mujoco", "musculoskeletal", "myohand", "code-as-policy", "trajectory", "baoding", "privileged"]
 
 [metadata]
-author_name = "Chi Gui"
 task_type = "trajectory"
 simulator = "myosuite"            # MyoSuite 2.12.2 on MuJoCo 3.6.0 (CPU)
 robot = "myohand"

@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/behavior-hiding-Easter-eggs-i00-privileged"
 description = "BEHAVIOR-1K v3.9.2 (2026 BEHAVIOR Challenge) hiding_Easter_eggs (R1Pro mobile manipulator, OmniGibson / Isaac Sim): produce one replayable trajectory. Hide the Easter eggs in the garden. The three eggs are inside the wicker basket on the lawn; take all three out and lay them on the lawn next to one tree (any tree in the garden, but the same tree for all three). Frozen scene instance (challenge public_test instance 301)."
-authors = [{ name = "qineng" }]
 keywords = ["robotics", "behavior", "omnigibson", "isaac-sim", "r1pro", "mobile-manipulation", "code-as-policy", "trajectory", "hiding_Easter_eggs"]
 
 [metadata]
-author_name = "qineng"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "behavior"            # BEHAVIOR-1K v3.9.2 = OmniGibson 3.9.2 on Isaac Sim (the 2026 challenge stack)
 robot = "r1pro"
@@ -16,7 +14,7 @@ family = "hiding_Easter_eggs"
 mode = "privileged"               # privileged state, unlimited resets, thin primitives (docs/protocol/README.md §3)
 dynamics = "static"               # scene dynamics (docs/protocol/README.md §2.14): the task's own declaration
 oracle = "none"
-oracle_evidence = "No reference solution: BEHAVIOR-1K ships no expert or planner that replays on this frozen instance. Solvable: model trial behavior-hiding-Easter-eggs-i00__QL9YpHL (behavior-lunaxh-t8-0927, privileged) graded success=1, deterministic=1 by the separate verifier on a pre-v1.0 version of this task (dev/qineng 20a382a8; grader verdict and frozen instance unchanged since); not re-run on this version (static validation only). Human review per family (protocol §2.7)."
+oracle_evidence = "No reference solution: BEHAVIOR-1K ships no expert or planner that replays on this frozen instance. Solvable: model trial behavior-hiding-Easter-eggs-i00__QL9YpHL (behavior-lunaxh-t8-0927, privileged) graded success=1, deterministic=1 by the separate verifier on a pre-v1.0 version of this task (dev branch 20a382a8; grader verdict and frozen instance unchanged since); not re-run on this version (static validation only). Human review per family (protocol §2.7)."
 instance_seed = 301               # scene = environment/instance.json (2026 challenge public_test instance 301 + its state hash); identity = dataset.toml digest
 expert_time_estimate_hours = 3.0
 

@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/bigym2-reach-target-dual-i00-privileged"
 description = "BiGym 2.0 reach-target-dual (Unitree G1 with GR00T-WBC, MuJoCo 3.8.1) in privileged mode: produce one replayable trajectory. Touch the red sphere with your left hand and the green sphere with your right hand at the same time. Frozen instance: upstream task reach_target_dual, seed 0."
-authors = [{ name = "pingyue" }]
 keywords = ["robotics", "bigym2", "mujoco", "unitree-g1", "humanoid", "loco-manipulation", "trajectory", "reach-target-dual"]
 
 [metadata]
-author_name = "pingyue"
 task_type = "trajectory"
 simulator = "bigym2"               # BiGym 2.0 (bigym 1.0.0 at 93ad4b3): MuJoCo 3.8.1 + NVIDIA GR00T-WBC, CPU physics
 robot = "unitree-g1-dex1"

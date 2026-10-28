@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/mujoco_playground_aloha_single_peg_insertion-privileged"
 description = "MuJoCo Playground AlohaSinglePegInsertion in plain MuJoCo: ALOHA 2 bimanual (two ViperX 300s); produce one replayable trajectory that picks up the socket and the peg and inserts the peg into the socket, frozen instance (seed 60417)."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "mujoco", "mujoco-playground", "aloha", "bimanual", "peg-insertion", "code-as-policy", "trajectory"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"
 simulator = "mujoco"
 robot = "aloha-2"

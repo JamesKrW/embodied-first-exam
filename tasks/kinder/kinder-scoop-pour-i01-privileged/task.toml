@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/kinder-scoop-pour-i01-privileged"
 description = "KinDER ScoopPour3D-o50 (privileged mode): produce one replayable trajectory that reaches the goal, frozen scene instance i01."
-authors = [{ name = "pingyue" }]
 keywords = ["robotics", "kinder", "mujoco", "tidybot", "mobile-manipulation", "physical-reasoning", "trajectory", "scoop-pour"]
 
 [metadata]
-author_name = "pingyue"
 task_type = "trajectory"
 simulator = "kinder"
 robot = "tidybot-plus-plus"

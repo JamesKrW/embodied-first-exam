@@ -21,11 +21,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" },
 [task]
 name = "embodied-first-exam/roboarc-interlocked-claws-12-i01-standard"
 description = "STANDARD MODE (robot as a service, eai-standard/2.4): RoboARC interlocked_claws on the same frozen instance as the privileged task. Completely separate the two interlocked pieces and briefly hold both still. The agent only gets a client: get_obs (RGB, optional depth, proprioception, calibrated cameras), submit (joint_position or ee_pose chunks), stateless kinematics. No reset, no privileged state; the sim service records the episode as a trajectory and grades it."
-authors = [{ name = "Jianwen Lyu" }]
 keywords = ["robotics", "roboarc", "mujoco", "aloha", "standard-mode", "trajectory", "interlocked_claws"]
 
 [metadata]
-author_name = "Jianwen Lyu"
 task_type = "trajectory"
 simulator = "roboarc"
 robot = "aloha-2"

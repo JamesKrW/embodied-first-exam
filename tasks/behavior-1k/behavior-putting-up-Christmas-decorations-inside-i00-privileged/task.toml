@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/behavior-putting-up-Christmas-decorations-inside-i00-privileged"
 description = "BEHAVIOR-1K v3.9.2 (2026 BEHAVIOR Challenge) putting_up_Christmas_decorations_inside (R1Pro mobile manipulator, OmniGibson / Isaac Sim): produce one replayable trajectory. Decorate the house for Christmas. In the living room stand a Christmas tree, three gift boxes and a wicker basket holding a wreath, three candy canes and two pillar candles. Put the gift boxes by the tree, both candles on one dining-room table, one candy cane on a table, and the wreath and the two other candy canes on a sofa. Frozen scene instance (challenge public_test instance 301)."
-authors = [{ name = "qineng" }]
 keywords = ["robotics", "behavior", "omnigibson", "isaac-sim", "r1pro", "mobile-manipulation", "code-as-policy", "trajectory", "putting_up_Christmas_decorations_inside"]
 
 [metadata]
-author_name = "qineng"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "behavior"            # BEHAVIOR-1K v3.9.2 = OmniGibson 3.9.2 on Isaac Sim (the 2026 challenge stack)
 robot = "r1pro"

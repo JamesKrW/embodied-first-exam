@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/dexjoco-pinch-tongs-i00-privileged"
 description = "DexJoCo pinch_tongs (a Franka Panda arm with a 16-DoF Allegro hand, MuJoCo): produce one replayable trajectory. Pick up the tongs and open and close them three times while holding them up. Frozen scene instance (the initial state of a DexJoCo human demonstration)."
-authors = [{ name = "Chi Gui" }]
 keywords = ["robotics", "dexjoco", "mujoco", "allegro", "dexterous-manipulation", "code-as-policy", "trajectory", "pinch_tongs"]
 
 [metadata]
-author_name = "Chi Gui"
 task_type = "trajectory"
 simulator = "dexjoco"
 robot = "franka-allegro"

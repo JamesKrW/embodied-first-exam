@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, { source
 [task]
 name = "embodied-first-exam/abc-sim-conveyor-pick-i00-standard-realtime"
 description = "ABC Sim conveyor pick (two I2RT YAM arms, MuJoCo): Pick the three objects off the moving belt and put them in the bin. The robot as a service on a clock that does not stop (eai-standard/2.3, S = 1); graded by the live episode."
-authors = [{ name = "Changhe Chen" }]
 keywords = ["robotics", "abc-sim", "mujoco", "yam", "bimanual", "conveyor_pick", "standard-realtime"]
 
 [metadata]
-author_name = "Changhe Chen"
 task_type = "trajectory"
 simulator = "mujoco"                # ABC Sim (abc_sim, amazon-far/abc @ d0832d1) on MuJoCo 3.6.0
 robot = "i2rt-yam-bimanual"

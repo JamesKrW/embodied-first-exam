@@ -3,11 +3,8 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, { source
 [task]
 name = "embodied-first-exam/roboengineer-go2-attitude-i00-standard"
 description = "Track public roll/pitch sinusoids after a 1 s acquisition interval while maintaining ground support."
-authors = [{name = "Robotic Engineering Bench contributors"}]
 keywords = ["robotics", "policy", "adaptation", "mujoco"]
 [metadata]
-author_name = "Robotic Engineering Bench contributors"
-author_org = "Robotic Engineering Bench"
 collection = "roboEngineer"
 embodiment = "quadruped"
 task_type = "policy"

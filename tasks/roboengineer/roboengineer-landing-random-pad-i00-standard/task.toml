@@ -4,12 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, { source
 [task]
 name = "embodied-first-exam/roboengineer-landing-random-pad-i00-standard"
 description = "Learn a safe, fast random-pad landing policy from noisy deployment feedback over bounded adaptation rounds."
-authors = [{ name = "Robotic Engineering Bench contributors" }]
 keywords = ["robotics", "mujoco", "quadrotor", "policy", "system-identification", "standard-mode"]
 
 [metadata]
-author_name = "Robotic Engineering Bench contributors"
-author_org = "Robotic Engineering Bench"
 collection = "roboEngineer"
 embodiment = "drone"
 task_type = "policy"

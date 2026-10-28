@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/robotwin_2_0_pick_dual_bottles-privileged"
 description = "RoboTwin 2.0 pick_dual_bottles (ALOHA-AgileX dual arm, SAPIEN): produce one replayable trajectory. Pick up one bottle with one arm, and pick up another bottle with the other arm. Frozen scene instance (RoboTwin seed 60417)."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "robotwin", "sapien", "aloha-agilex", "dual-arm", "code-as-policy", "trajectory", "pick_dual_bottles"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "robotwin"            # RoboTwin 2.0 = SAPIEN 3 / PhysX + CuRobo
 robot = "aloha-agilex"

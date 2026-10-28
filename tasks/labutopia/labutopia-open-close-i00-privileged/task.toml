@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/labutopia-open-close-i00-privileged"
 description = "LabUtopia open_close (OpenClose; a chemistry laboratory with a Franka Panda on Isaac Sim): produce one replayable trajectory of joint targets. Open the top drawer of the cabinet, let go of it, then close it again and let go. Frozen scene instance (LabUtopia's reset, seed 0); graded by two fresh-process replays with a copy of LabUtopia's own success check."
-authors = [{ name = "Canyu Chen" }]
 keywords = ["robotics", "labutopia", "isaac-sim", "laboratory", "chemistry", "franka-panda", "code-as-policy", "trajectory", "open_close", "privileged"]
 
 [metadata]
-author_name = "Canyu Chen"
 task_type = "trajectory"
 simulator = "labutopia"           # LabUtopia @ 8df7278 on NVIDIA Isaac Sim 6.1.0 (PhysX on the CPU, RTX cameras)
 robot = "franka-panda"

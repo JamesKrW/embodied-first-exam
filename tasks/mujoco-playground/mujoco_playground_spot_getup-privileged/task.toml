@@ -4,12 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/mujoco_playground_spot_getup-privileged"
 description = "MuJoCo Playground SpotGetup in plain MuJoCo (Boston Dynamics Spot, joint position control every 0.02 s): Boston Dynamics Spot has fallen over. Make it get up and stand upright at its standing height. Produce one replayable trajectory of joint position targets on a frozen instance (Playground's reset with seed 1); graded by an upright stance held for the trajectory's last 0.5 s (two fresh-process replays)."
-authors = [{ name = "Changhe Chen" }]
 keywords = ["robotics", "mujoco", "mujoco-playground", "boston-dynamics-spot", "quadruped", "locomotion", "getup", "code-as-policy", "trajectory", "privileged"]
 
 [metadata]
-author_name = "Changhe Chen"
-author_org = "MLL Lab"
 task_type = "trajectory"
 simulator = "mujoco"
 robot = "boston-dynamics-spot"

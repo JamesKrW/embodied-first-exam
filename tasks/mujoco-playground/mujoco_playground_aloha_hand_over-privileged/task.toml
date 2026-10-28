@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/mujoco_playground_aloha_hand_over-privileged"
 description = "MuJoCo Playground AlohaHandOver in plain MuJoCo: ALOHA 2 bimanual; produce one replayable trajectory in which the left arm picks up the box, hands it to the right arm, and the right arm holds it at the target, frozen instance (seed 60417)."
-authors = [{ name = "Kangrui Wang" }]
 keywords = ["robotics", "mujoco", "mujoco-playground", "aloha", "bimanual", "handover", "code-as-policy", "trajectory"]
 
 [metadata]
-author_name = "Kangrui Wang"
 task_type = "trajectory"
 simulator = "mujoco"
 robot = "aloha-2"

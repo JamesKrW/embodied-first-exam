@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/molmospaces-pick-i00-privileged"
 description = "MolmoSpaces pick (a Franka FR3 arm with a Robotiq 2F-85 gripper on a fixed base, MuJoCo 3.5.0) in privileged mode: produce one replayable trajectory. Pick up the pie. Frozen episode: upstream benchmark procthor-objaverse/FrankaPickHardBench/FrankaPickHardBench_20260206_json_benchmark, episode 806."
-authors = [{ name = "pingyue" }]
 keywords = ["robotics", "molmospaces", "mujoco", "franka-robotiq-2f85", "code-as-policy", "trajectory", "pick"]
 
 [metadata]
-author_name = "pingyue"
 task_type = "trajectory"
 simulator = "molmospaces"          # MolmoSpaces (molmo-spaces 0.2.9) on MuJoCo 3.5.0, CPU physics
 robot = "franka-robotiq-2f85"

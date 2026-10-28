@@ -4,11 +4,9 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 [task]
 name = "embodied-first-exam/myosuite-obj-hold-i00-privileged"
 description = "MyoSuite obj_hold (MyoHand, 39 muscles, MuJoCo): produce one replayable trajectory of actuator commands. Hold the object at the goal: its centre within 0.010 m of the goal site for 50 consecutive control steps (1.0 s). Frozen scene instance (myoHandObjHoldFixed-v0, reset seed 0); graded by two fresh-process replays."
-authors = [{ name = "Chi Gui" }]
 keywords = ["robotics", "myosuite", "mujoco", "musculoskeletal", "myohand", "code-as-policy", "trajectory", "obj_hold", "privileged"]
 
 [metadata]
-author_name = "Chi Gui"
 task_type = "trajectory"
 simulator = "myosuite"            # MyoSuite 2.12.2 on MuJoCo 3.6.0 (CPU)
 robot = "myohand"
