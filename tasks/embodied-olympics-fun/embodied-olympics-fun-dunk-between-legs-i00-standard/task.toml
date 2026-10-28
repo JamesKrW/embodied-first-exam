@@ -37,39 +37,6 @@ expert_time_estimate_hours = 22.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested: No real solution (no own jump of our searches dunks; an own-motor two-hand dunk from the same open-hand hold at this ring height is shown by search in dunk, the pass between the legs is not). Positive by a declared injection: real two-hand hold and release, the right hand swung behind the hip, the ball's path round the left leg and the push through the leg gate injected (velocities between control steps), the bounce through the gate real, the gather (the arms and both hands closing on the ball rising between the open palms) real after an injected rise, the raise overhead real, then the dunk's ghost jump, teleport over the ring and landing: dribble, between the legs, gather, dunk, stand; the same state hash twice. Negatives: a bounce beside the leg, a rolled ball, through and back, a gather before any bounce between the legs, a ball at rest on the upturned palm (carrying), a touch before the floor, a palm from above, a ball pushed at the shin, a ball that gets away, the ball on the floor while held, travelling before the release and after the gather, a release after the gather, a second dribble, a shot during the dribble, a dunk without the dribble, a drop over the ring, a one-hand entry from the side, up through the ring, a miss, hanging on the ring, out of bounds, a fall; nop (time, the ball still in the hands after 40 s).; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
-[metadata.resources]
-# minimum compute to run this task (docs/protocol/README.md §2.9)
-min_cpus = 3.0
-min_memory_gb = 5.0
-min_gpu_memory_gb = 0.0
-gpu_required = false
-gpu_class = "none"
-verifier_min_cpus = 2.0
-verifier_min_memory_gb = 3.0
-verifier_min_gpu_memory_gb = 0.0
-measured = "author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client"
-
-[metadata.resources.limits]
-# agent-phase limits in GiB (docs/protocol/README.md §2.10); scope: trial = every container, agent = the agent's container;
-# enforced from protocol v1.2 when RCB_LIMITS_ENFORCE=1 (a violation fails the trial), otherwise recorded only
-scope = "agent"
-max_gpu_memory_gb = 0.0
-max_memory_gb = 8.0
-max_processes = 512
-max_disk_gb = 20.0
-disk_paths = ["/app", "/tmp", "/root"]
-disk_exclude = []
-sustain_sec = 60.0
-window_sec = 120.0
-trial_max_gpu_memory_gb = 0.0
-trial_max_memory_gb = 16.0
-measured = "author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default"
-
-[metadata.resources.caps]
-# docker caps per compose service, applied from protocol v1.2 (docs/protocol/README.md §2.10)
-main = { cpus = 4.0, memory_gb = 10.0, pids = 8192 }
-sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
-
 [metadata.seeds]
 # the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
@@ -82,7 +49,7 @@ timeout_sec = 900.0
 environment_mode = "separate"
 network_mode = "no-network"
 
-# Resource limits (docs/protocol/README.md §2.10): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -115,6 +82,7 @@ timeout_sec = 7200.0
 build_timeout_sec = 1800.0
 cpus = 4
 memory_mb = 10240
+storage_mb = 20480
 
 [verifier.environment]
 build_timeout_sec = 600.0

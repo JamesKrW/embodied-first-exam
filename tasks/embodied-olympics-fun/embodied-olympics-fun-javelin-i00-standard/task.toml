@@ -37,39 +37,6 @@ expert_time_estimate_hours = 14.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested: The cord lies across the palm of the H1-2's own right Inspire hand (its default forces, 20 N per fingertip, 30 N the thumb), held by contact and friction. A fast overhand swing pulls the cord out of the hand: its load back-drives the finger drives to their self-locking limits and pulls the cord out across the fingers at about 1.14 s (before the commanded opening at 1.18 s), at 12-13 m/s pointing down, at 1x and equally at 2x these forces (so no factor up to 2x helps); a swing searched by CMA-ES (about 60 generations) reaches 9.8 m head first (the mark is 20 m). Positive by a declared magic action: real arm raised above the shoulder holding the javelin, the hand opened; injected once, the javelin moved 0.12 m up and given 17 m/s at 35 deg: it lands head first 31.6 m from the arc; the real walk back off the runway and stand; the same state hash twice. Negatives: nop, a release below the shoulder, the hand opened at the start, the back turned, walking over the arc, leaving the runway while it flies, tail first, outside the sector, short, touched after the release, out in front of the arc's ends, a fall. Stress: random arm targets with the hand closed: at most 0.4 mm into the fingers. The clean release (TR 38.1(a), held with one hand, not slung or hurled): the release is the javelin's last contact with any part of the robot after the hold ends (then 0.02 s free), with at most 0.2 s of unheld contact on the right arm in between; after it, brushes by the right arm in the 0.2 s grace may change its velocity by at most 0.5 m/s in all (the contact impulses, summed, over its mass). A model run's 21.2 m throw (the hold ended at 5.3 m/s, then batted by the opening hand to 20.8 m/s) fails: release at its last continuous contact (7.078 s, 8.6 m/s), then 'struck after the release' (5.1 m/s by contact at 7.109 s). Every rule above is judged in the family's own 1 ms substep hook.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
-[metadata.resources]
-# minimum compute to run this task (docs/protocol/README.md §2.9)
-min_cpus = 3.0
-min_memory_gb = 5.0
-min_gpu_memory_gb = 0.0
-gpu_required = false
-gpu_class = "none"
-verifier_min_cpus = 2.0
-verifier_min_memory_gb = 3.0
-verifier_min_gpu_memory_gb = 0.0
-measured = "author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client"
-
-[metadata.resources.limits]
-# agent-phase limits in GiB (docs/protocol/README.md §2.10); scope: trial = every container, agent = the agent's container;
-# enforced from protocol v1.2 when RCB_LIMITS_ENFORCE=1 (a violation fails the trial), otherwise recorded only
-scope = "agent"
-max_gpu_memory_gb = 0.0
-max_memory_gb = 8.0
-max_processes = 512
-max_disk_gb = 20.0
-disk_paths = ["/app", "/tmp", "/root"]
-disk_exclude = []
-sustain_sec = 60.0
-window_sec = 120.0
-trial_max_gpu_memory_gb = 0.0
-trial_max_memory_gb = 16.0
-measured = "author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default"
-
-[metadata.resources.caps]
-# docker caps per compose service, applied from protocol v1.2 (docs/protocol/README.md §2.10)
-main = { cpus = 4.0, memory_gb = 10.0, pids = 8192 }
-sim = { cpus = 4.0, memory_gb = 8.0, pids = 8192 }
-
 [metadata.seeds]
 # the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
@@ -82,7 +49,7 @@ timeout_sec = 900.0
 environment_mode = "separate"
 network_mode = "no-network"
 
-# Resource limits (docs/protocol/README.md §2.10): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -115,6 +82,7 @@ timeout_sec = 7200.0
 build_timeout_sec = 1800.0
 cpus = 4
 memory_mb = 10240
+storage_mb = 20480
 
 [verifier.environment]
 build_timeout_sec = 600.0

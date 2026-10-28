@@ -2,6 +2,7 @@
 # Python there that Kit imports at startup, so a cache the agent could write must never reach the grader.
 services:
   main:
+    x-gpu-memory-gb: 24   # rcb-monitor GPU memory cap, GiB (docs/protocol/README.md §6)
     shm_size: "8gb"
     volumes:
       - rcb_robolab_cache_trusted:/cache

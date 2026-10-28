@@ -31,18 +31,19 @@ grading replay, owner 2026-10-17); the video is rendered from the recorded attem
 clock starts at the first submit), reward 0. The
 rules: Two rope-turning machines stand 3.9 m apart, at y = -1.95 and +1.95 m; each turns the ends of two ropes on cranks 0.3 m long whose axles are 0.95 m above the floor, 0.4 m apart (one at x = +0.2 m, one at x = -0.2 m), at 1.1 turns per second each, the two ropes in opposite directions and half a turn apart, so that a rope passes under the middle every 0.4545 s, the two ropes taking turns: the rope at +x goes over the top towards -x and under the middle towards +x, the rope at -x the other way round. They are already turning at the start, and they never stop. You start outside the ropes and must enter them: the centre zone is within 0.35 m of x = 0 and 0.5 m of y = 0 (your pelvis decides). A jump counts when a rope passes under both your feet while nothing of you touches the ground and your pelvis is in the centre zone, if that rope has passed over your head since it last passed under you, and if it is not the same flight as the last counted jump (one rope per jump). You succeed when, after 10 counted jumps, your first contact with the floor is your feet only. You fail at once if a rope touches any part of you (a miss), if a rope passes under a foot that is on the ground or through you, if your pelvis leaves the centre zone after it has entered it, on a fall (your pelvis lower than 0.35 m, or any part of you other than your feet on the floor), on a landing after the last jump that is not on the feet, if you touch a turning machine, or after 25 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 1 GB | 1 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
+| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
 
-- GPU: required, any NVIDIA GPU; recommended: any NVIDIA GPU with EGL (RTX 4090 / L4).
+- GPU: any NVIDIA GPU, held by `sim`.
+- Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
 - Measured: as the standard twin, but the sidecar renders the cameras on the GPU over EGL (2026-10-14); the standard twin's author estimate (an RTX 4090 workstation, 2026-10-11): the sim sidecar steps the physics on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 4 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
 
 ## Details
 | | |

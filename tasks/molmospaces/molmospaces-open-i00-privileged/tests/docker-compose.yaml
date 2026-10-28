@@ -1,6 +1,7 @@
 # The verifier replays in MuJoCo and renders like the agent's environment (environment/docker-compose.yaml).
 services:
   main:
+    x-gpu-memory-gb: 7   # rcb-monitor GPU memory cap, GiB (docs/protocol/README.md §6)
     deploy:
       resources:
         reservations:

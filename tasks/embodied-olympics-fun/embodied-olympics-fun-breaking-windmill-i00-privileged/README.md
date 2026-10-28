@@ -25,18 +25,17 @@ None. No reference controller exists for this family yet: positive by injection 
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
 and both end in the same state. The rules: A windmill revolution is counted on your torso. Its long axis (from your pelvis up to your neck) must turn once round the vertical (360 degrees of heading) and in the same time your torso must roll once about that axis (back, shoulder, chest, shoulder, back towards the floor: at least 0.85 of a full roll per revolution), both the same way round. The turning and the rolling are counted only while you lie on the floor: your torso's long axis within 30.0 degrees of horizontal and your pelvis at most 0.45 m above the floor (on your head or your hands, upside down, nothing is counted). Your back, chest or shoulders (your torso or upper arms; your head does not count for this) must touch the floor in each half of each revolution. While you are doing windmills only your torso (back, chest, shoulders; your head, which is fixed to it, counts with it), your upper arms, forearms and hands may touch the floor: your hips and your legs (thighs, shins, feet) may not. The count starts when you are down (your back, chest or shoulders touching the floor with no foot on it) and goes back to zero whenever your hips or a leg touch the floor or the rotation reverses. You succeed when 3 revolutions are counted without such a reset. How you get down from standing is free (any part may touch the floor then). You fail if any part of you touches the floor outside the 8.0 m x 8.0 m field of play, or after 30 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | — | no GPU | — |
 
 - GPU: not needed.
 - Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured (caps): author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default
 
 ## Details
 | | |

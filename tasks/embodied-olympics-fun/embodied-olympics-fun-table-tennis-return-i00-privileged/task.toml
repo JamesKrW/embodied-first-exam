@@ -21,38 +21,6 @@ expert_time_estimate_hours = 10.0
 oracle = "none"
 oracle_evidence = "no reference solution; the referee is tested: No reference solution (the short service is over the robot's court for a few tenths of a second, 0.7-1.0 m inside the end line). Positive by a declared injection around a real contact: the robot holds the blade still over its end line with the paddle held by contact and friction in its own right Dex3-1 hand (a shakehand grip, the device's joint torques, no weld); after the machine's real service bounces on the robot's court the ball is put 0.10 m in front of the blade moving onto it at 3 m/s, and at the real strike it is moved 3 cm off the blade with a return's velocity (4.0, 0.3, 2.2) m/s; the flight over the net and the landing on the opponent's court are real; the hand's hold broken for at most 0.027 s, the handle at most 0.12 mm into the fingers; the same state hash twice. Negatives: nop (the short service bounces twice), touched before the service, obstruction, the trunk, a second strike, a block onto the robot's own court, the floor, the racket on the net, a fall. Realtime: physics-only RTF on the shared cluster 0.63 against 0.82-0.92 for a reference dynamic family whose workstation RTF is 3.07: about 1.5 (with a measured 2.4-times speed ratio between the two machines) to 2.2 (with the same run's reference) on the workstation.; human review in the pull request that adds the benchmark (PROTOCOL §2.7)"
 
-[metadata.resources]
-# minimum compute to run this task (docs/protocol/README.md §2.9)
-min_cpus = 2.0
-min_memory_gb = 4.0
-min_gpu_memory_gb = 0.0
-gpu_required = false
-gpu_class = "none"
-verifier_min_cpus = 2.0
-verifier_min_memory_gb = 3.0
-verifier_min_gpu_memory_gb = 0.0
-measured = "author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one"
-
-[metadata.resources.limits]
-# agent-phase limits in GiB (docs/protocol/README.md §2.10); scope: trial = every container, agent = the agent's container;
-# enforced from protocol v1.2 when RCB_LIMITS_ENFORCE=1 (a violation fails the trial), otherwise recorded only
-scope = "trial"
-max_gpu_memory_gb = 0.0
-max_memory_gb = 13.0
-max_processes = 512
-max_disk_gb = 20.0
-disk_paths = ["/app", "/tmp", "/root"]
-disk_exclude = []
-sustain_sec = 60.0
-window_sec = 120.0
-trial_max_gpu_memory_gb = 0.0
-trial_max_memory_gb = 13.0
-measured = "author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default"
-
-[metadata.resources.caps]
-# docker caps per compose service, applied from protocol v1.2 (docs/protocol/README.md §2.10)
-main = { cpus = 8.0, memory_gb = 16.0, pids = 8192 }
-
 [metadata.seeds]
 # the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
@@ -67,7 +35,7 @@ timeout_sec = 900.0
 environment_mode = "separate"
 network_mode = "no-network"
 
-# Resource limits (docs/protocol/README.md §2.10): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -87,6 +55,7 @@ timeout_sec = 7200.0
 build_timeout_sec = 1800.0
 cpus = 8
 memory_mb = 16384
+storage_mb = 20480
 
 [verifier.env]
 RCB_LIMITS_ENFORCE = "${RCB_LIMITS_ENFORCE:-0}"

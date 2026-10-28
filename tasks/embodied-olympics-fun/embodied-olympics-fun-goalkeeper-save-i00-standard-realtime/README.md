@@ -31,18 +31,19 @@ grading replay, owner 2026-10-17); the video is rendered from the recorded attem
 clock starts at the first submit), reward 0. The
 rules: You are the goalkeeper. You stand on the goal line, in the middle of the goal, facing the penalty mark 11.0 m in front of you (+x). The goal behind you is 7.32 m wide between the posts and 2.44 m high under the crossbar (posts and bar 0.12 m thick, on the goal line, the net 2.0 m deep). Three ball machines stand on the line through the penalty mark, 0.6 m apart (the middle one over the mark), their exits 0.6 m above the ground; each holds one size-5 football (0.22 m across, 0.43 kg, in air) and shoots it once, at 20.0 m/s with no spin: the first (on your right as you face them, at y = -0.6 m) is fed at 6.0 s and aimed at the point of the goal's plane -0.8 m to your left (negative: to your right) and 0.9 m above the ground; the middle one 9.0 s later, aimed at 0.8 m and 1.1 m; the third (on your left) 9.0 s after that, aimed at -0.5 m and 0.95 m. A shot is kicked when its ball leaves the machine's wheels (about 0.1 s after it is fed). At that moment (Law 14) you must be on your feet (nothing but the feet on the ground), with at least part of one foot touching or above the goal line between the posts, and touching neither the posts, the crossbar nor the net; otherwise you fail. After the kick you may move as you like and use any part of you: hands, arms, body, legs, no grip is needed, and you may go to ground. A goal is the whole ball over the goal line between the posts and under the crossbar; you fail at the first goal, by any of the three balls at any time (also a ball that comes back off you or the posts). A shot is saved when 2.5 s have passed since its kick without a goal; you succeed when all three are saved. You also fail if your pelvis leaves the goal area (5.5 m in front of the goal line, 9.16 m to each side of the goal's centre), if you touch a machine or a ball that has not yet been kicked, or after 27 s.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 1 GB | 1 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
+| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
 
-- GPU: required, any NVIDIA GPU; recommended: any NVIDIA GPU with EGL (RTX 4090 / L4).
+- GPU: any NVIDIA GPU, held by `sim`.
+- Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
 - Measured: as the standard twin, but the sidecar renders the cameras on the GPU over EGL (2026-10-14); the standard twin's author estimate (an RTX 4090 workstation, 2026-10-11): the sim sidecar steps the physics on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 4 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
 
 ## Details
 | | |

@@ -3,6 +3,7 @@
 # from the host's folder $RCB_ROBOWITS_BLENDERKIT (images/robowits/NOTICE).
 services:
   main:
+    x-gpu-memory-gb: 6   # rcb-monitor GPU memory cap, GiB (docs/protocol/README.md §6)
     shm_size: "2gb"
     volumes:
       - ${RCB_ROBOWITS_BLENDERKIT:?set RCB_ROBOWITS_BLENDERKIT to your BlenderKit model folder (images/robowits/NOTICE)}:/opt/robowits/assets/blender_kit:ro

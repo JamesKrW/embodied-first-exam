@@ -16,39 +16,6 @@ dynamics = "static"
 oracle = "full"
 expert_time_estimate_hours = 8.0
 
-[metadata.resources]
-# minimum compute to run this task (docs/protocol/README.md §2.9)
-min_cpus = 2.0
-min_memory_gb = 4.0
-min_gpu_memory_gb = 1.5
-gpu_required = true
-gpu_class = "any"
-recommended_gpu = "any NVIDIA GPU with EGL (RTX 4090 / L4)"
-verifier_min_cpus = 2.0
-verifier_min_memory_gb = 5.0
-verifier_min_gpu_memory_gb = 1.5
-measured = "oracle trials of all 60 directories, RTX 4090 workstation, 2026-10-21 (docker stats every 3 s; the rcb_monitor's NVML samples): the agent's container 1.9 GB (one Session replaying chess, no rendering), the verifier 3.9 GB (chess: two replays side by side, then the filmed one); a Session rendering three cameras 2.4 GB and 0.9 GiB of GPU memory (the spike, 2026-10-20); CPU 2.6-3.1 cores at peak"
-
-[metadata.resources.limits]
-# agent-phase limits in GiB (docs/protocol/README.md §2.10); scope: trial = every container, agent = the agent's container;
-# enforced from protocol v1.2 when RCB_LIMITS_ENFORCE=1 (a violation fails the trial), otherwise recorded only
-scope = "trial"
-max_gpu_memory_gb = 5.0
-max_memory_gb = 12.0
-max_processes = 512
-max_disk_gb = 10.0
-disk_paths = ["/app", "/tmp", "/root"]
-disk_exclude = []
-sustain_sec = 60.0
-window_sec = 120.0
-trial_max_gpu_memory_gb = 5.0
-trial_max_memory_gb = 12.0
-measured = "GPU: max(1.5 x 0.9, 0.9 + 4) GiB (a rendering Session 0.9 GiB); memory: several Sessions at once (2.4 GB each while rendering; the oracle trials' agent container 1.9 GB) under the 16 GiB cap by the monitor's margin; processes 512 and disk 10 GiB: design defaults"
-
-[metadata.resources.caps]
-# docker caps per compose service, applied from protocol v1.2 (docs/protocol/README.md §2.10)
-main = { cpus = 4.0, memory_gb = 16.0, pids = 8192 }
-
 [metadata.seeds]
 # the instances this task may run from (docs/protocol/README.md §2.13): the default, the ones a runner may draw
 # from (a list, { from = A, to = B } or "any"), and the ones the reference solution under solution/ is for
@@ -62,7 +29,7 @@ timeout_sec = 6000.0                # two side-by-side replays of at most 20,000
 environment_mode = "separate"
 network_mode = "no-network"
 
-# Resource limits (docs/protocol/README.md §2.10): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -82,6 +49,7 @@ allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.
 build_timeout_sec = 1800.0
 cpus = 4
 memory_mb = 16384
+storage_mb = 10240
 
 [verifier.env]
 RCB_LIMITS_ENFORCE = "${RCB_LIMITS_ENFORCE:-0}"

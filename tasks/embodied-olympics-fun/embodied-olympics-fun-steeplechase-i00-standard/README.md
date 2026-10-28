@@ -27,18 +27,18 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 `/data/final.json`: pass iff the live attempt succeeded. The
 rules: The hurdle is fixed (it does not move or topple): its top bar is 0.127 m square, 3.66 m wide, with its top 0.914 m above the track, on a post at each end. Its near face is 10.0 m ahead of where your pelvis starts. The water jump is 3.66 m long measured from the hurdle's near face, and 3.66 m wide, centred on your line: the pit is 0.5 m deep for the first 1.2 m and then slopes up evenly to the track's level at its far edge. There is no water in it. You must go over the hurdle: every time your pelvis or the centre of either foot crosses, going forward, the vertical plane through the middle of the top bar, that point must be higher than the bar's top (0.914 m), and your pelvis must also be between the two ends of the bar; otherwise you fail. You may go over the hurdle in any manner: your hands and feet may touch it or stand on it. Once your pelvis is beyond that plane and until your whole body is beyond the pit's far edge, you fail if your pelvis is outside the pit's width or if any part of you touches the track's surface beside the pit (a contact less than 0.05 m below the track's level; the pit's side walls below that may be touched). You may land in the pit or beyond it, and any part of you may touch the pit's floor and walls and the track before and beyond the pit: there is no fall rule. You succeed when your whole body is beyond the pit's far edge and you then stand for 1.0 s without a break: only your feet on the ground, your torso within 20.0 degrees of vertical, your pelvis moving no faster than 0.35 m/s. The attempt ends after 60 s of robot time. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
 
 - GPU: not needed.
 - Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
 
 ## Details
 | | |

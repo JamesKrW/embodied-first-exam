@@ -25,18 +25,17 @@ Neither built-in gait can jump: the robot must hop again and again, in time with
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
 and both end in the same state. The rules: Two rope-turning machines stand on the turners' spots, 3.6 m apart, one on each side of you (on the y axis, at y = -1.8 and +1.8 m); they turn a 6.0 m rope, 0.01 m thick, tied 1.4 m from each end to the tip of a crank arm, at a steady 1.0 revolutions per second: each tip goes round a vertical circle of 0.4 m radius, 1.0 m above the floor, 0.4 m in front of its machine's spot, driven by a motor of at most 10.0 N m. The rope goes over your head from behind you to the front, down in front of you and under you towards your back; it is already turning at the start. A jump counts when the rope passes under both your feet while nothing of you touches the ground (at the moment it passes under each foot), after it has passed over your head since the last counted jump (one jump per turn of the rope). You succeed when, after 10 counted jumps, the first contact with the floor is your feet only and you then stand still for 0.5 s (only your feet on the floor, your torso within about 20 degrees of vertical, your pelvis slower than 0.35 m/s): the turners keep turning, so this has to be done before the rope comes round again, and it must not touch you until then. You fail at once if the rope touches any part of you (a miss: the machines do not stop), if your pelvis leaves the centre zone (within 0.5 m of the rope's axis forwards and backwards and 0.5 m of the middle between the machines sideways), if the rope passes under a foot that is on the ground or through you, on a fall (your pelvis lower than 0.35 m, or any part of you other than your feet on the ground), on a landing that is not on the feet after the last jump, or after 20 s.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | — | no GPU | — |
 
 - GPU: not needed.
 - Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured (caps): author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default
 
 ## Details
 | | |

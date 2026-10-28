@@ -4,6 +4,7 @@
 # never reach the grader. The first replay compiles shaders into it, the second reuses it.
 services:
   main:
+    x-gpu-memory-gb: 30   # rcb-monitor GPU memory cap, GiB (docs/protocol/README.md §6)
     environment:
       OMP_NUM_THREADS: "8"
       MKL_NUM_THREADS: "8"

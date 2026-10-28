@@ -1,6 +1,7 @@
 # The verifier rebuilds the scene and replays in SAPIEN, which needs a Vulkan device (the NVIDIA GPU); physics is CPU PhysX.
 services:
   main:
+    x-gpu-memory-gb: 5   # rcb-monitor GPU memory cap, GiB (docs/protocol/README.md §6)
     deploy:
       resources:
         reservations:

@@ -27,18 +27,18 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 `/data/final.json`: pass iff the live attempt succeeded. The
 rules: You stand facing the goal (+x), 0.3 m behind the pass line: the line through the penalty mark parallel to the goal line, which is 11.0 m beyond it. The goal is 7.32 m wide between the posts and 2.44 m high under the crossbar (posts and bar 0.12 m thick), centred on the line you face along; there is no goalkeeper. A size-5 football (0.22 m across, 0.43 kg, in air) rests against a gate on a wooden ball ramp: the ramp's foot is on the pass line 4.0 m to your left, it rises away from you at 20.0 degrees (curving into the grass at its foot) and the ball waits 1.2 m up it. At 2.0 s a servo swings the gate open; the ball rolls down the ramp and along the pass line from your left to your right. The shot is the ball's first contact with you after the release: with a foot or an ankle of yours (the parts below the shin), while the ball's centre is between the lines of the two posts (7.32 m wide, measured across the pass). Every contact within 0.15 s of the first belongs to the one touch, which is over when the ball has been clear of you for 0.03 s; it must be a shot: the ball's speed when it leaves your foot is at least 1.0 times its speed just before the foot touched it, and it is moving towards the goal line. You succeed at the moment the whole ball is then over the goal line between the posts and under the bar; after the shot it may touch the ground, the posts and the bar. You fail if any part of you other than a foot or an ankle touches the ball at any time, if the first touch is outside the lines of the posts, if the touch lasts longer than 0.15 s, if the ball leaves the foot slower than that or not towards the goal line, if you touch the ball again after the shot, if the pass rolls past the line of the far post untouched, if the whole ball crosses the goal line outside the goal, if after the shot the ball has been slower than 0.1 m/s for 1.0 s, if you touch the ramp or its gate, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 15 s.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
 
 - GPU: not needed.
 - Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
 
 ## Details
 | | |

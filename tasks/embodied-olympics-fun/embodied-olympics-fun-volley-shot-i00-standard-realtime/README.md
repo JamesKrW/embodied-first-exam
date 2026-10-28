@@ -31,18 +31,19 @@ grading replay, owner 2026-10-17); the video is rendered from the recorded attem
 clock starts at the first submit), reward 0. The
 rules: You stand on the penalty mark, facing the goal; the goal line is 11.0 m ahead of you. The goal is 7.32 m wide between the posts and 2.44 m high under the crossbar (posts and bar 0.12 m thick), centred on the line you face along. A goalkeeper dummy, a board 1.9 m high, 0.6 m wide and 0.3 m thick (80.0 kg), stands on the goal line at the centre of the goal: it runs on a rail and a motor holds it there (a ball that hits it pushes it aside a little). A size-5 football (0.22 m across, 0.43 kg, in air) waits in a ball machine on the left wing, 20.0 m from you, and about 3.0 s after the start the machine crosses it: a lofted ball with backspin that comes down in front of you. The volley is the ball's first contact after the cross: with a foot or an ankle of yours (the parts below the shin), before the ball has touched the ground. Every contact within 0.15 s of the first belongs to the one strike, which is over when the ball has been clear of you for 0.03 s; and it must be a strike: the ball's speed when it leaves your foot is at least 1.0 times its speed just before the foot touched it. You succeed at the moment the whole ball is then over the goal line between the posts and under the bar; after the strike it may touch the ground, the posts, the bar and the dummy. You fail if the ball touches the ground before your strike, if any part of you other than a foot or an ankle touches the ball at any time, if the strike's contacts last longer than 0.15 s, if the ball leaves the foot slower than that, if you touch the ball again after the strike, if the whole ball crosses the goal line outside the goal, if after the strike the ball has been slower than 0.1 m/s for 1.0 s, if your pelvis comes within 9.15 m of the ball machine before the cross has left it, if you touch the machine or the waiting ball, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 10 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 1 GB | 1 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
+| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
 
-- GPU: required, any NVIDIA GPU; recommended: any NVIDIA GPU with EGL (RTX 4090 / L4).
+- GPU: any NVIDIA GPU, held by `sim`.
+- Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
 - Measured: as the standard twin, but the sidecar renders the cameras on the GPU over EGL (2026-10-14); the standard twin's author estimate (an RTX 4090 workstation, 2026-10-11): the sim sidecar steps the physics on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 4 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
 
 ## Details
 | | |

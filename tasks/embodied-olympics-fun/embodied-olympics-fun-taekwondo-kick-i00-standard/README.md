@@ -27,18 +27,18 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 `/data/final.json`: pass iff the live attempt succeeded. The
 rules: A body-opponent dummy stands free on the floor in front of you: a heavy round base (0.61 m across, 0.5 m high, 122.0 kg, friction 0.5 on the floor) carrying on a stem a torso (0.36 m wide, 0.22 m deep, from 0.74 m up, 8.0 kg) and a head, 1.52 m tall in all, one rigid body. Its torso wears a taekwondo trunk protector, 0.32 m wide and 0.04 m thick, from 0.78 m to 1.12 m above the floor, facing you; the front of the protector is 0.58 m in front of your pelvis. Your first touch of the dummy is your kick: it must be made with a foot (the part below the ankle; your lower leg counts only where it lies over the foot and below the ankle joint) and must land on the protector. It is an impact, not a push: the touch lasts at most 0.05 s (it ends when foot and dummy have been apart for 0.03 s), and during it the protector must receive an impulse of at least 7.2 N s (the sum of the contact forces on it over the touch). After a valid kick you succeed when you stand for 2.0 s without a break, clear of the dummy: both feet and nothing else on the floor, the torso within about 20 degrees of upright, the pelvis slower than 0.35 m/s. You fail if any other part of you touches the dummy, if the kick lands anywhere but on the protector, is too weak or is a push, if after the kick any part of you other than a foot touches the dummy (a foot may touch it again but scores nothing more), if you fall (your pelvis lower than 0.35 m above the floor, or any part of you other than the feet on the floor), or after 15 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §2.7).
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 3 | 2 |
-| Memory | 5 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
+| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| verifier (as `main`) | 4 | 10 GiB | — | no GPU | — |
 
 - GPU: not needed.
 - Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 8 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 16 GiB memory. Limits measured: author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured (caps): author estimate: no trials yet; the agent's container 8 GiB under its 10 GiB cap; whole trial: + the sim service's 8 GiB cap; disk 20 GiB for downloaded tools and controllers; processes 512: design default
 
 ## Details
 | | |

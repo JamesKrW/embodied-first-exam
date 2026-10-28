@@ -1,6 +1,7 @@
 # The verifier replays in the simulator, which needs the GPU (CuRobo import + Vulkan rendering for the video).
 services:
   main:
+    x-gpu-memory-gb: 13   # rcb-monitor GPU memory cap, GiB (docs/protocol/README.md §6)
     shm_size: "8gb"
     deploy:
       resources:

@@ -1,6 +1,7 @@
 # The verifier replays in the simulator, which needs the GPU for Genesis' EGL cameras (the replay video).
 services:
   main:
+    x-gpu-memory-gb: 6   # rcb-monitor GPU memory cap, GiB (docs/protocol/README.md §6)
     shm_size: "2gb"
     deploy:
       resources:

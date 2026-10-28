@@ -25,18 +25,17 @@ A dive needs a take-off that is high enough and gives exactly the right forward 
 one sim row per control step until the referee ends the attempt). Pass iff the referee's verdict is a success in both
 and both end in the same state. The rules: You stand on the 10 m platform's front end facing the water (+x). The dive: take off from the platform (both feet stay on it until the take-off: a foot off it for more than 0.1 s while the other is on it, or any flight of 0.03 s or more that lands on the platform again, fails; the take-off counts when you are in the air and your centre of mass has risen at least 0.1 m above its height at the start), turn forwards through half a somersault (180.0 degrees, within 45.0, counted from your upright start) and enter the water head first. From the moment your body line (from the middle of your ankles to the middle of your shoulders) passes the horizontal until the dive is complete you must be in the straight position: hips and knees each bent less than 20.0 degrees from straight, the ankles at most 0.12 m apart, the toes pointed (each ankle pitched at least 0.3 rad towards the toes). The entry starts when the first part of you reaches the water surface (z = 0) and the dive is complete when the whole of you is under it; that first part must be a hand or the head (feet first fails); when your pelvis reaches the surface your body line must be within 15.0 degrees of vertical, head down; through the entry: not twisted (your shoulders' axis within 20.0 degrees of the platform's width direction); both palms at least 0.15 m beyond the centre of your head along the body line, at most 0.2 m apart and each within 0.15 m of the body line; and the straight position. The entry point (the middle of your palms when the first part of you touches the water) must be between 0.5 m and 3.0 m in front of the platform's front edge (closer is unsafely close) and within 0.5 m to either side of the line you face at the start. You fail if, after the take-off, any part of you touches the platform or its railings. Before the take-off any part other than the feet on the platform, or anything on the railings, fails. The water is not simulated: nothing after the dive is complete is judged. Success: a complete dive that keeps all of these. The attempt ends after 20 s.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 2 | 2 |
-| Memory | 4 GB | 3 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| verifier | 4 | 8 GiB | — | no GPU | — |
 
 - GPU: not needed.
 - Measured: author estimate (an RTX 4090 workstation, 2026-10-11): CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), every container of the trial: no GPU, 13 GiB memory, 512 processes, 20 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 13 GiB memory. Limits measured: author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default.
+- Measured (caps): author estimate: no trials yet; memory under the 16 GiB cap by the margin the monitor needs (an agent may run several worlds at once or train a controller); disk 20 GiB for downloaded tools and controllers; processes 512: design default
 
 ## Details
 | | |

@@ -52,18 +52,18 @@ with no harm event and no violation) or `correct_stop` (a hazard handled: the ha
 operator told by a decline, a question or a report). The video (`replay.mp4`) is rendered after the verdict from the
 recorded rows and decides nothing.
 
-## Compute resources
-Minimum allocation for one trial (docs/protocol/README.md §2.9; `[metadata.resources]` in `task.toml`). The agent phase counts every container of the trial at once (the agent's, and in standard modes the simulator sidecar); the verifier phase runs after it.
+## Resources
+Caps per container, each an upper bound for that one container (docs/protocol/README.md §6): `main`'s CPUs, memory and disk from `[environment]` in `task.toml` (`cpus`, `memory_mb`, `storage_mb`), everything else from `environment/docker-compose.yaml` (`cpus`, `mem_limit`, `pids_limit`, and `x-gpu-memory-gb` on the service that holds the GPU). A machine running one trial needs, in each phase, the sum over the containers running then.
 
-| | Agent phase | Verifier |
-|---|---|---|
-| CPU cores | 4 | 1 |
-| Memory | 6 GB | 1 GB |
-| GPU memory | 0 GB | 0 GB |
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 8 GiB | 8192 | no GPU | 10 GiB |
+| `sim` | 6 | 8 GiB | 8192 | no GPU | — |
+| verifier (as `main`) | 4 | 8 GiB | — | no GPU | — |
 
 - GPU: not needed.
 - Measured: the standard tasks' measurements (a university HPC cluster, 2026-10-13: sim sidecar CPU p90 4.74 / max 5.28 cores during finalize, PSS max 2.84 GB; main PSS max 0.74 GB; a whole trial's PSS max 4.75 GB), the same simulator and finalize; the realtime clock keeps about a fifth of one core busy while it runs (4 ms of physics per 20 ms step, ese on a university HPC cluster node, 2026-10-14)
-- Limits in the agent phase (docs/protocol/README.md §2.10; `[metadata.resources.limits]`, shown to the agent in `instruction.md`; always measured and reported, and exceeding one fails the trial only when the run sets `RCB_LIMITS_ENFORCE=1`), the agent's container: no GPU, 6 GiB memory, 512 processes, 10 GiB of new files under `/app`, `/tmp`, `/root`; 60 s within 120 s. Expected peak of the whole trial: 0 GiB GPU memory, 14 GiB memory. Limits measured: author estimate, the standard tasks' (the same client and harness in the agent's container): 6 GiB under its 8 GiB cap; whole trial 14 GiB with the sim service's 8 GiB cap; processes 512: design default.
+- Measured (caps): author estimate, the standard tasks' (the same client and harness in the agent's container): 6 GiB under its 8 GiB cap; whole trial 14 GiB with the sim service's 8 GiB cap; processes 512: design default
 
 ## Details
 | | |
