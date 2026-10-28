@@ -370,9 +370,9 @@ the recipe every task builds from public sources.
 ## Standard-mode service details
 
 Resume class `approx` (OmniGibson declares rollouts nondeterministic; measured: live = fresh replay, so it normally
-resumes exactly). The record dir is `RCB_DATA=/out` (`/data` is its dataset). Its service states no
-`max_frames_per_call` yet. A frame's `extrinsic_cv` is the pose it was rendered with, the proprio row the state at
-`frame_step`.
+resumes exactly). The record dir is `RCB_DATA=/out` (`/data` is its dataset). One call returns at most 902 frames
+per camera (`ee_pose`: `meta.frames_skipped`). A frame's `extrinsic_cv` is the pose it was rendered with, the proprio
+row the state at `frame_step`.
 
 | | |
 |---|---|

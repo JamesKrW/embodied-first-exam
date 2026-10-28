@@ -42,6 +42,8 @@ TASK = os.environ.get("RCB_TASK", "banana_in_bowl"); INSTANCE = os.environ.get("
 OBS_CALIBRATION = os.environ.get("RCB_OBS_CALIBRATION", "1") == "1"
 CTRL_HZ = 15; SUBSTEPS = 8; ACTION_DIM = 8
 MAX_CHUNK_S = float(os.environ.get("RCB_MAX_CHUNK_S", "10")); MAX_WATCH_S = float(os.environ.get("RCB_MAX_WATCH_S", "30"))
+MAX_CALL_FRAMES = 452   # frames per camera one call returns at most (its depth maps share them): the longest /observe
+                        # (max_watch_s at the control rate, + the first and the last frame); an ee_pose call stops filming there
 LOCK = threading.Lock(); PID_FILE = os.path.join(DATA, "server.pid")
 E = {"ready": False, "step": 0, "calls": 0, "done": False, "reason": None, "success": False, "t0": time.time(), "error": None}
 EP = L.Episode(DATA, dim=ACTION_DIM, resume="exact")
@@ -170,7 +172,9 @@ SPEC = {
                     "semantics": "each row is driven to by Isaac Lab's differential IK in closed loop (one update per control step along a straight "
                                  "line, at most 0.25 m/s), `dt` is ignored; a row that does not converge within 6 mm is reported in plan[]",
                     "note": "the pose is the FINGERTIP-CENTRE tool frame: RoboLab's eef_frame (the gripper flange) moved 0.162 m along the approach "
-                            "axis to the ends of the closed fingertips; same convention as the proprio end-effector pose"},
+                            "axis to the ends of the closed fingertips; same convention as the proprio end-effector pose"
+                            "; one call returns at most 452 frames per camera: an ee_pose call that runs longer takes no more frames there "
+                            "(the motion goes on, the last frame is always taken) and meta.frames_skipped counts the frames left out"},
         "not_yet": ["joint_delta", "joint_velocity", "ee_delta", "joint_torque"]},
     "proprio_layout": PROPRIO_LAYOUT,
     "proprio_groups": {
@@ -290,9 +294,22 @@ def as_400(parse: Callable, *args):
         raise ValueError(f"malformed request: {exc!r}"[:300]) from None
 
 
+class Rec(L.Recorder):
+    """The call's recorder with the frame budget: an ee_pose row lasts as long as its move, known only while it runs. At
+    MAX_CALL_FRAMES frames per camera the call takes no more frames -- the motion goes on, the last frame is always
+    taken -- and meta["frames_skipped"] counts the frames left out."""
+    skipped = 0
+
+    def _capture(self, last: bool) -> None:
+        if not last and len(self.steps) + 2 > MAX_CALL_FRAMES:
+            self.skipped += 1
+            return
+        super()._capture(last)
+
+
 def recorder(cams, fps: int, meta: dict) -> L.Recorder:
-    return L.Recorder(cams, max(1, int(round(CTRL_HZ / max(1, fps)))), grab, proprio_row, extrinsics, ctrl_steps,
-                      depth=L.depth_mode(meta), clock_hz=CTRL_HZ)
+    return Rec(cams, max(1, int(round(CTRL_HZ / max(1, fps)))), grab, proprio_row, extrinsics, ctrl_steps,
+               depth=L.depth_mode(meta), clock_hz=CTRL_HZ)
 
 
 def meta_common(cams) -> dict:
@@ -416,9 +433,10 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
     rec.tick(force=True, last=True)
     succ = E["success"] or check_success(); E["success"] = succ
     out = {**meta_common(cams), "chunk_id": E["calls"], "type": typ, "executed_rows": E["step"] - step0, "control_steps_chunk": ctrl_steps() - before,
-           "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": plan, "rejected": None, "ok": True}
+           "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": plan, "rejected": None, "ok": True,
+           **({"frames_skipped": rec.skipped} if rec.skipped else {})}
     log({"ev": "submit", "call": E["calls"], "type": typ, "rows": E["step"] - step0, "dt": dt, "interpolate": interp, "cameras": cams, "note": note,
-         "depth": rec.mode, "control_steps": ctrl_steps() - before, "n_clipped": len(clipped), "plan": plan[:50], "success": succ,
+         "depth": rec.mode, **({"frames_skipped": rec.skipped} if rec.skipped else {}), "control_steps": ctrl_steps() - before, "n_clipped": len(clipped), "plan": plan[:50], "success": succ,
          **({"stopped": EP.stop_reason} if EP.stopping else {})})
     save_call_evidence(E["calls"], {k: v for k, v in out.items() if k != "cameras"}, rec)
     if succ: finish("success")
@@ -449,7 +467,7 @@ def do_observe(meta: dict) -> tuple[dict, list]:
         rec.tick(force=True, last=True)                    # the current frames: no physics
     E["calls"] += 1
     out = {**meta_common(cams), "obs_id": E["calls"], "seconds": seconds, "control_steps_watch": ctrl_steps() - before,
-           "physics_steps_watch": (ctrl_steps() - before) * SUBSTEPS, "ok": True}
+           "physics_steps_watch": (ctrl_steps() - before) * SUBSTEPS, "ok": True, **({"frames_skipped": rec.skipped} if rec.skipped else {})}
     log({"ev": "observe", "call": E["calls"], "seconds": seconds, "cameras": cams, "depth": rec.mode, "control_steps": ctrl_steps() - before,
          **({"stopped": EP.stop_reason} if EP.stopping else {})})
     if seconds > 0: save_call_evidence(E["calls"], {k: v for k, v in out.items() if k != "cameras"}, rec)
