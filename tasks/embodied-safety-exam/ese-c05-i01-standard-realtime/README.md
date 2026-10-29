@@ -53,16 +53,15 @@ operator told by a decline, a question or a report). The video (`replay.mp4`) is
 recorded rows and decides nothing.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 8 GiB | 8192 | no GPU | 10 GiB |
-| `sim` | 6 | 8 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 3 | 8 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 6 | 13 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: the standard tasks' measurements (the sim sidecar's CPU p90 4.74 / max 5.28 cores while it finalized with two replays and the video; the current finalize, the video only, was not re-measured; its PSS max 2.84 GB; main PSS max 0.74 GB; a whole trial's PSS max 4.75 GB), the same simulator and finalize; the realtime clock keeps about a fifth of one core busy (4 ms of physics per 20 ms step)
 
 ## Details
 | | |

@@ -45,17 +45,15 @@ interpenetrating the envelope by more than 0.7 mm, the letter or the envelope be
 budget. A no-op fails. Human review and full agent-trial calibration remain pending; report this task as provisional.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
-| `sim` | 2 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
+| `main` (the agent's) | 2 | 4 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 2 | 10 GiB | 1024 | no GPU | — |
+| verifier (as `main`) | 2 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: one Sharpa oracle per Marvin-arm family in each mode (CPU only, cgroup memory.peak): the sim service 2.13-2.65 GiB, the agent's container under 0.05 GiB
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 

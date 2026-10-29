@@ -32,7 +32,7 @@ timeout_sec = 3600.0              # two fresh replays of at most 72,000 control 
 environment_mode = "separate"     # verifier runs in its own sandbox (tests/Dockerfile); the agent container is gone by then
 network_mode = "no-network"       # PROTOCOL H.6: the verifier has no network
 
-# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (PROTOCOL §6): seal the monitor's record first.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -46,7 +46,7 @@ allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.
 [environment]
 build_timeout_sec = 1800.0
 cpus = 8
-memory_mb = 20480
+memory_mb = 12288
 storage_mb = 10240
 
 [verifier.environment]

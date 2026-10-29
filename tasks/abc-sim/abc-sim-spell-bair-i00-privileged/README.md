@@ -25,7 +25,7 @@ A hand-built trajectory (scripted inverse kinematics on the grasp frame, top-dow
 `/opt/abc-tools/grade.py` in a separate sandbox without network: two replays of `/app/output/trajectory.npz`, each in a fresh process (side by side), from the verifier's own copy of the instance (`tests/instance.npz`; the rebuilt start state is checked against its recorded hash); pass iff both episodes end in success in the same state (`deterministic`). `nop`: no trajectory, reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
@@ -34,8 +34,6 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 - GPU: any NVIDIA GPU, held by `main`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
-- Measured: oracle trials of all 60 directories on an RTX 4090 workstation (docker stats every 3 s, the trial's resource monitor): the agent's container 1.9 GB (one Session replaying chess, no rendering), the verifier 3.9 GB (chess: two replays side by side, then the filmed one); a Session rendering three cameras 2.4 GB and 0.9 GiB of GPU memory; CPU 2.6-3.1 cores at peak
-- Measured (caps): GPU memory: a rendering Session 0.9 GiB -> max(1.5 x peak, peak + 4), rounded up: 5 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

@@ -25,16 +25,14 @@ None. Solvability evidence: no positive example yet (two model attempts failed: 
 `tests/grade.py` in a separate sandbox without network: two replays of `/app/output/trajectory.npz`, each in a fresh process, from the verifier's own copy of the instance (`tests/instance.npz`; the rebuilt start state is checked against its recorded hash); pass iff both episodes end in success (the challenge's own success event) in the same state (`deterministic`). No oracle; human review in PR #65. `nop`: no trajectory, reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 12 GiB | 8192 | no GPU | 10 GiB |
+| `main` (the agent's) | 4 | 12 GiB | 4096 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: privileged container median 6.2 GB, verifier 1.4 GB (a per-container memory sampler); CPU only; CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

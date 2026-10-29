@@ -24,17 +24,15 @@ The agent has to find the fixtures and objects in the robot's camera images, dri
 The sim service judges the live episode when the agent's time is up (the environment's success check on the state after the last executed control step; nothing is replayed) and writes the verdict, final at once; `tests/grade.py` (separate sandbox, no network) reads its `final.json` (`graded_by = live`): `success = live_success ∧ not solved at the start ∧ no simulator error`. The episode's start is checked against the frozen instance before the agent is served (`RCB_INSTANCE_SHA`, `RCB_START_SHA`; a mismatch is an infrastructure failure, `instance_mismatch`). The video is rendered from the trajectory after the verdict (one render pass) and never decides it.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 6 | 14 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 4 | 6 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 4 | 10 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: sim p90 5.6 GB (a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

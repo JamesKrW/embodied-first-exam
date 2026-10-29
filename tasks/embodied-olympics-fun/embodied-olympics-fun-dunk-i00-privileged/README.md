@@ -26,16 +26,14 @@ one sim row per control step until the referee ends the attempt). Pass iff the r
 and both end in the same state. The rules: The basket (official size, lowered): a rigid ring of 0.45 m inner diameter (0.018 m metal), its top edge 2.39 m above the floor, its centre 0.375 m in front of a backboard 1.8 m wide and 1.05 m high whose lower edge is 2.24 m above the floor. The ball is a size-7 basketball (0.239 m across, 0.62 kg, it keeps 0.85 of its speed in a bounce on the floor). Your hands are five-finger hands; the ball starts held between them, the palms pressed on its sides and the hands open, and only the hands' contact and friction hold it; it can slip out. A hand is on the ball while it touches the ball, gaps shorter than 0.03 s included (a hand is the palm, the fingers and the wrist); the ball is in your hands while at least one hand is on it. The ball must stay in your hands from the start until its centre has gone down into the ring: no dribble, no throw, no drop. The dunk: the ball's centre goes down through the ring's plane inside the ring while both hands are on the ball, and on down to one ball diameter below the ring (in the hands, or let go once its centre is inside the ring). The ball may not pass up through the ring first: a ball whose centre comes up through the ring from below is a violation. Travelling: while the ball is in your hands you may take at most 2 steps. A step is a foot touching the floor after it has been off it for at least 0.03 s; both feet landing within 0.03 s of each other are one step; the same foot may not touch down twice in a row; a foot on the floor may not slide more than 0.2 m from where it stood or was put down; after that no foot may touch the floor again until the ball is through the ring. Hanging on the ring: you may touch the basket (the ring, its plate, the backboard) with any part of you for at most 0.3 s in all. After the dunk let go of the ball (no hand on it) and stand: for 1.0 s without a break only your feet touch the ground, your torso is upright (the cosine of its tilt at least 0.94) and your pelvis moves slower than 0.35 m/s. Then you have succeeded. You fail if the ball leaves your hands before its centre has entered the ring; if the ball touches the floor before the dunk; if the ball goes through the ring after an entry at which not both hands were on it (a one-hand dunk, a tip, a shot or a drop); if, let go inside the ring, it touches the floor without having gone through; if the ball comes up through the ring from below; if you travel; if you hang on the ring; if you fall at any time (a fall: your pelvis lower than 0.35 m above the floor, or any part of you other than your feet on the floor); or after 15 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| `main` (the agent's) | 8 | 16 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

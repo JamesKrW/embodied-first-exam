@@ -36,17 +36,15 @@ initial state and compiled model hashes) when it is built, and its start state w
 never changes it.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 15 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 4 | 5 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 4 | 11 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: sim p90 6.9 GB (a per-container memory sampler); CPU only; CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

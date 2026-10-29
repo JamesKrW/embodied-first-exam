@@ -24,16 +24,14 @@ Retargeted by PR #4 from official demonstration episode 0 (`demo_0`, 729 recorde
 `tests/grade.py` in a separate sandbox without network: two replays in fresh processes from the verifier's own copy of the instance; `success = deterministic ∧ success on the final state ∧ not solved at the start`. Reference: two fresh-process replays end in the live run's state (hash `51b0c9b3032c…`) and succeed. `nop`: no trajectory, reward 0; the instance is not solved at the start.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 20 GiB | 8192 | no GPU | 10 GiB |
+| `main` (the agent's) | 4 | 20 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 16 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: privileged container p90 7.2 GB (a per-container memory sampler); CPU only (OSMesa cameras); CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

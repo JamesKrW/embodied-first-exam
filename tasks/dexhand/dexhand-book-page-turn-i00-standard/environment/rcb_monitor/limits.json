@@ -4,13 +4,13 @@
   "main": {
    "cpus": 2.0,
    "disk_gb": 10.0,
-   "memory_gb": 10.0,
-   "pids": 8192
+   "memory_gb": 4.0,
+   "pids": 1024
   },
   "sim": {
    "cpus": 2.0,
-   "memory_gb": 8.0,
-   "pids": 8192
+   "memory_gb": 10.0,
+   "pids": 1024
   }
  },
  "disk_gb": 10.0,

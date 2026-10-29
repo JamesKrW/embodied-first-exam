@@ -137,18 +137,73 @@ as every container has its caps. A rule is a `[[cap]]` table:
   (`rcb_monitor` aside). `main` = { `cpus` (whole), `memory_gb`, `pids`, `disk_gb` }; every other service = { `cpus`,
   `memory_gb`, `pids` }; `gpu_memory_gb` on, and only on, a service that reserves a GPU. Memory, disk and GPU memory are
   in GiB; memory and disk a whole number of MiB (a multiple of 1/1024 GiB), since they are written in MiB.
-- optional: `gpu_types` (written to `[environment]`), `recommended_gpu`, `measured` (what the task was measured to use)
-  and `caps_measured` (where the GPU-memory and disk caps come from), each shown in the task README's `## Resources`
-  (`gpu_types` as its `GPU:` line).
+- optional: `gpu_types` (written to `[environment]`) and `recommended_gpu`, each shown in the task README's
+  `## Resources` (`gpu_types` as its `GPU:` line); `measured` (what the benchmark was measured to use) and
+  `caps_measured` (the measured peaks the caps come from), kept in the rules file only.
 
-Docker enforces CPU (a throttle), memory (the kernel's OOM killer) and processes. Docker caps neither GPU memory nor disk
-on a local host (a cloud backend may apply `storage_mb`): the resource monitor measures both and enforces them only when
-the run sets `RCB_LIMITS_ENFORCE=1` (off by default). The GPU-memory cap it enforces is that of the one GPU service in
-its scope (main, and in privileged mode the services the agent drives; at most one of them holds a GPU); a scope without
-a GPU has no GPU-memory cap, and GPU memory seen there anyway is only recorded. The `x-gpu-memory-gb` of a recorded
-service (a standard mode's simulator sidecar, RoboPaint's scorer) and of the verifier is a cap stated for the reader:
-nothing measures it against that cap. The agent reads its own container's caps in `## Resources` (§5) and in
-`/run/rcb-limits/usage.json`. Placing trials, enforcement and the reward fields: running.md "Resources".
+How a rule's caps are chosen from measurements (the provenance in `caps_measured`). From the peaks seen: memory the
+larger of 1.5 × the peak and the peak plus a margin (+2 GiB for main, +3 GiB for another service); GPU memory the larger
+of 1.5 × the peak and the peak + 2 GiB, at least 16 GiB for Isaac Sim; CPU at least every reading, on hosts that applied
+the cap and on hosts that did not, and a simulator that runs in real time keeps the CPU its slowdown was measured with;
+processes and threads a power of two at least 2 × the peak thread count (4 × for Isaac Sim, whose thread count follows
+the host's cores), at least 1024; disk at least 10 GiB. The peaks never raise a cap above the rule's earlier cap, for
+any resource: such a cap stays where it was. A cap with no per-container measurement is kept at the earlier cap. From
+the largest call the task allows: a simulator service that builds a response of frames in memory gets at least its
+resident size + 1.2 × what building the largest legal response holds, in whole GiB, and 2 GiB more where that leaves no
+margin over thin data. A cap may be set above what the peaks give only by (a) this largest-call rule, (b) kernel OOM
+kills recorded at the earlier cap, or (c) an owner's decision, which may also set a cap below. `caps_measured` names
+which one applies.
+
+**Who enforces a cap.** The container's runtime first: Docker and Harbor apply what the host lets them (the table).
+The resource monitor (the `rcb_monitor` sidecar) reads each container's own cgroup limits (`cpu.max`, `memory.max`,
+`pids.max`, or their cgroup v1 equivalents) at every sample (every 5 s; disk once a minute). A cap the runtime holds at
+the cap or below is the runtime's, and the monitor only records it. A cap whose limit is missing or higher than the cap
+(disk and GPU memory always) is enforced by the monitor when the run-time switch `RCB_LIMITS_ENFORCE` is `1` (the
+backstop), and only recorded when it is `0` (the default). The monitor acts on main and, in privileged mode, on the
+services the agent drives, the way Docker would. Who enforced each cap of each container is in the record
+(`enforced_by`, running.md "Resources"). A measurement is over a cap above cap × (1 + `RCB_LIMITS_TOLERANCE`, default
+0.05: sampling noise). A count of processes and threads is over above the cap itself, in two samples in a row (one alone
+can be a burst between samples). The benchmark's own services (a standard mode's simulator sidecar, RoboPaint's `scorer`)
+are recorded only, in both settings.
+
+The monitor never kills PID 1 of a container or what started with it. It kills a process only when that process still
+has the start time it was measured with and is still in the trial's container (through a pidfd where the kernel has
+them; elsewhere the check is made again right before each signal). What it cannot observe it records and never acts
+on: a process whose GPU memory NVML does not report, NVML's process IDs when the monitor is not in the host's PID
+namespace, or open files it cannot read. Neither setting changes the grade. A killed process ends like any process that dies, the trial may
+fail for it, and the grader judges what the agent left. Going over a cap is recorded (`limits_violation_observed`,
+running.md "Resources").
+
+| Resource | Docker / Harbor on a cgroup v2 Docker host | Hosts where they do not | Monitor backstop (a cap the runtime does not hold, `RCB_LIMITS_ENFORCE=1`) |
+|---|---|---|---|
+| CPU (`cpus`) | a throttle (CFS quota) | rootless podman without a delegated cgroup: none | writes the cap as the container's own CPU quota where its cgroup can be written, and puts the old value back after. Else it duty-cycles the container's processes with `SIGSTOP` / `SIGCONT` (100 ms periods) while their demand is above the cap. It resumes only the processes it stopped: a process found stopped that it did not stop last is never signalled again. Never a kill |
+| Memory (`memory_gb`) | the kernel's OOM killer, at the container's own cap | rootless podman without a delegated cgroup: none | kills the process with the largest PSS, one per sample, and only when the processes it may kill hold enough to cover the excess (none holding under 10 MiB). The next sample measures again |
+| Processes and threads (`pids`) | a fork or a new thread fails at the cap | rootless podman without a delegated cgroup: none | kills the newest processes until the count is back at the cap, and only when the processes it may kill hold enough of the count to get there (not when the excess is PID 1's or unreaped zombies) |
+| Disk (`disk_gb`, `storage_mb`) | a cloud backend may apply `storage_mb` | local Docker (overlay2 on ext4): none | at a disk measurement over the cap, kills the process that holds the most bytes open for writing in files under the measured paths, when those bytes cover the excess and are at least 10 MiB. No second kill until the disk has grown since the last one or has been under the cap again. Otherwise it records only |
+| GPU memory (`x-gpu-memory-gb`) | none | every card without MIG: none (a card may be shared between trials) | kills the process holding the most GPU memory in that container, one per sample, when the processes it may kill can cover the excess |
+
+The `SIGSTOP` fallback is visible to the agent. An interactive shell with job control reports a throttled child as a
+stopped job (`Stopped`) and may stop waiting for it, so commands run under such a shell can end early or need `fg`.
+The fallback is used only where the container's runtime does not hold its CPU and its cgroup cannot take a quota
+(rootless runtimes; `cgroup: host` is read-only on most hosts). A stop the agent sends to a process while the monitor
+holds it stopped cannot be told from the monitor's own, and is undone with it. A restarted monitor resumes every stopped
+process of a throttled container that is not known to have been stopped by the agent. A container is its own cgroup when it has one: a process
+of it in another mount namespace still counts in it. The fallback looks for new processes twice per period, so a short
+process can run free for up to one period before it is stopped. The share never drops below the cap divided by the
+container's CPUs, or 0.5 %, so no throttled process is held for more than 0.4 s. When the short processes alone use more
+than the cap, the monitor holds what it can and records `throttle_insufficient`. Without a cgroup of its own (Quest
+apptainer, rootless podman without delegation), the monitor counts a container's CPU from its processes, including the
+children they have reaped. A process that ends between two samples counts only through its parent, so CPU use may be
+under-recorded when the parent is outside the container or never waits.
+
+On cgroup v1, Docker applies CPU, memory and processes through the v1 controllers; the monitor then measures memory
+by PSS and reads no kernel OOM counters. It reads the runtime's limits from the container's directories (and their
+parents that carry the container's id) where the v1 hierarchy is visible to it; where it is not, every cap is recorded as
+the monitor's (`enforced_by`), and the kernel still applies the runtime's limits first. A runtime that refuses `pid: host` runs the monitor as a beacon (the clock in
+`usage.json`, nothing measured or enforced; running.md "Without Docker"). The `x-gpu-memory-gb` of a recorded service and
+of the verifier is a cap stated for the reader: nothing measures it. The agent reads its own container's caps in
+`## Resources` (§5) and in `/run/rcb-limits/usage.json`. Placing trials, the switches, the record and the reward
+fields: running.md "Resources".
 
 ## 7. Versions
 

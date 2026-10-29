@@ -95,11 +95,11 @@ has its own prefix (`task_conventions.py benchmarks --check`, `ci_scope.py --che
    [[cap]]
    match = "^mybench-.*-standard$"          # a regular expression on the task directory's name; the last match wins
                                             # (`-standard$` does not match `-standard-realtime` tasks: give them a rule too)
-   main = { cpus = 4, memory_gb = 10, pids = 8192, disk_gb = 20 }      # the agent's container (cpus: a whole number)
-   sim = { cpus = 4, memory_gb = 8, pids = 8192, gpu_memory_gb = 6 }   # gpu_memory_gb: only on the service that holds the GPU
+   main = { cpus = 4, memory_gb = 3, pids = 1024, disk_gb = 10 }      # the agent's container (cpus: a whole number)
+   sim = { cpus = 4, memory_gb = 5, pids = 1024, gpu_memory_gb = 4 }   # gpu_memory_gb: only on the service that holds the GPU
    recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4)"
    measured = "oracle trials on an RTX 4090: sim 1.9 GiB, 1.2 GiB of GPU memory; agent's container 0.1 GiB"
-   caps_measured = "GPU memory (the sim service): 1.2 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB"
+   caps_measured = "memory: the sim service 1.9 GiB -> max(1.5 x peak, peak + 3), rounded up: 5 GiB; the agent's container 0.1 GiB -> peak + 2, rounded up: 3 GiB; GPU memory (the sim service): 1.2 GiB -> max(1.5 x peak, peak + 2), rounded up: 4 GiB; processes and disk: no thread count measured, the minimums (1024, 10 GiB)"
    ```
 
    and for its privileged twin, where the agent's own container runs the simulator and holds the GPU:
@@ -107,8 +107,9 @@ has its own prefix (`task_conventions.py benchmarks --check`, `ci_scope.py --che
    ```toml
    [[cap]]
    match = "^mybench-.*-privileged$"
-   main = { cpus = 8, memory_gb = 16, pids = 8192, disk_gb = 30, gpu_memory_gb = 6 }
+   main = { cpus = 8, memory_gb = 10, pids = 1024, disk_gb = 10, gpu_memory_gb = 4 }
    gpu_types = ["L40S", "L4", "RTX 4090"]   # only if the task needs ray-tracing cores (RTX-class models); else leave it out
+   caps_measured = "the agent's container: memory 6.2 GiB -> max(1.5 x peak, peak + 2), rounded up: 10 GiB; GPU memory 1.3 GiB -> max(1.5 x peak, peak + 2), rounded up: 4 GiB; 300 threads -> 1024 (2 x peak, at least 1024); disk: the minimum (10 GiB)"
    ```
 
    One table per compose service (the names must be the compose file's), `gpu_types` only when the task needs an
@@ -116,10 +117,9 @@ has its own prefix (`task_conventions.py benchmarks --check`, `ci_scope.py --che
    devices`, `driver: nvidia`, `capabilities: [gpu]`); caps go in `cpus` / `mem_limit` / `pids_limit`, never in
    `deploy.resources.limits`. A separate verifier's caps are `cpus` / `memory_mb` you set in `[verifier.environment]`
    (PROTOCOL §6). Measure the oracle (and agent trials if you can: `docker stats` / cgroup `memory.peak`,
-   `nvidia-smi`), set the caps a generous margin above the peaks (e.g. `max(1.5 x peak, peak + 4 GiB)`) and make sure
-   the oracle stays inside them, unless the benchmark's README states an exception: memory over its cap is an OOM kill,
-   and GPU memory or disk over theirs fails the trial when a run enforces them (`RCB_LIMITS_ENFORCE=1`). Then run
-   `scripts/task_conventions.py` on the tasks; `check-resources.py` checks the result.
+   `nvidia-smi`), set the caps as PROTOCOL §6 "How a rule's caps are chosen" says (the peaks with a margin, and the
+   largest call the task allows) and make sure the oracle stays inside them, unless the benchmark's README states an
+   exception: a process over any cap but CPU can be killed (PROTOCOL §6). Then run `scripts/task_conventions.py` on the tasks; `check-resources.py` checks the result.
 4. Base images: `images/<sim>/Dockerfile`, versioned in `images/<sim>/VERSION`, built and pushed with
    `scripts/build_images.sh` / `scripts/push_images.sh`. Images that cannot be published carry `images/<sim>/BUILD_ONLY`
    and build instructions. A task on a private image builds it itself when the runner cannot pull it: its Dockerfile

@@ -74,8 +74,8 @@ tasks keep their names.
   and verifier): the references' numerics on any host that lets the container run on 4 CPUs. It also stops the default
   from spinning against the containers' 4-CPU quota: `bimanual_hanoi` ran at 35 control steps/s that way on the
   32-thread host, 150 with 4 threads.
-  - **4 visible CPUs are needed**: the agent's container and the sim sidecar are capped at 4 CPUs
-    (`scripts/task_resources.toml`); the separate verifier has no CPU cap. The
+  - **4 visible CPUs are needed** by the agent's container and by the sim sidecar (their caps: main's in each task's
+    `task.toml`, the sidecar's in its `environment/docker-compose.yaml`; PROTOCOL §6). The
     variable is an upper bound only: OpenBLAS never runs more threads than the CPUs the process may run on (its
     affinity, `os.sched_getaffinity`). A cpuset narrows that (`docker --cpuset-cpus`, `taskset`, a Slurm allocation of
     2 CPUs); a CFS quota does not (the tasks' `cpus: 4` caps, `docker --cpus 2`: the process still sees every host CPU
@@ -129,7 +129,7 @@ unchanged), resume class `exact`:
 - **frames per call:** at most 1000 images (cameras x frames, per-frame depth counted again; `/spec`
   `max_frames_per_call`), checked before anything is executed (400). Every frame is held until the response is sent;
   measured on the layer's Recorder with 640 x 480 frames: 2.7 GB per 1000 RGB frames, 5.1 GB per 1000 images of one
-  camera with per-frame depth, on top of the simulator's 1.9 GB under the sidecar's 8 GiB cap. The default camera at
+  camera with per-frame depth, on top of the simulator's 1.9 GB. The default camera at
   the default 10 fps needs 302 images for the longest watch (30 s) and 102 for the longest chunk (10 s);
   proprioception `joint_pos`, `joint_vel`, `joint_effort` (7 + 16 per arm), `tcp_pose`, plus `tcp_target` and
   `hand_target` (the targets being tracked); no gripper-opening column (a dexterous hand).

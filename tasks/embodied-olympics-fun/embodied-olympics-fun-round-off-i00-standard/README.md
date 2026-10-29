@@ -28,16 +28,15 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 rules: You face +x at the start. The hand support counts when only your hands touch the floor and your torso is upside down, its long axis (from the pelvis up to the neck) within 45.0 degrees of pointing straight down. After it, the landing: your feet come down with no hand on the floor, the second foot within 0.1 s of the first (both feet together; a foot off the floor again for more than 0.03 s before the other is down starts the landing over), the first foot down at most 0.7 s after your feet left the floor for the hand support (one continuous motion, not a held handstand), and when both feet are down your pelvis and your torso face back, -x, each within 45.0 degrees (landing facing +x or sideways is a cartwheel or a Tinsica, not a round-off). Then you stand for 1.0 s without a break: only your feet on the floor, your torso within 20.0 degrees of vertical, your pelvis slower than 0.35 m/s. You fail if any part of you other than your hands and feet touches the floor or your pelvis is lower than 0.25 m (a fall); if after the hand support one foot lands and the other does not follow within 0.1 s, or no foot is down 0.7 s after your feet left the floor, or a hand is on the floor when both feet are down, or you land not facing back; if a hand touches the floor after the landing; if any part of you touches the floor outside the 12.0 m x 12.0 m floor area; or after 30 s. Before the hand support anything is free (steps, a hop, a hurdle). No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `sim` | 4 | 6 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

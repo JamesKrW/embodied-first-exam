@@ -1,7 +1,7 @@
 # The verifier replays in MuJoCo and renders like the agent's environment (environment/docker-compose.yaml).
 services:
   main:
-    x-gpu-memory-gb: 6   # GiB of GPU memory (docs/protocol/README.md §6)   # rcb-monitor
+    x-gpu-memory-gb: 5   # GiB   # rcb-monitor
     environment:
       NVIDIA_DRIVER_CAPABILITIES: compute,graphics,utility
     deploy:

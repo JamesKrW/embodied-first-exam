@@ -135,52 +135,60 @@ beside it, and a trial without such a live verdict, started off the frozen insta
 re-graded under a stricter rule keeps the recorded one (benchmark docs name their fields where they differ).
 
 ## Resources: caps and their enforcement
-Every resource number of a task is an upper bound for one container; where each is set: PROTOCOL §6. This section is
-how a run applies and enforces them.
-- **What enforces what.** Memory: docker (cgroup); a process that goes over is killed by the kernel. Processes (and
-  threads): docker. Shared memory: docker applies the compose file's `shm_size` (a setting, not a cap), and it counts
-  against the memory cap. CPU: docker, a throttle only. A CPU cap above the host's count means the host's count: the
-  runner clamps it in its copy (`scripts/clamp_cpus.py`); memory and pids caps are never clamped. Disk: a cloud
-  backend applies `storage_mb`; local docker cannot (overlay2 on ext4), so the monitor measures it. GPU memory: docker
-  cannot cap it (a card may be shared between trials): the monitor measures it, and the agent is told its cap.
+Where each cap is set and who enforces it on which host: PROTOCOL §6. This section is how a run uses it.
+- **The switches** (run-time environment; compose defaults, so they do not change the digest):
+  `RCB_LIMITS_ENFORCE` — `0` (default) Docker / Harbor enforce what the host lets them, the monitor records; `1` the
+  monitor is also the backstop for every cap the container's own runtime does not hold (PROTOCOL §6); any other value: nothing is enforced, `infra_error = 1`,
+  `resource_switch_error = 1`. `RCB_LIMITS_TOLERANCE` — over a cap means above cap × (1 + this), default `0.05`, a
+  number in [0, 1] (anything else is treated like a bad switch). Neither changes the grade.
+- **CPU caps above the host's count** mean the host's count: the runner clamps them in its copy (`scripts/clamp_cpus.py`);
+  memory and pids caps are never clamped. Shared memory: docker applies the compose file's `shm_size` (a setting, not a
+  cap), and it counts against the memory cap.
 - **Placing trials.** Harbor caps each container and does not check whether a machine has room (concurrency is `-n`).
   A machine that holds the sum of a phase's caps (agent; verifier) never runs short; packing more is the runner's call.
   GPU memory: `x-gpu-memory-gb`; an RTX-class card where `gpu_types` is set. The verifier's caps (a key its
   `[verifier.environment]` lacks is no cap): PROTOCOL §6.
-- **Monitor**: the `rcb_monitor` sidecar samples every few seconds into its own record (`rcb-monitor/1`), sealed in the
-  first collect hook: GPU memory (NVML per process, summed), memory (cgroup `anon + shmem`), processes, disk (growth of
-  the files under `/app`, `/tmp`, `/root` of the agent's container), per container and summed over its scope (privileged:
-  every container the agent drives; standard modes: the agent's container; the `sim` sidecar and other benchmark-owned
-  services are recorded, never a failure). It writes `/run/rcb-limits/usage.json`: current use, the agent's own
-  container's caps (`caps`), the two caps it may enforce (`limits`: `gpu_memory_gb`, null without a GPU in the scope,
-  `disk_gb`, and the protocol's 60 s / 120 s as `sustain_sec` / `window_sec`) and the agent's clock (`elapsed_s`, `time_left_s`, `deadline_utc`: `[agent]
-  timeout_sec` from the environment's start, so never more than the agent has). Inside its container the agent can
-  also read its cgroup (`/sys/fs/cgroup/memory.max`, `cpu.max`, `pids.max`). The verifier recomputes violations from
-  the raw samples with its own copy of the caps (`tests/rcb_limits.json`, format `rcb-limits/2`). A missing, unsealed
-  or mostly empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`. A runner whose
-  container runtime cannot run the monitor (no `pid: host`) runs the same service as `monitor.py beacon` (no pid /
-  cgroup host, no record): `usage.json` then has the caps, the clock and `"measured": false`.
-- **Violations** (the protocol's rules, the same for every task): the scope's GPU memory above its cap (the
-  `x-gpu-memory-gb` of the scope's one GPU service) for 60 s within any 2 minutes, the agent's disk above `storage_mb` at two
-  measurements in a row (once a minute), or a kernel OOM kill in the scope at the container's own memory cap; gaps
-  never count against the agent. A scope without a GPU has no GPU-memory cap: GPU memory seen there is recorded only. A
-  `limits.json` that is not `rcb-limits/2` is an unusable record (`resource_monitor_missing = 1`; not a result when
-  enforced).
+- **The record**: the `rcb_monitor` sidecar samples every 5 s (disk once a minute) into its own record
+  (`rcb-monitor/1`), sealed in the first collect hook: per container (`containers`: `service`, `cpu`, `memory_gb`,
+  `processes`, `threads`, `pids`, `gpu_memory_gb`) and summed over the scope (`scope`, with `disk_gb`). Each container's
+  `runtime` holds the limits its own cgroup set (`cpus`, `memory_gb`, `pids`; null: none). Events: `enforcement`
+  (who holds each cap of a container, `by`: `runtime`, `monitor` or `none`, written when it changes; also the
+  summary's `enforced_by` per service), `over` (the first time a container is over a cap, per resource, in both
+  settings, with `by`; a count of processes and threads over in two samples in a row), `kill` (`resource`: `memory`,
+  `pids`, `disk`, `gpu_memory`; `pid`, `value`, `cap`), `throttle_start` / `throttle_end` (CPU, `method`: `cgroup` or
+  `signal`; `sec`: the time its stops reached the container's processes, `engaged_sec`: the time it was engaged),
+  `throttle_insufficient` (the CPU cap could not be held: short processes alone used more than it),
+  `unobservable` and `no_victim` (the backstop could not act), `backstop_error` (an action failed, or no pidfds on the
+  host), `oom` (a kernel OOM kill, `cause` `cap` or
+  `host`). The summary counts the record writes that failed (`write_errors`, per file) and the reads that failed for
+  want of a file descriptor (`fd_exhausted`). The verifier recomputes what was
+  over a cap from the raw samples with its own copy of the caps (`tests/rcb_limits.json`, format `rcb-limits/2`). A
+  missing, unsealed or mostly empty record (> 10 % of the agent phase unobserved) is `resource_monitor_missing = 1`; with
+  `RCB_LIMITS_ENFORCE=1` that is not a result (`infra_error = 1`: the backstop that was asked for did not run).
+- **usage.json** (`/run/rcb-limits/usage.json`, agent-visible): the agent's container's use (`own`) and caps (`caps`),
+  the scope's sums, `limits` (`gpu_memory_gb`, `disk_gb`, `tolerance`), `over`, `kills`, `cpu_throttled`, `enforced_by` (the agent's
+  container; `violations` and `emergency_kills` are monitor 0.4's names of `over` and the sum of `kills`; 0.4's
+  `last_emergency_kill` and `limits.sustain_sec` / `window_sec` are gone: nothing waits for a sustained excess), and the
+  agent's clock (`elapsed_s`, `time_left_s`, `deadline_utc`: `[agent] timeout_sec` from the environment's start, so never
+  more than the agent has). Inside its container the agent can also read its cgroup (`/sys/fs/cgroup/memory.max`,
+  `cpu.max`, `pids.max`). A runner whose container runtime cannot run the monitor (no `pid: host`) runs the same service
+  as `monitor.py beacon` (no record): `usage.json` then has the caps, the clock and `"measured": false`.
 - **Session log**: the monitor copies the agent's `/app/output/rcb_session_log.jsonl` append-only into its record
   (`session_log/`); before the grader, the verifier step gives the grader that copy when the agent's file was removed or
   rewritten (`session_log_tampered`, `session_log_from_monitor` in `reward.json`). The log feeds cost fields only.
-- **The switch** `RCB_LIMITS_ENFORCE` (compose default 0, so it does not change the digest): `1` — a confirmed violation
-  kills the scope's processes and fails the trial (`reward 0`, `success_before_limits`, `resource_limit_exceeded = 1`),
-  never retried; `0` — observe and record only (`limits_violation_observed`, `/logs/verifier/resource_limits.json`);
-  any other value — nothing is killed, `infra_error = 1`, `resource_switch_error = 1`.
-- **Out-of-memory kills**: a kill at a container's own cap in the scope is a violation (`over_oom`); a host OOM kill is
-  never one (enforcement on: `infra_error = 1`, `resource_host_oom`); a benchmark-owned service killed for memory in an
-  episode that did not succeed is `infra_error = 1` (`resource_service_oom`) in both settings. Host protection
-  (enforcement on): GPU memory above 1.5 × its cap kills the process holding the most; never a violation by itself.
-  A trial a pool kills to protect its host is an operations abort (`killed_by_pool`), not a graded result.
-- **reward.json** (always): `resource_enforced`, `limits_violation_observed`, `resource_monitor_missing`,
-  `peak_gpu_memory_gb`, `peak_memory_gb`, `peak_processes`, `peak_disk_gb`, `resource_emergency_kills`,
-  `resource_oom_kills`, `resource_host_oom_kills`, `resource_service_oom_kills`, and `over_<metric> = 1` per violation.
+- **Out-of-memory kills**: a host OOM kill of a process in the scope is never the agent's (enforcement on:
+  `infra_error = 1`, `resource_host_oom`); a benchmark-owned service killed for memory in an episode that did not
+  succeed is `infra_error = 1` (`resource_service_oom`) in both settings. A trial a pool kills to protect its host is an
+  operations abort (`killed_by_pool`), not a graded result.
+- **reward.json** (always): `resource_enforced`, `limits_violation_observed` (a cap exceeded at some sample, or a
+  backstop action), `resource_monitor_missing`, `peak_gpu_memory_gb`, `peak_memory_gb`, `peak_processes`, `peak_pids`,
+  `peak_cpus`, `peak_disk_gb` (the scope's sums), `over_<metric> = 1` per metric over its cap (`memory_gb`, `pids`,
+  `cpus`, `gpu_memory_gb`, `disk_gb`, `oom`); the backstop: `resource_memory_kills`, `resource_pids_kills`,
+  `resource_disk_kills`, `resource_gpu_memory_kills` (processes killed), `resource_monitor_kills` (their sum; also
+  `resource_emergency_kills`, its name before monitor 0.5), `resource_cpu_throttles`, `resource_cpu_throttled_sec`;
+  `resource_limit_exceeded` is always `0` (monitor 0.4's field; a cap never fails a trial now);
+  the kernel: `resource_oom_kills` (at the container's own cap), `resource_host_oom_kills`, `resource_service_oom_kills`.
+  Details in `/logs/verifier/resource_limits.json`.
 
 ## Agent logs and timelines
 Harbor keeps, per trial, `agent/codex.txt` (every message, command and output), `agent/trajectory.json` and the raw
@@ -289,8 +297,8 @@ node-local scratch (podman's storage does not work on most network file systems)
    `harbor run -p`, the same copy by hand: `podman pull` the image, stage a copy as in 5., replace the block with that
    `FROM` line and stamp the copy again.
 7. Where podman cannot give each container a cgroup of its own (cgroup v1, or a cgroup v2 node whose cgroup is not
-   delegated to your user, e.g. a Slurm job step), docker's caps are not applied and the monitor's enforcement stays off
-   (`RCB_LIMITS_ENFORCE=0`), and
+   delegated to your user, e.g. a Slurm job step), podman applies none of the caps (with `RCB_LIMITS_ENFORCE=1` the
+   monitor's backstop does, PROTOCOL §6), and
    podman cannot stop the `rcb_monitor` sidecar, which shares the host's PID namespace (podman stops such a container by
    signalling its cgroup's processes): the monitor then ends itself once its record is sealed.
 8. On cgroup v2 the containers' CPU caps need the `cpu` controller delegated to your user: when

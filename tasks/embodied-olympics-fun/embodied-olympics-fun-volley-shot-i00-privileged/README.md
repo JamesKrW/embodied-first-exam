@@ -26,16 +26,14 @@ one sim row per control step until the referee ends the attempt). Pass iff the r
 and both end in the same state. The rules: You stand on the penalty mark, facing the goal; the goal line is 11.0 m ahead of you. The goal is 7.32 m wide between the posts and 2.44 m high under the crossbar (posts and bar 0.12 m thick), centred on the line you face along. A goalkeeper dummy, a board 1.9 m high, 0.6 m wide and 0.3 m thick (80.0 kg), stands on the goal line at the centre of the goal: it runs on a rail and a motor holds it there (a ball that hits it pushes it aside a little). A size-5 football (0.22 m across, 0.43 kg, in air) waits in a ball machine on the left wing, 20.0 m from you, and about 3.0 s after the start the machine crosses it: a lofted ball with backspin that comes down in front of you. The volley is the ball's first contact after the cross: with a foot or an ankle of yours (the parts below the shin), before the ball has touched the ground. Every contact within 0.15 s of the first belongs to the one strike, which is over when the ball has been clear of you for 0.03 s; and it must be a strike: the ball's speed when it leaves your foot is at least 1.0 times its speed just before the foot touched it. You succeed at the moment the whole ball is then over the goal line between the posts and under the bar; after the strike it may touch the ground, the posts, the bar and the dummy. You fail if the ball touches the ground before your strike, if any part of you other than a foot or an ankle touches the ball at any time, if the strike's contacts last longer than 0.15 s, if the ball leaves the foot slower than that, if you touch the ball again after the strike, if the whole ball crosses the goal line outside the goal, if after the strike the ball has been slower than 0.1 m/s for 1.0 s, if your pelvis comes within 9.15 m of the ball machine before the cross has left it, if you touch the machine or the waiting ball, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground), or after 10 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| `main` (the agent's) | 8 | 16 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

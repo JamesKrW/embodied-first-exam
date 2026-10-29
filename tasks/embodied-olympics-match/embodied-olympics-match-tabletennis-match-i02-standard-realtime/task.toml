@@ -40,7 +40,7 @@ timeout_sec = 1260.0
 environment_mode = "separate"
 network_mode = "no-network"
 
-# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (PROTOCOL §6): seal the monitor's record first.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -68,8 +68,8 @@ allowed_hosts = ["chatgpt.com", "*.chatgpt.com", "auth.openai.com", "api.openai.
 [environment]
 build_timeout_sec = 1200.0
 cpus = 2
-memory_mb = 6144
-storage_mb = 20480
+memory_mb = 5120
+storage_mb = 10240
 
 [verifier.environment]
 build_timeout_sec = 600.0

@@ -28,16 +28,15 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 rules: You stand at the centre of the trampoline's bed, 1.155 m above the floor, facing +x along its length. A flight is a time of at least 0.1 s in which nothing of you touches anything; your centre of mass's height when you stand at the start is the reference height. Straight bounces first are free. The tuck jump is your first flight in which your body is not straight: at some moment of its middle half (from a quarter to three quarters of the flight's time) each leg must be tucked: the angle at the hip between your shoulder and your knee, and the angle at the knee between your hip and your ankle, both 135.0 degrees or less (180 is straight), held for at least 0.05 s without a break, and it must be a jump: in it your centre of mass rises at least 0.1 m above the reference height (a tuck without that height fails). A flight before it in which a hip or a knee closes to 135.0 degrees or less in the middle half without the tuck is another element and fails. Every landing must be on the bed, on your feet only, both feet within 0.1 s of each other. After the tuck jump's landing you may make one more flight, an out-bounce, which must be straight (hips and knees more open than 135.0 degrees through its middle half); a second flight fails. Then stop: stand still for 3.0 s without a break: only your feet on the bed, your torso within about 20 degrees of vertical, your pelvis slower than 0.35 m/s, your ankles at most 0.28 m apart. You fail on a landing with any other part of you on the bed, on touching anything other than the bed (the padding over the frame and springs, the end platforms, the floor), or after 30 s. Success: the tuck jump, its landing and the stop, in that order.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `sim` | 4 | 6 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

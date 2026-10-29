@@ -34,18 +34,16 @@ the live episode succeeded: every standard task is graded by its live episode, w
 human review in PR #142 (no positive example yet). `nop` (no actions) scores 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 16 GiB | 16384 | no GPU | 20 GiB |
-| `sim` | 16 | 25 GiB | 16384 | 16 GiB | — |
-| verifier (as `main`) | 8 | 16 GiB | no cap | no GPU | 20 GiB |
+| `main` (the agent's) | 2 | 8 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 16 | 35 GiB | 2048 | 16 GiB | — |
+| verifier (as `main`) | 2 | 8 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `sim`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: the heaviest scene (pour_liquid_into_cup_random), a client driving 12 joint_position chunks, on an RTX 4090: sim sidecar peak 16.0 GiB (anon 14.9), GPU memory 9.5 GiB, up to 16 cores while Isaac starts; the agent's container under 0.1 GiB (a per-container sampler every 10 s); the collect hook only encodes the live video on the CPU, so the sidecar's peak is the live service's
-- Measured (caps): GPU memory (the sim service): 9.5 GiB on the heaviest scene (RTX 4090) -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

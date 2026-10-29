@@ -46,18 +46,16 @@ The verifier has 3600 s: two replays of the 72,000 control steps a trajectory ma
 67-102 steps/s (tasks/robopaint/README.md).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 20 GiB | 8192 | 5 GiB | 10 GiB |
-| `scorer` | 2 | 7 GiB | 8192 | 5 GiB | — |
-| verifier | no cap | no cap | no cap | 5 GiB | no cap |
+| `main` (the agent's) | 8 | 12 GiB | 2048 | 3 GiB | 10 GiB |
+| `scorer` | 2 | 4 GiB | 1024 | 3 GiB | — |
+| verifier | no cap | no cap | no cap | 3 GiB | no cap |
 
 - GPU: any NVIDIA GPU, held by `main` and `scorer`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
-- Measured: GPU memory 0.25-0.5 GB (per-trial peaks of past trials); memory: privileged container p90 2.5 GB plus the scorer's 0.7 GB (a per-container memory sampler); CPU: an estimate
-- Measured (caps): GPU memory: a per-trial peak of 0.5 GiB -> max(1.5 x peak, peak + 4), rounded up: 5 GiB; the scorer service (the benchmark's own, recorded only) has the same 5 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

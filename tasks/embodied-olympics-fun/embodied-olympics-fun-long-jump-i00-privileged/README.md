@@ -26,16 +26,14 @@ one sim row per control step until the referee ends the attempt). Pass iff the r
 and both end in the same state. The rules: World Athletics rules for the long jump. The runway is 40.0 m long and 1.22 m wide along +x. The take-off line is x = 0, the edge of the white take-off board (0.2 m long, level with the runway) that is nearer the pit. The landing area is a pit of sand, level with the runway, that begins 1.0 m beyond the take-off line and is 9.0 m long and 2.75 m wide, centred on y = 0. Before your landing in the sand: no foot that is on the ground may have any part of it on or over the take-off line's plane (TR 30.1.1; the whole foot counts, also the parts of it that are in the air), and nothing of you may touch the ground at x >= 0 outside the sand (TR 30.1.4: the runway beyond the line and the ground beside the pit). Your jump is the flight (nothing of you touches anything, for at least 0.05 s) that ends with your first contact with the sand: its last ground contact before lift-off must have been within the runway's width (TR 30.1.2), and during it your pelvis must rise at least 0.05 m above its height at lift-off. Taking off before the board is allowed; the jump is measured from the take-off line all the same. You may land on any part of your body. The mark is the point nearest the take-off line at which any part of you touches the sand in the first 2.0 s after the first contact; in that time you may not touch the ground outside the pit nearer the take-off line than the mark (TR 30.1.5). You succeed when that time has passed after a valid jump: the mark is then at least 1.0 m. A fall is not a failure by itself. You fail on any of the faults above, when you touch the sand without such a flight, if you leave the venue (the level ground ends 8 m to each side of the runway's axis, 45 m behind the take-off line and 6 m beyond the pit), or after 60 s (the time allowed for a trial). No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| `main` (the agent's) | 8 | 16 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

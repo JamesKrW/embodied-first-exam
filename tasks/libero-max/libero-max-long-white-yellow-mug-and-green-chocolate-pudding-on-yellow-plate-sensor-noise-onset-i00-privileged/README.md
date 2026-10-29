@@ -37,16 +37,14 @@ trajectory invalid). Oracle: the replays end in the live state (hash `3ad65c2583
 reward 0; the instance is not solved at the start.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `main` (the agent's) | 4 | 10 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: verifier 1.6 GB (a per-container memory sampler); the rest estimated (robosuite, CPU only, 256x256 OSMesa cameras)
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

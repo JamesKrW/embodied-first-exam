@@ -35,17 +35,15 @@ trajectory) scores 0. The success description in `instruction.md` was written fr
 (`task/RoboDojo/tasks/fill_pen_holder.py`, `env/reward_manager/`); the code is the reference.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 39 GiB | 16384 | 16 GiB | 20 GiB |
+| `main` (the agent's) | 8 | 39 GiB | 8192 | 16 GiB | 10 GiB |
 | verifier | 8 | 32 GiB | no cap | 16 GiB | no cap |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: the heaviest scene (pour_liquid_into_cup_random: GPU PhysX liquid and 15-20 clutter objects), one Isaac Session driven through 300 actions with frames from the three cameras, then the verifier's two fresh-process replays (the second filmed), on an RTX 4090: main container peak 16.1 GiB (anon 14.9), GPU memory 9.0 GiB, CPU at its 8-core cap; verifier peak 15.7 GiB, GPU memory 9.6 GiB, 8 cores (the trial's resource monitor and a per-container sampler every 10 s); the determinism runs over all 54 tasks: 4.6-8.4 GB of GPU memory per Isaac process
-- Measured (caps): GPU memory: 9.0 GiB per Isaac Session on the heaviest scene (RTX 4090) -> max(1.5 x peak, peak + 4), at least 16 GiB for Isaac Sim: 16 GiB; processes and disk: defaults (measured peaks: 6 processes, 0.7 GiB of new files)
 
 ## Details
 

@@ -24,16 +24,14 @@ The demonstration's own actions (original: 370 actions), executed from the froze
 `tests/grade.py` in a separate sandbox without network: two replays in fresh processes from the verifier's own copy of the instance; `success = deterministic ∧ success on the final state ∧ not solved at the start`. Reference: two fresh-process replays end in the live run's state (hash `8cc5e06733d5…`) and succeed. `nop`: no trajectory, reward 0; the instance is not solved at the start.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 20 GiB | 8192 | no GPU | 10 GiB |
+| `main` (the agent's) | 4 | 15 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 16 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: verifier p90 4.0 GB (RoboCasa and RoboCasa-GR1 together; a per-container memory sampler); the standard twin's sim service, the same robosuite simulator, p90 9.7 GB; CPU only (OSMesa cameras); CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

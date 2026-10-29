@@ -31,13 +31,11 @@ the same state. The oracle (`solution/solve.sh`) scores 1; `nop` scores 0.
 Benchmark notes: `tasks/kinder/README.md`.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 16 | 20 GiB | 8192 | no GPU | 10 GiB |
+| `main` (the agent's) | 16 | 7 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: privileged container p90 2.8 GB (a per-container memory sampler); CPU only; CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured

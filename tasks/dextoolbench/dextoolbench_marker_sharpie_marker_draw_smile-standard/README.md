@@ -24,18 +24,16 @@ Same scene, instance and success rule as `dextoolbench_marker_sharpie_marker_dra
 the live episode's verdict (`graded_by = "live"`, no grading replay): the last episode (every control step since the last reset) passes when the goal tracker, run on every executed control step, has reached every goal (`progress` = goals reached / goals in `reward.json`). The frozen start is checked when the episode begins (`RCB_START_SHA`)
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 7 GiB | 8192 | 7 GiB | — |
+| `main` (the agent's) | 3 | 16 GiB | 1024 | no GPU | 11 GiB |
+| `sim` | 4 | 4 GiB | 1024 | 5 GiB | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
-- Measured: GPU memory: per-trial peaks of past trials 0.3-0.9 GB on 24 GB cards and up to 2.1 GiB on a 48 GB card; memory: sim p90 0.9 GB (a per-container memory sampler); CPU: an estimate
-- Measured (caps): GPU memory (the sim service): a per-trial peak of 2.1 GiB on a 48 GB card -> max(1.5 x peak, peak + 4), rounded up: 7 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

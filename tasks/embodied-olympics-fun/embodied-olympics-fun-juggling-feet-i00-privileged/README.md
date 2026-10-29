@@ -26,16 +26,14 @@ one sim row per control step until the referee ends the attempt). Pass iff the r
 and both end in the same state. The rules: A size-5 football (0.22 m across, 0.43 kg, in air) starts pressed between your two open palms; you stand in the middle of a square grid 5.0 m on each side, marked on the grass. Your hands have no fingers and no grip (the grip columns of the action rows do nothing in this task): only the squeeze of your arms and friction hold the ball, and it slips out when they press too little. Until the drop only your hands (the palm pads and the wrists) may touch the ball. The drop: the ball has touched no part of you for 0.03 s; it is the end of the ball's last contact with a hand. A hand or an arm may still be in contact with the ball for 0.15 s after the drop (the ball leaving the hand); after that a hand or an arm on the ball is a handball. From the drop on, only your feet may touch the ball: a foot is the part below the ankle joint (sole, instep, sides, toe and heel); a contact with your lower leg also counts as the foot where it lies over the foot (from 0.08 m behind to 0.15 m ahead of the ankle joint along the foot) and no more than 0.12 m above the ankle joint (along the foot's up direction), because your leg's collision shape covers the instep; the leg above that (shin, knee, thigh), the trunk, the head and the arms are other surfaces. A touch is a contact of the ball with a foot (contacts less than 0.05 s apart are one touch). It counts when, before anything touches the ball again, the ball's centre has risen at least 0.22 m above the height it had when the touch began and the whole ball (its lowest point) has risen above 0.36 m, your knee height; and when the ball left the touch with at least 0.95 of the speed it had when the touch began (both taken at the height where the touch began): a ball that only bounces off a still foot leaves slower, and such a touch is not counted, and is not a fault. You succeed at the moment the tenth touch counts. You fail if the ball touches the ground (before the drop too), if a part of you other than the hands touches it before the drop, if a hand or an arm touches it later than 0.15 s after the drop, or at all while a foot touches it or before a foot's touch has counted or been judged a bounce, if any part of you other than a foot touches it, if both feet touch it at once (the ball trapped), if one touch lasts longer than 0.05 s (the ball resting, rolling or balanced on a foot), if the ball is touched again before a touch has counted or been judged a bounce, if a foot (its ankle) leaves the grid, if you fall (your pelvis lower than 0.35 m above the ground, or any part of you other than the feet on the ground; standing on one foot is not a fall), or after 60 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 16 GiB | 8192 | no GPU | 20 GiB |
+| `main` (the agent's) | 8 | 16 GiB | 1024 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: estimated on an RTX 4090 workstation: CPU-only MuJoCo with OSMesa rendering; one world steps 5 times faster than real time on one core and holds about 0.4 GB; the verifier runs two replays and a filmed one
-- Measured (caps): disk: 20 GiB, room for downloaded tools and controllers (not measured)
 
 ## Details
 | | |

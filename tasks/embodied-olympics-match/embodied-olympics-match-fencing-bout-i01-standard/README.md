@@ -31,16 +31,15 @@ valid, finished match that the agent won. `tests/fexam_reward.py` adds the hub's
 `slowdown`, `opponent_level`; `realtime` = 0 for a turn-based match).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 2 | 6 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 8 GiB | 256 | no GPU | — |
+| `main` (the agent's) | 2 | 4 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 4 | 4 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: Harbor oracle and nop trials of both tasks on a 32-core RTX 4090 workstation, docker stats every 5 s: the sim peaks at 4.0 CPUs (its cap) and 0.71 GiB (the replay in a fresh process and the video after the bout; a bout is about 20 s of service time), the oracle's container under 0.1 GiB (a model's harness needs more); turn-based, so fewer CPUs only slow it down; CPU only
 
 ## Details
 

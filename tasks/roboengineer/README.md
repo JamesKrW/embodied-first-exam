@@ -131,8 +131,7 @@ roboEngineer task except the eight `roboengineer-neuralfly-*` ones.
 Rules: `scripts/task_resources.toml` (`^roboengineer-`), measured on 2026-10-18 (Harbor 0.23 trials,
 docker stats, cgroup `memory.peak` and per-container `nvidia-smi` every 3-6 s). The verifier only reads JSON (~20 s).
 
-- **28 CPU tasks** (all but G1): the agent's container is capped at 2 CPUs / 6 GiB, the sidecar at 4 CPUs
-  / 6 GiB. The sidecar uses 1.7-1.9 cores while a deployment runs (one worker, OSMesa), its full 4 cores while it
+- **28 CPU tasks** (all but G1; caps: main's in each task's `task.toml`, the sidecar's in its `environment/docker-compose.yaml`; PROTOCOL §6). The sidecar uses 1.7-1.9 cores while a deployment runs (one worker, OSMesa), its full 4 cores while it
   finalizes (held-out cases twice on four single-threaded workers, then the video: 79-199 s) and, for Neural Landing,
   through the per-case reference search before the agent starts (~480 s); its peak memory is 0.6-2.1 GiB (go2-weave
   the largest), 1.2 GiB for landing. The reference runs' agent containers stay below 0.25 GiB. The sidecar's 4 cores
@@ -144,11 +143,11 @@ docker stats, cgroup `memory.peak` and per-container `nvidia-smi` every 3-6 s). 
   trainer: 1.8 GB of GPU memory at its default 256 environments, 4.7 GB at its cap of 1024, 16.5 GB at 4096 (the
   reference solution), about one CPU core (the PPO loop is bound by one Python thread); over the reference's 3.5 hours
   16.1 GiB of GPU memory, 5.6 GiB of memory, 1.6 cores at most. The sidecar: 2.2-2.6 cores during a deployment (four
-  rendered 20 s cases, ~3.6 min), its 4-CPU cap while finalizing (419-488 s), peak 2.1 GiB. Caps: 20 GiB of GPU memory
-  for `main` (`x-gpu-memory-gb`; 16.1 GiB x 1.15 = 18.5, rounded up; any CUDA GPU by memory, but all measurements are on
+  rendered 20 s cases, ~3.6 min), all its cores while finalizing (419-488 s), peak 2.1 GiB. The GPU-memory cap of `main` (`task.toml`) covers 16.1
+  GiB x 1.15 (any CUDA GPU by memory, but all measurements are on
   the L40S: a 24 GB card fits only when otherwise free and trains slower, so fewer iterations fit the cutoff and
   results are comparable only on one GPU model; the trainer caps torch at 15 % of the card, which its 0.64 GB at
-  4096 environments stays under on 24 GB), `main` 4 CPUs / 12 GiB, `sim` 4 CPUs / 6 GiB. Hosts: a GPU host that holds the three
+  4096 environments stays under on 24 GB). Hosts: a GPU host that holds the three
   control-transfer images (`-train`, `-nominal` is its base, the evaluator) and lists the `roboengineer` bench.
 
 ## Checks

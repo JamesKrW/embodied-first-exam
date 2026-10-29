@@ -26,18 +26,16 @@ None in the repository. Solvability evidence: a successful episode of the privil
 The sim service (`environment/sim/rcb_realtime.py` + `rcb_service.py`, the shared eai-standard/2.3 layer, with `environment/sim/server.py`, MyoSuite's adapter) judges the episode live and records every control step it ran (`trajectory_live.f64`), after checking at the episode's start that the scene is the frozen instance (its recorded state hash; else `instance_mismatch`, an infrastructure failure); after the agent's time the collect hook stops the agent's programs and signals the service, which writes the live episode's verdict to `final.json` (`graded_by` = `live`; nothing is replayed to grade it) and then renders `replay.mp4` from the trajectory, which decides nothing; `tests/grade.py` (separate sandbox, no network) passes iff the live episode succeeded. The clock's record (`stalls`, `max_lag_s`, ...) is copied into `reward.json` and decides nothing. `nop`: the episode never starts (its clock starts at the first submit), reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
 | `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 8 GiB | 8192 | 4 GiB | — |
+| `sim` | 4 | 11 GiB | 8192 | 4 GiB | — |
 | verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 20 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
-- Measured: as the standard twin (sim 1.2-1.4 GB); the GPU only renders the cameras over EGL (5 ms a frame on an RTX 4090); the sim keeps the GPU through the collect hook, which renders the video
-- Measured (caps): GPU memory (the sim service): EGL camera rendering only, under 1 GiB; capped at 4 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

@@ -56,16 +56,14 @@ leaderboard metric, keeps the per-task numbers (`episode_return`, `success_bar`)
 `/logs/verifier/diagnostics.json`. No oracle; human review in PR #9. `nop` scores 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 16 | 20 GiB | 8192 | no GPU | 10 GiB |
+| `main` (the agent's) | 16 | 20 GiB | 2048 | no GPU | 10 GiB |
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: memory: privileged container median 2.2 GB (p90 11 GB when agents run parallel rollouts) (a per-container memory sampler); CPU only; CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

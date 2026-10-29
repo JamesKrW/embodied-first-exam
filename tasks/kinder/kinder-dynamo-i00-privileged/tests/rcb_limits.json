@@ -4,8 +4,8 @@
   "main": {
    "cpus": 16.0,
    "disk_gb": 10.0,
-   "memory_gb": 20.0,
-   "pids": 8192
+   "memory_gb": 7.0,
+   "pids": 1024
   }
  },
  "disk_gb": 10.0,

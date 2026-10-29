@@ -41,18 +41,16 @@ Oracle partial: the reference solution scored 1 on an earlier version of this ta
 (`oracle_evidence` in `task.toml`); human review in PR #3 (PROTOCOL §4), with its privileged twin.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 16 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 11 GiB | 8192 | 6 GiB | — |
-| verifier (as `main`) | 4 | 16 GiB | no cap | no GPU | 20 GiB |
+| `main` (the agent's) | 4 | 5 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 4 | 12 GiB | 1024 | 4 GiB | — |
+| verifier (as `main`) | 4 | 5 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any 8 GB+ NVIDIA GPU (RTX 4090 / L4).
-- Measured: GPU memory 0.5-1.4 GB (physics on the CPU, the GPU renders the cameras; per-trial peaks of past trials); memory: sim p90 4.5 GB (a per-container memory sampler); CPU: an estimate (single-threaded Genesis CPU backend)
-- Measured (caps): GPU memory (the sim service): a per-trial peak of 1.4 GiB -> max(1.5 x peak, peak + 4), rounded up: 6 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

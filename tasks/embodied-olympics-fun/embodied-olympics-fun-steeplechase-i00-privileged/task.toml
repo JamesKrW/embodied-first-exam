@@ -26,7 +26,7 @@ timeout_sec = 900.0
 environment_mode = "separate"
 network_mode = "no-network"
 
-# Resources (docs/protocol/README.md §6): seal the monitor's record first, before any other sidecar ends the episode.
+# Resources (PROTOCOL §6): seal the monitor's record first.
 [[verifier.collect]]
 service = "rcb_monitor"
 command = "python3 /opt/rcb_monitor/monitor.py seal --wait 90"
@@ -47,7 +47,7 @@ network_mode = "public"        # open egress, the task author's choice (docs/pro
 build_timeout_sec = 1800.0
 cpus = 8
 memory_mb = 16384
-storage_mb = 20480
+storage_mb = 10240
 
 [verifier.env]
 RCB_LIMITS_ENFORCE = "${RCB_LIMITS_ENFORCE:-0}"

@@ -472,8 +472,7 @@ One reference execution therefore takes 10–15 minutes of the time limit, or ab
 - The privileged `scorer` service has `restart: on-failure:6`. It keeps no state a request needs: after a
   restart the next `s.score()` replays the posted actions from the reset. The scorer is the benchmark's own service:
   the resource monitor records it but keeps it out of the agent's scope (`BENCHMARK_SERVICES` in
-  `images/monitor/rcb_monitor/inject.py`), so nothing it uses counts against the agent; its caps are 2 CPUs, 7 GiB of
-  memory and 5 GiB of GPU memory (`scripts/task_resources.toml`). If the kernel kills it for memory and the episode
+  `images/monitor/rcb_monitor/inject.py`), so nothing it uses counts against the agent (its caps: the task's `environment/docker-compose.yaml`; PROTOCOL §6). If the kernel kills it for memory and the episode
   then ends without success, the trial is `infra_error = 1` (`resource_service_oom`), not the agent's 0.
 
 ## Tooling (file names)

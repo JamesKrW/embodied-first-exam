@@ -570,12 +570,12 @@ Numbers are stable (task files cite them); closed items are removed.
 ## Resources
 CPU only. The sim sidecar holds one Embodied Safety Exam world and, at the finalize, one more for the video; the agent's container holds the harness and the
 client.
-Caps (`scripts/task_resources.toml`, PROTOCOL §6; each an upper bound for one container): 4 CPUs and 8 GiB for `main`,
-6 CPUs and 8 GiB for `sim` (the finalize runs in the sim sidecar, not in the verifier).
+The caps of every container: each task's `task.toml` and README `## Resources` (the finalize runs in the sim sidecar,
+not in the verifier).
 Measured on a university HPC cluster (rootless podman on cgroups v1, where the caps are not applied): `/proc` PSS and
 CPU of each container's processes every 5 s, oracle and nop trials of every task: the sim sidecar at most 2.84 GB PSS,
 CPU p90 4.74 / max 5.28 cores while it finalized (over 414 trials; that finalize ran two replays side by side and the
-video, the current one renders the video only and was not re-measured), hence its 6-CPU cap; a whole trial at most 4.75
+video, the current one renders the video only and was not re-measured); a whole trial at most 4.75
 GB PSS; `main` at most 0.74 GB. Run at most 10 Embodied Safety Exam trials at once per 32 free cores.
 
 ## How to run

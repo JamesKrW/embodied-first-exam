@@ -25,7 +25,7 @@ AutoBio's scripted expert (mani_thermal_mixer.py @ 0850421), seed 0: the positio
 `tests/grade.py` in a separate sandbox without network: two replays of `/app/output/trajectory.npz`, each in a fresh process, from the verifier's own copy of the instance (`tests/instance.json`; the compiled model and the rebuilt start state are checked against its recorded hashes); pass iff both episodes succeed (the episode is judged in the state in which it ends, success iff AutoBio's score is 1) in the same state (`deterministic`). `nop`: no trajectory, reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
@@ -33,8 +33,6 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 | verifier | 4 | 8 GiB | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: CPU only; 4 CPUs and 8 GB per trial, the verifier the same (the benchmark's estimate)
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

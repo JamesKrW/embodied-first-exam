@@ -42,18 +42,16 @@ clock's record (`stalls`, `max_lag_s`, ...) is copied into `reward.json` and dec
 episode never starts (its clock starts at the first submit), reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 7 GiB | 8192 | 4 GiB | — |
-| verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 20 GiB |
+| `main` (the agent's) | 2 | 4 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 4 | 5 GiB | 1024 | 4 GiB | — |
+| verifier (as `main`) | 2 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
-- Measured: as the standard twin; the GPU only renders the cameras over EGL: GPU memory 1.0-1.3 GB (per-trial peaks of past trials); memory: sim 0.7 GB; CPU p90 1.9 cores
-- Measured (caps): GPU memory (the sim service): EGL camera rendering only (1.0-1.3 GiB in the standard twin's trials); capped at 4 GiB; processes and disk: defaults, not measured
 
 ## Details
 | | |

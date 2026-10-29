@@ -25,17 +25,15 @@ Same instance and success rule as `autobio-thermal-cycler-open-i00-privileged` (
 Graded by the live episode (docs/protocol/README.md H.4): `success` = the live episode's success, judged by the sim service on the episode the agent ran, with no grading replay; an episode that ended in a simulator error scores 0. The service records every executed control step; the collect hook (`environment/sim/finalize.sh`) ends the service, writes `final.json` from the live episode's record and, after the verdict is on disk, replays the recorded trajectory once from the frozen instance to render `replay.mp4` (a failed video replay costs the video only). `tests/grade.py` (separate sandbox, no network) writes the reward fields (`graded_by_live` = 1, `replays` = 0, `infra_error`, the crash-recovery fields). A missing or unfinished `final.json` (the hook never wrote its verdict) and a live episode that did not start in the instance's recorded state are `infra_error = 1`, never the agent's 0. `nop`: the episode times out, reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 8 | 15 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 20 GiB |
+| `main` (the agent's) | 4 | 4 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 4 | 39 GiB | 1024 | no GPU | — |
+| verifier (as `main`) | 4 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: CPU only; 4 CPUs and 8 GB per trial, the verifier the same (the benchmark's estimate)
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

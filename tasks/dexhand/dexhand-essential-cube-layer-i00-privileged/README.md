@@ -33,16 +33,14 @@ on the oracle, no-op, truncated, dropped-object, forged-metadata and wrong-width
 Release status is provisional until independent solvability review.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 2 | 10 GiB | 8192 | no GPU | 10 GiB |
-| verifier (as `main`) | 2 | 10 GiB | no cap | no GPU | 10 GiB |
+| `main` (the agent's) | 2 | 4 GiB | 1024 | no GPU | 10 GiB |
+| verifier (as `main`) | 2 | 4 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: 30 Harbor trials of both modes of the six essential families (12 oracle, 12 nop, 6 Wuji) plus the hamburger and paper oracle and nop trials, CPU only, the trial's resource monitor every 5 s: one fresh replay process 0.25-0.32 GiB max RSS (paper 0.31, hamburger 0.28), and the verifier runs two at once (at most 0.65 GiB); the agent's container at most 0.03 GiB without an agent; one core per replay process; an agent's own simulator sessions take about 0.3 GiB each
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 

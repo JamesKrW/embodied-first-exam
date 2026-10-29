@@ -26,13 +26,12 @@ The scripted learner in `solution/` fits force corrections from permitted IMU/RP
 The private MuJoCo service evaluates the sealed policy in six held-out cases, each replayed twice in fresh processes. The no-network verifier reads only collected simulator evidence and emits binary success plus a continuous score. Reference times come from finite full-model optimization, without a claim of global optimality. Ground-truth states, model residuals, seeds, reference searches and grades are never feedback to the agent.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 2 | 6 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 6 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 2 | 4 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 4 | 5 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: Harbor oracle on a cloud CPU host (docker stats and cgroup memory.peak every 3-6 s): the sidecar holds its 4-CPU cap through the reference search before the agent starts (~480 s, the agent's container idle) and the finalization (136 s), peak 1.18 GiB; the sidecar 1-2 cores during deployments; the agent's container 0.06 GiB; the agent waits for the sidecar's health check and is stopped before finalization, so the sidecar's 4 cores never coincide with the agent's work; the verifier itself only reads JSON (~20 s)

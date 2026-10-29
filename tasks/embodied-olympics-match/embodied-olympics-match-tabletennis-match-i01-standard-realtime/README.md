@@ -32,17 +32,15 @@ valid, finished match that the agent won. `tests/fexam_reward.py` adds the hub's
 `slowdown`, `opponent_level`).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 2 | 6 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 6 | 8 GiB | 256 | no GPU | — |
+| `main` (the agent's) | 2 | 5 GiB | 2048 | no GPU | 10 GiB |
+| `sim` | 6 | 6 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: the values Embodied Olympics measured for its exported matches (tasks/embodied-olympics-fun/README.md): the sim takes up to 6 CPUs, the agent 2; memory: sim 0.7-1.4 GB, agent 2.2 GB (a per-container memory sampler); CPU only, real time needs the cores
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 

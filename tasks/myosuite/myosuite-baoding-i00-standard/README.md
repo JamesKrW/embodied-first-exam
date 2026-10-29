@@ -25,17 +25,15 @@ None. Solvability evidence: no positive example in standard mode yet: the privil
 The sim service judges the episode live (the task's rule on the steps it ran: the goal held 200 control steps) and records every executed control step; it checks at the episode's start that the scene is the frozen instance (its recorded state hash; else `instance_mismatch`, an infrastructure failure). The collect hook (`environment/sim/finalize.sh`) ends the service and writes that live verdict to `final.json` (`graded_by` = `live`; nothing is replayed to grade it), then renders `replay.mp4` in one pass over the recorded trajectory, which decides nothing; `tests/grade.py` (separate sandbox, no network) passes iff the live episode succeeded. A missing or unreadable `final.json`, one without a verdict, or a give-up after crashes not all inside the agent's calls is an infrastructure failure (`infra_error = 1`), not the agent's 0. No oracle; human review in PR #65. `nop`: the episode times out, reward 0.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
-| verifier (as `main`) | 4 | 10 GiB | no cap | no GPU | 20 GiB |
+| `main` (the agent's) | 4 | 7 GiB | 2048 | no GPU | 10 GiB |
+| `sim` | 4 | 8 GiB | 1024 | no GPU | — |
+| verifier (as `main`) | 4 | 7 GiB | no cap | no GPU | 10 GiB |
 
 - GPU: not needed.
-- Measured: memory: sim p90 1.4 GB (a per-container memory sampler); CPU only; CPU: an estimate
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

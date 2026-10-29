@@ -51,17 +51,15 @@ more than 50,000 rows) is `bad_trajectory`; `grader_error = 1` (with `infra_erro
 or ran out of time, a frozen instance this host did not rebuild).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 8 | 30 GiB | 16384 | 18 GiB | 20 GiB |
+| `main` (the agent's) | 8 | 30 GiB | 8192 | 18 GiB | 10 GiB |
 | verifier | no cap | no cap | no cap | 18 GiB | no cap |
 
 - GPU: an RTX-class NVIDIA GPU (ray-tracing cores), one of the models in `gpu_types`: L40S, L40, L4, RTX 4090, RTX 6000 Ada, held by `main`.
 - Recommended GPU: L40S 48GB / L4 24GB / RTX 4090 24GB.
-- Measured: GPU memory and CPU from BEHAVIOR-1K (the same OmniGibson / Isaac Sim stack); the verifier 15.8 GB (a per-container memory sampler); the standard twin's sim service, the same simulator, in one trial: anon memory 17.5 GB, start-up CPU bursts to 29 cores, GPU memory 3.6 GB 15 min in (a per-container sampler every 30 s)
-- Measured (caps): GPU memory: cap 18 GiB, the benchmark's choice, below the measured peaks of 18.1-19.4 GiB (per trial: 18.1 GiB on a 24 GB card, 19.4 GiB on a 48 GB card; no texture budget in its tooling): a trial over it is recorded and fails only when a run sets RCB_LIMITS_ENFORCE=1 (tasks/maniguard/README.md "GPU memory"); processes and disk: defaults, not measured
 
 ## Details
 | | |

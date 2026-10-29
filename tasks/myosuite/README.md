@@ -143,7 +143,7 @@ locomotion challenges and by hand_pose); elbow and finger pose / reach (near-dup
   the verifier books a missing, unreadable or never-finalized `final.json` as `infra_error = 1`;
   `finalize.sh` writes `final.json` atomically. One call returns at most 1000 images (cameras x frames, per-frame depth
   counted again; `/spec` `max_frames_per_call`), checked before anything runs (400): every frame is held until the
-  response is sent (2.7 GB per 1000 640 x 480 RGB frames, under the sidecar's 8 GiB cap). The default camera at 10 fps needs 302 images for the longest watch. One gap is left in the shared 2.2 layer (`embodied_first_exam/standard/
+  response is sent (2.7 GB per 1000 640 x 480 RGB frames). The default camera at 10 fps needs 302 images for the longest watch. One gap is left in the shared 2.2 layer (`embodied_first_exam/standard/
   rcb_limited.py`, not MyoSuite's): JSON `actions` holding an object is a TypeError there, still a 500.
 - **Reset budget: 10** (PROTOCOL §2: the task's own budget). MyoSuite's own termination ends most standard episodes
   within one or two seconds of simulated time, so a single episode would be one blind attempt at muscle-level control.

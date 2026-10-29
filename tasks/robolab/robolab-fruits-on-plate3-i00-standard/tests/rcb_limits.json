@@ -3,18 +3,18 @@
  "caps": {
   "main": {
    "cpus": 8.0,
-   "disk_gb": 20.0,
+   "disk_gb": 10.0,
    "memory_gb": 24.0,
-   "pids": 16384
+   "pids": 1024
   },
   "sim": {
    "cpus": 8.0,
-   "gpu_memory_gb": 24.0,
-   "memory_gb": 23.0,
-   "pids": 16384
+   "gpu_memory_gb": 22.0,
+   "memory_gb": 41.0,
+   "pids": 4096
   }
  },
- "disk_gb": 20.0,
+ "disk_gb": 10.0,
  "disk_tick_sec": 60,
  "format": "rcb-limits/2",
  "gpu": false,

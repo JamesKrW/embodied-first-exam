@@ -28,16 +28,15 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 rules: The course is 10.0 m long (x from 0 to 10.0 m) and 5.0 m wide, centred on y = 0: its left side line is half that width to the left of the centre line (y > 0), its right side line as far to the right. Corner cones stand where the side lines meet the start line x = 0 (the start cone on the left, the finish cone on the right) and the far line x = 10.0 m (the far-left and the far-right cone). Four centre cones stand on the centre line y = 0, the first on the start line and one every 3.3 m after it. The cones are free (0.09 m base radius, 0.23 m high, 0.25 kg). The clock starts at t = 0. The path, judged on your pelvis, in this order: (1) round the far-left cone: cross the left side line's continuation beyond the far line (x > 10.0 m), in either direction; (2) come back and go round the first centre cone on the start line's side: cross the centre line at x < 0 from the left half (y > 0) to the right half; (3) weave up: cross the centre line between the first and second centre cones from right to left, between the second and third from left to right, between the third and fourth from right to left; (4) go round the fourth centre cone: cross the centre line beyond it from left to right; (5) weave down: between the fourth and third from right to left, the third and second from left to right, the second and first from right to left; (6) go round the first centre cone again: cross the centre line at x < 0 from left to right; (7) round the far-right cone: cross the right side line's continuation beyond the far line (x > 10.0 m), in either direction; (8) finish: the leading point of your torso (not the head, arms, legs or feet) reaches the start line's plane x = 0 with your pelvis in the right half (y < 0). Any crossing of the centre line by your pelvis that is not the next one of this list, at any time, is leaving the prescribed path. You succeed when you finish within 60 s of robot time. A fall does not end the attempt: you are down while your pelvis is below 0.4 m, you may get up and go on, but 10.0 s down in a row end it. You fail if any part of you touches any of the eight cones, if you leave the prescribed path, when down for 10.0 s, or after 60 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `sim` | 4 | 6 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

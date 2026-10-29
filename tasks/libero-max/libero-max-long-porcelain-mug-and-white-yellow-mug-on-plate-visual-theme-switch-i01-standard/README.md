@@ -41,17 +41,15 @@ served. After the verdict the collect hook replays `trajectory.npz` once in a fr
 (`tasks/libero-max/README.md`, "Grading (standard mode)").
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 11 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 3 | 10 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 3 | 6 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: the sim service estimated (robosuite, CPU only, 256x256 OSMesa cameras); the privileged twin's verifier, which replays the same simulator, 1.6 GB (a per-container memory sampler)
-- Measured (caps): processes and disk: defaults, not measured
 
 ## Details
 | | |

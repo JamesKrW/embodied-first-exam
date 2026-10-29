@@ -32,7 +32,7 @@ clock starts at the first submit), reward 0. The
 rules: The bout is on a dohyo: a clay mound 0.55 m high, 6.7 m square, with a ring of straw bales whose inside edge is a circle 4.55 m across (the bales stand 0.05 m proud of the clay). You stand facing the opponent behind your starting line (the white lines are 0.7 m apart, across the middle of the ring); the opponent, another Unitree G1, stands behind its line facing you. The bout starts at t = 0; the opponent charges at t = 0.5 s and keeps walking into you, arms forward, turning to face you. You win at the first moment the opponent touches the ground outside the ring (the mound beyond the bales, or the floor below the mound) with any part of its body, or touches the clay or the bales inside with any part other than its feet, provided you have not done the same before. You lose (the attempt fails) if that happens to you first: any part of you on the ground outside the ring, any part other than your feet on the clay or the bales, or your pelvis lower than 0.35 m above the clay. Both in the same instant is no decision and fails. Kicking the opponent's trunk (its pelvis or torso) with a foot is forbidden and fails. If there is no decision after 30 s, you fail.
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
@@ -42,8 +42,6 @@ Each number is an upper bound for one container; docs/protocol/README.md §6 say
 
 - GPU: any NVIDIA GPU, held by `sim`.
 - Recommended GPU: any NVIDIA GPU with EGL (RTX 4090 / L4).
-- Measured: as the standard twin, but the sidecar renders the cameras on the GPU over EGL; estimated on an RTX 4090 workstation: the sim sidecar steps the physics on one or two cores (under 1 GB), the agent's container holds the harness and the client
-- Measured (caps): GPU memory (the sim service): EGL camera rendering only (not measured); capped at 4 GiB
 
 ## Details
 | | |

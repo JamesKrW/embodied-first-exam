@@ -28,16 +28,15 @@ infrastructure), and the video is rendered from the recorded attempt afterwards.
 rules: Two rope-turning machines stand 3.9 m apart, at y = -1.95 and +1.95 m; each turns the ends of two ropes on cranks 0.3 m long whose axles are 0.95 m above the floor, 0.4 m apart (one at x = +0.2 m, one at x = -0.2 m), at 1.1 turns per second each, the two ropes in opposite directions and half a turn apart, so that a rope passes under the middle every 0.4545 s, the two ropes taking turns: the rope at +x goes over the top towards -x and under the middle towards +x, the rope at -x the other way round. They are already turning at the start, and they never stop. You start outside the ropes and must enter them: the centre zone is within 0.35 m of x = 0 and 0.5 m of y = 0 (your pelvis decides). A jump counts when a rope passes under both your feet while nothing of you touches the ground and your pelvis is in the centre zone, if that rope has passed over your head since it last passed under you, and if it is not the same flight as the last counted jump (one rope per jump). You succeed when, after 10 counted jumps, your first contact with the floor is your feet only. You fail at once if a rope touches any part of you (a miss), if a rope passes under a foot that is on the ground or through you, if your pelvis leaves the centre zone after it has entered it, on a fall (your pelvis lower than 0.35 m, or any part of you other than your feet on the floor), on a landing after the last jump that is not on the feet, if you touch a turning machine, or after 25 s. No oracle; human review in the pull request that adds the benchmark (PROTOCOL §4).
 
 ## Resources
-Each number is an upper bound for one container; docs/protocol/README.md §6 says where each is set and what enforces it.
+Caps per container (PROTOCOL §6).
 
 | Container | CPUs | Memory | Processes | GPU memory | Disk |
 |---|---|---|---|---|---|
-| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 20 GiB |
-| `sim` | 4 | 8 GiB | 8192 | no GPU | — |
+| `main` (the agent's) | 4 | 10 GiB | 8192 | no GPU | 10 GiB |
+| `sim` | 4 | 6 GiB | 1024 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 
 - GPU: not needed.
-- Measured: estimated on an RTX 4090 workstation: CPU only; the sim sidecar steps and renders on one or two cores (under 1 GB), the agent's container holds the harness and the client
 
 ## Details
 | | |

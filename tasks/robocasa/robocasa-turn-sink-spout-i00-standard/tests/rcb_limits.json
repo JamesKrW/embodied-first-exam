@@ -2,18 +2,18 @@
  "agent_timeout_sec": 3600,
  "caps": {
   "main": {
-   "cpus": 4.0,
-   "disk_gb": 20.0,
-   "memory_gb": 16.0,
-   "pids": 8192
+   "cpus": 2.0,
+   "disk_gb": 10.0,
+   "memory_gb": 5.0,
+   "pids": 1024
   },
   "sim": {
    "cpus": 6.0,
-   "memory_gb": 27.0,
-   "pids": 8192
+   "memory_gb": 15.0,
+   "pids": 1024
   }
  },
- "disk_gb": 20.0,
+ "disk_gb": 10.0,
  "disk_tick_sec": 60,
  "format": "rcb-limits/2",
  "gpu": false,

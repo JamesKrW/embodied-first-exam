@@ -71,7 +71,7 @@ Guide for maintainers. The contract is [protocol/README.md](protocol/README.md);
   results must stay comparable), old -> new and why in its description, the tasks normalized (their `DIGEST` files changed with them), nothing else changed.
 - Resources (PROTOCOL §6, protocol/running.md "Resources"): every number is a cap for one container. Are the caps
   measured with a margin (what do `measured` / `caps_measured` in `scripts/task_resources.toml` cite, and do they say
-  where there are no measurements)? Would an honest agent and the oracle stay inside them (one simulator at the
+  where there are no measurements)? Would an honest agent and the oracle stay inside them (any cap but CPU can kill a process; one simulator at the
   task's defaults on the largest card it runs on, the tooling's own replay checks, videos it is told to write), or
   does the benchmark's README state the exception? Does
   `gpu_types` match the simulator (Isaac Sim / Omniverse: an RTX-class GPU)? Does a separate verifier need caps in
