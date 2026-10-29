@@ -106,6 +106,7 @@ BENCHMARK_TABLE = [
     ("labutopia-", "LabUtopia", "labutopia"),
     ("autobio-", "AutoBio", "autobio"),
     ("abc-sim-", "ABC Sim", "abc-sim"),
+    ("embodiedswe-", "EmbodiedSWE", "embodiedswe"),
 ]
 BENCHMARKS = [(p, label) for p, label, _ in BENCHMARK_TABLE]   # (directory prefix, label): the first matching prefix wins
 # Modes (PROTOCOL §3): a benchmark ships any subset of the modes. A standard or standard-realtime
