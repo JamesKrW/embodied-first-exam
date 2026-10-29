@@ -39,9 +39,7 @@ r.status()                                     # calls, control steps, done, rea
 Cameras: `top` (above and behind the arms, looking down at the table), `left` and `right` (wrist cameras on the arms), `overhead`, `left_side`, `right_side` (640x480; default `top`, `left`, `right`); `spec["cameras"]` gives each camera's mounting (static,
 or on an arm link: the wrist cameras move with the arm, so use the pose returned with each frame) and intrinsics, and
 every response carries each frame's pose. Rendering runs on the service's GPU (a few milliseconds a frame): ask only for
-the cameras you need; `video="none"` makes a chunk fastest. One call returns at most 1000 images (cameras x frames at
-`video_fps`, default 10; depth for every frame counts again; `spec["max_frames_per_call"]`): a larger request is refused
-with a 400 before anything runs. Proprioception (`spec["proprio_groups"]`): `joint_pos` (`q_<entry>`, the 14 action
+the cameras you need; `video="none"` makes a chunk fastest. One call returns at most 1000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"). Proprioception (`spec["proprio_groups"]`): `joint_pos` (`q_<entry>`, the 14 action
 coordinates measured), `joint_vel` (`qd_<entry>`), `gripper_opening` (m), `tcp_pose` (each arm's tool centre point,
 world frame, `wxyz`), `joint_effort` (`effort_<entry>`). `/kinematics` (`r.fk`, `r.ik`) gives the tool frames `left_tcp`,
 `right_tcp`, `left_grasp`, `right_grasp` and the arm links for any joint positions, and solves IK for the tool frames.

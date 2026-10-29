@@ -28,6 +28,7 @@ INSTANCE = os.environ.get("RCB_INSTANCE", os.path.join(os.path.dirname(os.path.a
 WALL_CLOCK_S = float(os.environ.get("RCB_WALL_CLOCK_S", "3600"))
 MAX_CHUNK_S = float(os.environ.get("RCB_MAX_CHUNK_S", "10"))
 MAX_WATCH_S = float(os.environ.get("RCB_MAX_WATCH_S", "30"))
+MAX_FRAMES = 1812  # /spec max_frames_per_call: images per call (cameras x frames, per-frame depth counted again)
 UNITS = os.environ["RCB_ACTION_UNITS"]  # the row's units, as the instruction words them (compose, from families.json)
 LOCK = threading.Lock()
 PID_FILE = os.path.join(DATA, "server.pid")
@@ -92,6 +93,7 @@ SPEC = {
     "physics_substeps": SUBSTEPS,
     "max_chunk_s": MAX_CHUNK_S,
     "max_watch_s": MAX_WATCH_S,
+    "max_frames_per_call": MAX_FRAMES,
     "cameras": {
         c: {
             "rgb": True,
@@ -244,17 +246,30 @@ def ctrl_step(a, rec) -> bool:
     return E["done"] or stop
 
 
+def frame_every(fps: int) -> int:
+    """The Recorder's stride in control steps: round(control rate / video_fps)."""
+    return max(1, int(round(CTRL_HZ / max(1, fps))))
+
+
 def recorder(cams, fps: int, meta: dict) -> L.Recorder:
     return L.Recorder(
         cams,
-        max(1, int(round(CTRL_HZ / max(1, fps)))),
+        frame_every(fps),
         grab,
         proprio_row,
         extrinsics,
         ctrl_steps,
         depth=L.depth_mode(meta),
         clock_hz=CTRL_HZ,
+        max_images=MAX_FRAMES,
     )
+
+
+def frames_ok(steps: int, fps: int, cams, meta: dict) -> None:
+    """The images the call's Recorder captures over `steps` control steps (its real stride, every camera, per-frame
+    depth counted again), refused above max_frames_per_call before anything runs (a 400)."""
+    L.check_frames(len(dict.fromkeys(cams)), L.frames_per_call(steps, frame_every(fps)), L.depth_mode(meta) in ("frames", "legacy"),
+                   MAX_FRAMES)
 
 
 def video_fps(meta: dict) -> int:
@@ -350,6 +365,7 @@ def do_submit(meta: dict, A: np.ndarray):
         raise ValueError("interpolate must be hold|linear")
     if not isinstance(video, str) or video not in ("mp4", "frames", "both", "none"):
         raise ValueError("video must be mp4|frames|both|none")
+    frames_ok(A.shape[0] * int(round(k)), fps, cams, meta)
     rec, clipped = recorder(cams, fps, meta), []
     E["calls"] += 1
     step0, before = E["step"], ctrl_steps()
@@ -410,6 +426,7 @@ def do_observe(meta: dict):
         raise ValueError(f"seconds must be in [0, {MAX_WATCH_S}]")
     if not isinstance(video, str) or video not in ("mp4", "frames", "both", "none"):
         raise ValueError("video must be mp4|frames|both|none")
+    frames_ok(int(round(seconds / S.dt)), fps, cams, meta)
     rec, before = recorder(cams, fps, meta), ctrl_steps()
     if seconds > 0 and not E["done"]:
         rec.tick(force=True)

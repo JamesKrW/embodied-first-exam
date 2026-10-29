@@ -187,9 +187,7 @@ come from the 15,000-action cap and the replay speed, `RCB_STARTUP_TIMEOUT_S` fr
 simulator's link6 poses); 58 proprio columns. Request checks: every field of a `/submit` or `/observe` is
 read and checked before the first action; a malformed request (a wrong type, a value out of range, an `ee_pose` position
 more than 3 m from the world origin on any axis, a zero quaternion) is a 400 and executes nothing. Cameras are taken once
-each, and one call captures at most 3000 images (cameras × frames, per-frame depth counted again; `/spec`
-`max_frames_per_call`): a `joint_position` chunk or an `/observe` that would exceed it is a 400; an `ee_pose` call, whose
-length is only known once its IK is solved, keeps executing and stops filming (`meta["frames_capped"]`).
+each, and one call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 ## Known issues
 - **Joint limits in `/spec` and `robot_spec()`** are the articulation's soft limits as Isaac Lab reports them (about

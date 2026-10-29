@@ -1,10 +1,10 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:bigym2-files-0.3.1@sha256:17b2f27405fe018fbddf4bf8f71003e4d73c3216f24c865f30e894c2f5643501",
+ "image": "ghcr.io/mll-lab-nu/efe:bigym2-files-0.4.0@sha256:fe8dd55600b32447391fbe16e1789a0df479ac6a17190ecf2f85cd59af9a5447",
  "source": "embodied_first_exam/benchmarks/bigym2",
  "files": {
   "privileged/environment/rcb_bigym2.py": "ef2345f5ec8806584617600edae10a9764ef9ad386bfc301b93d077e7f2cd636",
   "privileged/tests/grade.py": "fe5eaa42bf417b3b259ce975f96f288aad4ec83f06a3ed80321d75b2a65bc659",
-  "sim/rcb_service.py": "260821609201c36dbfb1be9cf528b82573d8364fe6f7839c7d11db6a852a7c20",
+  "sim/rcb_service.py": "a6c50beec04bdb3b11885939dfe90a249506edcd5c462d2ac10816bbf2a71e2e",
   "sim/server.py": "066c91719b5a97c84da41f0dfa79ae2d98baee606b9539ab49f29c7afca5e56a"
  }
 }

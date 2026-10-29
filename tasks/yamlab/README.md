@@ -224,7 +224,7 @@ YAMLab, its USDs and its dataset (objects, demonstrations): MIT. Isaac Lab: BSD-
 
 ## Standard-mode service details
 
-Serves `eai-standard/2.2`. Resume class `exact` (Isaac Lab, CPU PhysX, a fixed env seed: the resumed service is a fresh process, whose first run is bit-exact). Its service states no `max_frames_per_call` yet (calls are bounded by `max_watch_s`, `max_chunk_s` and the frame rate).
+Serves `eai-standard/2.2`. Resume class `exact` (Isaac Lab, CPU PhysX, a fixed env seed: the resumed service is a fresh process, whose first run is bit-exact). One call returns at most 5412 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 ## Screening
 

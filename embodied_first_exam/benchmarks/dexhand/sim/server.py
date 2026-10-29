@@ -340,7 +340,7 @@ def options(meta, steps: int):
         raise ValueError(f"video_fps must be between 1 and {MAX_FPS}")
     every = max(1, int(round(HZ / fps)))
     depth = L.depth_mode(meta)
-    L.check_frames(len(cameras), math.ceil(steps / every) + 3, depth in ("frames", "legacy"), 1000)
+    L.check_frames(len(cameras), L.frames_per_call(steps, every), depth in ("frames", "legacy"), SPEC["max_frames_per_call"])
     capture = grab
     if video == "none" and depth not in ("frames", "legacy"):
         def capture(cams, want_depth):

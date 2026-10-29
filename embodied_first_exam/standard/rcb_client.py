@@ -21,6 +21,12 @@
     res.meta["time_left_s"]                      # your time limit minus the time since your first request to the service:
                                                  # never out before your time is (spec()["budget"]["clock"]); plan by it
 
+Images per call: one call returns at most spec()["max_frames_per_call"] images, counted as cameras x the frames it
+really captures (at video_fps, rounded to whole control steps, plus its first and last), a depth frame one more. A
+get_obs(seconds=...) or a joint_position chunk over it raises ValueError (400) and runs nothing. An ee_pose call, whose
+length is known only while it runs, stops filming at the budget instead: the motion goes on, its last frame is always
+taken, and res.meta["frames_skipped"] counts the frames left out.
+
 Nothing is put into your context automatically: what you look at, and where you store it, is your code's decision.
 
 If a call fails with a connection error or a 5xx, the service may have crashed; it restarts and resumes the SAME episode

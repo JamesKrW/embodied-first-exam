@@ -55,6 +55,7 @@ r.status()                                     # calls, control steps, done, rea
 obs = r._post("/reset", {"cameras": ["track"]}, [], 900)   # POST /reset: a new episode (the 2.2 client has no reset())
 ```
 Cameras: `track` (follows the robot) and `realsense/rgb` (on its head); `spec["cameras"]` gives each one's mounting and intrinsics, and every response carries its pose. Proprioception (`spec["proprio_groups"]`): `joint_pos`, `joint_vel`, `joint_effort` (12 each, action
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 order), `imu_gyro`, `imu_accelerometer`, `imu_gravity`, `imu_linvel` (3 each, IMU frame: x forward, y left, z up),
 `foot_contact` (foot_front_left, foot_hind_left, foot_front_right, foot_hind_right).
 

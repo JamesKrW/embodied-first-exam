@@ -1,6 +1,6 @@
 FROM ghcr.io/mll-lab-nu/efe:mujoco-0.1.2
 COPY instance.json /app/instance.json
-COPY --from=ghcr.io/mll-lab-nu/efe:mujoco-playground-files-0.4.1@sha256:edc4ee147fcda819b1ed3df6faa7277aca673f75f52bac2cf34f3dd9357c4e9b /privileged/environment/rcb_aloha.py /opt/tools/rcb_aloha.py
+COPY --from=ghcr.io/mll-lab-nu/efe:mujoco-playground-files-0.5.0@sha256:3f0b9610b741f2807ff2c5b545c5287500de98ab1f7dcadc9f4780cd0a6bc42a /privileged/environment/rcb_aloha.py /opt/tools/rcb_aloha.py
 ENV PYTHONPATH=/opt/tools
 RUN mkdir -p /app/output
 WORKDIR /app

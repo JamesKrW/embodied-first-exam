@@ -243,9 +243,20 @@ def video_fps(meta: dict) -> int:
     return int(fps)
 
 
+class Rec(L.Recorder):
+    def _skip(self) -> None:
+        """A frame past the budget (a long ee_pose move) is still rendered (the observation, cached for the state) when
+        the live video, which records only the states a call rendered, wants one there; it is not kept in the response."""
+        try:
+            if VIDEO.wants(ctrl_steps()):
+                S.observe()
+        except Exception:  # noqa: BLE001 -- the video loses this frame; the call goes on
+            pass
+
+
 def recorder(cams, fps: int, meta: dict) -> L.Recorder:
-    return L.Recorder(cams, max(1, int(round(CTRL_HZ / max(1, fps)))), grab, proprio_row, extrinsics, ctrl_steps,
-                      depth=L.depth_mode(meta), clock_hz=CTRL_HZ)
+    return Rec(cams, max(1, int(round(CTRL_HZ / max(1, fps)))), grab, proprio_row, extrinsics, ctrl_steps,
+               depth=L.depth_mode(meta), clock_hz=CTRL_HZ, max_images=MAX_FRAMES)
 
 
 def meta_common(cams) -> dict:
@@ -288,11 +299,8 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder) -> bool:
     a failed check, the runaway guard), or the service stops the call (max_call_wall_s, the client hung up)."""
     a = np.asarray(a, dtype=np.float32)                    # the exact row Session.step executes (and records)
     over = S.step(a); stop = EP.journal(a)
-    if rec.n % rec.every == 0 and (len(rec.steps) + 2) * images_per_frame(rec.cams, rec.mode) > MAX_FRAMES:
-        rec.n += 1; rec.capped = getattr(rec, "capped", 0) + 1     # the call's frame budget is used up (a long ee_pose move):
-    else:                                                          # the actions go on, the filming stops; the forced last
-        rec.tick()                                                 # frame is still taken
-    VIDEO.offer(ctrl_steps())                                      # a frame only if the call rendered this action
+    rec.tick()                     # past the call's budget (a long ee_pose move) it films no more; the last frame is taken
+    VIDEO.offer(ctrl_steps())      # a frame only if the call rendered this action (past the budget too: Rec._skip)
     if over: finish(end_reason())
     return E["done"] or stop
 
@@ -421,16 +429,12 @@ def check_ee_rows(A: np.ndarray) -> None:
                 raise ValueError(f"ee_pose row {ri}: the {a} quaternion (wxyz) has zero length")
 
 
-def images_per_frame(cams, depth: str) -> int:
-    return len(cams) * (2 if depth in ("frames", "legacy") else 1)
-
-
 def check_frames(cams, fps: int, depth: str, control_steps: int) -> None:
     """A call whose length is known before it runs (a joint_position chunk, an /observe) is refused when it would capture
     more than MAX_FRAMES images (the layer's check: a 400, nothing executed): the Recorder films every `every`-th action
     plus the first and the last frame, whatever `video` asks to be returned."""
     every = max(1, int(round(CTRL_HZ / max(1, fps))))
-    L.check_frames(len(cams), int(math.ceil(control_steps / every)) + 2, depth in ("frames", "legacy"), MAX_FRAMES)
+    L.check_frames(len(cams), L.frames_per_call(control_steps, every), depth in ("frames", "legacy"), MAX_FRAMES)
 
 
 def parse_submit(meta: dict, A: np.ndarray) -> tuple:
@@ -451,7 +455,7 @@ def parse_submit(meta: dict, A: np.ndarray) -> tuple:
     if typ == "ee_pose" and A.shape[0] > 50: raise ValueError("ee_pose: at most 50 rows per submit")
     if typ == "ee_pose": check_ee_rows(A)
     # joint_position: the chunk's length is known here. ee_pose: a row lasts as long as its move (known after its IK), so
-    # ctrl_step() stops filming once the call has captured MAX_FRAMES images and the rows go on (meta "frames_capped")
+    # the recorder stops filming once the call has captured MAX_FRAMES images and the rows go on (meta "frames_skipped")
     if typ == "joint_position": check_frames(cams, fps, depth, A.shape[0] * int(round(dt * CTRL_HZ)))
     return typ, dt, interp, cams, fps, video, note
 
@@ -467,7 +471,7 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
     succ = E["success"] or check_success(); E["success"] = succ
     out = {**meta_common(cams), "chunk_id": E["calls"], "type": typ, "executed_rows": E["step"] - step0, "control_steps_chunk": ctrl_steps() - before,
            "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": plan, "rejected": None, "ok": True,
-           "frames_capped": int(getattr(rec, "capped", 0))}
+           **({"frames_skipped": rec.skipped} if rec.skipped else {})}
     log({"ev": "submit", "call": E["calls"], "type": typ, "rows": E["step"] - step0, "dt": dt, "interpolate": interp, "cameras": cams, "note": note,
          "depth": rec.mode, "control_steps": ctrl_steps() - before, "n_clipped": len(clipped), "plan": plan[:50], "success": succ,
          **({"stopped": EP.stop_reason} if EP.stopping else {})})

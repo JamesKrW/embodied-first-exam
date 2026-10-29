@@ -245,10 +245,6 @@ licensed to whoever downloads them, never in the image or the repository (`image
 - A JSON `/submit` body (not RCB1) whose `actions` is an object, or an RCB1 header whose `meta` is not an object with
   no `actions` part, fails in the shared layer before the adapter sees it (`rcb_limited.py`: 500, the episode ends).
   The official client always sends an RCB1 `actions` array, so only a hand-written request can do this.
-- The response of one call is built in memory, so one call returns at most 1500 images (`/spec` `max_frames_per_call`,
-  `environment/sim/server.py` `MAX_FRAMES`: cameras x frames, a frame with per-frame depth counts 4): over it a 400 before anything
-  runs, and `ee_pose` rows that take longer than counted (up to 400 control steps each) stop adding frames there
-  (`meta["frames_skipped"]`).
 - `ball_into_bottle`: the red bottle's base collides as a thin shell (about 3.5 mm), so a ball that falls fast down the
   bottle can pass through it onto the table (9 of 16 slightly perturbed replays of one pour). The instruction says so;
   a thicker collision base would change the frozen scene and has not been made.
@@ -264,7 +260,7 @@ licensed to whoever downloads them, never in the image or the repository (`image
 
 Resume class `exact` on Genesis' CPU backend; `approx` on the GPU backend (the particle families separate_marbles_and_sand and stabilize_bottle, `RCB_ROBOWITS_BACKEND=gpu`).
 
-`max_frames_per_call` = 1500, per-frame depth counted as four images; where a call's length is known only while it runs (`ee_pose` rows) the call stops taking frames at the bound and `meta.frames_skipped` counts them. The service refuses the episode at its start when the frozen instance does not rebuild; its collect hook waits with `--wait-key video_done`.
+`max_frames_per_call` = 1500 (PROTOCOL §3 "Images per call"). The service refuses the episode at its start when the frozen instance does not rebuild; its collect hook waits with `--wait-key video_done`.
 
 A resume replays the episode so far without rendering at ~700 steps/s (CPU). Grading: the live episode.
 

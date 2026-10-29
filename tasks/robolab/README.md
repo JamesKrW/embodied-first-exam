@@ -244,8 +244,6 @@ sees it and still ends the episode with a 500.
   service runs 3-15 steps/s, so the time limit ends an episode long before. Stated in `/spec` (`max_control_steps`,
   `episode`) and in both instructions (a technical cap, not a step budget); a
   privileged trajectory may hold at most that many rows.
-- An `ee_pose` submit has no frame cap: a long one at a high `video_fps` keeps many frames in memory (the client's
-  defaults, 5 fps and mp4, stay small).
 - RoboLab's success terms are upstream's ("the original simulator decides"), except the three additions of Success
   semantics (both fingers, two on-table terms, the settle hold). Still looser than their words: "inside" extends without limit along the container's up axis (the instructions state it), so a toppled or
   tilted container can count objects as outside or inside; `object_upright` has no support term (an object in free fall
@@ -262,7 +260,7 @@ proprietary software (no redistribution), hence BUILD_ONLY.
 ## Standard-mode service details
 
 Resume class `exact` (Isaac, CPU PhysX: the resumed service is a fresh process, whose first replay is bit-exact). A
-resume replays at ~20 steps/s. Its service states no `max_frames_per_call` yet.
+resume replays at ~20 steps/s. One call returns at most 2712 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 Per-simulator notes:
 

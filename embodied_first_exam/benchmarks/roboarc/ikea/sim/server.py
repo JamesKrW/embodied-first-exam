@@ -75,13 +75,10 @@ OBS_CALIBRATION = os.environ.get("RCB_OBS_CALIBRATION", "1") == "1"
 MAX_CHUNK_S = float(os.environ.get("RCB_MAX_CHUNK_S", "10")); MAX_WATCH_S = float(os.environ.get("RCB_MAX_WATCH_S", "30"))
 WALL_CLOCK_S = float(os.environ.get("RCB_WALL_CLOCK_S", "10800"))
 LIVE_FPS = int(os.environ.get("RCB_LIVE_FPS", "10")); LIVE_CAM = os.environ.get("RCB_LIVE_CAMERA", "cam_high")
-# /spec max_frames_per_call (cameras x frames; a frame with per-frame depth counts DEPTH_WEIGHT more). The recorder holds every frame
-# of a call (848 x 480 RGB = 1.2 MB) and stacks and encodes them again: 1000 keeps one call near 3.7 GB at its peak,
-# inside the sidecar's 8 GB cap (3000 could take the service past it: an OOM kill in the middle of a call).
+# /spec max_frames_per_call (PROTOCOL §3 "Images per call"): cameras x frames as the recorder takes them (one every 1/fps of
+# sim time, its first and last frames included); a frame with per-frame depth counts once more (L.check_frames). The
+# recorder holds every frame of a call (848 x 480 RGB = 1.2 MB) until the response is sent.
 MAX_FRAMES = 1000
-# per-frame depth (depth="frames") is float32 here and float64 in the shared encoder (x 1000, rint): it costs about five
-# RGB frames of memory, "legacy" (float16 per frame) about three; both count that much against MAX_FRAMES
-DEPTH_WEIGHT = {"frames": 5, "legacy": 3}
 LOCK = threading.Lock()
 E = {"ready": False, "step": 0, "calls": 0, "done": False, "reason": None, "success": False, "t0": time.time(), "error": None,
      "service_s": 0.0, "t_first": None, "deadline": float("inf")}
@@ -627,7 +624,7 @@ class Rec(L.Recorder):
     skipped = 0
 
     def _capture(self, last: bool) -> None:
-        per = len(self.cams) * (1 + DEPTH_WEIGHT.get(self.mode, 0))
+        per = len(self.cams) * (2 if self.mode in ("frames", "legacy") else 1)   # as L.check_frames counts
         if not last and per * (len(self.steps) + 2) > MAX_FRAMES:
             self.skipped += 1
             return
@@ -787,8 +784,17 @@ def infra_exception(exc: BaseException) -> bool:
     return isinstance(exc, (OSError, MemoryError) + ((render,) if render else ()))
 
 
-def _frames(cams, fps, seconds, depth_mode) -> int:
-    return int(len(cams) * (math.ceil(seconds * fps) + 2) * (1 + DEPTH_WEIGHT.get(depth_mode, 0)))
+def recorded_frames(steps: int, fps: int) -> int:
+    """The frames per camera the 2.4 recorder takes over a call of `steps` control steps (the count of real captures):
+    one at the start, one at the first control step at or after each k/fps of sim time (k = 1 .. floor(steps x fps /
+    control_hz)), and the last unless the last of those is taken at the call's last step."""
+    m = int(steps * fps / CTRL_HZ + 1e-9)
+    return m + 1 + (math.ceil(m * CTRL_HZ / fps - 1e-9) < steps)
+
+
+def _frames(cams, fps, steps, depth_mode) -> int:
+    """The images a call of `steps` control steps returns, 400 (ValueError) above MAX_FRAMES."""
+    return L.check_frames(len(cams), recorded_frames(steps, fps), depth_mode in ("frames", "legacy"), MAX_FRAMES)
 
 
 @_call
@@ -819,8 +825,7 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
     if not isinstance(fps, (int, float)) or not 1 <= fps <= 30:
         raise ValueError("video_fps must be in [1, 30]")
     fps = int(fps); depth = L.depth_mode(meta)
-    if _frames(cams, fps, A.shape[0] * k * CTRL_DT, depth) > MAX_FRAMES:
-        raise ValueError(f"more than {MAX_FRAMES} frames in one response (cameras x (fps x seconds + 2); a frame with per-frame depth counts 6, legacy depth 4)")
+    _frames(cams, fps, A.shape[0] * k, depth)
     try:   # executing: a ValueError from here on is the simulator's (a 400 would hide it), never the request's
         rec = recorder(cams, fps, meta); clipped: list = []
         E["calls"] += 1; step0 = E["step"]; before = ctrl_steps()
@@ -857,8 +862,7 @@ def do_observe(meta: dict) -> tuple[dict, list]:
     if not isinstance(fps, (int, float)) or not 1 <= fps <= 30:
         raise ValueError("video_fps must be in [1, 30]")
     fps = int(fps); depth = L.depth_mode(meta)
-    if _frames(cams, fps, seconds, depth) > MAX_FRAMES:
-        raise ValueError(f"more than {MAX_FRAMES} frames in one response (cameras x (fps x seconds + 2); a frame with per-frame depth counts 6, legacy depth 4)")
+    _frames(cams, fps, int(round(seconds * CTRL_HZ)) if seconds > 0 and not E["done"] else 0, depth)
     try:   # executing: a ValueError from here on is the simulator's (a 400 would hide it), never the request's
         rec = recorder(cams, fps, meta); before = ctrl_steps()
         watch = seconds > 0 and not E["done"]

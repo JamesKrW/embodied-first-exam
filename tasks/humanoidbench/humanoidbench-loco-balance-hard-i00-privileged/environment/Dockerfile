@@ -2,7 +2,7 @@
 # Generated from scripts/humanoidbench/templates/Dockerfile -- edit the template, not this copy.
 FROM ghcr.io/mll-lab-nu/efe:humanoidbench-0.2.0
 COPY instance.npz /app/instance.npz
-COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.3.1@sha256:df3e8d9b499e19de3627cd895b65de21e8f73e90bb9cce51badaabe0de9447a0 /privileged/environment/rcb_hb.py /opt/tools/rcb_hb.py
+COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.4.0@sha256:ce4fd00e84bb202de450b54de645a1bdb35b19767d0e07de298c329072632528 /privileged/environment/rcb_hb.py /opt/tools/rcb_hb.py
 ENV PYTHONPATH=/opt/tools
 RUN mkdir -p /app/output
 WORKDIR /app

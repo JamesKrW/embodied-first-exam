@@ -10,7 +10,7 @@ services:
     depends_on: [sim]
   sim:
     cpus: 4   # rcb-monitor
-    mem_limit: 6144m   # rcb-monitor
+    mem_limit: 5120m   # rcb-monitor
     pids_limit: 1024   # rcb-monitor
     build:   # environment/sim/Dockerfile: the base image, sim/ at /srv, the files shared with other tasks
       context: sim

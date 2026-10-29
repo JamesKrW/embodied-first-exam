@@ -76,6 +76,8 @@ res.save("/app/runs/001")
 targets are clipped to the published joint limits and clipping is reported. Quaternions in measured poses use WXYZ;
 world z is up and the desk top is at z = 0.78 m. Cameras are overview, closeup, front and top, at 640 x 480.
 
+One call returns at most 1000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
+
 Row layout, `sharpa` (58): 0-6 left arm `SHOULDER_PITCH_L_J1, SHOULDER_ROLL_L_J2, ELBOW_PITCH_L_J3, ELBOW_YAW_L_J4,
 WRIST_PITCH_L_J5, WRIST_YAW_L_J6, WRIST_ROLL_L_J7` (actuators `<joint>_target`); 7-13 the same right-arm joints
 (`..._R_J1` to `..._R_J7`); 14-35 the left Sharpa Wave fingers `left_thumb_CMC_FE, left_thumb_CMC_AA,

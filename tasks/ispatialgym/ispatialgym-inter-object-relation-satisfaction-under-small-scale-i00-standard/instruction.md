@@ -40,8 +40,8 @@ the last command.
   `base_link` at the start of the episode (x forward, y left, z up). You get no object poses, no map, no world frame, and
   no success signal before the episode ends.
 - **A malformed request is refused with a 400 and nothing is executed** (a wrong type or shape, a value out of range,
-  a `dt` that is not a whole number of control periods, `video_fps` outside 1-30, a call that would return more than
-  300 images, cameras × frames, `spec["max_frames_per_call"]`): fix it and send it again.
+  a `dt` that is not a whole number of control periods, `video_fps` outside 1-30, a call over the image budget below): fix it and send it again.
+- One call returns at most 300 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 - **Nothing to hand in.** The service records your episode as the trajectory and grades it. Leave your script at
   `/app/output/gen.py` for the record.
 - **Nothing is put into your context automatically.** Images and videos come back as arrays/bytes in a Python object;

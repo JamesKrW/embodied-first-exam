@@ -165,7 +165,7 @@ each task's own `[agent] timeout_sec`.
 
 ## Standard-mode service details
 
-Serves `eai-standard/2.4` (docs/protocol/standard_mode.md Part 4). Contact and safety telemetry is published in `meta["safety"]`, declared field by field in this doc. `max_frames_per_call` = 2000, per-frame depth counted as four images; where a call's length is known only while it runs (`ee_pose` rows) the call stops taking frames at the bound and `meta.frames_skipped` counts them. Its service ends the episode when `time_left_s` reaches 0 (counted from the agent's first request), until its next task update.
+Serves `eai-standard/2.4` (docs/protocol/standard_mode.md Part 4). Contact and safety telemetry is published in `meta["safety"]`, declared field by field in this doc. `max_frames_per_call` = 2000 (IKEA suite: 1000; PROTOCOL §3 "Images per call"); `meta.frames_skipped` counts the frames a call whose length is known only while it runs left out. Its service ends the episode when `time_left_s` reaches 0 (counted from the agent's first request), until its next task update.
 
 ## IKEA suite
 

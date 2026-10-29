@@ -524,7 +524,7 @@ More in docs/protocol/standard_mode.md §16.
 
 Resume class `exact` (ManiSkill/SAPIEN, CPU PhysX, CPU brush model); the adapter's `persist` keys include the last tip target.
 
-`max_frames_per_call` = 640, per-frame depth counted as four images.
+`max_frames_per_call` = 640 (PROTOCOL §3 "Images per call").
 
 Per-simulator notes:
 

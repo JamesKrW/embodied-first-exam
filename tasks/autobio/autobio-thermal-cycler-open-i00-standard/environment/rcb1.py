@@ -6,6 +6,12 @@
 kinds: "mp4" (fps, n), "jpeg", "array" (dtype, shape; C-order raw bytes), "json" (utf-8), "bytes".
 Zero dependencies for bytes/json parts; numpy only when you ask for arrays. Used on both sides (server and client),
 over HTTP bodies (Content-Type: application/x-rcb1) and equally usable over a raw socket. `python -m rcb1 unpack f dir`.
+
+A server's frames go into the body once: frames_part() names a list of arrays (one frame axis) without stacking them,
+size() gives a frame's length from its parts' sizes before anything is built (so a response limit can drop parts
+first), and encode() writes each such array into the body once and lets go of it, so building a response holds the
+captured frames plus one response body (docs/protocol/README.md §3 and §6, the sim's memory cap). The bytes are the
+same as for the stacked array.
 """
 from __future__ import annotations
 import json, struct, sys, pathlib
@@ -13,15 +19,79 @@ import json, struct, sys, pathlib
 MAGIC = b"RCB1"
 
 
-def encode(meta: dict, parts: list[tuple[str, str, bytes, dict]]) -> bytes:
-    """parts: [(name, kind, blob, extra), ...]; extra carries dtype/shape/fps/n."""
+class Frames:
+    """An array part's data that is not stacked: the arrays of one frame axis, all of one shape, written into the body
+    one by one as C-order `dtype` bytes (the bytes of np.stack(arrays).astype(dtype)). len() is their size; encode()
+    takes each array out of the list once it is written, so the list is empty after the body is built."""
+
+    def __init__(self, arrays: list, dtype, shape: tuple):
+        import numpy as np
+        self.arrays, self.dtype, self.shape = arrays, np.dtype(dtype), tuple(int(x) for x in shape)
+        self.nbytes = len(arrays) * self.dtype.itemsize * int(np.prod(self.shape, dtype=np.int64))
+
+    def __len__(self) -> int:
+        return self.nbytes
+
+    def write_into(self, out: bytearray) -> None:
+        import numpy as np
+        a = self.arrays
+        a.reverse()                                  # pop() from the end: each array is dropped once it is written
+        while a:
+            x = np.ascontiguousarray(a.pop(), dtype=self.dtype)
+            if x.size:                               # (a view with a zero in its shape cannot be cast: no bytes anyway)
+                out += memoryview(x).cast("B")
+
+
+def frames_part(name: str, arrays: list, extra: dict | None = None, empty=None) -> tuple:
+    """array_part(name, np.stack(arrays)) without the stack: the same header and bytes, each array copied into the body
+    once (Frames). `arrays` is handed over (encode() empties it). No arrays: array_part(name, empty), or np.stack's
+    error when `empty` is None."""
+    import numpy as np
+    if not len(arrays):
+        if empty is None:
+            np.stack(arrays)                         # raises as np.stack does
+        return array_part(name, empty, extra)
+    for i, x in enumerate(arrays):
+        if not isinstance(x, np.ndarray):
+            arrays[i] = np.asarray(x)
+    shape, dt = arrays[0].shape, arrays[0].dtype
+    for x in arrays:
+        if x.shape != shape:
+            np.stack(arrays)                         # raises as np.stack does (all arrays must have the same shape)
+        if x.dtype != dt:
+            dt = np.promote_types(dt, x.dtype)       # np.stack's result type
+    if not dt.isnative:
+        dt = dt.newbyteorder("=")                    # ... in native byte order, as np.stack gives it
+    return (name, "array", Frames(arrays, dt, shape), {"dtype": str(dt), "shape": [len(arrays), *shape], **(extra or {})})
+
+
+def _header(meta: dict, parts: list) -> bytes:
     hdr_parts = []
     for name, kind, blob, extra in parts:
         d = {"name": name, "kind": kind, "len": len(blob)}
         d.update({k: v for k, v in (extra or {}).items() if v is not None})
         hdr_parts.append(d)
-    header = json.dumps({"v": 1, "meta": meta, "parts": hdr_parts}, separators=(",", ":")).encode()
-    return b"".join([MAGIC, struct.pack("<I", len(header)), header] + [blob for _, _, blob, _ in parts])
+    return json.dumps({"v": 1, "meta": meta, "parts": hdr_parts}, separators=(",", ":")).encode()
+
+
+def size(meta: dict, parts: list) -> int:
+    """The length encode(meta, parts) will have, without building it."""
+    return 8 + len(_header(meta, parts)) + sum(len(blob) for _, _, blob, _ in parts)
+
+
+def encode(meta: dict, parts: list[tuple[str, str, bytes, dict]]) -> bytes:
+    """parts: [(name, kind, blob, extra), ...]; extra carries dtype/shape/fps/n. A blob is bytes, or Frames
+    (frames_part()): then the frame is a bytearray with each array written into it once (and the Frames emptied)."""
+    header = _header(meta, parts)
+    if not any(isinstance(blob, Frames) for _, _, blob, _ in parts):
+        return b"".join([MAGIC, struct.pack("<I", len(header)), header] + [blob for _, _, blob, _ in parts])
+    out = bytearray(MAGIC + struct.pack("<I", len(header)) + header)
+    for _, _, blob, _ in parts:
+        if isinstance(blob, Frames):
+            blob.write_into(out)
+        else:
+            out += blob
+    return out
 
 
 def array_part(name: str, arr, extra: dict | None = None) -> tuple[str, str, bytes, dict]:

@@ -14,7 +14,7 @@ services:
     depends_on: [sim]
   sim:
     cpus: 16   # rcb-monitor
-    mem_limit: 35840m   # rcb-monitor
+    mem_limit: 25600m   # rcb-monitor
     pids_limit: 2048   # rcb-monitor
     x-gpu-memory-gb: 16   # GiB   # rcb-monitor
     build:

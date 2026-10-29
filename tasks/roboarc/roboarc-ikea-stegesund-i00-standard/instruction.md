@@ -50,14 +50,14 @@ obs.group("tcp_pose", now=True)                # proprio groups: joint_pos, join
 res = r.submit("joint_position", rows, dt=0.0025, interpolate="linear", cameras=["cam_high"], video="mp4")
 res.meta["executed_rows"], res.meta["clipped"], res.meta["done"], res.meta["reason"], res.meta["time_left_s"]
 res.video["cam_high"]                          # mp4 bytes of the chunk; video="frames" gives res.frames[cam] (N, H, W, 3)
-obs = r.get_obs(seconds=2.0)                   # hold the last command, simulate 2 s and return the video (<= 30 s, and
-                                               # at most spec()["max_frames_per_call"] frames: cameras x (fps x s + 2),
-                                               # x 6 with per-frame depth, x 4 with legacy depth)
+obs = r.get_obs(seconds=2.0)                   # hold the last command, simulate 2 s and return the video (<= 30 s)
 r.fk(q); r.ik({"left/tcp": [x, y, z, qw, qx, qy, qz]})   # stateless kinematics on the robot's model
 r.status()                                     # calls, control steps, done, reason, time left
 ```
 A connection error means the service crashed and is resuming the SAME episode: call `r.wait_ready()` and check
 `r.status()` before you continue (`spec()["on_service_error"]`).
+
+One call returns at most 1000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 ## Robot, actions, observations
 - **Action** `joint_position`: rows of 16 values, float32 or float64, layout `spec()["action_types"]["joint_position"]["layout"]`:

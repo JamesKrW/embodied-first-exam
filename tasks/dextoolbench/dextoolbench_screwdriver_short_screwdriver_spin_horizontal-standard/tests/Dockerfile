@@ -1,7 +1,7 @@
 # Separate verifier sandbox: grades the sim service's own artifacts; needs nothing but python.
 FROM docker.io/library/python:3.12-slim
 COPY test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:dextoolbench-files-0.3.0@sha256:e15e01e5c682e09c96b9c6e2d48def61a483a1ff8d2df74b813c4d3d845847a9 /standard/tests/grade.py /tests/grade.py
+COPY --from=ghcr.io/mll-lab-nu/efe:dextoolbench-files-0.4.0@sha256:516bfd792e158d6d7f37051661e82267aa401998d3780b2cdfa3da3cd0b1382c /standard/tests/grade.py /tests/grade.py
 RUN chmod +x /tests/test.sh
 # resources (PROTOCOL §6) # rcb-monitor
 COPY --from=ghcr.io/mll-lab-nu/efe:monitor-0.5.0@sha256:ecc5f24f1516ca11711d7c2d3ac07c89f79cd9220812c1244498ec71e352402a /opt/rcb_monitor/rcb_limits.py /tests/rcb_limits.py

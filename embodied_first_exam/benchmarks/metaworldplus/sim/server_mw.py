@@ -377,10 +377,15 @@ def write_final(extra: dict | None = None) -> None:
     _write_json(os.path.join(DATA, "final.json"), d)
 
 
+def _every(fps: int) -> int:
+    """The Recorder's capture stride: a frame every this many control steps for the requested video_fps."""
+    return max(1, int(round(1.0 / (CTRL_DT * max(1, fps)))))
+
+
 class Recorder:
     def __init__(self, cams, fps, depth):
         self.cams = cams
-        self.every = max(1, int(round(1.0 / (CTRL_DT * max(1, fps)))))
+        self.every = _every(fps)
         self.depth = depth
         self.frames = {c: [] for c in cams}
         self.dep = {c: [] for c in cams}
@@ -398,9 +403,14 @@ class Recorder:
         self.n += 1
 
     def parts(self, video: str, fps: int):
+        """The response's parts, with one copy of the frames: no np.stack; frames/ and depth/ are written into the body
+        from the lists (rcb1.frames_part, which hands them over), the mp4 is encoded from the list."""
         out = []
         for c in self.cams:
-            fr = np.stack(self.frames[c]) if self.frames[c] else np.zeros((0, H, W, 3), np.uint8)
+            fp = rcb1.frames_part(f"frames/{c}", self.frames[c], empty=np.zeros((0, H, W, 3), np.uint8))
+            self.frames[c] = []
+            fr = fp[2].arrays if isinstance(fp[2], rcb1.Frames) else []
+            dt = fp[2].dtype if fr else np.uint8
             if video in ("mp4", "both") and len(fr):
                 import imageio.v2 as imageio
 
@@ -417,7 +427,7 @@ class Recorder:
                         output_params=["-movflags", "+faststart"],
                     ) as w:
                         for f in fr:
-                            w.append_data(np.ascontiguousarray(f))
+                            w.append_data(np.ascontiguousarray(f, dtype=dt))
                     data = open(path, "rb").read()
                 finally:
                     try:
@@ -425,12 +435,16 @@ class Recorder:
                     except OSError:
                         pass
                 out.append((f"video/{c}", "mp4", data, {"fps": fps, "n": int(len(fr))}))
+            last = rcb1.array_part(f"last/{c}", np.asarray(fr[-1], dtype=dt)) if len(fr) else None
             if video in ("frames", "both"):
-                out.append(rcb1.array_part(f"frames/{c}", fr))
-            if len(fr):
-                out.append(rcb1.array_part(f"last/{c}", fr[-1]))
+                out.append(fp)
+            else:
+                fr.clear()
+            if last:
+                out.append(last)
             if self.dep[c]:
-                out.append(rcb1.array_part(f"depth/{c}", np.stack(self.dep[c])))
+                out.append(rcb1.frames_part(f"depth/{c}", self.dep[c]))  # float16 at capture: 2 bytes a pixel
+            self.dep[c] = []
         prop = np.stack(self.prop) if self.prop else np.zeros((0, len(PROPRIO_LAYOUT)), np.float32)
         out.append(rcb1.array_part("proprio", prop))
         return out
@@ -498,12 +512,15 @@ def _video(meta: dict, default: str) -> str:
     return v
 
 
-def _frame_budget(cams, fps: int, seconds: float, depth: bool) -> None:
-    n = (int(seconds * fps) + 2) * len(cams) * (2 if depth else 1)
+def _frame_budget(cams, fps: int, steps: int, depth: bool) -> None:
+    """Refuse (400, before anything runs) a call of `steps` control steps whose Recorder would take more than
+    MAX_FRAMES_PER_CALL images: per camera the forced first and last frame and one every _every(fps) steps (the stride
+    it really films at, not the requested fps), depth counted again."""
+    n = (int(steps) // _every(fps) + 2) * len(cams) * (2 if depth else 1)
     if n > MAX_FRAMES_PER_CALL:
         raise ValueError(
-            f"this call would return {n} frames (cameras x fps x seconds, depth counts double); the limit is "
-            f"{MAX_FRAMES_PER_CALL}: use fewer cameras, a lower video_fps or a shorter chunk"
+            f"this call would return {n} images (cameras x frames at the capture stride, depth counted again); the "
+            f"limit is max_frames_per_call = {MAX_FRAMES_PER_CALL}: use fewer cameras, a lower video_fps or a shorter chunk"
         )
 
 
@@ -535,7 +552,7 @@ def parse_submit(meta: dict, parts: dict) -> dict:
     fps = _fps(meta)
     video = _video(meta, "mp4")
     depth = bool(meta.get("include_depth", False))
-    _frame_budget(cams, fps, A.shape[0] * dt, depth)
+    _frame_budget(cams, fps, A.shape[0] * k, depth)
     note = str(meta.get("note") or "")[:500]
     return {"A": A, "dt": dt, "k": k, "interp": interp, "cams": cams, "fps": fps, "video": video, "depth": depth, "note": note}
 
@@ -549,7 +566,7 @@ def parse_observe(meta: dict) -> dict:
     depth = bool(meta.get("include_depth", False))
     if seconds < 0 or seconds > MAX_WATCH_S:
         raise ValueError(f"seconds must be in [0, {MAX_WATCH_S}]")
-    _frame_budget(cams, fps, seconds, depth)
+    _frame_budget(cams, fps, int(round(seconds / CTRL_DT)), depth)
     return {"cams": cams, "seconds": seconds, "fps": fps, "video": video, "depth": depth}
 
 
@@ -741,11 +758,13 @@ class Hd(BaseHTTPRequestHandler):
         self.wfile.write(b)
 
     def _rcb1(self, meta, parts):
-        body = rcb1.encode(meta, parts)
-        if len(body) > MAX_RESP:
+        if rcb1.size(meta, parts) > MAX_RESP:  # known before anything is built: the body is built once
+            for p in parts:
+                if p[0].startswith(("frames/", "depth/")) and isinstance(p[2], rcb1.Frames):
+                    p[2].arrays.clear()
             parts = [p for p in parts if not (p[0].startswith("frames/") or p[0].startswith("depth/"))]
             meta = {**meta, "degraded": "frames/depth dropped (response too large)"}
-            body = rcb1.encode(meta, parts)
+        body = rcb1.encode(meta, parts)
         self.send_response(200)
         self.send_header("Content-Type", "application/x-rcb1")
         self.send_header("Content-Length", str(len(body)))

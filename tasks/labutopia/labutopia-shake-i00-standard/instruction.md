@@ -66,8 +66,7 @@ velocity targets of a row hold for its whole interval.
 The control rate is 60 Hz (one physics step per control step). At the start the arm is not at rest: it stands
 straight up and is moving towards its home pose (the targets in effect, `cmd_*` in the proprioception); holding them,
 e.g. with `r.get_obs(seconds=2)`, brings it there in about two seconds. There is no step budget: the
-one technical cap is `spec["max_control_steps"]`, 36000 (600 s of simulated time), at which the episode ends. A
-response carries at most 300 frames per camera (`video_fps` up to 30, default 10).
+one technical cap is `spec["max_control_steps"]`, 36000 (600 s of simulated time), at which the episode ends. One call returns at most 1800 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"); `video_fps` is up to 30, default 10.
 
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
