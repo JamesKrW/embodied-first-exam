@@ -79,6 +79,7 @@ UNITS: dict[str, list[str]] = {
     "roboEngineer": ["images/control-transfer/", "images/quadrotor-landing/"],
     "ABC Sim": _own("abc-sim"),
     "Embodied Safety Exam": _own("ese"),
+    "EmbodiedSWE": _own("embodiedswe"),
 }
 HAND_UNITS = {k: list(v) for k, v in UNITS.items()}   # the rows above, before the conventional paths below are added
 # images/ directories every benchmark builds on: a change to one runs the full suite (no unit owns it)
