@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Unit tests of the repository's shared tooling, in two tiers.
 #  1. Standard library only: the runner's helpers (scripts/tests/), the usage gateway's raw log and budget stop, the
-#     runner's lane stop and infra rules (account_failure_check.py --selftest).
+#     runner's lane stop and infra rules (account_failure_check.py --selftest), and the EmbodiedSWE grader's rollout limit
+#     (a request outlasting it is a graded timeout, not infra; needs Landlock, skipped with a note otherwise).
 #  2. numpy + requests (no simulator, no image, no GPU): the eai-standard/2.2 and 2.4 layers' selftests on a stub
 #     simulator (embodied_first_exam/standard/), the 2.1 service's first-attempt record on a toy simulator (v2_1/), and
 #     the per-call image budget of the 2.1, 2.2 and 2.3 layers (frames_selftest.py). Run when both modules can be imported, skipped with a note otherwise;
@@ -38,6 +39,7 @@ for t in scripts/usage_gateway/tests/test_rawlog.py scripts/usage_gateway/tests/
   run 300 "$t"
 done
 run 120 scripts/account_failure_check.py --selftest
+run 120 embodied_first_exam/benchmarks/embodiedswe/rollout_limit_selftest.py
 if python3 -c "import numpy, requests" 2>/dev/null; then
   export PATH="$(dirname "$(command -v python3)"):$PATH"   # run.sh starts `python`: the same interpreter
   for t in embodied_first_exam/standard/selftest.py embodied_first_exam/standard/v2_4/selftest.py \

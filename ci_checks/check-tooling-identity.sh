@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shared-source rules (PROTOCOL §1: copies of shared sources are byte-identical). Two parts:
-# 1. BEHAVIOR-1K, RoboLab, RoboWits, ManiGuard, MolmoSpaces, MyoSuite, DexJoCo, DexHand, RoboARC, BiGym 2.0, YAMLab, RoboDojo, Panda Dynamic Scenes, AM-Bench, LabUtopia and AutoBio: within one benchmark (RoboARC's IKEA suite, roboarc-ikea-*, is a group of its own), every mode, every copy of a shared file is byte-identical
+# 1. BEHAVIOR-1K, RoboLab, RoboWits, ManiGuard, MolmoSpaces, MyoSuite, DexJoCo, DexHand, RoboARC, BiGym 2.0, YAMLab, RoboDojo, Panda Dynamic Scenes, AM-Bench, LabUtopia, AutoBio and EmbodiedSWE: within one benchmark (RoboARC's IKEA suite, roboarc-ikea-*, is a group of its own), every mode, every copy of a shared file is byte-identical
 #    (one source per benchmark, copied unchanged):
 #    - the tooling module rcb_<sim>.py wherever it sits (privileged environment/ and tests/, standard environment/sim/);
 #    - the standard agent side environment/rcb_client.py + rcb1.py and the sim service environment/sim/ (server.py,
@@ -13,7 +13,7 @@
 #    A change to one of them is rolled out to every task of the benchmark at once. Same approach as ci_checks/benchmarks/robopaint/advisory-tooling.sh.
 #    Tasks the benchmark's own exporter wrote (task.toml [metadata] exporter: Embodied Olympics, PROTOCOL §3) are a group of their own,
 #    one per exporter and [metadata] skill_in_loop.
-# 2. The eai-standard/2.2 layer (every task whose metadata.protocol is 2.2: BEHAVIOR, RoboLab, RoboWits, RoboPaint, MolmoSpaces, MyoSuite, DexJoCo, DexHand, YAMLab, RoboDojo, LabUtopia, AutoBio): the
+# 2. The eai-standard/2.2 layer (every task whose metadata.protocol is 2.2: BEHAVIOR, RoboLab, RoboWits, RoboPaint, MolmoSpaces, MyoSuite, DexJoCo, DexHand, YAMLab, RoboDojo, LabUtopia, AutoBio, EmbodiedSWE): the
 #    agent's client environment/rcb_client.py + rcb1.py and the service's environment/sim/rcb_limited.py + rcb1.py +
 #    run.sh are byte-identical to their source in embodied_first_exam/standard/ (docs/protocol/standard_mode.md), and the sidecar is
 #    set up for crash recovery: `command: sh /srv/run.sh` (run.sh exits non-zero when the service crashes) and
@@ -49,7 +49,8 @@ MODULE = {"behavior": "rcb_behavior.py", "robolab": "rcb_robolab.py", "robowits"
           "pandadyn": "rcb_pandadyn.py",
           "ambench": "rcb_ambench.py", "ispatialgym": "rcb_ispatialgym.py",
           "roboarc-ikea": "rcb_ikea.py",   # RoboARC's IKEA suite (roboarc-ikea-*)
-          "ese": "rcb_ese.py"}   # ese-: Embodied Safety Exam
+          "ese": "rcb_ese.py",   # ese-: Embodied Safety Exam
+          "embodiedswe": "rcb_embodiedswe.py"}
 SHARED = {"environment/rcb_client.py", "environment/rcb1.py", "environment/sim/server.py", "environment/sim/finalize.sh",
           "environment/sim/run.sh", "environment/sim/rcb1.py", "environment/sim/rcb_limited.py", "tests/grade.py"}
 LAYER = {"environment/rcb_client.py": "rcb_client.py", "environment/rcb1.py": "rcb1.py", "environment/sim/rcb_limited.py": "rcb_limited.py",

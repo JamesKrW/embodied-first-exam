@@ -4,7 +4,7 @@
 |---|---|
 | Benchmark | EmbodiedSWE |
 | Mode | privileged |
-| Twin | — (privileged only) |
+| Twin | `embodiedswe-puzzle-stack-blocks-g1-pink-ik-i00-standard` |
 | Simulator / robot | `embodiedswe` / `unitree-g1-dex3` |
 | Family / instance | `puzzle.stack_blocks.g1.pink_ik` / seed 0 |
 | Oracle | `none` — No reference solution in the repository. A scripted reference solve() exists outside the repository (internal only, used to check the task is solvable through the grading path); it is not shipped. |

@@ -4,7 +4,7 @@
 |---|---|
 | Benchmark | EmbodiedSWE |
 | Mode | privileged |
-| Twin | — (privileged only) |
+| Twin | `embodiedswe-puzzle-syringe-bimanual-franka-osc-i00-standard` |
 | Simulator / robot | `embodiedswe` / `franka-panda-bimanual` |
 | Family / instance | `puzzle.syringe.bimanual_franka.osc` / seed 0 |
 | Oracle | `none` — No reference solution in the repository, and none written for this scene yet; the build, the start-state hash and a do-nothing run scoring 0 are checked. |
