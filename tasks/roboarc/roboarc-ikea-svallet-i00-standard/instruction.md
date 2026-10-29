@@ -58,6 +58,8 @@ r.status()                                     # calls, control steps, done, rea
 A connection error means the service crashed and is resuming the SAME episode: call `r.wait_ready()` and check
 `r.status()` before you continue (`spec()["on_service_error"]`).
 
+One call returns at most 1000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
+
 ## Robot, actions, observations
 - **Action** `joint_position`: rows of 14 values, float32 or float64, layout `spec()["action_types"]["joint_position"]["layout"]`:
   per arm (`left_`, then `right_`): `waist`, `shoulder`, `elbow`, `forearm_roll`, `wrist_angle`, `wrist_rotate` = joint position targets (rad; `wrist_rotate` unlimited), `gripper` = finger rail position target (0.002 m closed .. 0.037 m open). One control step is 2.5 ms (400 Hz: the row is applied for 4 physics steps of

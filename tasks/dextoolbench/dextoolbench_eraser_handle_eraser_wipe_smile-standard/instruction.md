@@ -60,6 +60,8 @@ goal is reached or at the step limit (`spec["max_control_steps"]`); after that `
   **end** of that call (the `last` image and the last frame of every stack). Depth is the distance along the viewing
   axis, in metres. The four cameras are fixed.
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

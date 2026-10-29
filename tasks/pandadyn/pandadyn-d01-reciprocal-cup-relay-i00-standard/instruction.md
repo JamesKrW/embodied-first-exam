@@ -100,8 +100,7 @@ this robot's: this robot's are in `r.spec()` and below. The calls and the endpoi
 The answers are binary (RCB1) and come back decoded: `res.meta` (the counters, `done`, `reason`, `proprio["now"]`,
 `clipped`), `res.last[camera]` (the last frame), `res.frames` or `res.video` (what the cameras saw during a watch),
 `res.depth[camera]` (with `include_depth=True`, metres), `res.proprio` (proprioception rows: one at the call's start, one
-every 1/`video_fps` s of robot time, one at its end). `video_fps` (1..30, default 10) sets how many frames a call returns; a call may
-return at most `spec()["max_frames_per_call"]` images. A malformed request raises `ValueError` and runs nothing; once an
+every 1/`video_fps` s of robot time, one at its end). `video_fps` (1..30, default 10) sets how many frames a call returns. One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"). A malformed request raises `ValueError` and runs nothing; once an
 episode has ended, `submit` raises `EpisodeOver` (409) and `get_obs` still answers (no time passes).
 ```python
 from rcb_client import Robot

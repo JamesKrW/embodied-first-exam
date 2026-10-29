@@ -86,6 +86,8 @@ authoritative).
 | `r.submit(type, A, dt=0.01, interpolate="linear", at=None, cameras=None)` | `POST /submit` | plans `A`, rows of that action type `dt` seconds apart (a multiple of 0.01; a chunk covers at most 10 s), from step `at`; answers at once; the first one starts the attempt's clock |
 | `r.reset(cameras=None)` | `POST /reset` | a new attempt from the same start, paused (see above) |
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"). A watch is refused with a 429 while the images in flight (pending watches and answers not read yet) would exceed it or 8 of them are outstanding; a `submit` is never refused for its images: its answer then comes without its frames and `meta["frames_skipped"]` is set.
+
 The answers are binary (RCB1) and come back decoded: `res.meta` (the counters, `done`, `reason`, `proprio["now"]`,
 `clipped`), `res.last[camera]` (the last frame), `res.frames` or `res.video` (what the cameras saw during the call),
 `res.depth`, `res.proprio` (proprioception rows). Values outside the bounds are clipped and reported in

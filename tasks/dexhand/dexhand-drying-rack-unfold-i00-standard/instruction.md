@@ -69,6 +69,8 @@ service connection fails, call `r.wait_ready()` and inspect `r.status()` before 
 same journaled episode, without a reset, and the wall-clock budget keeps running. The episode allows at most
 6000 controls.
 
+One call returns at most 1000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
+
 ## Scene
 The rack is a folding sweater dryer: two rectangular frame halves (each 0.33 m x 0.65 m, 0.205 kg) joined by a passive
 pole hinge on the side rims (0 rad = open flat, pi rad = folded), each half with two offset 0.098 m legs on passive hinges

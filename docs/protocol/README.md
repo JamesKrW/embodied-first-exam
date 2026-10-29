@@ -87,16 +87,20 @@ infrastructure, a reference implementation, one benchmark using it, CI support t
   are reported apart.
 
 **Images per call (standard modes).** Every call that returns images has a per-call image budget,
-`max_frames_per_call`, stated in the task (its `/spec` and its instruction). Each camera frame is one image, and a depth
+`max_frames_per_call`, stated in the task (its `/spec` and its instruction). Tasks that bring their own runtime instead of
+an eai-standard service (EO Match, RoboEngineer) are outside this rule. Each camera frame is one image, and a depth
 frame one more: a service keeps depth as it is sent (uint16 millimetres or float16 metres), so it costs no more than an
 RGB frame. The count is of the frames the service really captures, at the capture stride it uses (one frame every
 `round(control rate / video_fps)` control steps, plus the call's first and last), not at the requested rate. It is
 checked before the call runs: a call over the budget is refused with an error that says so and runs nothing. A call
 whose length is known only while it runs (`ee_pose` rows, a chunk the service plans, a watch that ends with the
 episode) stops filming at the budget instead: the motion goes on, its last frame is always taken, and `meta["frames_skipped"]` counts the frames left out of the response (the trial's video still has them). `video` = `mp4` or `frames` changes what is
-sent, not the budget. A service builds a response holding about one copy of its frames (streamed, or written once into
-the body), and its memory cap covers the largest response the budget allows (§6). In standard-realtime mode the
-pending watches and the answers not yet sent count against one budget together.
+sent, not the budget. Building a response holds the captured frames plus one response body (the frames are written
+once into it, and a part the response drops is let go of first), and the service's memory cap covers the largest
+response the budget allows (§6). In standard-realtime mode the pending watches and the answers not yet sent count
+against one budget together: a watch that would exceed it, or that would make more than 8 watches and unsent answers
+outstanding, is refused (429, nothing ran); a submit is never refused for its images: past the budget its answer comes
+without its frames and `meta["frames_skipped"]` is set.
 
 ## 4. Grading and results
 

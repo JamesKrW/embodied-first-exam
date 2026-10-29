@@ -58,9 +58,11 @@ simulator thread. What a request can cost the clock is bounded:
   back by it, so a controller's loop goes on. Requests can so take at most 1 / (1 + BEHIND_PACE) of the clock's time.
 - Cameras are rendered (and the proprioception read) at most once per control step, however many requests and watches
   ask for them: all of them get that step's frames. The pending watches and the answers not yet sent (built, or
-  being written to a client that reads slowly) together hold at most max_frames_per_call images; a request that would
-  exceed it is refused (429) until one completes or is sent. At most MAX_UNSENT_BODIES answers with images wait to be
-  sent, and an answer whose client does not take it within SEND_TIMEOUT_S is dropped with its connection.
+  being written to a client that reads slowly) together hold at most max_frames_per_call images. A watch (or an
+  /observe now) that would exceed it, or that would make more than MAX_UNSENT_BODIES pending watches and unsent answers
+  with images, is refused (429, nothing ran) until one completes or is sent. A submit is never refused for its images:
+  past the budget, or with MAX_UNSENT_BODIES answers unsent, it is answered without its last frames (meta
+  frames_skipped). An answer whose client does not take it within SEND_TIMEOUT_S is dropped with its connection.
 More than MAX_LAG_S behind, the service drops the debt instead of fast-forwarding the robot (a stall: counted, and its
 seconds added to stalled_s).
 
@@ -112,7 +114,7 @@ CHILD_TIMEOUT_S = 60.0   # the child process's time for one body
 CHILD_MEM = 1 << 30      # ... and its memory above what its interpreter needs (a body that needs more is refused)
 SWITCH_INTERVAL_S = 0.001   # the interpreter's thread switch interval while serving (default 0.005): HTTP threads
                             # hand the lock back to the simulator thread within a millisecond
-MAX_UNSENT_BODIES = 8    # answers with images built or being sent at a time (each counts its images in flight too)
+MAX_UNSENT_BODIES = 8    # answers with images built or being sent, with the pending watches for a watch (not for a submit)
 SEND_TIMEOUT_S = 30.0    # a client that has not taken an answer within this loses it (and its connection)
 FIELDS = ("type", "dt", "interpolate", "at", "cameras", "video_fps", "video", "include_depth", "note", "seconds")
 
@@ -726,7 +728,6 @@ class RealtimeService(Service):
         nxt = len(self.episode)
         typ, A, dt, k, interp, at = (req[x] for x in ("type", "actions", "dt", "k", "interpolate", "at"))
         cams, fps, video, depth = req["view"]
-        self._in_flight(Recorder(self.views, cams, fps, depth, "none").images_per_call(0))
         if at is not None and at - nxt > self.max_ahead:
             raise Refused(400, {"error": f"at = {at} is more than max_ahead_steps = {self.max_ahead} control steps "
                                          f"ahead of the next one ({nxt})"})
@@ -768,11 +769,15 @@ class RealtimeService(Service):
         self.late_steps += min(late, len(steps))
         self._start_clock()
         rec = Recorder(self.views, cams, fps, depth, "none")
+        full = not self._submit_fits(rec.images_per_call(0))
+        if full:                                     # a submit is never refused for its images: answered without them
+            rec = Recorder(self.views, [], fps, False, "none")
         rec.start()
         rec.finish()
         out = {**self.meta(), "chunk_id": self.calls, "type": typ, "n_rows": int(len(A)), "dt": dt,
                "interpolate": interp, "at": at, "start_step": max(at, nxt), "late_steps": late,
-               "plan_end_step": nxt + len(self.plan), "clipped": clipped[:200], "n_clipped": len(clipped), "ok": True}
+               "plan_end_step": nxt + len(self.plan), "clipped": clipped[:200], "n_clipped": len(clipped), "ok": True,
+               **({"frames_skipped": 1} if full else {})}
         self._save_call({**out, "note": req["note"]}, A)
         self._finish_rec(job, out, rec, rec.images_per_call(0))
 
@@ -814,6 +819,17 @@ class RealtimeService(Service):
             raise Refused(429, {"error": f"{bodies} answers with images are not read yet and {len(self.watches)} "
                                          f"watches are pending: at most {MAX_UNSENT_BODIES} at a time; read them first",
                                 "images_in_flight": pending + unsent})
+
+    def _submit_fits(self, images: int) -> bool:
+        """Whether a submit's answer may carry its `images` (its last frames): they fit in max_frames_per_call with the
+        pending watches' and the unsent answers', and fewer than MAX_UNSENT_BODIES answers wait to be sent (pending
+        watches do not count here). Otherwise the submit is answered without them (meta frames_skipped), never refused."""
+        if not images:
+            return True
+        pending = sum(w.rec.images_per_call(w.end - w.start) for w in self.watches)
+        with self._unsent_lock:
+            unsent, bodies = self.unsent_images, self.unsent_bodies
+        return pending + unsent + images <= self.max_frames and bodies < MAX_UNSENT_BODIES
 
     def _finish_rec(self, job: _Job, out: dict, rec: Recorder, images: int) -> None:
         """Answer with a Recorder: its images count as in flight until the HTTP thread has sent the body (_sent)."""

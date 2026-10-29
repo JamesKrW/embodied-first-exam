@@ -139,7 +139,8 @@ FIRST = images(); CAMS = [c for c in ("egocentric_mirrored_camera", "over_should
     sorted(c for c in FIRST if c not in ("egocentric_mirrored_camera", "over_shoulder_left_camera", "wrist_cam"))
 # /spec max_frames_per_call (PROTOCOL §3 "Images per call"): the longest /observe (max_watch_s at the control rate,
 # + the first and the last frame) with every camera and its depth
-MAX_FRAMES = (int(round(MAX_WATCH_S * CTRL_HZ)) + 2) * 2 * len(CAMS)
+BUDGET_WATCH_S = 30.0   # the longest watch the sim memory cap was sized for (an RCB_MAX_WATCH_S above it does not raise the budget)
+MAX_FRAMES = (int(round(min(MAX_WATCH_S, BUDGET_WATCH_S) * CTRL_HZ)) + 2) * 2 * len(CAMS)
 
 
 def joint_limits() -> dict:

@@ -38,6 +38,8 @@ res.save("/app/runs/003")                     # meta.json, <cam>.mp4, frames/<ca
 Cameras: `head_camera` (static, above the table), `front_camera` (static, facing the robot), `left_camera` /
 `right_camera` (wrists), plus `observer_camera` and `world_camera1` (free third-person views). Resolution 320×240.
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
+
 ### Proprioception (what a real arm reports; `spec["proprio_groups"]` gives each group's columns)
 | columns | group | meaning |
 |---|---|---|

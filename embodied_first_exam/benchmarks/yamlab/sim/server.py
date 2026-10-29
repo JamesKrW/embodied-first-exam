@@ -124,7 +124,8 @@ LAYOUT = [f"{a}_{j}" for a in ARMS for j in list(M.ARM_JOINTS) + ["gripper"]]
 CAMS = list(M.CAMERAS)
 # /spec max_frames_per_call (PROTOCOL §3 "Images per call"): the longest /observe (max_watch_s at the control rate,
 # + the first and the last frame) with every camera and its depth
-MAX_FRAMES = (int(round(MAX_WATCH_S * CTRL_HZ)) + 2) * 2 * len(CAMS)
+BUDGET_WATCH_S = 30.0   # the longest watch the sim memory cap was sized for (an RCB_MAX_WATCH_S above it does not raise the budget)
+MAX_FRAMES = (int(round(min(MAX_WATCH_S, BUDGET_WATCH_S) * CTRL_HZ)) + 2) * 2 * len(CAMS)
 MOUNT = {"top": "static, above the table looking down at the workspace", "left_wrist": "on the left arm's wrist (link_6)",
          "right_wrist": "on the right arm's wrist (link_6)"}
 
@@ -298,10 +299,11 @@ def frames_ok(cams, steps: int, fps: int, meta: dict) -> None:
 
 class Rec(L.Recorder):
     def _skip(self) -> None:
-        """A frame past the budget is still rendered (sim.render once for the state) for the live video, which records
-        only the states a call rendered; it is not kept in the response."""
+        """A frame past the budget is still rendered (sim.render once for the state) when the live video, which records
+        only the states a call rendered, wants one there; it is not kept in the response."""
         try:
-            S._fresh(self.cams[0])
+            if VIDEO.wants(ctrl_steps()):
+                S._fresh(self.cams[0])
         except Exception:  # noqa: BLE001 -- the video loses this frame; the call goes on
             pass
 

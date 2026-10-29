@@ -88,6 +88,8 @@ Your whole interface to the robot. Its docstring is the full reference
 | `r.get_obs(cameras=None, seconds=0, include_depth=False, video="frames")` | `POST /observe` | the robot now, or what the cameras saw over the next `seconds` |
 | `r.reset(cameras=None, include_depth=False)` | `POST /reset` | a new episode from the frozen starting state, paused (at most 50 in all); returns the start's frames |
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"). A watch is refused with a 429 while the images in flight (pending watches and answers not read yet) would exceed it or 8 of them are outstanding; a `submit` is never refused for its images: its answer then comes without its frames and `meta["frames_skipped"]` is set.
+
 The answers are binary (RCB1) and come back decoded: `res.meta` (the counters, `done`, `reason`, `proprio["now"]`,
 `clipped`), `res.last[camera]` (the last frame), `res.frames` or `res.video` (what the cameras saw during a watch),
 `res.proprio` (proprioception rows). Values outside [-1, 1] are clipped and reported in `meta["clipped"]`, never

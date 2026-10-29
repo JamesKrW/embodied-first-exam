@@ -9,7 +9,7 @@
 | Family / instance | `sweep` / seed 0 |
 | Oracle | `full` |
 | Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
-| Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.2.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:abc-sim-0.1.0` |
 
 ## Task
 ABC Sim `sweep_away_paper_scraps_from_table` (two I2RT YAM arms (6 revolute joints and a parallel two-finger gripper each) side by side at the near edge of a table, facing +x (the left arm is the one at +y)): Get the paper scraps into the trash can: sweep them into the dustpan with the brush and empty it into the can, or any other way. Success: all 2 scraps are inside the trash can at the same time (each scrap's centre within the can's inner radius of its axis and between its floor and its rim). Pushing scraps off the table does not count. The goal must hold for 30 consecutive control steps (1.02 s); the episode then ends in success.

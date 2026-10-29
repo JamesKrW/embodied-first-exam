@@ -121,20 +121,37 @@ def depth_mm(z) -> np.ndarray:
     return np.ascontiguousarray(mm.astype("<u2"))
 
 
+class Deflate:
+    """depth_frames/<cam> not compressed yet: a list of depth_mm() frames that encode_response() compresses only once the
+    response keeps them (a part it drops is never compressed). Its zlib bytes are the same as zlib.compress of the
+    stacked frames; until then len() is an upper bound of their length."""
+
+    def __init__(self, frames: list):
+        self.frames = frames
+        n = sum(int(f.nbytes) for f in frames)
+        self.bound = n + n // 1000 + 64            # zlib's worst case: stored blocks (5 bytes per 64 KiB) and its framing
+
+    def __len__(self) -> int:
+        return self.bound
+
+    def compress(self) -> bytearray:
+        z, out, a = zlib.compressobj(1), bytearray(), self.frames
+        a.reverse()                                # each frame is let go of once it is compressed
+        while a:
+            out += z.compress(a.pop())
+        out += z.flush()
+        return out
+
+
 def depth_frames_part(name: str, stack) -> tuple[str, str, bytes, dict]:
-    """(N,H,W) metres, or a list of N depth_mm() frames (emptied as it is compressed) -> an RCB1 "bytes" part: zlib of
-    C-order uint16 millimetres (0 = no reading). Clients that do not know it keep the raw bytes and ignore it;
-    rcb_client decodes it back to float32 metres."""
+    """(N,H,W) metres, or a list of N depth_mm() frames (Deflate: compressed in encode_response, if it is sent) -> an
+    RCB1 "bytes" part: zlib of C-order uint16 millimetres (0 = no reading). Clients that do not know it keep the raw
+    bytes and ignore it; rcb_client decodes it back to float32 metres."""
     if not isinstance(stack, list):
         a = depth_mm(stack)
         return (name, "bytes", zlib.compress(a.tobytes(), 1), {"codec": "zlib", "dtype": "uint16", "shape": list(a.shape), "unit": "mm"})
     shape = [len(stack), *stack[0].shape] if stack else [0]
-    z, out = zlib.compressobj(1), []       # the same bytes as zlib.compress of the stacked frames, one frame at a time
-    stack.reverse()
-    while stack:
-        out.append(z.compress(stack.pop()))
-    out.append(z.flush())
-    return (name, "bytes", b"".join(out), {"codec": "zlib", "dtype": "uint16", "shape": shape, "unit": "mm"})
+    return (name, "bytes", Deflate(stack), {"codec": "zlib", "dtype": "uint16", "shape": shape, "unit": "mm"})
 
 
 def encode_mp4(frames, fps: int) -> bytes:
@@ -262,7 +279,19 @@ class Recorder:
 def encode_response(meta: dict, parts: list, max_bytes: int = MAX_RESP) -> bytes:
     """The RCB1 body; over `max_bytes` the per-frame depth goes first, then the raw frames (mp4, last frames, last
     depth, proprio and the per-frame arrays always stay), and meta["degraded"] says what was dropped. The size is known
-    from the parts before anything is built (rcb1.size), so the body is built once."""
+    from the parts before anything is built (rcb1.size), so the body is built once. The per-frame depth (Deflate) is
+    compressed only if it may stay: not when the response is over the limit without it. A dropped part is let go of
+    at once (`parts` is edited in place), so the peak is the captured frames plus one body."""
+    if not isinstance(parts, list):
+        parts = list(parts)
+    if any(isinstance(p[2], Deflate) for p in parts):
+        if (rcb1.size(meta, parts) > max_bytes
+                and rcb1.size(meta, [(n, k, b"" if isinstance(b, Deflate) else b, e) for n, k, b, e in parts]) > max_bytes):
+            pass                                     # over the limit whatever it compresses to: dropped below as it is
+        else:
+            for i, (n, k, b, e) in enumerate(parts):
+                if isinstance(b, Deflate):
+                    parts[i] = (n, k, b.compress(), e)
     dropped, m = [], meta
     for prefixes in (("depth_frames/", "depth/"), ("frames/",)):
         if rcb1.size(m, parts) <= max_bytes:
@@ -272,7 +301,9 @@ def encode_response(meta: dict, parts: list, max_bytes: int = MAX_RESP) -> bytes
             for p in parts:
                 if p[0].startswith(prefixes) and isinstance(p[2], rcb1.Frames):
                     p[2].arrays.clear()              # not sent: let go of its frames now
-            parts = keep; dropped += [x.rstrip("/") for x in prefixes]
+                elif p[0].startswith(prefixes) and isinstance(p[2], Deflate):
+                    p[2].frames.clear()
+            parts[:] = keep; dropped += [x.rstrip("/") for x in prefixes]
             m = {**meta, "degraded": f"response over {max_bytes} bytes: {', '.join(dropped)} dropped"}
     return rcb1.encode(m, parts)
 

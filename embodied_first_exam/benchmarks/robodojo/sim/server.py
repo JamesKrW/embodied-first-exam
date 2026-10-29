@@ -245,10 +245,11 @@ def video_fps(meta: dict) -> int:
 
 class Rec(L.Recorder):
     def _skip(self) -> None:
-        """A frame past the budget (a long ee_pose move) is still rendered (the observation, cached for the state) for
-        the live video, which records only the states a call rendered; it is not kept in the response."""
+        """A frame past the budget (a long ee_pose move) is still rendered (the observation, cached for the state) when
+        the live video, which records only the states a call rendered, wants one there; it is not kept in the response."""
         try:
-            S.observe()
+            if VIDEO.wants(ctrl_steps()):
+                S.observe()
         except Exception:  # noqa: BLE001 -- the video loses this frame; the call goes on
             pass
 

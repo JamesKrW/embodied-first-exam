@@ -9,9 +9,9 @@ over HTTP bodies (Content-Type: application/x-rcb1) and equally usable over a ra
 
 A server's frames go into the body once: frames_part() names a list of arrays (one frame axis) without stacking them,
 size() gives a frame's length from its parts' sizes before anything is built (so a response limit can drop parts
-first), and encode() writes each such array into the body once and lets go of it, so building a response holds about
-one copy of the frames (docs/protocol/README.md §6, the sim's memory cap). The bytes are the same as for the stacked
-array.
+first), and encode() writes each such array into the body once and lets go of it, so building a response holds the
+captured frames plus one response body (docs/protocol/README.md §3 and §6, the sim's memory cap). The bytes are the
+same as for the stacked array.
 """
 from __future__ import annotations
 import json, struct, sys, pathlib
@@ -37,7 +37,9 @@ class Frames:
         a = self.arrays
         a.reverse()                                  # pop() from the end: each array is dropped once it is written
         while a:
-            out += memoryview(np.ascontiguousarray(a.pop(), dtype=self.dtype)).cast("B")
+            x = np.ascontiguousarray(a.pop(), dtype=self.dtype)
+            if x.size:                               # (a view with a zero in its shape cannot be cast: no bytes anyway)
+                out += memoryview(x).cast("B")
 
 
 def frames_part(name: str, arrays: list, extra: dict | None = None, empty=None) -> tuple:
@@ -58,6 +60,8 @@ def frames_part(name: str, arrays: list, extra: dict | None = None, empty=None) 
             np.stack(arrays)                         # raises as np.stack does (all arrays must have the same shape)
         if x.dtype != dt:
             dt = np.promote_types(dt, x.dtype)       # np.stack's result type
+    if not dt.isnative:
+        dt = dt.newbyteorder("=")                    # ... in native byte order, as np.stack gives it
     return (name, "array", Frames(arrays, dt, shape), {"dtype": str(dt), "shape": [len(arrays), *shape], **(extra or {})})
 
 

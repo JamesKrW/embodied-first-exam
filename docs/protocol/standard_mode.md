@@ -101,7 +101,7 @@ the wall clock; the simulated time is recorded as cost.
 ### Errors (no physics executed)
 | code | when |
 |---|---|
-| 400 | wrong type/dim, a chunk with no rows, NaN/inf, a field of the wrong JSON type (`dt`, `seconds` or `video_fps` not a finite number, `cameras` not a list), `dt` or `seconds` out of range or `dt` not a multiple of the physics step, chunk too long, bad interpolate/video value, `video_fps` outside [1, 30], more than 3000 frames in one response (cameras × fps × seconds, depth counts double), malformed body |
+| 400 | wrong type/dim, a chunk with no rows, NaN/inf, a field of the wrong JSON type (`dt`, `seconds` or `video_fps` not a finite number, `cameras` not a list), `dt` or `seconds` out of range or `dt` not a multiple of the physics step, chunk too long, bad interpolate/video value, `video_fps` outside [1, 30], more images than `max_frames_per_call` in one response (PROTOCOL §3), malformed body |
 | 409 | episode already finished (`done`); the trial is over |
 | 413 | body over 64 MB (`rcb_client.py` raises before sending such a body) |
 | 500 | simulator error; the episode ends with `reason = "error"` (the client raises `EpisodeOver`; the verifier reports `sim_error = 1`) |
@@ -363,12 +363,8 @@ In both cases the executed prefix stays: it is journaled and checkpointed like a
 response with fewer rows executed; `rcb_client` exposes `Result.stopped` and prints a one-line warning.
 
 A third bound keeps one call from exhausting the service's memory (every frame is held until the response is sent):
-**`max_frames_per_call`** (`/spec`; the rule: PROTOCOL §3 "Images per call"): the images a call may return, cameras x
-frames at the real capture stride (`rcb_limited.frames_per_call`) with per-frame depth counted again. A request over it
-is a 400 before anything is executed (`rcb_limited.check_frames`); a camera named twice is one camera. Where the length
-of a call is known only while it runs (planner-executed rows), the call stops taking frames at the bound
-(`Recorder(max_images=...)`), runs to its end, always returns the last frame, and `meta.frames_skipped` counts the frames
-left out.
+**`max_frames_per_call`** (`/spec`): the images a call may return; the rule is PROTOCOL §3 "Images per call" (shared
+helpers: `rcb_limited.frames_per_call`, `check_frames`, `Recorder(max_images=...)`).
 
 ### 13. Crash recovery (the shared layer's default behaviour)
 The shared layer (`rcb_limited.Episode`; adapters call it as `toy_server.py` does) resumes a crashed service in the same

@@ -37,6 +37,8 @@ help(rcb_client)"`); the calls and the endpoints they use:
 | `r.get_obs(cameras=None, seconds=0, include_depth=False, video="frames")` | `POST /observe` | the current frames (free), or hold the last command and watch for `seconds` (at most 30) |
 | `r.submit("delta", A, cameras=None, video="mp4", include_depth=False)` | `POST /submit` | runs `A`, one row of 11 values per control step, at most 100 rows a call; stops early when the episode ends |
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
+
 The answers are binary (RCB1) and come back decoded: `res.meta` (the counters, `done`, `reason`, `proprio["now"]`,
 `clipped`), `res.last[camera]` (the last frame), `res.frames` or `res.video` (what the cameras saw during the call),
 `res.depth` (metres), `res.proprio` (one row per frame). Values outside the bounds are clipped and reported in

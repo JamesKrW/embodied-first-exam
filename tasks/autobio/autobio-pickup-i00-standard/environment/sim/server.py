@@ -362,7 +362,7 @@ def frames_ok(steps: int, fps: int, video: str, cams, meta: dict) -> None:
     """The images the call's Recorder captures over `steps` control steps (its real stride, every camera, per-frame
     depth counted again), refused above max_frames_per_call before anything runs (a 400)."""
     every = frame_every(fps, video)
-    L.check_frames(len(cams), L.frames_per_call(steps, every), L.depth_mode(meta) in ("frames", "legacy"), MAX_FRAMES)
+    L.check_frames(len(dict.fromkeys(cams)), L.frames_per_call(steps, every), L.depth_mode(meta) in ("frames", "legacy"), MAX_FRAMES)
 
 
 def cameras_of(meta: dict) -> list:

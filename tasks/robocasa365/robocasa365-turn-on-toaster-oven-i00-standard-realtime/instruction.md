@@ -71,6 +71,8 @@ Its docstring is the full reference (`python -c "import rcb_client; help(rcb_cli
 | `r.get_obs(cameras=None, seconds=0, include_depth=False, video="frames")` | `POST /observe` | the robot now, or what the cameras saw over the next `seconds` |
 | `r.reset(cameras=[])` | `POST /reset` | a new episode from the frozen starting state, paused (at most 10 in all); `cameras=[]`: no images (see Rules) |
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"). A watch is refused with a 429 while the images in flight (pending watches and answers not read yet) would exceed it or 8 of them are outstanding; a `submit` is never refused for its images: its answer then comes without its frames and `meta["frames_skipped"]` is set.
+
 The answers come back decoded: `res.meta` (the counters, `done`, `reason`, `proprio["now"]`, `clipped`), `res.last[camera]`,
 `res.frames` / `res.video`, `res.depth`, `res.proprio`.
 - Action `joint_position`: the robot's native controller command, one row per control step (`control_dt` = 0.05 s).

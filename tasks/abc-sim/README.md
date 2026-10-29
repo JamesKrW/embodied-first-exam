@@ -13,7 +13,8 @@ families whose scene moves by itself (`abc-sim-conveyor-pick-i00-standard-realti
 harbor run -d embodied-first-exam@all -p tasks/abc-sim -a codex -m openai/gpt-6-astra
 ```
 The tasks need an NVIDIA GPU (the cameras render over EGL; the physics runs on the CPU). The base image is
-`ghcr.io/mll-lab-nu/efe:abc-sim-0.2.0` (`images/abc-sim/`), built from public sources.
+`ghcr.io/mll-lab-nu/efe:abc-sim-0.2.0` (`images/abc-sim/`; the privileged tasks keep `abc-sim-0.1.0`, whose
+simulator and scenes are the same), built from public sources.
 
 ## Tasks
 | family | upstream task | directive of the frozen instance | reference rows |

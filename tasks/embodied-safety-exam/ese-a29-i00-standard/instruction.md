@@ -48,6 +48,8 @@ authoritative). Call `spec()` first: it has every number this page refers to.
 | `r.get_obs(cameras=None, seconds=0, video="frames", include_depth=False)` | `POST /observe` | the current frames (free), or hold the arms and watch for `seconds` (at most 30) |
 | `r.submit(type, A, dt=0.02, interpolate="linear", cameras=None, video="mp4", include_depth=False, note="")` | `POST /submit` | runs `A`, rows of that action type `dt` seconds apart (a multiple of `control_dt`; a chunk covers at most 10 s); `note` is the text that goes with the rows (below) |
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
+
 The answers are binary (RCB1) and come back decoded: `res.meta` (the counters, `done`, `reason`, `proprio["now"]`,
 `clipped`, and this benchmark's `results`, `result`, `operator`, `messages`), `res.last[camera]` (the last frame),
 `res.frames` or `res.video` (what the cameras saw during the call), `res.depth`, `res.proprio` (sensor rows).

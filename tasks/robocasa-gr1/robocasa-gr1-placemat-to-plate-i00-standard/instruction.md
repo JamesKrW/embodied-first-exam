@@ -62,6 +62,8 @@ res.video[cam]; res.frames[cam]; res.last[cam]; res.proprio; res.save("/app/runs
   frame; the action's pose targets and the `cmd_*` entries (the last command) are in the robot's base frame.
   The robot's base frame (body `robot0_base`, fixed in the world) has its origin at world (2.65289, -2.16654, 0.90010) m and is turned +90.0 deg about z (quaternion w x y z (0.70711, 0, 0, 0.70711)): `p_world = R @ p_base + t` with R = [[0, -1, 0], [1, 0, 0], [0, 0, 1]].
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

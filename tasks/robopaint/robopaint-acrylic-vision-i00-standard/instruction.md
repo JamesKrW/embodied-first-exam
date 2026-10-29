@@ -112,8 +112,7 @@ view along the sheets that shows the brush's height).
 - `joint_position` (7): `panda_joint1..7` absolute joint targets in radians (PD-tracked), rows `dt` apart, `interpolate` =
   `"linear"` (default) or `"hold"`; a chunk may cover at most 10 s; out-of-limit values are clipped and listed in
   `meta["clipped"]` (limits in the spec).
-- One call returns at most 640 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"): an
-  `ee_pose` row slowed down to 0.25 m/s takes the control steps its distance needs.
+- One call returns at most 640 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
 
 The exemplar is this robot's painting after Paul Gauguin, *Vision after the Sermon* (1888), a public-domain work (Wikimedia Commons `File:La vision après le sermon (Paul Gauguin).jpg`, Public domain); the exemplar picture is CC0.
 

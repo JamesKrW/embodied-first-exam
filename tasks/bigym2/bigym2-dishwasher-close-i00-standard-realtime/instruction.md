@@ -44,6 +44,8 @@ Its docstring is the full reference (`python -c "import rcb_client; help(rcb_cli
 | `r.submit("whole_body", A, dt=0.02, interpolate="linear", at=None, cameras=None)` | `POST /submit` | plans `A`, rows of 21 commands `dt` seconds apart (a chunk covers at most 10 s), from step `at`; answers at once; the first one starts the clock |
 | `r.get_obs(cameras=None, seconds=0, video="frames")` | `POST /observe` | the robot now, or what the cameras saw over the next `seconds` |
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"). A watch is refused with a 429 while the images in flight (pending watches and answers not read yet) would exceed it or 8 of them are outstanding; a `submit` is never refused for its images: its answer then comes without its frames and `meta["frames_skipped"]` is set.
+
 Measured here on an otherwise idle host: the simulator spends about 14 ms of each 20 ms control step, so it keeps up
 with the clock (largest lag seen 0.07 s); `get_obs()` without seconds answers in about 10 ms. Values outside the bounds are clipped and reported in `meta["clipped"]`, never refused; a malformed request raises
 `ValueError` and changes nothing.

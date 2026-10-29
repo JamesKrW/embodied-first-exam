@@ -69,6 +69,8 @@ Forward kinematics uses only the robot's own links (arms and hands); no IK primi
 call `r.wait_ready()` and inspect `r.status()` before continuing. Crash recovery resumes the same journaled episode,
 without a reset, and the wall-clock budget keeps running.
 
+One call returns at most 1000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call").
+
 ## Scene (frozen instance, world frame)
 World frame: z up, metres and radians. The floor is at z = 0. The robot's stand origin is at (0.58, -0.66, 0.10) with
 its base plate on the floor, beside the desk's -y edge, facing the desk diagonally (heading 135 deg: toward -x and +y);

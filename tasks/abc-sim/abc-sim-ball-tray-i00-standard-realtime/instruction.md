@@ -68,6 +68,8 @@ wall-clock time (real time). `spec()["timing"]["slowdown"]` states it.
 | `r.get_obs(cameras=None, seconds=0, include_depth=False, video="frames")` | `POST /observe` | the robot now, or what the cameras saw over the next `seconds` |
 | `r.reset(cameras=None, include_depth=False)` | `POST /reset` | a new episode from the frozen starting state, paused (at most 10 in all); returns the start's frames |
 
+One call returns at most 3000 images (`max_frames_per_call`, PROTOCOL §3 "Images per call"). A watch is refused with a 429 while the images in flight (pending watches and answers not read yet) would exceed it or 8 of them are outstanding; a `submit` is never refused for its images: its answer then comes without its frames and `meta["frames_skipped"]` is set.
+
 The answers are binary (RCB1) and come back decoded: `res.meta` (the counters, `done`, `reason`, `proprio["now"]`),
 `res.last[camera]` (the last frame), `res.frames` or `res.video` (what the cameras saw during a watch), `res.proprio`
 (proprioception rows). A malformed request raises `ValueError` and changes nothing. Cameras: `top` (above and behind the arms, looking down at the table), `left` and `right` (wrist cameras on the arms), `overhead`, `left_side`, `right_side` (640x480,
