@@ -107,6 +107,7 @@ BENCHMARK_TABLE = [
     ("autobio-", "AutoBio", "autobio"),
     ("abc-sim-", "ABC Sim", "abc-sim"),
     ("embodiedswe-", "EmbodiedSWE", "embodiedswe"),
+    ("humanclaw-", "HumanCLAW", "humanclaw"),  # find / navigate / sit with a simulated human body (HumanClawBench)
 ]
 BENCHMARKS = [(p, label) for p, label, _ in BENCHMARK_TABLE]   # (directory prefix, label): the first matching prefix wins
 # Modes (PROTOCOL §3): a benchmark ships any subset of the modes. A standard or realtime
