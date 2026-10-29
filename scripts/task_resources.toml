@@ -819,3 +819,12 @@ sim = { cpus = 4, memory_gb = 13, pids = 8192, gpu_memory_gb = 5 }
 recommended_gpu = "any NVIDIA GPU with EGL (RTX 4090 / L4)"
 measured = "oracle trials of all 60 directories on an RTX 4090 workstation (docker stats every 3 s, the trial's resource monitor): the sim sidecar 2.1 GB and 0.83 GiB of GPU memory (standard, chess; realtime 0.8 GB and 0.72 GiB), the agent's container (the client) 0.03 GB; the collect hook renders the video inside the sidecar (EGL)"
 caps_measured = "GPU memory (the sim service): at most 0.83 GiB in the oracle trials -> max(1.5 x peak, peak + 2), rounded up: 3 GiB; kept at the earlier cap (no per-container data): 5 GiB; processes and disk: defaults, not measured; the sim service's memory covers its largest legal call (4 cameras, 750 frames each (3000 images)): 8.4 GiB to build the response on top of the simulator's 2.4 GiB"
+
+# 24 task(s)
+[[cap]]
+match = "^embodiedswe-.*-privileged$"
+main = { cpus = 8, memory_gb = 29, pids = 16384, gpu_memory_gb = 16, disk_gb = 10 }
+gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
+recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
+measured = "GPU PhysX on an L40S (nvidia-smi every 2 s, one process on the card): a graded rollout process 3.2-4.6 GiB of GPU memory, a process with cameras (the video) 6.6-7.0 GiB; a fresh process starts and builds a scene in 13-27 s with a warm Kit cache"
+caps_measured = "GPU memory: 7.0 GiB (a process with cameras, L40S) -> max(1.5 x peak, peak + 2) = 10.5, at least 16 GiB for Isaac Sim: 16 GiB; disk: 0.9 GiB at most in 3 four-hour agent trials (the trial's resource monitor) -> at least 10 GiB: 10 GiB; memory, CPU, processes and threads: no reliable per-container measurement (those trials' monitor ran before GPU PhysX and saw under 2.5 GiB, less than one Isaac Sim process holds), kept at the earlier caps (29 GiB, 8 CPUs, 16384)"

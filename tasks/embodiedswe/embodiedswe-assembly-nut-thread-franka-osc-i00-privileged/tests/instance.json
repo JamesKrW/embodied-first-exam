@@ -1,0 +1,144 @@
+{
+ "action_dim": 8,
+ "control_dt": 0.066667,
+ "device": "cuda:0",
+ "format": "esw-instance/1",
+ "gpu_model": "NVIDIA L40S",
+ "physics_dt": 0.0020833333333333333,
+ "preset": "assembly.nut_thread.franka.osc",
+ "seed": 0,
+ "start_state": {
+  "layout": [
+   [
+    "/articulation/bolt_0/joint_position",
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    "/articulation/bolt_0/joint_velocity",
+    [
+     1,
+     0
+    ]
+   ],
+   [
+    "/articulation/bolt_0/root_pose",
+    [
+     1,
+     7
+    ]
+   ],
+   [
+    "/articulation/bolt_0/root_velocity",
+    [
+     1,
+     6
+    ]
+   ],
+   [
+    "/articulation/robot/joint_position",
+    [
+     1,
+     9
+    ]
+   ],
+   [
+    "/articulation/robot/joint_velocity",
+    [
+     1,
+     9
+    ]
+   ],
+   [
+    "/articulation/robot/root_pose",
+    [
+     1,
+     7
+    ]
+   ],
+   [
+    "/articulation/robot/root_velocity",
+    [
+     1,
+     6
+    ]
+   ],
+   [
+    "/rigid_object/nut_0/root_pose",
+    [
+     1,
+     7
+    ]
+   ],
+   [
+    "/rigid_object/nut_0/root_velocity",
+    [
+     1,
+     6
+    ]
+   ]
+  ],
+  "vector": [
+   0.5,
+   -3.637978807091713e-12,
+   -6.51925802230835e-09,
+   1.0000001192092896,
+   -4.161558250781461e-12,
+   -5.29941888982588e-12,
+   -1.5299113087507976e-09,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.001500000013038516,
+   -0.19699999690055847,
+   -0.00139999995008111,
+   -1.9759999513626099,
+   -0.0002800000074785203,
+   1.7799999713897705,
+   0.7860000133514404,
+   0.03999999910593033,
+   0.03999999910593033,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   1.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.37798091769218445,
+   0.00033358336077071726,
+   0.019999999552965164,
+   1.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "state_sha": "d3ace57f86b6b24c0ef9d94dd43400d34fcbff5a13905a3654061a4e6f657249"
+}
