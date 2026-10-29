@@ -129,8 +129,8 @@ if not S.instance_matches:
 CAMS = S.camera_names()                 # cam_opposite, cam_left, cam_right, cam_left_shoulder, wrist
 # /spec max_frames_per_call (PROTOCOL §3 "Images per call"): the longest /observe (max_watch_s at the control rate,
 # + the first and the last frame) with every camera and its depth
-BUDGET_WATCH_S = 30.0   # the longest watch the sim memory cap was sized for (an RCB_MAX_WATCH_S above it does not raise the budget)
-MAX_FRAMES = (int(round(min(MAX_WATCH_S, BUDGET_WATCH_S) * CTRL_HZ)) + 2) * 2 * len(CAMS)
+BUDGET_WATCH_S = 30.0   # the budget is a 30 s watch's whatever RCB_MAX_WATCH_S is: the sim memory cap and the instruction use it
+MAX_FRAMES = (int(round(BUDGET_WATCH_S * CTRL_HZ)) + 2) * 2 * len(CAMS)
 VIDEO_CAMS = [c for c in ("cam_left", M.WRIST) if c in CAMS] or CAMS[:1]   # the replay video's view (Session.start_video)
 S.enable_depth(CAMS)                    # z-depth rendered alongside RGB from now on (attached before the episode)
 CAMINFO = S.camera_info(CAMS)

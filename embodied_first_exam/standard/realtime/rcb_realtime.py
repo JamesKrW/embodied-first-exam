@@ -58,10 +58,10 @@ simulator thread. What a request can cost the clock is bounded:
   back by it, so a controller's loop goes on. Requests can so take at most 1 / (1 + BEHIND_PACE) of the clock's time.
 - Cameras are rendered (and the proprioception read) at most once per control step, however many requests and watches
   ask for them: all of them get that step's frames. The pending watches and the answers not yet sent (built, or
-  being written to a client that reads slowly) together hold at most max_frames_per_call images. A watch (or an
-  /observe now) that would exceed it, or that would make more than MAX_UNSENT_BODIES pending watches and unsent answers
-  with images, is refused (429, nothing ran) until one completes or is sent. A submit is never refused for its images:
-  past the budget, or with MAX_UNSENT_BODIES answers unsent, it is answered without its last frames (meta
+  being written to a client that reads slowly) together hold at most max_frames_per_call images. A watch that would
+  exceed it, or that would make more than MAX_UNSENT_BODIES pending watches and unsent answers with images, is refused
+  (429, nothing ran) until one completes or is sent. A submit or an /observe now is never refused for its images:
+  past the budget, or with MAX_UNSENT_BODIES answers unsent, it is answered without its frames (meta
   frames_skipped). An answer whose client does not take it within SEND_TIMEOUT_S is dropped with its connection.
 More than MAX_LAG_S behind, the service drops the debt instead of fast-forwarding the robot (a stall: counted, and its
 seconds added to stalled_s).
@@ -114,7 +114,7 @@ CHILD_TIMEOUT_S = 60.0   # the child process's time for one body
 CHILD_MEM = 1 << 30      # ... and its memory above what its interpreter needs (a body that needs more is refused)
 SWITCH_INTERVAL_S = 0.001   # the interpreter's thread switch interval while serving (default 0.005): HTTP threads
                             # hand the lock back to the simulator thread within a millisecond
-MAX_UNSENT_BODIES = 8    # answers with images built or being sent, with the pending watches for a watch (not for a submit)
+MAX_UNSENT_BODIES = 8    # answers with images built or being sent, with the pending watches for a watch (not for a submit or an /observe now)
 SEND_TIMEOUT_S = 30.0    # a client that has not taken an answer within this loses it (and its connection)
 FIELDS = ("type", "dt", "interpolate", "at", "cameras", "video_fps", "video", "include_depth", "note", "seconds")
 
@@ -789,13 +789,19 @@ class RealtimeService(Service):
             self._frame_budget(rec, n)
         # Every pending watch and every answer not sent yet holds its images: together they stay within the per-call
         # frame budget, or concurrent calls could exhaust the sidecar's memory (an OOM kill is no crash record, so it
-        # would count as infrastructure: a free retry). Nothing ran: a 429 to retry once one completes or is read.
-        self._in_flight(rec.images_per_call(n))
+        # would count as infrastructure: a free retry). A watch over it: nothing ran, a 429 to retry once one completes
+        # or is read. The present (n = 0) is never refused, as a submit: past the budget it comes without its frames.
+        full = False
+        if n:
+            self._in_flight(rec.images_per_call(n))
+        elif not self._submit_fits(rec.images_per_call(0)):
+            full, rec = True, Recorder(self.views, [], fps, False, "frames")
         self.calls += 1
         rec.start()
         if not n:
             rec.finish()
-            out = {**self.meta(), "obs_id": self.calls, "seconds": 0.0, "control_steps_watch": 0, "ok": True}
+            out = {**self.meta(), "obs_id": self.calls, "seconds": 0.0, "control_steps_watch": 0, "ok": True,
+                   **({"frames_skipped": 1} if full else {})}
             self._save_call(out, None)
             return self._finish_rec(job, out, rec, rec.images_per_call(0))
         self._start_clock()
@@ -821,9 +827,9 @@ class RealtimeService(Service):
                                 "images_in_flight": pending + unsent})
 
     def _submit_fits(self, images: int) -> bool:
-        """Whether a submit's answer may carry its `images` (its last frames): they fit in max_frames_per_call with the
-        pending watches' and the unsent answers', and fewer than MAX_UNSENT_BODIES answers wait to be sent (pending
-        watches do not count here). Otherwise the submit is answered without them (meta frames_skipped), never refused."""
+        """Whether a submit's or an /observe now's answer may carry its `images`: they fit in max_frames_per_call with
+        the pending watches' and the unsent answers', and fewer than MAX_UNSENT_BODIES answers wait to be sent (pending
+        watches do not count here). Otherwise it is answered without them (meta frames_skipped), never refused."""
         if not images:
             return True
         pending = sum(w.rec.images_per_call(w.end - w.start) for w in self.watches)

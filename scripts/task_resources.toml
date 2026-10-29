@@ -242,10 +242,10 @@ caps_measured = "GPU memory: a per-trial peak of 2.7 GiB on a 48 GB card -> max(
 [[cap]]
 match = "^molmospaces-.*-standard$"
 main = { cpus = 3, memory_gb = 4, pids = 1024, disk_gb = 12 }
-sim = { cpus = 2, memory_gb = 9, pids = 1024, gpu_memory_gb = 5 }
+sim = { cpus = 2, memory_gb = 10, pids = 1024, gpu_memory_gb = 5 }
 recommended_gpu = "any 8 GB+ NVIDIA GPU (RTX 4090 / L4 / L40S)"
 measured = "GPU memory 2.7 GB on an L40S (per-trial peaks of past trials); memory and CPU estimated (MuJoCo, CPU physics, EGL rendering)"
-caps_measured = "per-container peaks in 11 past trials: the agent's container memory 0.6 GiB, 113 threads, CPU 2.0 cores, disk 7.5 GiB; the sim service memory 4.4 GiB, 170 threads, CPU 1.8 cores, GPU memory 2.6 GiB (2.7 GiB in an earlier measurement); the sim service's memory covers its largest legal call (open-door: observe 30 s, 3 cameras 576x1024 with depth, 302 frames each (1812 images); depth constant, ramp or random): 2.9 GiB to build the response on top of the simulator's 4.4 GiB, 1 GiB more for an mp4 request's encoder"
+caps_measured = "per-container peaks in 11 past trials: the agent's container memory 0.6 GiB, 113 threads, CPU 2.0 cores, disk 7.5 GiB; the sim service memory 4.4 GiB, 170 threads, CPU 1.8 cores, GPU memory 2.6 GiB (2.7 GiB in an earlier measurement); the sim service's memory covers its largest legal call (open-door: observe 30 s, 3 cameras 576x1024 with depth, 302 frames each (1812 images), video none or mp4, random depth): 3.1 GiB to build the response on top of the simulator's 4.4 GiB, 1 GiB more for an mp4 request's encoder"
 
 # 9 task(s)
 [[cap]]

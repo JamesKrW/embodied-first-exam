@@ -141,8 +141,8 @@ FIRST, _ = S._frames(sorted(S._cam_sensors()))
 CAMS = sorted(c for c, a in FIRST.items() if min(a.shape[:2]) >= 32)
 # /spec max_frames_per_call (PROTOCOL §3 "Images per call"): the longest /observe (max_watch_s at the control rate,
 # + the first and the last frame) with every camera and its depth
-BUDGET_WATCH_S = 30.0   # the longest watch the sim memory cap was sized for (an RCB_MAX_WATCH_S above it does not raise the budget)
-MAX_FRAMES = (int(round(min(MAX_WATCH_S, BUDGET_WATCH_S) * CTRL_HZ)) + 2) * 2 * len(CAMS)
+BUDGET_WATCH_S = 30.0   # the budget is a 30 s watch's whatever RCB_MAX_WATCH_S is: the sim memory cap and the instruction use it
+MAX_FRAMES = (int(round(BUDGET_WATCH_S * CTRL_HZ)) + 2) * 2 * len(CAMS)
 S.enable_depth(CAMS)                    # z-depth rendered alongside RGB from now on (attached before the episode: no mid-episode USD edit)
 MOUNT = {c: ("head (moves with the base and trunk)" if "zed" in c else "left wrist" if "left" in c else "right wrist" if "right" in c else "on the robot") for c in CAMS}
 CAMINFO = S.camera_info(CAMS)

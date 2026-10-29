@@ -7,12 +7,13 @@ toy simulators (numpy only, no image, a few seconds):
   - 2.2 (rcb_limited): under the servers' tick pattern a Recorder captures exactly frames_per_call() at its stride;
     check_frames accepts a call at the budget and refuses one image over it; Recorder(max_images=...) stops filming at
     the budget, keeps the last frame and counts the rest in `skipped`; depth is kept as it is sent (uint16 mm,
-    float16), never more bytes than an RGB frame, and compressed only if the response keeps it (same zlib bytes);
+    float16), never more bytes than an RGB frame, and compressed only while it fits in the room the rest of the
+    response leaves (same zlib bytes; compression stops once its output passes it, and the depth is dropped);
   - 2.1 (every distinct rcb_service.py, the abc-sim copy included): the real capture count under the service's
     pattern; a call at the budget is accepted, one image over refused, at the real stride;
   - 2.3 (rcb_realtime): an answer built but not sent counts against max_frames_per_call with the pending watches (429
-    for a watch until it is sent), at most MAX_UNSENT_BODIES such answers and watches wait, and a submit is never
-    refused for its images (answered without them, meta frames_skipped).
+    for a watch until it is sent), at most MAX_UNSENT_BODIES such answers and watches wait, and a submit or an
+    /observe now is never refused for its images (answered without them, meta frames_skipped).
 """
 import hashlib
 import importlib.util
@@ -134,7 +135,7 @@ _, got = rcb1.decode(bytes(body))
 check(got["frames/a"]["data"].shape == (n, 6, 8, 3), f"2.2 frames/a shape {got['frames/a']['data'].shape}, {n} frames")
 
 
-# per-frame depth is compressed only if the response keeps it, with the bytes of zlib.compress of the stacked frames
+# per-frame depth is compressed only while it fits, with the bytes of zlib.compress of the stacked frames
 import zlib  # noqa: E402
 for content in ("ramp", "random"):
     z = (np.linspace(0.3, 2.0, 6 * 8, dtype=np.float32).reshape(6, 8) if content == "ramp"
@@ -151,6 +152,18 @@ for content in ("ramp", "random"):
     meta, got = rcb1.decode(bytes(L.encode_response({}, parts, max_bytes=100)), arrays=False)
     check("depth_frames/a" not in got and small[2].frames == [] and "degraded" in meta and len(parts) == 1,
           "a dropped depth part was compressed or kept")
+    # the rest fits but the compressed depth does not: compression stops at the room left, the depth is dropped
+    rest = rcb1.size({}, [("depth_frames/a", "bytes", b"", {"codec": "zlib", "dtype": "uint16", "shape": [5, 6, 8],
+                                                                  "unit": "mm"}),
+                    rcb1.array_part("proprio", np.zeros((5, 3), np.float32))])
+    for limit in (rest, rest + len(ref) // 2, rest + len(ref) - 1):
+        part = L.depth_frames_part("depth_frames/a", list(mm))
+        parts = [part, rcb1.array_part("proprio", np.zeros((5, 3), np.float32))]
+        meta, got = rcb1.decode(bytes(L.encode_response({}, parts, max_bytes=limit)), arrays=False)
+        check("depth_frames/a" not in got and part[2].frames == [] and "depth_frames" in meta.get("degraded", ""),
+              f"depth over the room left was kept ({content}, limit {limit})")
+    check(L.Deflate(list(mm)).compress(len(ref) - 1) is None and L.Deflate(list(mm)).compress(len(ref)) == ref,
+          f"Deflate.compress(limit) ({content})")
 
 
 # ---------------------------------------------------------------- 2.1 and 2.3
@@ -283,10 +296,14 @@ try:
     svc.watches.clear()
     svc.unsent_images, svc.unsent_bodies = 0, R.MAX_UNSENT_BODIES
     try:
-        svc._rt_observe({"seconds": 0.0, "view": view}, R._Job("POST", "/observe"))
-        check(False, "2.3: more than MAX_UNSENT_BODIES answers waiting was accepted")
+        svc._rt_observe({"seconds": 0.1, "view": view}, R._Job("POST", "/observe"))
+        check(False, "2.3: a watch with MAX_UNSENT_BODIES answers waiting was accepted")
     except R.Refused as exc:
         check(exc.code == 429, f"2.3: bodies refusal {exc.code}")
+    j = R._Job("POST", "/observe")                           # the present is never refused: answered without frames
+    svc._rt_observe({"seconds": 0.0, "view": view}, j)
+    check(j.reply[1].get("frames_skipped") == 1 and j.images == 0 and not j.reply[2].cams,
+          f"2.3: an observe now with MAX_UNSENT_BODIES answers waiting: {j.reply[1].get('frames_skipped')}, {j.images}")
     svc.unsent_bodies = 0
     j = R._Job("POST", "/observe")
     svc._rt_observe({"seconds": 0.0, "view": (["a"], 25, "none", False)}, j)       # seconds = 0: answered at once
@@ -307,6 +324,10 @@ try:
     j = submit(full)
     check(j.reply[1].get("frames_skipped") == 1 and j.images == 0 and not j.reply[2].cams,
           f"2.3: a submit past the budget: {j.reply[1].get('frames_skipped')} skipped, {j.images} images")
+    j = R._Job("POST", "/observe")
+    svc._rt_observe({"seconds": 0.0, "view": full}, j)
+    check(j.reply[1].get("frames_skipped") == 1 and j.images == 0 and not j.reply[2].cams,
+          f"2.3: an observe now past the budget: {j.reply[1].get('frames_skipped')} skipped, {j.images} images")
     svc.watches.clear()
     for _ in range(R.MAX_UNSENT_BODIES):
         svc._rt_observe({"seconds": 0.1, "view": (["a"], 25, "frames", False)}, R._Job("POST", "/observe"))
@@ -326,4 +347,4 @@ if fails:
     print(f"{len(fails)} failure(s)")
     sys.exit(1)
 print(f"ok per-call image budget: rcb1 frames_part/size, 2.2 stride count + max_images + depth as sent, "
-      f"{len(copies)} distinct rcb_service.py (at the budget / one over), 2.3 unsent answers in flight")
+      f"{len(copies)} distinct rcb_service.py (at the budget / one over), 2.3 unsent answers in flight, submit / observe now never refused")

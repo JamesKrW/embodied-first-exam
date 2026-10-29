@@ -121,9 +121,9 @@ def depth_mm(z) -> np.ndarray:
 
 
 class Deflate:
-    """depth_frames/<cam> not compressed yet: a list of depth_mm() frames that encode_response() compresses only once the
-    response keeps them (a part it drops is never compressed). Its zlib bytes are the same as zlib.compress of the
-    stacked frames; until then len() is an upper bound of their length."""
+    """depth_frames/<cam> not compressed yet: a list of depth_mm() frames that encode_response() compresses only while
+    they still fit in the response (compression stops as soon as its output passes the room left). Its zlib bytes are
+    the same as zlib.compress of the stacked frames; until then len() is an upper bound of their length."""
 
     def __init__(self, frames: list):
         self.frames = frames
@@ -133,13 +133,17 @@ class Deflate:
     def __len__(self) -> int:
         return self.bound
 
-    def compress(self) -> bytearray:
+    def compress(self, limit: int):
+        """The zlib bytes, or None (the frames let go of) once they pass `limit` bytes: then they cannot be sent."""
         z, out, a = zlib.compressobj(1), bytearray(), self.frames
         a.reverse()                                # each frame is let go of once it is compressed
         while a:
             out += z.compress(a.pop())
+            if len(out) > limit:
+                a.clear()
+                return None
         out += z.flush()
-        return out
+        return out if len(out) <= limit else None
 
 
 def depth_frames_part(name: str, stack) -> tuple[str, str, bytes, dict]:
@@ -281,18 +285,22 @@ def encode_response(meta: dict, parts: list, max_bytes: int = MAX_RESP) -> bytes
     """The RCB1 body; over `max_bytes` the per-frame depth goes first, then the raw frames (mp4, last frames, last
     depth, proprio and the per-frame arrays always stay), and meta["degraded"] says what was dropped. The size is known
     from the parts before anything is built (rcb1.size), so the body is built once. The per-frame depth (Deflate) is
-    compressed only if it may stay: not when the response is over the limit without it. A dropped part is let go of
-    at once (`parts` is edited in place), so the peak is the captured frames plus one body."""
+    compressed only while it fits in the room the rest of the response leaves: compression stops as soon as its output
+    passes it, and the depth is then dropped. A dropped part is let go of at once (`parts` is edited in place), so
+    the peak is the captured frames plus one body."""
     if not isinstance(parts, list):
         parts = list(parts)
     if any(isinstance(p[2], Deflate) for p in parts):
-        if (rcb1.size(meta, parts) > max_bytes
-                and rcb1.size(meta, [(n, k, b"" if isinstance(b, Deflate) else b, e) for n, k, b, e in parts]) > max_bytes):
-            pass                                     # over the limit whatever it compresses to: dropped below as it is
-        else:
-            for i, (n, k, b, e) in enumerate(parts):
-                if isinstance(b, Deflate):
-                    parts[i] = (n, k, b.compress(), e)
+        room = max_bytes - rcb1.size(meta, [(n, k, b"" if isinstance(b, Deflate) else b, e) for n, k, b, e in parts])
+        for i, (n, k, b, e) in enumerate(parts):
+            if isinstance(b, Deflate):
+                z = b.compress(room) if room >= 0 else None
+                if z is None:                        # over the limit: kept as its upper bound, dropped below
+                    b.frames.clear()
+                    room = -1
+                else:
+                    parts[i] = (n, k, z, e)
+                    room -= len(z)
     dropped, m = [], meta
     for prefixes in (("depth_frames/", "depth/"), ("frames/",)):
         if rcb1.size(m, parts) <= max_bytes:

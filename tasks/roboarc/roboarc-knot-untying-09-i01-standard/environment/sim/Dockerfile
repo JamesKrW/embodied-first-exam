@@ -12,7 +12,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0@sha256:beb13ec1db0d85df2c
      /sim/run.sh \
      /standard/sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:331e2a74d699de500cbc63027d16e144db89c59b955cf6efbb3198ab1f69bcd8 \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:90253c4cb419668f84c6728dc6d6e23ea55ef8d7f7e7835a5eb65015729f91b0 \
      /rcb1.py \
      /v2_4/rcb_limited.py \
      /srv/
