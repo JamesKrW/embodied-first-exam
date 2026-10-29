@@ -4,7 +4,7 @@
 |---|---|
 | Benchmark | EmbodiedSWE |
 | Mode | privileged |
-| Twin | — (privileged only) |
+| Twin | `embodiedswe-packing-egg-carton-g1-pink-ik-i00-standard` |
 | Simulator / robot | `embodiedswe` / `unitree-g1-dex3` |
 | Family / instance | `packing.egg_carton.g1.pink_ik` / seed 0 |
 | Oracle | `none` — No reference solution in the repository, and none written for this scene yet; the build, the start-state hash and a do-nothing run scoring 0 are checked. |

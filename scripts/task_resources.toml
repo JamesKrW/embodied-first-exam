@@ -828,3 +828,13 @@ gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
 recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
 measured = "GPU PhysX on an L40S (nvidia-smi every 2 s, one process on the card): a graded rollout process 3.2-4.6 GiB of GPU memory, a process with cameras (the video) 6.6-7.0 GiB; a fresh process starts and builds a scene in 13-27 s with a warm Kit cache"
 caps_measured = "GPU memory: 7.0 GiB (a process with cameras, L40S) -> max(1.5 x peak, peak + 2) = 10.5, at least 16 GiB for Isaac Sim: 16 GiB; disk: 0.9 GiB at most in 3 four-hour agent trials (the trial's resource monitor) -> at least 10 GiB: 10 GiB; memory, CPU, processes and threads: no reliable per-container measurement (those trials' monitor ran before GPU PhysX and saw under 2.5 GiB, less than one Isaac Sim process holds), kept at the earlier caps (29 GiB, 8 CPUs, 16384)"
+
+# 24 task(s)
+[[cap]]
+match = "^embodiedswe-.*-standard$"
+main = { cpus = 8, memory_gb = 24, pids = 1024, disk_gb = 10 }
+sim = { cpus = 8, memory_gb = 24, pids = 2048, gpu_memory_gb = 18 }
+gpu_types = ["L40S", "L40", "L4", "RTX 4090", "RTX 6000 Ada"]
+recommended_gpu = "L40S 48GB / L4 24GB / RTX 4090 24GB"
+measured = "the sim service of every one of the 24 scenes on an L40S (48 vCPU host), started alone and given the two largest legal calls (a watch at the full frame rate, every camera, video both, 240 images; the same with depth frames, 120 + 120): cgroup memory 12.5-15.4 GiB idle, memory.peak at most 14.89 GiB, GPU memory at most 11.5 GiB (bulb, three cameras), 239-246 threads; re-measured with the final service (shared layer standard-files-0.4.0, 12 warm-up renders) on the two largest: clear_organic_objects memory.peak 15.61 GiB (15.4 idle), GPU 9.0 GiB; bulb 14.41 GiB, GPU 11.5 GiB, 245 threads; Harbor oracle trials (stack_blocks, fruit_delivery; the resource monitor): the sim 13.2-13.9 GiB, 6.9-8.1 GiB of GPU memory, CPU at its cap (8), 239 threads; the oracle's client 0.03 GiB, 52 threads"
+caps_measured = "the sim service: memory max(1.5 x 15.61, 15.61 + 3) = 23.4 -> 24 GiB (the largest legal call adds at most 1.4 GiB to a 15.4 GiB service: within it); GPU memory max(1.5 x 11.52, 11.52 + 2) = 17.3 -> 18 GiB (at least 16 for Isaac Sim); threads 246 on a 48 vCPU host (Isaac Sim's thread pools grow with the host's cores) -> 2048, room for a host with four times the cores; CPU at its cap in every reading: 8 (the privileged twins' value); main: no agent trial yet, the shared client's caps of RoboLab's standard tasks (the same image), kept until agent trials are measured"

@@ -789,23 +789,42 @@ def run_solution(env, solution: Path, work: Path, on_step, deadline: float, log_
             time.sleep(0.2)
     threading.Thread(target=watchdog, daemon=True).start()
     t0 = None
+
+    def ended(exc) -> None:
+        """The solution's side of the pipe is gone: at the time limit (the watchdog killed it, or TERM) that is the
+        rollout's timeout, a graded end like any other; otherwise the process ended by itself."""
+        late = timer_fired.is_set() or TERM.is_set() or time.monotonic() > deadline
+        out["solve_status"] = "timeout" if late else "process_ended"
+        out["solve_error"] = None if late else f"connection: {exc}"
+
+    def reply(msg) -> bool:
+        """Answer the solution; False (and the end recorded) when it can no longer be answered: a solution killed at
+        the time limit while its request was being served leaves a broken pipe, never a grader error."""
+        try:
+            wire.send(msg)
+            return True
+        except (BrokenPipeError, ConnectionError, OSError) as exc:
+            ended(exc)
+            return False
+
     try:
-        wire.send({"op": "hello", "root": srv.handle_of(env), "protocol": "esw-proxy/1", "scratch": str(scratch)})
-        while True:
+        ok = reply({"op": "hello", "root": srv.handle_of(env), "protocol": "esw-proxy/1", "scratch": str(scratch)})
+        while ok:
             try:
                 req = wire.recv()
             except (EOFError, ValueError, OSError) as exc:
-                out["solve_status"] = "timeout" if timer_fired.is_set() else "process_ended"
-                out["solve_error"] = None if timer_fired.is_set() else f"connection: {exc}"
+                ended(exc)
                 break
             if not isinstance(req, dict):
-                wire.send({"error": "malformed request", "kind": "ValueError"})
+                if not reply({"error": "malformed request", "kind": "ValueError"}):
+                    break
                 continue
             op = req.get("op")
             if op == "loaded":
                 t0 = time.monotonic()
                 out["load_s"] = round(t0 - t_start, 3)
-                wire.send({"value": None})
+                if not reply({"value": None}):
+                    break
                 continue
             if op == "done":
                 if req.get("sandbox_failed"):
@@ -818,20 +837,23 @@ def run_solution(env, solution: Path, work: Path, on_step, deadline: float, log_
                 break
             try:
                 v = srv.handle(req)
-                wire.send({"value": v if op != "step" else None})
+                msg = {"value": v if op != "step" else None}
             except StopRollout as exc:
                 out["solve_status"] = str(exc)
-                wire.send({"error": str(exc), "kind": "RuntimeError", "stop": True})
+                reply({"error": str(exc), "kind": "RuntimeError", "stop": True})
+                out["solve_status"] = str(exc)            # the step cap stands even if the answer cannot be sent
                 break
             except (Refused, PermissionError) as exc:
                 srv.n_refused += 1
                 if len(srv.refusals) < 50:
                     srv.refusals.append(f"{req.get('op')}:{req.get('name', '')}: {exc}"[:300])
-                wire.send({"error": str(exc), "kind": "PermissionError"})
+                msg = {"error": str(exc), "kind": "PermissionError"}
             except Exception as exc:  # noqa: BLE001 — the solve's error (a bad attribute, a bad index) is its own
-                wire.send({"error": f"{type(exc).__name__}: {exc}"[:4000], "kind": type(exc).__name__})
+                msg = {"error": f"{type(exc).__name__}: {exc}"[:4000], "kind": type(exc).__name__}
             if time.monotonic() > deadline or TERM.is_set():
                 out["solve_status"] = "timeout"
+                break
+            if not reply(msg):
                 break
     finally:
         try:

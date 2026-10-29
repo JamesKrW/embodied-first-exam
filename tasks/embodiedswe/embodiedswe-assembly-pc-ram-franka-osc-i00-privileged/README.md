@@ -4,7 +4,7 @@
 |---|---|
 | Benchmark | EmbodiedSWE |
 | Mode | privileged |
-| Twin | — (privileged only) |
+| Twin | `embodiedswe-assembly-pc-ram-franka-osc-i00-standard` |
 | Simulator / robot | `embodiedswe` / `franka-panda` |
 | Family / instance | `assembly.pc_ram.franka.osc` / seed 0 |
 | Oracle | `none` — No reference solution in the repository, and none written for this scene yet; the build, the start-state hash and a do-nothing run scoring 0 are checked. |
