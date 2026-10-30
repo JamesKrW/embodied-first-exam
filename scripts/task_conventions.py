@@ -1540,7 +1540,7 @@ def before_you_run_link(lab: str) -> tuple[str, str]:
 # Benchmarks whose shared-files pull request comes before their tasks pull request (CONTRIBUTING): until the tasks
 # arrive, their BEFORE_YOU_RUN row is not rendered or link-checked and ci_scope does not check their UNITS paths. The
 # tasks pull request empties its label from this set; a label listed here whose task folder is in the tree is an error.
-PENDING_BENCHMARKS: set[str] = {"TactileLab"}
+PENDING_BENCHMARKS: set[str] = set()
 
 
 def before_you_run_listed(lab: str, tasks_dir: Path | None = None) -> bool:
