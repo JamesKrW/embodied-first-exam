@@ -3,8 +3,10 @@
 EmbodiedSWE's robot benchmark (`robobench`, commit `67f44e8a2ca5`) on Isaac Lab 2.3.2 / Isaac Sim 5.1, PhysX on the
 GPU: the agent writes a program, `solution/solve.py` exposing `solve(env)`, that completes a manipulation or
 loco-manipulation task by stepping the env. `simulator = "embodiedswe"`. 24 tasks (assembly, packing, puzzle, cutting
-and loco-manipulation scenes, one frozen instance each), in the full set only: EmbodiedSWE's 28 published tasks without
-its 4 deformable ones (they need Newton physics and a networked VLM judge). Each is in privileged mode
+and loco-manipulation scenes, one frozen instance each): EmbodiedSWE's 28 published tasks without its 4 deformable ones
+(they need Newton physics and a networked VLM judge). The 13 tasks the screening run (GPT-6 Luna,
+`codex-gpt6_luna-xhigh`) failed in both modes are in the core set (`docs/core_set.toml`), default mode standard; the
+other 11 are in the `all` set only. Each is in privileged mode
 (`task_type = "policy"`) and, as `<task>-standard`, in standard mode (`task_type = "trajectory"`, "Standard mode" below);
 all 24 scenes are static, so there is no standard-realtime mode.
 
