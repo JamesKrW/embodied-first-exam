@@ -126,6 +126,72 @@ source_commits = ["0d7f680cc049"]
 kind = "fullsim-policy"
 
 [[tasks]]
+name = "embodied-olympics-match-badminton-duelrl-i01-privileged"
+source_task = "roboolympics/badminton-duel-wallclock-program-standard"
+source_commits = ["b12667a02300"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-badminton-match-i04-privileged"
+source_task = "roboolympics/badminton-match-wallclock-program-standard"
+source_commits = ["62333496959f"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-badminton-matchlow-i01-privileged"
+source_task = "roboolympics/badminton-match-wallclock-program-lowlevel-standard"
+source_commits = ["02c93822a35e"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-fencing-bout-i02-privileged"
+source_task = "roboolympics/fencing-bout-wallclock-program-standard"
+source_commits = ["a6712a675343"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-foosball-match-i01-privileged"
+source_task = "roboolympics/foosball-match-wallclock-program-standard"
+source_commits = ["d71e9f642ead"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-soccer-jointcpu-i01-privileged"
+source_task = "roboolympics/soccer-match-wallclock-program-lowlevel-standard"
+source_commits = ["7ae66874c32e"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-soccer-jointgpu-i01-privileged"
+source_task = "roboolympics/soccer-match-wallclock-program-lowlevel-standard"
+source_commits = ["7ae66874c32e"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-soccerssl-match-i01-privileged"
+source_task = "roboolympics/soccer_ssl-match-wallclock-program-standard"
+source_commits = ["91156213b0de"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-tabletennis-duelrl-i01-privileged"
+source_task = "roboolympics/tabletennis-duel-wallclock-program-standard"
+source_commits = ["13f5e0981a99"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-tabletennis-match-i04-privileged"
+source_task = "roboolympics/tabletennis-match-wallclock-program-standard"
+source_commits = ["e25d8cc11861"]
+kind = "fullsim-policy"
+
+[[tasks]]
+name = "embodied-olympics-match-tabletennis-matchlow-i01-privileged"
+source_task = "roboolympics/tabletennis-match-wallclock-program-lowlevel-standard"
+source_commits = ["02c93822a35e"]
+kind = "fullsim-policy"
+
+[[tasks]]
 name = "embodied-olympics-match-tabletennis-matchlow-i01-standard-realtime"
 source_task = "roboolympics/tabletennis-match-wallclock-program-lowlevel-standard"
 revision = "wallclock-15+duel-wallclock-12+low-inloop-1+core-0.2"

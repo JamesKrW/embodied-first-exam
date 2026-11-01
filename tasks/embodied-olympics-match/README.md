@@ -3,9 +3,9 @@
 The matches [Embodied Olympics](https://github.com/CHIGUI0/roboolympics) (CHIGUI0; MIT, private) exports itself with its own
 service inside the task, and a privileged twin: table tennis, badminton, humanoid soccer, wheeled soccer and
 foosball matches, duels against a learned player, the low-level matches and a turn-based fencing bout; and table
-tennis between two Unitree G1 humanoids, ported from Embodied Olympics core 0.5. 30 task
+tennis between two Unitree G1 humanoids, ported from Embodied Olympics core 0.5. 41 task
 directories: 12 exported (11 standard-realtime, 1 standard; `ci_checks/benchmarks/embodied-olympics-match/exported.toml`), the 11
-standard twins of the real-time matches (below), 1 privileged twin, and the G1 table-tennis task in its three modes,
+standard twins of the real-time matches (below), 12 privileged twins, and the G1 table-tennis task in its three modes,
 in a CPU and a GPU tier (below).
 
 ## Quick start
@@ -56,10 +56,27 @@ and play exactly as in real time. `/spec` timing has `clock = "lockstep"`, `peri
 video and grading are unchanged. A program that never waits leaves the match standing; it is lost when the session ends
 (`abandoned`). The reviews keep their limit of real time, and the start window is unchanged.
 
-**Privileged twins.** One match has a privileged twin `<base>-privileged` on the same frozen instance: the full
-simulator in development (any state, the whole match reset), the deliverable a closed-loop Python program that plays a
-fresh, unmodified match in the verifier on the original clock, seeing the full state instead of camera images:
-`embodied-olympics-match-soccer-match-i00`.
+**Privileged twins.** Every exported match has a privileged twin `<base>-privileged` on the same frozen instance: the
+full simulator in development (any state, the whole match reset), the deliverable a closed-loop Python program that
+plays a fresh, unmodified match in the verifier on the original clock (a turn-based bout: the original turns and chess
+clock), seeing the full state instead of camera images. The generic full-simulator layer (`tools/fullsim`) with a per-task
+adapter; a duel's built-in learned seat plays inside the formal match as in the twin. The soccer joint pair keeps its
+resource tiers: the GPU twin's agent container holds a GPU and the twin's training stack, the verifier is CPU-only in both.
+
+| twin | oracle (Harbor; nop: no program, 0) |
+|---|---|
+| `embodied-olympics-match-soccer-match-i00-privileged` | see its README |
+| `embodied-olympics-match-badminton-duelrl-i01-privileged` | untested (oracle runs waived); nop 0 |
+| `embodied-olympics-match-badminton-match-i04-privileged` | partial: lost 2:11 (valid, replay identical) |
+| `embodied-olympics-match-badminton-matchlow-i01-privileged` | partial: lost 0:11 (valid, replay identical) |
+| `embodied-olympics-match-fencing-bout-i02-privileged` | full: won 15:13 (valid, replay identical) |
+| `embodied-olympics-match-foosball-match-i01-privileged` | full: won 5:3 (valid, replay identical) |
+| `embodied-olympics-match-soccer-jointcpu-i01-privileged` | untested (oracle runs waived); nop 0 |
+| `embodied-olympics-match-soccer-jointgpu-i01-privileged` | untested (oracle runs waived) |
+| `embodied-olympics-match-soccerssl-match-i01-privileged` | untested (oracle runs waived); nop 0 |
+| `embodied-olympics-match-tabletennis-duelrl-i01-privileged` | partial: lost 3:5 to the built-in learned seat (valid, replay identical) |
+| `embodied-olympics-match-tabletennis-match-i04-privileged` | partial: lost 4:6 (valid, replay identical) |
+| `embodied-olympics-match-tabletennis-matchlow-i01-privileged` | partial: lost 0:5 (valid, replay identical) |
 
 ## G1 table tennis (`tabletennisg1`, ported from Embodied Olympics core 0.5)
 
@@ -125,7 +142,7 @@ What differs from Embodied Olympics - Fun's tasks (`eai-standard/2.x`; PROTOCOL 
 | slowdown | — | per task, the sport's official slowdown: table tennis 10 (Embodied Olympics PR #138), badminton 20, humanoid soccer 5, wheeled soccer 10, foosball 20 (the sim service's `RO_SLOWDOWN` default); turn-based matches have none (`metadata.chess_clock_s`: fencing 3600 s) | results state S, or the chess clock |
 | agent budget | the benchmark's 7200 s | 7200 s; badminton i04, the badminton duel, wheeled soccer and foosball 14400 s (those tasks' own `[agent] timeout_sec`) | a game to 11 at S = 20 took the reference alone 78 to 93 min; a 5 v 5 match is 2.9 h of wall time at S = 10; foosball's 240 s of play is up to 4800 s at S = 20 |
 | network | open (Embodied Olympics - Fun's exception) | the allowlist (model APIs and package registries), as every other benchmark: these tasks declare it, and PROTOCOL H.6 holds them to it | Embodied Olympics' design; the open-egress exception is Embodied Olympics - Fun's |
-| twin | privileged + standard | a privileged twin for 1 match (below); none for the others (the README's Twin row says why) | no trajectory deliverable; a twin needs a full-state program the verifier can play |
+| twin | privileged + standard | a privileged twin for every match (below) | no trajectory deliverable; a twin needs a full-state program the verifier can play |
 | seeds | the instance's | matches: `instance_seed` = the instance's development seed, the only one allowed (a turn-based match whose world is deterministic has one outcome per sequence of choices: its oracle is `full` when the reference wins that seed); skill tasks: seed 0 = the fixed development request set | development seeds below 100000: previews; Embodied Olympics' official results are produced by Embodied Olympics on its hidden six-digit seeds |
 | metering | the usage gateway | the same (the seat is "unmetered" for Embodied Olympics: no proxy, no credential in the sim; the proxy file `metering/think_proxy.py` is in the image's copy but never started) | |
 
