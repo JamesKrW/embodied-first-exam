@@ -8,7 +8,7 @@ and retry) refuses a launch that breaks one.
 ## Official runs
 A result is official only when its run had all of these:
 - **Harbor's native agents** (`-a codex`, `-a claude-code`, ...), configured through environment variables; no agent
-  adapter, no gateway that holds credentials or changes requests.
+  adapter.
 - **The usage gateway** (`GATEWAY=1`, below): it forwards model-API calls only and is, with the package registries, the
   agent container's only egress; a task that declares open egress keeps it (Network). The runner flags a trial whose
   `totals.json` has `refused_paths`, `refused_server_tools` or `refused_bodies` for a look.
