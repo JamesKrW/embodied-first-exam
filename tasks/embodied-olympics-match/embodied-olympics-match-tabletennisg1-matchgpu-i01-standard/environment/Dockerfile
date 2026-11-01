@@ -3,4 +3,7 @@
 # toolkit under /opt/ro, the training kit /opt/train, the practice sandbox /opt/practice), prebuilt.
 FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-seat-0.1.1
 ENV SIM_URL=http://localhost:8000 PRACTICE_URL=http://localhost:8100 SEAT=A
+# Embodied First Exam: the verdict ends the session (match_end.sh, the container's entrypoint).
+COPY match_end.sh /opt/efe/match_end.sh
+ENTRYPOINT ["/opt/efe/match_end.sh"]
 WORKDIR /app

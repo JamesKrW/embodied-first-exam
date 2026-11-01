@@ -266,7 +266,7 @@ name = "embodied-olympics-match-tabletennisg1-matchcpu-i01-standard-realtime"
 source_task = "roboolympics/tabletennis_g1-match-wallclock-program-engineer-standard"
 revision = "g1tt-10+core-0.5"
 source_commits = ["45ed806a5"]
-patched = ["instruction.md", "README.md", "task.toml", "environment/Dockerfile", "environment/docker-compose.yaml", "environment/sim/Dockerfile", "environment/sim/core/realtime.py", "environment/sim/core/service.py", "environment/sim/core/metering/think_clock.py", "environment/sim/core/phases.py", "tests/Dockerfile", "tests/test.sh", "tests/fexam_reward.py", "tests/eo_judge/verdict.py", "tests/eo_judge/evidence.py", "solution/solve.sh", "solution/ro_client.py"]
+patched = ["instruction.md", "README.md", "task.toml", "environment/Dockerfile", "environment/docker-compose.yaml", "environment/sim/Dockerfile", "environment/sim/core/realtime.py", "environment/sim/core/service.py", "environment/sim/core/metering/think_clock.py", "environment/sim/core/phases.py", "environment/sim/core/http.py", "environment/match_end.sh", "tests/Dockerfile", "tests/test.sh", "tests/fexam_reward.py", "tests/eo_judge/verdict.py", "tests/eo_judge/evidence.py", "solution/solve.sh", "solution/ro_client.py"]
 
 # Its standard twin (the same task; the world in lockstep on core 0.5: environment/sim/core/lockstep.py, Embodied
 # First Exam's, with the platform's opponent held to the same rule: core/platform_seat.py live = False).
@@ -276,7 +276,7 @@ name = "embodied-olympics-match-tabletennisg1-matchcpu-i01-standard"
 source_task = "roboolympics/tabletennis_g1-match-wallclock-program-engineer-standard"
 revision = "g1tt-10+core-0.5"
 source_commits = ["45ed806a5"]
-patched = ["instruction.md", "README.md", "task.toml", "environment/Dockerfile", "environment/docker-compose.yaml", "environment/sim/Dockerfile", "environment/sim/core/realtime.py", "environment/sim/core/service.py", "environment/sim/core/metering/think_clock.py", "environment/sim/core/phases.py", "environment/sim/core/lockstep.py", "tests/Dockerfile", "tests/test.sh", "tests/fexam_reward.py", "tests/eo_judge/verdict.py", "tests/eo_judge/evidence.py", "solution/solve.sh", "solution/ro_client.py"]
+patched = ["instruction.md", "README.md", "task.toml", "environment/Dockerfile", "environment/docker-compose.yaml", "environment/sim/Dockerfile", "environment/sim/core/realtime.py", "environment/sim/core/service.py", "environment/sim/core/metering/think_clock.py", "environment/sim/core/phases.py", "environment/sim/core/http.py", "environment/match_end.sh", "environment/sim/core/lockstep.py", "tests/Dockerfile", "tests/test.sh", "tests/fexam_reward.py", "tests/eo_judge/verdict.py", "tests/eo_judge/evidence.py", "solution/solve.sh", "solution/ro_client.py"]
 standard_realtime_twin = "embodied-olympics-match-tabletennisg1-matchcpu-i01-standard-realtime"
 
 # Its privileged twin (Embodied First Exam's: the full simulator in development; the program plays seat A of a fresh
@@ -297,7 +297,7 @@ name = "embodied-olympics-match-tabletennisg1-matchgpu-i01-standard-realtime"
 source_task = "roboolympics/tabletennis_g1-match-wallclock-program-engineer-standard"
 revision = "g1tt-10+core-0.5"
 source_commits = ["45ed806a5"]
-patched = ["instruction.md", "README.md", "task.toml", "environment/Dockerfile", "environment/docker-compose.yaml", "environment/sim/Dockerfile", "environment/sim/core/realtime.py", "environment/sim/core/service.py", "environment/sim/core/metering/think_clock.py", "environment/sim/core/phases.py", "tests/Dockerfile", "tests/test.sh", "tests/fexam_reward.py", "tests/eo_judge/verdict.py", "tests/eo_judge/evidence.py", "solution/solve.sh", "solution/ro_client.py"]
+patched = ["instruction.md", "README.md", "task.toml", "environment/Dockerfile", "environment/docker-compose.yaml", "environment/sim/Dockerfile", "environment/sim/core/realtime.py", "environment/sim/core/service.py", "environment/sim/core/metering/think_clock.py", "environment/sim/core/phases.py", "environment/sim/core/http.py", "environment/match_end.sh", "tests/Dockerfile", "tests/test.sh", "tests/fexam_reward.py", "tests/eo_judge/verdict.py", "tests/eo_judge/evidence.py", "solution/solve.sh", "solution/ro_client.py"]
 
 # Its standard twin (the same task; the world in lockstep on core 0.5: environment/sim/core/lockstep.py, Embodied
 # First Exam's, with the platform's opponent held to the same rule: core/platform_seat.py live = False).
@@ -307,7 +307,7 @@ name = "embodied-olympics-match-tabletennisg1-matchgpu-i01-standard"
 source_task = "roboolympics/tabletennis_g1-match-wallclock-program-engineer-standard"
 revision = "g1tt-10+core-0.5"
 source_commits = ["45ed806a5"]
-patched = ["instruction.md", "README.md", "task.toml", "environment/Dockerfile", "environment/docker-compose.yaml", "environment/sim/Dockerfile", "environment/sim/core/realtime.py", "environment/sim/core/service.py", "environment/sim/core/metering/think_clock.py", "environment/sim/core/phases.py", "environment/sim/core/lockstep.py", "tests/Dockerfile", "tests/test.sh", "tests/fexam_reward.py", "tests/eo_judge/verdict.py", "tests/eo_judge/evidence.py", "solution/solve.sh", "solution/ro_client.py"]
+patched = ["instruction.md", "README.md", "task.toml", "environment/Dockerfile", "environment/docker-compose.yaml", "environment/sim/Dockerfile", "environment/sim/core/realtime.py", "environment/sim/core/service.py", "environment/sim/core/metering/think_clock.py", "environment/sim/core/phases.py", "environment/sim/core/http.py", "environment/match_end.sh", "environment/sim/core/lockstep.py", "tests/Dockerfile", "tests/test.sh", "tests/fexam_reward.py", "tests/eo_judge/verdict.py", "tests/eo_judge/evidence.py", "solution/solve.sh", "solution/ro_client.py"]
 standard_realtime_twin = "embodied-olympics-match-tabletennisg1-matchgpu-i01-standard-realtime"
 
 # Its privileged twin (Embodied First Exam's: the full simulator in development; the program plays seat A of a fresh
