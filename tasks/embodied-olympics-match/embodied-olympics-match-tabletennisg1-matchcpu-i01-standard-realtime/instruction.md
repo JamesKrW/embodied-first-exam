@@ -40,7 +40,7 @@ You are encouraged to study your opponent: observe how it plays, find its patter
 
 ### End
 - The match ends when its rules end it (chapter 2); every match has a finite end. You may resign with `game resign` (you lose).
-- The result is recorded automatically. When the match has ended, `game status` gives one short post-match step; it never changes your result.
+- The result is recorded automatically. When the match is over (full time, a no-show or a forfeit), its result is final and your session is ended a few seconds later; nothing after that changes the result.
 - Your session must last until the match is over: when your session ends (you finish, or the time limit), a match that has not started is a no-show and a match in play is lost (abandoned), both valid losses.
 
 ### Continuity

@@ -89,6 +89,7 @@ service, core and judge (`tests/eo_judge`) are kept, and the changed files are l
 The patches switch on through the compose environment:
 - The seat is `unmetered` (`core/metering/think_clock.py`): there is no metering proxy, and Harbor records the usage.
 - The match is graded live (`RO_VERDICT_REPLAY=0`).
+- The verdict ends the session: the agent container's entrypoint (`environment/match_end.sh`) asks the match service whether the result is final (`GET /over`, a patch of `core/http.py`: no seat, no arrival) and, a few seconds after it is, stops every process of the container (the collect hook's `kill -9 -1`). Harbor records the harness's exit (`NonZeroAgentExitCodeError`) and grades as at the cutoff; the result is already final.
 - The session's end decides (`RO_COLLECT_ENDS_MATCH=1`). Without this patch, core 0.5 lets the programs play on after the session.
   - An end before the start is a no-show.
   - An end during play is `abandoned`, the agent's R-EXIT.
