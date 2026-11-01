@@ -107,11 +107,17 @@ def play_match():
             main.call("ready", {"why": "reference team", "plan": "same plan"})
             stats["reviews"].append(dict(k=st.get("step"), s=round(time.time() - t0, 2)))
             continue
-        if st.get("world") != "running" or "robots" not in st or st.get("step") == last_k:
+        if st.get("world") != "running" or "robots" not in st:
             time.sleep(0.02)
+            continue
+        if st.get("step") == last_k:            # standard mode (lockstep): the world advances only while we wait or act
+            main.call("wait", {"dt": 0.02})
             continue
         last_k = st["step"]
         rows = ctl.rows(st)
+        if not rows:                            # no robot of ours can act (fallen, penalized): let the world run a step
+            main.call("wait", {"dt": 0.02})
+            continue
         res = {}
 
         def send(n, q):

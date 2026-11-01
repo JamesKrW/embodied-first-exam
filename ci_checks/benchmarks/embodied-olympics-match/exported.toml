@@ -307,7 +307,7 @@ name = "embodied-olympics-match-soccer-jointcpu-i01-standard"
 source_task = "roboolympics/soccer-match-wallclock-program-lowlevel-standard"
 revision = "soccer-2v2-11"
 source_commits = ["7ae66874c32e"]
-patched = ["environment/sim/audit/policy_fingerprint.py", "tests/fexam_reward.py", "task.toml", "solution/solve.sh", "environment/sim/core/lockstep.py", "environment/docker-compose.yaml", "instruction.md", "README.md"]
+patched = ["environment/sim/audit/policy_fingerprint.py", "tests/fexam_reward.py", "task.toml", "solution/solve.sh", "environment/sim/core/lockstep.py", "environment/docker-compose.yaml", "instruction.md", "README.md", "solution/joint_oracle.py"]
 standard_realtime_twin = "embodied-olympics-match-soccer-jointcpu-i01-standard-realtime"
 
 [[tasks]]
@@ -315,7 +315,7 @@ name = "embodied-olympics-match-soccer-jointgpu-i01-standard"
 source_task = "roboolympics/soccer-match-wallclock-program-lowlevel-standard"
 revision = "soccer-2v2-11"
 source_commits = ["7ae66874c32e"]
-patched = ["environment/sim/audit/policy_fingerprint.py", "tests/fexam_reward.py", "task.toml", "solution/solve.sh", "environment/sim/core/lockstep.py", "environment/docker-compose.yaml", "instruction.md", "README.md"]
+patched = ["environment/sim/audit/policy_fingerprint.py", "tests/fexam_reward.py", "task.toml", "solution/solve.sh", "environment/sim/core/lockstep.py", "environment/docker-compose.yaml", "instruction.md", "README.md", "solution/joint_oracle.py"]
 standard_realtime_twin = "embodied-olympics-match-soccer-jointgpu-i01-standard-realtime"
 
 [[tasks]]
