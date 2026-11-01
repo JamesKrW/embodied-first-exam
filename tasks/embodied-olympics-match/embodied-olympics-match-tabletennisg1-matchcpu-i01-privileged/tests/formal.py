@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The privileged twin's formal match (Embodied First Exam, board 0307), run by tests/test.sh as root in the separate
+"""The privileged twin's formal match (Embodied First Exam), run by tests/test.sh as root in the separate
 no-network verifier: /app/output/policy/program.py plays seat A of a fresh, unmodified match of the frozen instance
 (tests/match_instance.json) on the trusted simulator (/opt/trusted/sim, root only) with the sport's in-process runner
 (tools/g1tt_priv/match.py: core/local.py), the program in its own process as `nobody` (tools/g1tt_priv/isolate.py,
