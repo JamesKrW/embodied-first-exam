@@ -1,6 +1,6 @@
 # The privileged twin's verifier: the sim service's image; the trusted simulator (root only) and a public read-only
 # copy for the program (/opt/dev), both the image's own /srv plus tools/g1tt_priv.
-FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0
+FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0@sha256:8bc6d02f91aa5730bbf93bc5c1c4a477feee6f5846ff8c609aaa3a25e0eb36af
 ENV PYTHONDONTWRITEBYTECODE=1 MUJOCO_GL=osmesa PYOPENGL_PLATFORM=osmesa OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 RUN mkdir -p /opt/trusted && cp -a /srv /opt/trusted/sim && cp -a /srv /opt/dev && mkdir -p /opt/trusted/sim/tools /opt/dev/tools
 COPY g1tt_priv/ /opt/trusted/sim/tools/g1tt_priv/
