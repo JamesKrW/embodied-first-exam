@@ -19,8 +19,8 @@ source_commits = ["45ed806a5"]
 source_task = "roboolympics/tabletennis_g1-match-wallclock-program-engineer-standard"
 official = false
 expert_time_estimate_hours = 2.0
-oracle = "full"
-oracle_evidence = "the sport's camera-only reference player (solution/program.py: builtin_players:OpenReference in its in-process form, the learned striker of the release on CPU; it ignores the truth) won 5:3 (Embodied First Exam's local Harbor runs: see the benchmark README; replay identical); nop 0"
+oracle = "partial"
+oracle_evidence = "the sport's camera-only reference player (solution/program.py: builtin_players:OpenReference in its in-process form, the learned striker of the release on CPU; it ignores the truth) won 5:3 on a Xeon Platinum 8488C (the CPU tier) and lost 6:7 on the GPU tier's EPYC host (the in-process match is replay-identical on one host, not across CPU architectures) (Embodied First Exam's local Harbor runs: see the benchmark README; replay identical); nop 0"
 validated = true
 
 [agent]

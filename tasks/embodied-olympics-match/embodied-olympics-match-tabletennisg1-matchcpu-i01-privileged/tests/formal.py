@@ -33,8 +33,8 @@ reward = {"success": 0, "valid_trial": 1, "technical_failure": 0, "grader_error"
 
 
 def write(note=None):
-    if note:
-        reward["note"] = str(note)[:500]
+    if note:                                           # reward.json holds numbers only (Harbor's parser): the note apart
+        (OUT / "note.txt").write_text(str(note)[:500] + "\n")
     for name in ("reward.json", "reward.txt"):
         p = OUT / name
         if p.exists() or p.is_symlink():

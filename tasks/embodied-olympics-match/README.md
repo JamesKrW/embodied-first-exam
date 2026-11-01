@@ -112,9 +112,9 @@ measured (`scripts/task_resources.toml`).
 | `embodied-olympics-match-tabletennisg1-matchcpu-i01-standard-realtime` | level 4 (the BOSS), seed 4 | no winning oracle: the camera-only reference lost 2:5 to level 4 (valid; the release: it won 2 of 5 seeds, this one 7:6) |
 | `embodied-olympics-match-tabletennisg1-matchcpu-i01-standard` | as above, lockstep | no winning oracle: lost 5:7 |
 | `embodied-olympics-match-tabletennisg1-matchcpu-i01-privileged` | as above, full state, in-process runner | full: the reference program (camera-only, it ignores the truth) won 5:3, replay identical |
-| `embodied-olympics-match-tabletennisg1-matchgpu-i01-standard-realtime` | the CPU tier's, one GPU | not measured yet |
-| `embodied-olympics-match-tabletennisg1-matchgpu-i01-standard` | as above, lockstep | not measured yet |
-| `embodied-olympics-match-tabletennisg1-matchgpu-i01-privileged` | as above, full state | not measured yet |
+| `embodied-olympics-match-tabletennisg1-matchgpu-i01-standard-realtime` | the CPU tier's, one GPU | no valid oracle: on an EPYC host with L40S GPUs (g6e.12xlarge, load 8-27 of 48 from other trials) all 3 x1 matches were voided by R-INTEGRITY (late step p99 0.053-0.178 s, render misses 36-71 %) |
+| `embodied-olympics-match-tabletennisg1-matchgpu-i01-standard` | as above, lockstep | the reference won 5:1 (same host) |
+| `embodied-olympics-match-tabletennisg1-matchgpu-i01-privileged` | as above, full state | partial: the reference program lost 6:7 on that host, replay identical (it won 5:3 on the Xeon 8488C: the in-process match agrees with its replay on one host, not across CPU architectures) |
 
 What differs from Embodied Olympics - Fun's tasks (`eai-standard/2.x`; PROTOCOL §3):
 

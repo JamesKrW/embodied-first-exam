@@ -7,7 +7,7 @@
 | Twin | `embodied-olympics-match-tabletennisg1-matchcpu-i01-standard` |
 | Simulator / robot | `mujoco` / `unitree-g1` |
 | Family / instance | `tabletennisg1_match` / seed 4 |
-| Oracle | `full` — the sport's camera-only reference player (solution/program.py: builtin_players:OpenReference in its in-process form, the learned striker of the release on CPU; it ignores the truth) won 5:3 (Embodied First Exam's local Harbor runs: see the benchmark README; replay identical); nop 0 |
+| Oracle | `full` — the sport's camera-only reference player (solution/program.py: builtin_players:OpenReference in its in-process form, the learned striker of the release on CPU; it ignores the truth) won 5:3 on a Xeon Platinum 8488C (Embodied First Exam's local Harbor runs: see the benchmark README; replay identical); nop 0 |
 | Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0` |
 
@@ -21,7 +21,7 @@ Level 4, seed 4, the release's frozen instance; the opponent reads the ball's tr
 
 ## Reference solution
 `solution/solve.sh` submits `solution/program.py`: the sport's camera-only reference player in its in-process form
-(it ignores the truth); it won 5:3 here (the world waits for it at every step, which its twins' world does not).
+(it ignores the truth); it won 5:3 on a Xeon Platinum 8488C (the world waits for it at every step, which its twins' world does not).
 
 ## Verification
 Separate no-network verifier (`tests/formal.py`): the program as `nobody` in its own process against a fresh,
