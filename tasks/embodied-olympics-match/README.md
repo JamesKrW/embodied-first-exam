@@ -3,10 +3,10 @@
 The matches [Embodied Olympics](https://github.com/CHIGUI0/roboolympics) (CHIGUI0; MIT, private) exports itself with its own
 service inside the task, and a privileged twin: table tennis, badminton, humanoid soccer, wheeled soccer and
 foosball matches, duels against a learned player, the low-level matches and a turn-based fencing bout; and table
-tennis between two Unitree G1 humanoids, ported from Embodied Olympics core 0.5. 27 task
+tennis between two Unitree G1 humanoids, ported from Embodied Olympics core 0.5. 30 task
 directories: 12 exported (11 standard-realtime, 1 standard; `ci_checks/benchmarks/embodied-olympics-match/exported.toml`), the 11
-standard twins of the real-time matches (below), 1 privileged twin, and the G1 table-tennis task in its three modes
-(below).
+standard twins of the real-time matches (below), 1 privileged twin, and the G1 table-tennis task in its three modes,
+in a CPU and a GPU tier (below).
 
 ## Quick start
 ```bash
@@ -65,7 +65,7 @@ fresh, unmodified match in the verifier on the original clock, seeing the full s
 
 Embodied Olympics' `tabletennis_g1` is a separate sport from `tabletennis`'s Franka. It is played by two Unitree G1s, each holding a racket. On the
 Engineer track the agent's program drives all 29 joints of its G1 at 100 Hz and sees the ball only through two cameras. The match is one game to 5 points.
-One task against the hardest opponent, level 4 (owner 2026-11-01), in three modes. It is ported by Embodied First Exam,
+One task against the hardest opponent, level 4 (owner 2026-11-01), in three modes and two resource tiers. It is ported by Embodied First Exam,
 not exported: core 0.5 has no exporter. The source is the release branch's generated task
 `tabletennis_g1-match-wallclock-program-engineer-standard` (revision `g1tt-10+core-0.5`, commit `45ed806a5`). Its sim
 service, core and judge (`tests/eo_judge`) are kept, and the changed files are listed under `patched` in `exported.toml`.
@@ -76,7 +76,7 @@ The patches switch on through the compose environment:
   - An end before the start is a no-show.
   - An end during play is `abandoned`, the agent's R-EXIT.
   - Both are valid losses.
-- The seat has no GPU. The release's GPU serves only its training kit, and the kit's PyTorch runs on the CPUs.
+- Two tiers (`resource_tier`, `tier_twin`). `matchcpu`: the seat has no GPU; the release's GPU serves only its training kit, and the kit's PyTorch runs on the CPUs. `matchgpu`: the release's seat, one NVIDIA GPU for the kit (20 GiB cap). The world and the opponent run on CPU in both.
 
 The `-standard` twin runs `python3 -m core.lockstep`: the rule of the paragraph above, written for core 0.5. The platform's opponent is
 a program on core 0.5 (`core/platform_seat.py`), so it is held to the same rule (`live = False`): the world waits for its
@@ -88,7 +88,8 @@ images and `truth` (the sport's `practice_truth()`: the ball's position, velocit
 separate verifier the program, run as `nobody` in its own process, plays seat A of a fresh match with the sport's
 in-process runner (`core/local.py`). The world waits for it at every control step: 0.5 s a call, 1800 s of program time
 in all. The opponent is waited for the same way. The core's fresh-process replay must agree with the match, and the video
-is drawn after the verdict. No duel, no persistent session.
+is drawn after the verdict. No duel, no persistent session. The `matchgpu` privileged container adds the seat image's
+GPU kit (`/opt/train`, `/opt/robot`, `/opt/ro`); the formal match runs the program on CPU without PyTorch.
 
 **Hosts (standard-realtime).** x1 needs fast cores. A trial uses:
 - the world: 12 vCPU;
@@ -111,6 +112,9 @@ measured (`scripts/task_resources.toml`).
 | `embodied-olympics-match-tabletennisg1-matchcpu-i01-standard-realtime` | level 4 (the BOSS), seed 4 | no winning oracle: the camera-only reference lost 2:5 to level 4 (valid; the release: it won 2 of 5 seeds, this one 7:6) |
 | `embodied-olympics-match-tabletennisg1-matchcpu-i01-standard` | as above, lockstep | no winning oracle: lost 5:7 |
 | `embodied-olympics-match-tabletennisg1-matchcpu-i01-privileged` | as above, full state, in-process runner | full: the reference program (camera-only, it ignores the truth) won 5:3, replay identical |
+| `embodied-olympics-match-tabletennisg1-matchgpu-i01-standard-realtime` | the CPU tier's, one GPU | not measured yet |
+| `embodied-olympics-match-tabletennisg1-matchgpu-i01-standard` | as above, lockstep | not measured yet |
+| `embodied-olympics-match-tabletennisg1-matchgpu-i01-privileged` | as above, full state | not measured yet |
 
 What differs from Embodied Olympics - Fun's tasks (`eai-standard/2.x`; PROTOCOL §3):
 
