@@ -10,6 +10,7 @@ simulator = "mujoco"
 robot = "unitree-g1"
 family = "tabletennisg1_match"
 resource_tier = "cpu"
+tier_twin = "embodied-olympics-match-tabletennisg1-matchgpu-i01-privileged"
 dynamics = "dynamic"
 instance_seed = 4
 opponent_level = 4

@@ -19,6 +19,7 @@ simulator = "mujoco"
 robot = "unitree-g1"
 family = "tabletennisg1_match"
 resource_tier = "cpu"
+tier_twin = "embodied-olympics-match-tabletennisg1-matchgpu-i01-standard"
 dynamics = "dynamic"              # scene dynamics (docs/protocol/README.md §2): the task's own declaration
 protocol = "eai-standard-lockstep/1.0"
 instance_seed = 4
