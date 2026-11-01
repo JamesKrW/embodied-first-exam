@@ -76,7 +76,7 @@ actively. The standard-realtime mode is offered where a benchmark's tasks call f
 - Embodied Olympics - Fun: `<base>` is
   `embodied-olympics-fun-<family-with-dashes>-i<NN>` (`[metadata].family` = the family with underscores, e.g. `penalty_kick`);
   every family in privileged and standard mode. Embodied Olympics - Match, the tasks Embodied Olympics exports (PROTOCOL §3, `ci_checks/benchmarks/embodied-olympics-match/exported.toml`): `<base>` is
-  `embodied-olympics-match-<sport>-<format>-i<NN>` with the sport's Embodied Olympics id (`tabletennis`, `badminton`, `soccer`,
+  `embodied-olympics-match-<sport>-<format>-i<NN>` with the sport's Embodied Olympics id (`tabletennis`, `tabletennisg1` (`tabletennis_g1`), `badminton`, `soccer`,
   `soccerssl`, `fencing`) and its format (`match`, `bout`; `matchlow`: the low level, the agent's own uploaded skill plays the match); real-time
   matches in standard-realtime mode only, turn-based matches (`eai-standard-turn/1.0`) in standard mode only; never a family name of the generated families.
 - RoboPaint: `<base>` is `robopaint-<family>-<target>-i<NN>`; Chinese targets by pinyin (the codepoint appended on a

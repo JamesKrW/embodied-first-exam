@@ -2,9 +2,11 @@
 
 The matches [Embodied Olympics](https://github.com/CHIGUI0/roboolympics) (CHIGUI0; MIT, private) exports itself with its own
 service inside the task, and a privileged twin: table tennis, badminton, humanoid soccer, wheeled soccer and
-foosball matches, duels against a learned player, the low-level matches and a turn-based fencing bout. 24 task
+foosball matches, duels against a learned player, the low-level matches and a turn-based fencing bout; and table
+tennis between two Unitree G1 humanoids, ported from Embodied Olympics core 0.5. 27 task
 directories: 12 exported (11 standard-realtime, 1 standard; `ci_checks/benchmarks/embodied-olympics-match/exported.toml`), the 11
-standard twins of the real-time matches (below) and 1 privileged twin.
+standard twins of the real-time matches (below), 1 privileged twin, and the G1 table-tennis task in its three modes
+(below).
 
 ## Quick start
 ```bash
@@ -58,6 +60,57 @@ video and grading are unchanged. A program that never waits leaves the match sta
 simulator in development (any state, the whole match reset), the deliverable a closed-loop Python program that plays a
 fresh, unmodified match in the verifier on the original clock, seeing the full state instead of camera images:
 `embodied-olympics-match-soccer-match-i00`.
+
+## G1 table tennis (`tabletennisg1`, ported from Embodied Olympics core 0.5)
+
+Embodied Olympics' `tabletennis_g1` is a separate sport from `tabletennis`'s Franka. It is played by two Unitree G1s, each holding a racket. On the
+Engineer track the agent's program drives all 29 joints of its G1 at 100 Hz and sees the ball only through two cameras. The match is one game to 5 points.
+One task against the hardest opponent, level 4 (owner 2026-11-01), in three modes. It is ported by Embodied First Exam,
+not exported: core 0.5 has no exporter. The source is the release branch's generated task
+`tabletennis_g1-match-wallclock-program-engineer-standard` (revision `g1tt-10+core-0.5`, commit `45ed806a5`). Its sim
+service, core and judge (`tests/eo_judge`) are kept, and the changed files are listed under `patched` in `exported.toml`.
+The patches switch on through the compose environment:
+- The seat is `unmetered` (`core/metering/think_clock.py`): there is no metering proxy, and Harbor records the usage.
+- The match is graded live (`RO_VERDICT_REPLAY=0`).
+- The session's end decides (`RO_COLLECT_ENDS_MATCH=1`). Without this patch, core 0.5 lets the programs play on after the session.
+  - An end before the start is a no-show.
+  - An end during play is `abandoned`, the agent's R-EXIT.
+  - Both are valid losses.
+- The seat has no GPU. The release's GPU serves only its training kit, and the kit's PyTorch runs on the CPUs.
+
+The `-standard` twin runs `python3 -m core.lockstep`: the rule of the paragraph above, written for core 0.5. The platform's opponent is
+a program on core 0.5 (`core/platform_seat.py`), so it is held to the same rule (`live = False`): the world waits for its
+reply after every step. The reference plays observe, act, `wait` (`solution/ro_client.py`).
+The `-privileged` twin is Embodied First Exam's (`tools/g1tt_priv`, `tests/formal.py`; the agent plays the computer,
+owner 2026-11-01). Development has the full simulator at `/opt/fullsim`: any level, seed or state, and the formal
+runner itself. The deliverable is a program `make_policy(config).act(view)`; every view has the seat's state, its camera
+images and `truth` (the sport's `practice_truth()`: the ball's position, velocity and spin, both robots, the score). In the
+separate verifier the program, run as `nobody` in its own process, plays seat A of a fresh match with the sport's
+in-process runner (`core/local.py`). The world waits for it at every control step: 0.5 s a call, 1800 s of program time
+in all. The opponent is waited for the same way. The core's fresh-process replay must agree with the match, and the video
+is drawn after the verdict. No duel, no persistent session.
+
+**Hosts (standard-realtime).** x1 needs fast cores. A trial uses:
+- the world: 12 vCPU;
+- the platform's G1: 8 vCPU;
+- the seat: 8 vCPU;
+- the practice service: 8 vCPU;
+- the practice player: 1 vCPU.
+
+Oracle runs (levels 1-4 while porting) on an idle Xeon Platinum 8488C (m7i.16xlarge) passed the integrity rules in all 5 matches:
+- world lag p99: 1.2-1.7 ms;
+- late step p99: 9.4-11.2 ms;
+- render misses: 0.08-0.12 %.
+
+The limits are 0.5 s, 0.05 s and 1 %. On a Ryzen 9 7950X at a load of 30-50 on 32 threads, the matches were voided (late step p99 0.09-0.8 s). A breach
+voids the match as infrastructure (R-INTEGRITY), never as the player's loss. The x1 world's minimum is 12 vCPU, the fewest
+measured (`scripts/task_resources.toml`).
+
+| task | instance | oracle (Harbor 0.23.0; nop: a valid no-show or no deliverable, 0) |
+|---|---|---|
+| `embodied-olympics-match-tabletennisg1-matchcpu-i01-standard-realtime` | level 4 (the BOSS), seed 4 | no winning oracle: the camera-only reference lost 2:5 to level 4 (valid; the release: it won 2 of 5 seeds, this one 7:6) |
+| `embodied-olympics-match-tabletennisg1-matchcpu-i01-standard` | as above, lockstep | no winning oracle: lost 5:7 |
+| `embodied-olympics-match-tabletennisg1-matchcpu-i01-privileged` | as above, full state, in-process runner | full: the reference program (camera-only, it ignores the truth) won 5:3, replay identical |
 
 What differs from Embodied Olympics - Fun's tasks (`eai-standard/2.x`; PROTOCOL §3):
 
@@ -152,4 +205,5 @@ between requests (it gets no outcome back, so it learns nothing it was not given
 
 Images: `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0` (public; the image Embodied Olympics' frozen revisions were screened on;
 built from Embodied Olympics' own tree, not from this repository), for every task but humanoid soccer, which runs on
-`ghcr.io/mll-lab-nu/efe:embodied-olympics-match-soccer-0.1.0` (public). CPU only.
+`ghcr.io/mll-lab-nu/efe:embodied-olympics-match-soccer-0.1.0` (public). CPU only. G1 table tennis: `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0` (the sim and
+practice services) and `-tabletennisg1-seat-0.1.0` (the agent's container).
