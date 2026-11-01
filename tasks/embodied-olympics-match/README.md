@@ -2,9 +2,9 @@
 
 The matches [Embodied Olympics](https://github.com/CHIGUI0/roboolympics) (CHIGUI0; MIT, private) exports itself with its own
 service inside the task, and their privileged twins: table tennis, badminton, humanoid soccer, wheeled soccer and
-foosball matches, duels against a learned player, the low-level matches and two turn-based fencing bouts. 25 task
-directories: 19 exported (17 standard-realtime, 2 standard; `ci_checks/benchmarks/embodied-olympics-match/exported.toml`) and 6 privileged
-twins.
+foosball matches, duels against a learned player, the low-level matches and two turn-based fencing bouts. 42 task
+directories: 19 exported (17 standard-realtime, 2 standard; `ci_checks/benchmarks/embodied-olympics-match/exported.toml`), the 17
+standard twins of the real-time matches (below) and 6 privileged twins.
 
 ## Quick start
 ```bash
@@ -46,6 +46,20 @@ they are refreshed by re-running the exporter on this checkout, then `scripts/ta
 | `embodied-olympics-match-fencing-bout-i02-standard` | as above | level 2, seed 35 | full: the reference won 15:13 (32 phrases, replay identical); nop 0 |
 | `embodied-olympics-match-tabletennis-matchlow-i01-standard-realtime` | table tennis at the **low level** (Embodied Olympics' Engineer mode as a match; owner's decision 2026-10-16): the agent implements the robot's `hit` skill itself from the joint interface and the toolkit, serves it from its own container (`game skill serve`; the sim calls it over the shared loopback), and every stroke of the match is played by that skill (the skill in the loop: its compute counts in match time; no execution scatter); success = the agent wins | level 1, seed 22, S = 10, 7200 s | partial: Embodied Olympics' toolkit-only reference skill with the camera-only reference strategy lost 0:5 (valid, replay identical; it lost 0:5 on 8 more seeds: its slow serves bounce twice on its own court); feasibility: the platform's own hit packaged as a skill, with the truth-state strategy, wins level 1 in 7 of 8 seeds of Embodied Olympics' competition test (this seed 5:1; the reference skill 0 of 4); through the live service (core 0.2.32's upload path) with the camera-only strategy it scored 2:5, 1:5, 2:5; GPT-6 Astra (one precheck) lost 2:3 by a missed review (`ready_timeout`, a valid loss; its own skill, then uploaded to the sim (core 0.2.32), won 2 points); nop 0 |
 | `embodied-olympics-match-badminton-matchlow-i01-standard-realtime` | badminton at the **low level**, as the table-tennis one: the agent implements the robot's `act` skill (the racket head's state at contact, optional base position) from the joint interface and the toolkit (bm_kinematics, bm_servo), serves it from its own container (`game skill serve`), and every stroke of the match is played by that skill; success = the agent wins | level 2, seed 8, S = 20, 14400 s | partial: our toolkit-only reference act with the camera-only reference strategy lost 1:11 on this instance (vanilla Harbor 0.23.0, the skill served from the oracle's own container: a valid, replayed match, 30 act calls, none failed); feasibility: our evaluator's competition test (the camera-only reference strategy calling a skill, no wall clock) wins level 1 4/4 and level 2 2/4 with our toolkit-only reference act (API test 512/519), and in the screening's skill-in-the-loop match (revision 12, S = 20) Claude Opus won level 1 11:6 with its own act; level 2 because models won level 1; nop 0 |
+
+**Standard twins of the real-time matches (`eai-standard-lockstep/1.0`).** Each `-standard-realtime` match has a
+`-standard` twin: the same export (instance, seed, level, opponent, rules, referee, observation, action levels, reviews,
+cutoff, live grading, oracle), with the sim service started as `python3 -m core.lockstep` (`environment/sim/core/lockstep.py`,
+Embodied First Exam's, on top of the unchanged `core/realtime.py`). Only the clock differs: the world advances one control
+step at a time, and only while every seat that plays lets it (an open `wait {dt}`, up to its target step; an accepted act,
+up to the step at which it takes effect); between the player's calls it stands still, and nothing advances while any
+act is being prepared (the high level's planning, a low-level skill call), so thinking and computation cost no game
+time. A built-in seat (the duels) is held to the same rule: the world waits for it too, so it plays its loop (observe,
+act, `wait 0.05`) step for step, as the core's in-process play does. The scripted opponents live inside the world's step
+and play exactly as in real time. `/spec` timing has `clock = "lockstep"`, `period_s` null; `final.json` has
+`clock = "lockstep"`; `tests/fexam_reward.py` writes `realtime = 0`. The episode is a realtime episode, so the replay
+video and grading are unchanged. A program that never waits leaves the match standing; it is lost when the session ends
+(`abandoned`). The reviews keep their limit of real time, and the start window is unchanged.
 
 **Privileged twins.** Six matches have a privileged twin `<base>-privileged` on the same frozen instance: the full
 simulator in development (any state, the whole match reset), the deliverable a closed-loop Python program that plays a

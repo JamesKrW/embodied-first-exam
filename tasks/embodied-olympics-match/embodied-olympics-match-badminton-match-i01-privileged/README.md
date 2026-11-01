@@ -4,7 +4,7 @@
 |---|---|
 | Benchmark | Embodied Olympics - Match |
 | Mode | privileged |
-| Twin | `embodied-olympics-match-badminton-match-i01-standard-realtime` |
+| Twin | `embodied-olympics-match-badminton-match-i01-standard` |
 | Simulator / robot | `mujoco` / `franka-panda` |
 | Family / instance | `badminton_match` / seed 7 |
 | Oracle | `partial` — full-state reference program (solution/): the camera-only reference player's planner fed the true state; its results on this instance and across the levels are in the Embodied Olympics privileged report; not reproduced in this repository: the owner waived the oracle runs on 2026-10-17 (validated = false) |

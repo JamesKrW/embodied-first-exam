@@ -4,7 +4,7 @@
 |---|---|
 | Benchmark | Embodied Olympics - Match |
 | Mode | privileged |
-| Twin | `embodied-olympics-match-tabletennis-match-i02-standard-realtime` |
+| Twin | `embodied-olympics-match-tabletennis-match-i02-standard` |
 | Simulator / robot | `mujoco` / `franka-panda` |
 | Family / instance | `tabletennis_match` / seed 12 |
 | Oracle | `partial` — full-state reference program (solution/): the camera-only reference player's serve and stroke planner fed the true ball state; its wins on this instance and across levels 1-4 are in the Embodied Olympics privileged report; not reproduced in this repository: the owner waived the oracle runs on 2026-10-17 (validated = false) |
