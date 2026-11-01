@@ -9,7 +9,7 @@
 | Family / instance | `tabletennisg1_match` / seed 4 |
 | Oracle | `full` — the sport's camera-only reference player (solution/program.py: builtin_players:OpenReference in its in-process form, the learned striker of the release on CPU; it ignores the truth) won 5:3 on a Xeon Platinum 8488C (Embodied First Exam's local Harbor runs: see the benchmark README; replay identical); nop 0 |
 | Agent time budget | 7200 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
-| Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0@sha256:8bc6d02f91aa5730bbf93bc5c1c4a477feee6f5846ff8c609aaa3a25e0eb36af` |
 
 ## Task
 Win one complete match against the platform's G1 at level 4 (the BOSS), seed 4: the same frozen instance as

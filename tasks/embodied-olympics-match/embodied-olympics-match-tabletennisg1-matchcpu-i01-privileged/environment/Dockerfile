@@ -2,7 +2,7 @@
 # NumPy builds: PROTOCOL H.7) with a full copy of the simulator at /opt/fullsim (the sim tree /srv, the seat's robot
 # toolkit in sport/seat included, plus tools/g1tt_priv: the formal match's runner) and the rules (the seat's
 # /opt/rules/RULES.md, copied from the seat image).
-FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0
+FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0@sha256:8bc6d02f91aa5730bbf93bc5c1c4a477feee6f5846ff8c609aaa3a25e0eb36af
 RUN cp -a /srv /opt/fullsim && mkdir -p /opt/fullsim/tools /app/output
 COPY g1tt_priv/ /opt/fullsim/tools/g1tt_priv/
 COPY rules/ /opt/rules/
