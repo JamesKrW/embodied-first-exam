@@ -210,4 +210,5 @@ between requests (it gets no outcome back, so it learns nothing it was not given
 Images: `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0` (public; the image Embodied Olympics' frozen revisions were screened on;
 built from Embodied Olympics' own tree, not from this repository), for every task but humanoid soccer, which runs on
 `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-soccer-0.1.0` (public). CPU only. G1 table tennis: `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0` (the sim and
-practice services) and `-tabletennisg1-seat-0.1.0` (the agent's container).
+practice services) and `-tabletennisg1-seat-0.1.1` (the agent's container: the release's seat image, 0.1.0, plus the GPU kit's
+missing `bodies/sources.py` in `/opt/robot/lib/bodies`, the release's fix 7e0b8c573; without it `bodies.gpu.twin.GpuTwin` fails to import `bodies.servo`).

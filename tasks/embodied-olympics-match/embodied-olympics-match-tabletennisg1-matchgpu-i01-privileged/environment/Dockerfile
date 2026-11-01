@@ -6,9 +6,9 @@ FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-0.1.0
 RUN cp -a /srv /opt/fullsim && mkdir -p /opt/fullsim/tools /app/output
 COPY g1tt_priv/ /opt/fullsim/tools/g1tt_priv/
 COPY rules/ /opt/rules/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-seat-0.1.0 /opt/train /opt/train
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-seat-0.1.0 /opt/robot /opt/robot
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-seat-0.1.0 /opt/ro /opt/ro
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-seat-0.1.1 /opt/train /opt/train
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-seat-0.1.1 /opt/robot /opt/robot
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-match-tabletennisg1-seat-0.1.1 /opt/ro /opt/ro
 ENV WARP_CACHE_PATH=/tmp/warp-cache
 ENV PYTHONPATH=/opt/fullsim PYTHONDONTWRITEBYTECODE=1 MUJOCO_GL=osmesa PYOPENGL_PLATFORM=osmesa OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 RUN chmod -R a+rX /opt/fullsim /opt/rules
