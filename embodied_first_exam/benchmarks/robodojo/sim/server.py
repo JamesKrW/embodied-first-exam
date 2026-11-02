@@ -72,7 +72,14 @@ def write_final() -> None:
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": E["done"], "task": TASK,
                    "protocol": PROTOCOL, "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields(),
-                   **L.hide_fields(E)})
+                   **L.hide_fields(E), **step_fields(n)})
+
+
+def step_fields(n: int) -> dict:
+    """(step-limit ablation) final.json / episode.json: the limit and the steps the episode used (nothing without it)."""
+    if "STEP_LIMIT" not in globals() or not STEP_LIMIT:
+        return {}
+    return {"step_limit": STEP_GUARD, "steps_used": int(n), "step_limit_source": "RoboDojo step_lim"}
 
 
 def dump() -> None:
@@ -90,7 +97,7 @@ def dump() -> None:
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
                    "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), "determinism_verdict_mode": VERDICT, **INSTANCE_CHECK,
-                   **EP.final_fields(), **L.hide_fields(E)})
+                   **EP.final_fields(), **L.hide_fields(E), **step_fields(n)})
     write_final()
     VIDEO.last(ctrl_steps(), frame=lambda: S.render_frame("cam_head"))   # the end state, rendered once (after the verdict)
 
@@ -165,6 +172,11 @@ KIN = {"endpoint": "/kinematics", "joint_names": [f"{a}_{j}" for a in ARMS for j
                            "seed": "12 joint angles (optional; default: the current targets)"}},
        "model": "numpy models of both arms from RoboDojo's ARX X5 URDF at their base poses (no physics, no simulated time)"}
 STEP_GUARD = int(S.step_lim)
+# The RoboDojo-step-limit ablation (RCB_ROBODOJO_STEP_LIMIT=1; off: nothing below changes): the episode's step limit is the
+# task's own RoboDojo step_lim (Session: env.step_lim), one step = one 25 Hz action (one row handed to Session.step, 10
+# physics steps), as RoboDojo's evaluator counts them; the end there is reason "step_limit" (with RCB_HIDE_SUCCESS) and
+# graded as it stands. The spec states the budget; every meta / status gives the steps left.
+STEP_LIMIT = M.ROBODOJO_STEP_LIMIT
 
 SPEC = {
     "protocol": PROTOCOL, "protocol_compat": list(L.COMPAT), "simulator": "robodojo (RoboDojo's evaluator on Isaac Lab / Isaac Sim 5.1)",
@@ -203,14 +215,18 @@ SPEC = {
                        "far side of the table, z up; the arm bases and every link are in it (spec.robot_spec)",
               "up": "+z", "units": {"length": "m", "angle": "rad", "time": "s"}, "quaternion_order": "wxyz",
               "camera_axes": "intrinsic_cv / extrinsic_cv: OpenCV camera axes (x right, y down, z forward); cam2world_gl: OpenGL axes (x right, y up, z back)"},
-    "budget": {"reset": 0, "steps": None, "wall_clock_s": float(os.environ.get("RCB_WALL_CLOCK_S", "3600"))},
+    "budget": {"reset": 0, "steps": STEP_GUARD if STEP_LIMIT else None, "wall_clock_s": float(os.environ.get("RCB_WALL_CLOCK_S", "3600"))},
     # PROTOCOL §4.5: no step budget, but a technical cap is stated here. The tooling's runaway guard ends the episode after
     # STEP_GUARD actions (reason "step_guard"): 10 min of simulated time.
     "max_control_steps": STEP_GUARD,
-    "episode": f"one episode, no reset: it ends at the first action where RoboDojo's check for the task passes (checked after every "
-               f"action), when a check fails for good, when your time is up, on a simulator error, or after {STEP_GUARD:,} actions "
-               f"({STEP_GUARD / CTRL_HZ / 60:.0f} min of simulated time: a technical cap, reason \"step_guard\", spec.max_control_steps; "
-               f"graded as it stands)",
+    "episode": (f"one episode, no reset, with a step limit of {STEP_GUARD:,} steps (RoboDojo's own limit for this task; one step = one "
+                f"25 Hz action, 1/25 s of simulated time; meta control_steps / steps_left): it ends at the limit (reason \"step_limit\", "
+                f"graded as it stands), when a check fails for good, when your time is up, on a simulator error, or at POST /finish"
+                if STEP_LIMIT else
+                f"one episode, no reset: it ends at the first action where RoboDojo's check for the task passes (checked after every "
+                f"action), when a check fails for good, when your time is up, on a simulator error, or after {STEP_GUARD:,} actions "
+                f"({STEP_GUARD / CTRL_HZ / 60:.0f} min of simulated time: a technical cap, reason \"step_guard\", spec.max_control_steps; "
+                f"graded as it stands)"),
     "robot_spec": RSPEC,
     "kinematics": KIN,
     "depth": {"modes": list(L.DEPTH_MODES), "default": "none", "kind": "z-depth", "unit": "m", "invalid": 0, "max_m": L.DEPTH_MAX_M,
@@ -270,6 +286,7 @@ def meta_common(cams) -> dict:
     return {"step": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS, "sim_time_s": round(n / CTRL_HZ, 3),
             "time_s": round(L.agent_time(E), 2), "time_left_s": max(0.0, round(SPEC["budget"]["wall_clock_s"] - L.agent_time(E), 1)),
             "proprio": {"layout": SPEC["proprio_layout"], "now": proprio_row().tolist()}, "done": E["done"], "reason": E["reason"],
+            **({"step_limit": STEP_GUARD, "steps_left": max(0, STEP_GUARD - n)} if STEP_LIMIT else {}),
             **({"cameras": cal} if OBS_CALIBRATION else {})}
 
 
@@ -530,7 +547,8 @@ def do_kinematics(req: dict) -> dict:
 
 def status() -> dict:
     return {"step": E["step"], "calls": E["calls"], "control_steps": ctrl_steps(), "done": E["done"], "reason": E["reason"],
-            "elapsed_s": round(time.time() - E["t0"], 1)}
+            "elapsed_s": round(time.time() - E["t0"], 1),
+            **({"step_limit": STEP_GUARD, "steps_left": max(0, STEP_GUARD - ctrl_steps())} if STEP_LIMIT else {})}
 
 
 def end_from_signal() -> None:

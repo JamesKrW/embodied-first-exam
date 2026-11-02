@@ -75,6 +75,10 @@ MAX_ACTIONS = 15000                    # no step budget (PROTOCOL D1; the wall c
 # counts only grow; only a failure takes a reached 1 back): env._rcb_latch keeps "the reward reached 1", which a later
 # failure does not take back (Session.latched: the verdict at a failure end too).
 HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
+# The RoboDojo-step-limit ablation (RCB_ROBODOJO_STEP_LIMIT=1, the standard-mode service only; off: nothing below changes):
+# the episode ends after the task's own step_lim actions, as in RoboDojo's evaluation (EvalEnv.take_action_batch /
+# is_episode_end count one per 14-D action, the 25 Hz action of step() here), instead of the runaway guard MAX_ACTIONS.
+ROBODOJO_STEP_LIMIT = os.environ.get("RCB_ROBODOJO_STEP_LIMIT") == "1"
 
 
 def _hidden_episode_end(env) -> bool:
@@ -380,8 +384,9 @@ class Session:
         # end-of-episode check), it only ends the episode. Here there is no step cap (PROTOCOL D1): the episode runs until
         # the check passes or fails for good, or until the runaway guard MAX_ACTIONS.
         self.robodojo_step_lim = int(env.step_lim)
-        env.step_lim = MAX_ACTIONS
-        self.step_lim = MAX_ACTIONS
+        cap = self.robodojo_step_lim if ROBODOJO_STEP_LIMIT else MAX_ACTIONS   # (step-limit ablation) RoboDojo's own limit
+        env.step_lim = cap
+        self.step_lim = cap
         if HIDE_SUCCESS:     # (hide) the episode's end without the success end (see _hidden_episode_end)
             import types
             env._rcb_goal = [False] * int(env.num_envs)
