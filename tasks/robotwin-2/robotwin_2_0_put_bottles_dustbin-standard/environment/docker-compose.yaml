@@ -20,6 +20,8 @@ services:
     command: python /srv/server.py
     restart: on-failure:6          # a crash retries; mid-episode the service resumes the same episode from its journal (never a reset; server.py)
     environment:
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
       RCB_TASK: put_bottles_dustbin
       RCB_INSTANCE: /srv/instance.json
       PYTHONPATH: /srv:/opt/RoboTwin

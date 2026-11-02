@@ -32,6 +32,8 @@ services:
     command: sh /srv/run.sh
     restart: on-failure:6          # N >= 3 (docs/protocol/standard_mode.md); a resume continues the episode
     environment:
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
       NPY_DISABLE_CPU_FEATURES: AVX512F,AVX512CD,AVX512_SKX,AVX512_CLX,AVX512_CNL,AVX512_ICL,AVX512_SPR
       OPENBLAS_CORETYPE: Haswell
       RCB_TASK: rope_threading

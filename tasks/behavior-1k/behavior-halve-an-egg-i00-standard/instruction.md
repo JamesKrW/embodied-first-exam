@@ -100,6 +100,31 @@ position + quaternion **XYZW**.
 
 For scale: the 2026 challenge's human teleoperators needed 213 s on average (6,377 control steps) for this task, and the simulator runs at ~7-11 control steps/s. Budget your time, drive before you reach, and check `meta["done"]`.
 
+## This run: unlimited resets, save and load
+
+This run changes the reset budget and adds two calls. This section overrides anything above, and anything in `/spec`,
+that says there is no reset, one episode only, or fewer resets.
+
+- You have 1000 resets (`spec()["budget"]["reset"]` is 1000): in practice as many as your time allows.
+- `POST /reset` on the same base URL as your other calls (`http://sim:8000` or `http://localhost:8000`), with a JSON body
+  such as `{"cameras": []}` (in Python, for example `requests.post(base + "/reset", json={"cameras": []})`; the
+  client's `_post("/reset", {"cameras": []}, [], 60)` where it has no `reset()`). It abandons the running episode, or
+  follows one that has ended (a failure or a fall included), and starts a new episode from the same starting state.
+  The answer carries the new episode's first frames; `meta` and `GET /status` add `episode`, `resets_left`, `saves`,
+  `loads` and `control_steps_total`.
+- Where `/spec` has `state_ops`, two more calls exist (its text is the full rule):
+  - `POST /save_state` with `{}` stores the current state in the service and answers JSON
+    `{"handle": "s1", "step": ...}`. The handle is all you get, never the state's contents.
+  - `POST /load_state` with `{"handle": "s1", "cameras": []}` restores a state saved earlier in this run and starts a
+    new episode there; it answers as `/reset` does. At most 32 handles are kept (the least recently used one is
+    dropped). Saves and loads do not use up resets.
+  Where `/spec` has no `state_ops`, this task offers resets only.
+- Your time keeps running across resets and loads (in standard-realtime the robot's clock pauses after a reset or a
+  load until your next command).
+- Only the last episode is graded: from the starting state, or for a loaded episode the path that led to the saved
+  state followed by what you did after the load. The success rule is checked again from your next command on. A
+  success still ends the run: no reset, save or load after it.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

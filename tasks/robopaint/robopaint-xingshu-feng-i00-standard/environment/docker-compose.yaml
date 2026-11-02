@@ -23,6 +23,8 @@ services:
     command: sh /srv/run.sh
     restart: on-failure:6
     environment:
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
       RCB_TASK: robopaint_xingshu_feng
       RCB_INSTANCE: /srv/instance.json
       RCB_TOOL: /srv/rcb_brush_strict.py   # the sim service scores the live sheet with it: the picture rule and the process rules

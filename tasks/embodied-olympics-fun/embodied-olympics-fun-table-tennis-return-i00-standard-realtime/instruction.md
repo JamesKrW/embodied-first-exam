@@ -214,6 +214,31 @@ sensor; angular velocity `gx, gy, gz`, rad/s; acceleration `ax, ay, az`, m/s², 
 4 joints / lowcmd; the G1 also 5 walk_falcon, 6 walk_agile), the velocity command in force (`cmd_vx`, `cmd_vy`, `cmd_wz`) and `time_s`, the attempt's time. Then, at the end of the row, the gripper: `jaw_opening_right`, `jaw_speed_right`, `jaw_force_right` (the opening between the pads in m, its speed in m/s, + opening, and the clamp force in N, + closing); a gripper's `holding_*` is 1 while both its jaws touch the same object. A
 real G1 has no sensor for its position in the venue, and neither do you: that is what the cameras are for.
 
+## This run: unlimited resets, save and load
+
+This run changes the reset budget and adds two calls. This section overrides anything above, and anything in `/spec`,
+that says there is no reset, one episode only, or fewer resets.
+
+- You have 1000 resets (`spec()["budget"]["reset"]` is 1000): in practice as many as your time allows.
+- `POST /reset` on the same base URL as your other calls (`http://sim:8000` or `http://localhost:8000`), with a JSON body
+  such as `{"cameras": []}` (in Python, for example `requests.post(base + "/reset", json={"cameras": []})`; the
+  client's `_post("/reset", {"cameras": []}, [], 60)` where it has no `reset()`). It abandons the running episode, or
+  follows one that has ended (a failure or a fall included), and starts a new episode from the same starting state.
+  The answer carries the new episode's first frames; `meta` and `GET /status` add `episode`, `resets_left`, `saves`,
+  `loads` and `control_steps_total`.
+- Where `/spec` has `state_ops`, two more calls exist (its text is the full rule):
+  - `POST /save_state` with `{}` stores the current state in the service and answers JSON
+    `{"handle": "s1", "step": ...}`. The handle is all you get, never the state's contents.
+  - `POST /load_state` with `{"handle": "s1", "cameras": []}` restores a state saved earlier in this run and starts a
+    new episode there; it answers as `/reset` does. At most 32 handles are kept (the least recently used one is
+    dropped). Saves and loads do not use up resets.
+  Where `/spec` has no `state_ops`, this task offers resets only.
+- Your time keeps running across resets and loads (in standard-realtime the robot's clock pauses after a reset or a
+  load until your next command).
+- Only the last episode is graded: from the starting state, or for a loaded episode the path that led to the saved
+  state followed by what you did after the load. The success rule is checked again from your next command on. A
+  success still ends the run: no reset, save or load after it.
+
 ## External material
 The network is open. You may install packages (pip, apt), and you may search for, download and use public tools, robot models and pretrained controllers (for example a published Unitree G1 walking, jumping or whole-body policy): finding existing work and adapting it to this robot is encouraged. Say in your notes what you used. You may read anything installed in your container, this benchmark's own source code included. The one thing not to look up is a ready-made solution to this exact task, such as this benchmark's reference solutions. This is an honour rule; trials are reviewed.
 

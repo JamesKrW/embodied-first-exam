@@ -9,7 +9,7 @@
 | Family / instance | `hurdle` / seed 0 |
 | Oracle | `none` — no rollout of this instance; published RL passes the bar (FastTD3 887 / 700); human review in PR #83 |
 | Agent time budget | 3600 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
-| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 50 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
+| Real time | slowdown S = 1 (the world runs at 1/S of real speed: one control step every S x control_dt s of wall time; `RCB_SLOWDOWN`'s default); reset budget 1000 (`RCB_RESET_BUDGET`'s default) (PROTOCOL §3) |
 | Base image | `ghcr.io/mll-lab-nu/efe:humanoidbench-0.2.0` |
 
 ## Task
