@@ -28,6 +28,8 @@ services:
     command: sh /srv/run.sh
     restart: on-failure:6
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
+      RCB_ROBODOJO_STEP_LIMIT: "1"                     # the RoboDojo-step-limit ablation: RoboDojo's own step_lim
       RCB_TASK: play_stacking_toy
       RCB_INSTANCE: /srv/instance.json
       RCB_TOOL: /srv/rcb_robodojo.py
