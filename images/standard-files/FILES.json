@@ -1,14 +1,14 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:90253c4cb419668f84c6728dc6d6e23ea55ef8d7f7e7835a5eb65015729f91b0",
+ "image": "ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-resetpose@sha256:90a9bd8fd47f66371cba9378ccc5954544457eab8dc60efe8d25dfb58ac329aa",
  "source": "embodied_first_exam/standard",
  "files": {
   "rcb1.py": "d8c6ceabdad914afd39ac4a93904e486039c69c14ec5ae140b33aa653ff7979f",
   "rcb_client.py": "8bbaec33b075dc41b9618c582be1d4db09f8ccbe8ab5173f96b4a2f4cb1ddcad",
-  "rcb_limited.py": "352cc7efea2846a03b67215b9caf4fcf21da1b1591e63ef4f2435566cf6e84a2",
+  "rcb_limited.py": "3f86d2a158a6ba0d1b66adf83a590c770d5bed2d3ae3ecbec7f25e7d46d3eed4",
   "realtime/rcb_client.py": "b6c08ca8d2b196dd44ed660d1f30b3181f419d38faa728b4fb72b25b15cce8f2",
-  "realtime/rcb_realtime.py": "2a3c9f4ffa95aec5d468078fb5ac3fd043ddc4ef53687d1486a35b1d18aaabc2",
+  "realtime/rcb_realtime.py": "981137c695de7023251166226e4f3cfbf3e4477228c7593b60a2e24f803c0e1c",
   "run.sh": "5a3fb29ea050a005cb0e441f9129b347fa0af5d536d9d210178b1398df032f64",
-  "v2_1/grade.py": "77671160e8dd751435bd6619f2331dd20649a914919aac5f41ea660005b80da8",
+  "v2_1/grade.py": "ef191ec88c38cfd78405a5fb08fb839ff9104ee4fefa58cb34a418a7fa8efb62",
   "v2_1/rcb_client.py": "4a3097258fe55cdd58961f63967ce93a4568ce23a50d7d0b5b0b3763f4e59064",
   "v2_1/variants/042c4ff1e4/rcb_client.py": "042c4ff1e41a475039cebabe648242fd5d7aa00368a8b67e10bdb6aa527dee46",
   "v2_1/variants/62def5e7ce/rcb_client.py": "62def5e7ce8f0006521bd3d1bacf185aeecdcf093c7411d9a790d99b77dce647",
@@ -16,6 +16,6 @@
   "v2_1/variants/bb67bdefd5/rcb_client.py": "bb67bdefd50e3396ab3f2476d1eb61647cf6a638ec6933764dd313ec536fe243",
   "v2_1/variants/f2b4a08eba/rcb_client.py": "f2b4a08eba32de5f42ccae18a0a1cff25633704e979c4e90a325eeeb067a34e5",
   "v2_4/rcb_client.py": "4f3d3d28f8ae5e2de864852585180efa13662d775cafe0fcc7693c9773fbc988",
-  "v2_4/rcb_limited.py": "fccd6d03a9c690d5b352efb0ad15ea6def1096279f40a94ffcda7ed933f91f54"
+  "v2_4/rcb_limited.py": "ce8d767355ab38dc41023dd94a4ad6515ca0e4ff795e9c301cae3099ffba36f3"
  }
 }

@@ -18,6 +18,18 @@ LOG = os.environ.get("RCB_VERIFIER_LOG_DIR") or "/logs/verifier"; os.makedirs(LO
 OUTCOMES = ("idle", "reached", "manipulated", "success")
 def write(ok, out):
     open(f"{LOG}/reward.txt", "w").write("1\n" if ok else "0\n"); json.dump(out, open(f"{LOG}/reward.json", "w")); print(out)
+def state_ops_fields(d, ok):
+    """The unlimited-reset ablation's record (the service writes it with RCB_STATE_OPS=1): saves and loads, and for a
+    success resets_at_success / loads_at_success; first_success = a success with no reset and no load. Numbers only; {}
+    without the switch."""
+    if "loads" not in d:
+        return {}
+    n = lambda k: int(d.get(k) or 0)  # noqa: E731
+    out = {"resets": n("resets"), "reset_budget": n("reset_budget"), "saves": n("saves"), "loads": n("loads"),
+           "first_success": int(bool(ok) and n("resets") + n("loads") == 0)}
+    if ok:
+        out.update({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d})
+    return out
 def grade(d):
     num = lambda k: float(d.get(k) or 0.0)  # noqa: E731
     step = lambda k: -1 if d.get(k) is None else int(d[k])  # noqa: E731
@@ -52,6 +64,7 @@ def grade(d):
     for cid, c in sorted((d.get("constraints") or {}).items()):         # per-rule flags (numeric keys only)
         k = re.sub(r"[^A-Za-z0-9_]", "_", str(cid))
         out[f"viol_{k}"] = int(bool((c or {}).get("violated"))); out[f"viol_step_{k}"] = -1 if (c or {}).get("step") is None else int(c["step"])
+    out.update(state_ops_fields(d, ok))
     return ok, out
 def main():
     dirs = (os.environ["RCB_DATA"],) if os.environ.get("RCB_DATA") else ("/out", "/data")   # a test's directory, else the sidecar's

@@ -490,6 +490,8 @@ def dump() -> None:
     # the verdict first, then the video (evidence only: a hung or failing encoder must not hold the verdict back)
     episode_json()
     write_final()
+    if OPS is not None and not E.get("exiting"):
+        return          # the trial may go on after a reset or a load: the live video stays open until the service exits
     t = threading.Thread(target=live_close, daemon=True)   # bounded: a hung encoder must not keep the service alive
     t.start(); t.join(float(os.environ.get("RCB_LIVE_CLOSE_S", "300")))
     episode_json()
@@ -505,7 +507,8 @@ def episode_json() -> None:
         "service_time_s": round(service_time(), 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
         "n_actions": E.get("n_actions"), "live_rows": E.get("live_rows"), "live_sha": E.get("live_sha"), "live_verdict": E.get("verdict"),
         "live_video": LIVE["path"] and os.path.basename(LIVE["path"]), "live_video_frames": LIVE["frames"],
-        "settle_failed": E.get("settle_failed", 0), "settled_verdict": E.get("settled_verdict"), **EP.final_fields()})
+        "settle_failed": E.get("settle_failed", 0), "settled_verdict": E.get("settled_verdict"), **EP.final_fields(),
+        **(OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows) if OPS is not None else {})})
 
 
 def verdict() -> dict:
@@ -984,6 +987,10 @@ def _end_and_exit() -> None:
         finish("timeout")
     else:
         dump()
+    if OPS is not None and LIVE["w"] is not None:     # an episode that ended before (dumped then): its video closes now
+        t = threading.Thread(target=live_close, daemon=True)
+        t.start(); t.join(float(os.environ.get("RCB_LIVE_CLOSE_S", "300")))
+        episode_json()
     log({"ev": "exit", "reason": "collect hook: episode dumped"})
     if not os.path.exists(PID_FILE):
         open(PID_FILE, "w").write(str(os.getpid()))
@@ -995,9 +1002,62 @@ def replay_row(row) -> None:
     s.step(np.asarray(row, dtype=np.float64))
 
 
+# ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
+# RCB_EXPOSE_OBJECT_POSES=1: the furniture parts (rcb_ikea.part_bodies: every movable body that is not the robot's, the
+# privileged twin's parts), body frame pose in the robot frame (spec world.frame, to_robot), quaternion wxyz.
+# RCB_STATE_OPS=1, exact (MuJoCo on the CPU): save = rcb_ikea.Session.get_state() (MuJoCo's integration state, the
+# mechanism's latched welds and the success monitor, the recorded rows, the breakdown watch, MuJoCo's warning counters)
+# + the model's eq_data (the welds' frames, which the mechanism writes into the model, as verdict() keeps them) + the
+# clamp's tick counter + the episode's E keys (the settle-failure count and the last verdicts); load = set_state of
+# a copy; reset = load of the frozen start, taken before the episode begins (Session.reset() would build a new model).
+POSE_IDS = [int(b) for b in R.part_bodies(m)] if L.OBJECT_POSES else []
+POSE_SPEC = {"frame": "the world frame of spec world.frame (origin at the left arm's base link), each part's body frame",
+             "quaternion_order": "wxyz", "objects": [m.body(b).name for b in POSE_IDS]}
+EP_KEYS = ("settle_failed", "verdict", "settled_verdict")
+
+
+def _object_poses() -> dict:
+    return {m.body(b).name: (lambda p: L.pose_entry(p[:3], p[3:]))(to_robot(np.concatenate([d.xpos[b], d.xquat[b]])))
+            for b in POSE_IDS}
+
+
+def object_poses() -> dict:
+    return on_main(_object_poses)
+
+
+def _snap() -> dict:
+    import copy
+    return {"session": s.get_state(), "eq_data": m.eq_data.copy(), "slewed": int(s.slewed_ticks),
+            "E": {k: copy.deepcopy(E[k]) for k in EP_KEYS if k in E}}
+
+
+def _restore(st: dict) -> None:
+    import copy
+    m.eq_data[:] = st["eq_data"]
+    ses = st["session"]                               # its rows go back to the state's rows (never written in place)
+    s.set_state({**copy.deepcopy({k: v for k, v in ses.items() if k != "rows"}), "rows": list(ses["rows"])})
+    s.slewed_ticks = st["slewed"]
+    for k in EP_KEYS + ("dumped", "live_sha", "n_actions", "live_rows", "dump_error", "error_infra"):
+        E.pop(k, None)
+    E.update(copy.deepcopy(st["E"]))
+    for f in ("episode.json", "trajectory.npz"):      # an ended episode's record is not the new episode's
+        try:
+            os.remove(os.path.join(DATA, f))
+        except OSError:
+            pass
+    FRAME_CACHE.clear(); RIG._t = None                # frames are cached by control step: a new episode draws anew
+    LIVE["next"] = sim_time()                         # the live video goes on from the restored simulated time
+
+
+ST0 = _snap() if L.STATE_OPS else None              # the frozen start (before the journal replay of a resume)
+OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)),
+                 reset=lambda: on_main(_restore, ST0), save=lambda: on_main(_snap),
+                 load=lambda snap: on_main(_restore, snap)) if L.STATE_OPS else None
+
+
 # ---------------------------------------------------------------- start, or resume after a crash
 resumed = EP.begin(state=E, step=replay_row, state_sha=s.state_sha, proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
-                   start_event={"task": TASK, "initial_state_sha": init_sha})
+                   start_event={"task": TASK, "initial_state_sha": init_sha}, **({"ops": OPS} if OPS is not None else {}))
 if E.get("done") and E.get("reason") == "error":   # a resumed, ended episode keeps its error's class (infra or sim)
     _ends = [e for e in EP.events() if e.get("ev") == "end"]
     E["error_infra"] = bool(_ends and _ends[-1].get("error_infra"))
@@ -1012,7 +1072,9 @@ print(f"{PROTOCOL} IKEA MuJoCo sim ready: task {TASK}, startup {EP.n_startups}, 
 threading.Thread(target=L.serve, daemon=True, args=(L.Service(
     spec=SPEC, lock=LOCK, state=E, submit=lambda meta, A: on_main(do_submit, meta, A), observe=lambda meta: on_main(do_observe, meta),
     kinematics=lambda req: on_main(do_kinematics, req), status=status, on_submit_error=lambda exc: on_main(fail, exc), log=log,
-    episode=EP, state_sha=lambda: on_main(s.state_sha), proprio=lambda: on_main(proprio_row)),)).start()
+    episode=EP, state_sha=lambda: on_main(s.state_sha), proprio=lambda: on_main(proprio_row),
+    **({"state_ops": OPS} if OPS is not None else {}),
+    **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})),)).start()
 while True:
     if deadline_reached():                      # between simulator jobs: never inside a call
         finish("timeout")

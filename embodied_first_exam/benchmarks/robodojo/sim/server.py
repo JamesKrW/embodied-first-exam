@@ -89,7 +89,7 @@ def dump() -> None:
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
                    "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), "determinism_verdict_mode": VERDICT, **INSTANCE_CHECK,
-                   **EP.final_fields()})
+                   **ops_fields(), **EP.final_fields()})
     write_final()
     VIDEO.last(ctrl_steps(), frame=lambda: S.render_frame("cam_head"))   # the end state, rendered once (after the verdict)
 
@@ -211,6 +211,48 @@ SPEC = {
     "depth": {"modes": list(L.DEPTH_MODES), "default": "none", "kind": "z-depth", "unit": "m", "invalid": 0, "max_m": L.DEPTH_MAX_M,
               "frames_encoding": "uint16 mm, zlib", "noise": L.DEPTH_NOISE},
 }
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
+# RCB_EXPOSE_OBJECT_POSES=1: the layout's labelled items, as Session.objects() names them: position and orientation
+# (wxyz) from RoboDojo's layout manager, in the scene frame of /spec world (that of the arms' links and /kinematics).
+OBJECTS = S.labels() if L.OBJECT_POSES else []
+
+
+def object_poses() -> dict:
+    lm, out = S.env.scene_manager.layout_manager, {}
+    for label in OBJECTS:
+        try:
+            pos, rot = lm.get_instance_pose(0, label=label)
+        except Exception:  # noqa: BLE001 -- an item the layout manager cannot place is left out of this answer
+            continue
+        out[label] = L.pose_entry(M._np(pos).reshape(-1)[:3], M._np(rot).reshape(-1)[:4])
+    return out
+
+
+# RCB_STATE_OPS=1, reset only: Session.reset() (RoboDojo's own episode start on the frozen layout, env.reset(seed=layout):
+# approximate in-process, the scene settles again from where it is), a new recording of the graded rows and a new live
+# video. No save / load: Isaac Lab and RoboDojo's evaluator have no state snapshot to restore.
+def ops_reset() -> None:
+    S.reset()
+    S.record_start()
+    E.update(t_end=None, episode_control_steps=None, dumped=False, n_actions=None, live_sha=None)
+    if E["ready"]:          # live (a crash resume's replay leaves the frames on disk to the resume)
+        VIDEO.truncate(-1)
+        VIDEO.offer(0)
+
+
+OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset) if L.STATE_OPS else None
+
+
+def ops_fields() -> dict:
+    """episode.json's record of the state ops (RCB_STATE_OPS=1; {} without)."""
+    if OPS is None:
+        return {}
+    return OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows)
+
+
+if OPS is not None:
+    SPEC["episode"] = SPEC["episode"].replace("one episode, no reset: it", "an episode") + (
+        "; POST /reset starts a new one (`reset`), only the last is graded")
 L.check_spec(SPEC)       # a spec that misses a 2.2 field or names a forbidden one never starts the episode
 EP.scene_built()         # the watchdog stands down: a long resume replay below is not a hung build
 
@@ -545,11 +587,17 @@ def replay_row(row) -> None:
 S.record_start()         # the resume replay is recorded too: trajectory.npz is the whole episode
 VIDEO.offer(0)           # the start state (rendered for /spec's images; a restarted service has it on disk already)
 resumed = EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
-         start_event={"task": TASK, "layout": S.inst.get("layout_file"), "cameras": CAMS, "kinematics_check": S.kinematics_check()})
+         start_event={"task": TASK, "layout": S.inst.get("layout_file"), "cameras": CAMS, "kinematics_check": S.kinematics_check()},
+         ops=OPS)
 if resumed:
     VIDEO.truncate(ctrl_steps())   # frames of the call lost in the crash show rolled-back states
 E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  state_ops=OPS,
+                  **({"object_poses": object_poses,
+                      "object_pose_spec": {"frame": "RoboDojo's scene frame (/spec world: that of the arm links, proprio tcp_pose "
+                                                    "and /kinematics)", "quaternion_order": "wxyz", "objects": OBJECTS}}
+                     if L.OBJECT_POSES else {})))

@@ -53,6 +53,14 @@ def ctrl_steps() -> int:
     return int(S.n_steps)                # = EP.rows: every step Session.step executes is journaled (a resume replays them)
 
 
+VOFF = [0]   # control steps of the trial before the running episode's own (RCB_STATE_OPS: a reset / load restarts n_steps)
+
+
+def vstep() -> int:
+    """The live video's step: the trial's control steps (ctrl_steps() unless a reset or load began a new episode)."""
+    return ctrl_steps() + VOFF[0]
+
+
 def write_final() -> None:
     if L.final_verdict(DATA):        # finalize.sh's verdict, or a give-up after crashes: never overwritten
         return
@@ -78,9 +86,10 @@ def dump() -> None:
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
                    "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), "settle_steps": E.get("settle_steps"),
-                   **({"settle_error": E["settle_error"]} if E.get("settle_error") else {}), **INSTANCE_CHECK, **EP.final_fields()})
+                   **({"settle_error": E["settle_error"]} if E.get("settle_error") else {}), **INSTANCE_CHECK, **EP.final_fields(),
+                   **(OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows) if OPS is not None else {})})
     write_final()
-    VIDEO.last(ctrl_steps())  # after the verdict is on disk: a render that fails or hangs here never costs it
+    VIDEO.last(vstep())  # after the verdict is on disk: a render that fails or hangs here never costs it
 
 
 def finish(reason: str) -> None:
@@ -93,7 +102,7 @@ def finish(reason: str) -> None:
         try:
             hold = np.asarray(S.hold_action(), dtype=np.float32); n = 0
             while n < M.SETTLE_STEPS and not S.episode_done:
-                n += 1; S.step(hold); EP.journal(hold); VIDEO.offer(ctrl_steps())
+                n += 1; S.step(hold); EP.journal(hold); VIDEO.offer(vstep())
             E["settle_steps"] = n
         except Exception as exc:  # noqa: BLE001 -- a simulator error during the hold: recorded; the term is judged as it stands
             traceback.print_exc(); E["settle_error"] = repr(exc)[:300]; log({"ev": "settle_error", "error": E["settle_error"]})
@@ -342,7 +351,7 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder) -> bool:
     """One recorded control step, journaled for crash recovery. True when the call must stop here: the episode is over
     (RoboLab's success term also terminates it), or the service stops the call (max_call_wall_s, the client hung up)."""
     a = np.asarray(a, dtype=np.float32)                    # the exact row Session.step executes (and records)
-    over = S.step(a); stop = EP.journal(a); rec.tick(); VIDEO.offer(ctrl_steps())
+    over = S.step(a); stop = EP.journal(a); rec.tick(); VIDEO.offer(vstep())
     if over: finish("success" if check_success() else "step_guard")
     return E["done"] or stop
 
@@ -520,17 +529,96 @@ def replay_row(row) -> None:
     """One journaled row during a resume (no rendering asked for). A row the scene can no longer take (the episode ended
     earlier than logged) is skipped: the state hash check then refuses the resume (class exact)."""
     if not S.episode_done:
-        S.step(np.asarray(row, dtype=np.float32)); VIDEO.offer(ctrl_steps())   # slots already on disk are skipped
+        S.step(np.asarray(row, dtype=np.float32)); VIDEO.offer(vstep())   # slots already on disk are skipped
+
+
+# ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
+# RCB_EXPOSE_OBJECT_POSES=1: the rigid objects of the privileged twin's Session.objects() (Isaac Lab's scene.rigid_objects,
+# the same names) without the table, in the env-local frame (spec.world, the ee_pose action's frame), position +
+# quaternion wxyz, and the twin's size (the extent of the object's box, axis-aligned in that frame).
+# RCB_STATE_OPS=1: reset = Session.reset() (env.reset_to of the frozen start, RoboLab's evaluation bookkeeping cleared;
+# approximate: reset_to does not restore every PhysX internal); save / load = the scene's get_state(is_relative=True) of
+# env 0 restored the same way (Session._restore: reset_to) plus the episode's own state: its control steps (n_steps;
+# the runaway guard counts per episode), the joint targets the hold keeps, the recorded rows and Isaac Lab's episode
+# length counter. The live video counts the trial's control steps across episodes (vstep).
+POSE_NAMES = [n for n in S.object_names() if n != "table"] if L.OBJECT_POSES else []
+POSE_SPEC = {"frame": "env-local = the robot's root frame (spec.world; the ee_pose action's and the proprio tcp_pose's frame), "
+                      "each object's root; size: the extent of its box, axis-aligned in that frame",
+             "quaternion_order": "wxyz", "objects": POSE_NAMES}
+
+
+def object_poses() -> dict:
+    out = {}
+    for n in POSE_NAMES:
+        p, q = S.object_pose(n)
+        try:
+            b = S.object_bounds(n); size = b[1] - b[0]
+        except Exception:  # noqa: BLE001
+            size = None
+        out[n] = L.pose_entry(p, q, size)
+    return out
+
+
+def _new_episode() -> None:
+    """The ended episode's record (episode.json, trajectory.npz, the video's end frame) is not the new episode's."""
+    for k in ("episode_control_steps", "dumped", "n_actions", "live_sha", "settle_steps", "settle_error"):
+        E.pop(k, None)
+    for f in ("episode.json", "trajectory.npz"):
+        try:
+            os.remove(os.path.join(DATA, f))
+        except OSError:
+            pass
+    VIDEO.truncate(vstep())              # removes only last.jpg / last.json: no frame lies past the trial's step
+
+
+def _episode_length(n: int | None = None):
+    buf = getattr(S.env, "episode_length_buf", None)
+    if buf is None:
+        return None
+    if n is None:
+        return int(buf[0].item())
+    buf[:] = int(n)
+    return n
+
+
+def ops_reset() -> None:
+    VOFF[0] += ctrl_steps()
+    S.reset()
+    S.record_start()
+    _new_episode()
+
+
+def ops_save():
+    return {"state": S._tree_to_lists(S.env.scene.get_state(is_relative=True)), "n_steps": int(S.n_steps),
+            "episode_done": bool(S.episode_done), "targets": S._targets.copy(), "episode_length": _episode_length(),
+            "rec": list(S._recording) if S._recording is not None else []}
+
+
+def ops_load(snap) -> None:
+    VOFF[0] += ctrl_steps() - snap["n_steps"]
+    S._restore(snap["state"])
+    S.n_steps, S.episode_done, S._targets = snap["n_steps"], snap["episode_done"], snap["targets"].copy()
+    if snap["episode_length"] is not None:
+        _episode_length(snap["episode_length"])
+    S._recording = list(snap["rec"])
+    _new_episode()
+
+
+OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset, save=ops_save,
+                 load=ops_load) if L.STATE_OPS else None
 
 
 S.record_start()         # the resume replay is recorded too: trajectory.npz is the whole episode
 VIDEO.offer(0)           # the start state (a restarted service has it on disk already)
 resumed = EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
-         start_event={"task": TASK, "seed": S.seed, "cameras": CAMS, "kinematics_check": S.kinematics_check})
+         start_event={"task": TASK, "seed": S.seed, "cameras": CAMS, "kinematics_check": S.kinematics_check},
+         **({"ops": OPS} if OPS is not None else {}))
 if resumed:
-    VIDEO.truncate(ctrl_steps())   # frames of the call lost in the crash show rolled-back states
+    VIDEO.truncate(vstep())   # frames of the call lost in the crash show rolled-back states
 E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  **({"state_ops": OPS} if OPS is not None else {}),
+                  **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})))

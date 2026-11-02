@@ -90,6 +90,12 @@ def main() -> None:
         "infra_error": int(infra),
         "grader_error": int(failed_finalize),
     }
+    if "saves" in d:  # the unlimited-reset ablation (RCB_STATE_OPS=1): a load begins a new episode too; numbers only
+        resets, loads = num(d.get("resets"), int), num(d.get("loads"), int)
+        out.update(resets=resets, reset_budget=num(d.get("reset_budget"), int), saves=num(d.get("saves"), int),
+                   loads=loads, first_success=int(ok and resets + loads == 0))
+        if ok:  # only for a success
+            out.update({k: num(d[k], int) for k in ("resets_at_success", "loads_at_success") if k in d})
     write(out)
 
 

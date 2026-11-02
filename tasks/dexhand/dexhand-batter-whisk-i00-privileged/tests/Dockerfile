@@ -1,7 +1,7 @@
 FROM ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350
 COPY . /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0@sha256:f9bfacf8829c29d55552a1646f4af4878a958a06025452a1fa6ada74d530c556 /privileged/environment/hands.py /privileged/tests/grade.py /privileged/environment/arm_rig.py /privileged/environment/variants/bc48a3e915/catalog.json /privileged/environment/variants/5b6c0efb04/checker.py /privileged/environment/variants/b1a971bef9/replay.py /privileged/environment/variants/0bd2e5aa3c/runtime.py /privileged/environment/variants/c1c76156ec/scene.py /privileged/environment/variants/0b89750a2c/task.json /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0@sha256:f9bfacf8829c29d55552a1646f4af4878a958a06025452a1fa6ada74d530c556 /privileged/environment/assets/rosle-bowl-original.obj /privileged/environment/assets/rosle-whisk-wires-original.obj /tests/assets/
+COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-resetpose@sha256:9d1f54a40c8ea34df8a02efd57fd333ff7b7e96fee2bf691c83fa44551804a1f /privileged/environment/hands.py /privileged/tests/grade.py /privileged/environment/arm_rig.py /privileged/environment/variants/bc48a3e915/catalog.json /privileged/environment/variants/5b6c0efb04/checker.py /privileged/environment/variants/b1a971bef9/replay.py /privileged/environment/variants/0bd2e5aa3c/runtime.py /privileged/environment/variants/c1c76156ec/scene.py /privileged/environment/variants/0b89750a2c/task.json /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-resetpose@sha256:9d1f54a40c8ea34df8a02efd57fd333ff7b7e96fee2bf691c83fa44551804a1f /privileged/environment/assets/rosle-bowl-original.obj /privileged/environment/assets/rosle-whisk-wires-original.obj /tests/assets/
 ENV PYTHONPATH=/tests
 RUN chmod +x /tests/test.sh
 WORKDIR /tests

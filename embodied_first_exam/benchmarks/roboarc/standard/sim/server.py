@@ -116,7 +116,8 @@ def dump() -> None:
     L._write_json(os.path.join(DATA, "episode.json"), {
         "success": bool(E["success"]), "infra_error": int(E["reason"] in INFRA_REASONS), **instability_fields(), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": S.physics_steps, "sim_time_s": S.sim_time_s,
         "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
-        "n_actions": E.get("n_actions"), "live_rows": E.get("live_rows"), "live_sha": E.get("live_sha"), **EP.final_fields()})
+        "n_actions": E.get("n_actions"), "live_rows": E.get("live_rows"), "live_sha": E.get("live_sha"), **EP.final_fields(),
+        **(OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows) if OPS is not None else {})})
     write_final()
 
 
@@ -709,11 +710,66 @@ def replay_row(row) -> None:
             E["end_row"] = len(S._recording)
 
 
+# ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
+# RCB_EXPOSE_OBJECT_POSES=1: the task's own entities of Session.objects() (the privileged twin's names: the robot, the
+# table and the lab scene props left out), without goal / target markers (a name with "target", "goal" or "marker"), in
+# the robot frame every other pose of this service is in (to_robot), quaternion wxyz; size = the privileged twin's
+# axis-aligned bounds' extent (the frame's axes are the simulator world's). A deformable (cloth, rope, FEM mesh) gives
+# its particles' / vertices' centroid and their bounds' extent, no orientation, as the privileged twin does.
+# RCB_STATE_OPS=1, reset only: Session.reset() (env.privileged.rewind_to(S0), the frozen first checkpoint; its rewind
+# event re-applies the torque caps and resets the safety monitor; approximate on Genesis' GPU solvers), the recording
+# restarted (the graded rows from the frozen start) and this service's episode keys cleared. No save / load: the
+# simulator keeps a complete checkpoint of the first tick only (rcb_topogym TASKS history_storage "segment"), so an
+# arbitrary state cannot be restored.
+POSE_SKIP = ("target", "goal", "marker")
+POSE_NAMES = sorted(n for n in S._entities() if not any(k in n.lower() for k in POSE_SKIP)) if L.OBJECT_POSES else []
+POSE_SPEC = {"frame": "the world frame of spec world.frame (origin at the robot's root link); rigid objects: their body "
+                      "frame; deformables: the centroid of their particles or vertices, no orientation",
+             "quaternion_order": "wxyz", "objects": POSE_NAMES}
+
+
+def _object_poses() -> dict:
+    out = {}
+    for n, o in S.objects().items():
+        if n not in POSE_NAMES:
+            continue
+        lo, hi = (np.asarray(o["bounds"][0], dtype=np.float64), np.asarray(o["bounds"][1], dtype=np.float64)) \
+            if o.get("bounds") else (None, None)
+        size = None if lo is None else hi - lo
+        if "orientation_wxyz" in o:
+            p, q = to_robot(o["position"], o["orientation_wxyz"])
+            out[n] = L.pose_entry(p, q, size)
+        else:
+            out[n] = L.pose_entry(T_RW[:3, :3] @ np.asarray(o["position"], dtype=np.float64) + T_RW[:3, 3], None, size)
+    return out
+
+
+def object_poses() -> dict:
+    return on_main(_object_poses)
+
+
+def _ops_reset() -> None:
+    S.reset()
+    S.record_start()
+    S.last_guard = S.last_static_guard = None
+    for k in ("episode_control_steps", "end_row", "dumped", "live_sha", "n_actions", "live_rows"):
+        E.pop(k, None)
+    for f in ("episode.json", "trajectory.npz"):      # an ended episode's record is not the new episode's
+        try:
+            os.remove(os.path.join(DATA, f))
+        except OSError:
+            pass
+
+
+OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=lambda: on_main(_ops_reset)) \
+    if L.STATE_OPS else None
+
+
 # ---------------------------------------------------------------- start, or resume after a crash
 E["deadline"] = float("inf")
 S.record_start()                        # before begin(): a resume replay of the journal is recorded too
 EP.begin(step_ticks=lambda row, ticks: S.step(row, _physics_steps=ticks), state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
-         start_event={"task": TASK, "eval_index": S.eval_index})
+         start_event={"task": TASK, "eval_index": S.eval_index}, **({"ops": OPS} if OPS is not None else {}))
 _first = [e for e in EP.events() if e.get("ev") == "first_request"]
 if _first:                              # a resumed service: the agent's clock keeps running from its first request
     start_clock(float(_first[0]["t_first"]))
@@ -723,7 +779,9 @@ print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", f
 threading.Thread(target=L.serve, daemon=True, args=(L.Service(
     spec=SPEC, lock=LOCK, state=E, submit=lambda meta, A: on_main(do_submit, meta, A), observe=lambda meta: on_main(do_observe, meta),
     kinematics=lambda req: on_main(do_kinematics, req), status=status, on_submit_error=lambda exc: on_main(finish, "error"), log=log,
-    episode=EP, state_sha=lambda: on_main(S.state_sha), proprio=lambda: on_main(proprio_row)),)).start()
+    episode=EP, state_sha=lambda: on_main(S.state_sha), proprio=lambda: on_main(proprio_row),
+    **({"state_ops": OPS} if OPS is not None else {}),
+    **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})),)).start()
 while True:                                 # the main thread: simulator jobs in order; signals are handled between them
     if deadline_reached():
         finish("timeout")

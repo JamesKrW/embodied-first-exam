@@ -77,7 +77,19 @@ def grade() -> None:
                "calls": num("calls"), "settle_failed": num("settle_failed"), "gave_up": int(bool(d.get("gave_up"))),
                "sim_startups": num("sim_startups"), "resumes": num("resumes"), "resume_state_mismatch": num("resume_state_mismatch"),
                "instance_mismatch": int(mismatch), "video_rendered": int(bool(videos)), "video_segments": len(videos),
-               "sim_error": int(sim_error), "dump_lost": int(dump_lost), "infra_error": int(infra), "grader_error": 0})
+               "sim_error": int(sim_error), "dump_lost": int(dump_lost), "infra_error": int(infra), "grader_error": 0,
+               **state_ops_fields(d, ok, num)})
+
+
+def state_ops_fields(d: dict, ok: bool, num) -> dict:
+    """The unlimited-reset ablation's record (RCB_STATE_OPS=1: final.json then has saves and loads; {} without it):
+    resets, saves, loads, the budget, first_success (no reset and no load before the success: a load begins a new
+    episode, as a reset does) and, for a success, resets_at_success / loads_at_success."""
+    if "saves" not in d:
+        return {}
+    return {"resets": num("resets"), "saves": num("saves"), "loads": num("loads"), "reset_budget": num("reset_budget"),
+            "first_success": int(ok and num("resets") + num("loads") == 0),
+            **({k: num(k) for k in ("resets_at_success", "loads_at_success") if k in d} if ok else {})}
 
 
 if __name__ == "__main__":

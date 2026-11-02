@@ -77,7 +77,11 @@ def write_final() -> None:
         "live_sha": E.get("live_sha"), "video": bool(E.get("video")),
         "video_done": bool(E.get("video_done")), "backend": BACKEND, "grade_error": bool(E.get("grade_error")),
         "instance_exact": E.get("instance_exact"), "settle": E.get("settle"), "agent_time_s": E.get("agent_time_s"),
-        "final_window": E.get("final_window"), **{k: E[k] for k in ("trajectory_error", "video_error", "finalize_error") if E.get(k)}, **EP.final_fields()})
+        "final_window": E.get("final_window"), **{k: E[k] for k in ("trajectory_error", "video_error", "finalize_error") if E.get(k)},
+        **OPS_FINAL, **EP.final_fields()})
+
+
+OPS_FINAL: dict = {}      # the state ops' record (RCB_STATE_OPS=1), set once by finalize(); empty without the switch
 
 
 VERDICT_KEYS = ("success", "graded_by", "grade_error", "n_actions", "live_sha", "reason", "settle", "final_window")
@@ -108,6 +112,8 @@ def finalize() -> None:
             traceback.print_exc(); log({"ev": "finalize_error", "error": repr(exc)})
             E["finalize_error"] = repr(exc)[:300]; acts = None
         E["graded_by"] = "live"; E["finalized"] = True; E["video_pending"] = acts is not None and len(acts) > 0
+        if OPS is not None:
+            OPS_FINAL.update(OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows))
         log({"ev": "verdict", "graded_by": "live", "success": bool(E["success"]), "reason": E["reason"], "n_actions": E.get("n_actions"),
              "live_sha": E.get("live_sha"), "final_window": E.get("final_window")})
         write_final()                     # the verdict is on disk before the video, whose rendering grows with the episode (~N/60 s for N steps)
@@ -199,7 +205,10 @@ def finish(reason: str) -> None:
     E["episode_control_steps"] = ctrl_steps()
     log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "elapsed_s": round(E["t_end"] - E["t0"], 1), "success": bool(E["success"]),
          "final_window": E.get("final_window")})
-    write_final(); start_finalize()
+    write_final()
+    if OPS is not None and reason not in ("success", "timeout", "agent_exit"):
+        return       # state ops: an episode that ended otherwise is followed by /reset or /load_state, or by the phase's end
+    start_finalize()
 
 
 # ---------------------------------------------------------------- scene
@@ -306,6 +315,65 @@ SPEC = {
                 "stops there, and no settle window is run, so the episode ends as a failure); the verdict is the live episode's: "
                 "the settle window that ended it (its steps are part of the recording; nothing is replayed to grade it)"),
 }
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
+# RCB_EXPOSE_OBJECT_POSES=1: the task objects as Session.objects() names them (the table left out), in the world frame of
+# /spec world, ee_pose and proprio tcp_pose: position and orientation (wxyz) of a rigid object, its size where RoboWits
+# declares one; a particle body (dough, sand, water) gives its particle centroid only, as the privileged API does.
+OBJECTS = S.objects() if L.OBJECT_POSES else {}
+OBJECT_SIZE = {n: o["size"] for n, o in OBJECTS.items() if any(float(x) for x in (o.get("size") or ()))}
+
+
+def object_poses() -> dict:
+    out = {}
+    for n, o in OBJECTS.items():
+        if o.get("material") == "particle":
+            out[n] = L.pose_entry(S._particles(S.env.get_entity(n)).mean(axis=0))
+        else:
+            pos, quat = S.object_pose(n)
+            out[n] = L.pose_entry(pos, quat, size=OBJECT_SIZE.get(n))
+    return out
+
+
+# RCB_STATE_OPS=1: reset = Session.reset() (scene.reset(S0), the frozen start, exact on the CPU backend) with a new
+# recording of the graded rows; save = Genesis' SimState of every solver (scene.get_state(): rigid qpos / velocities /
+# accelerations / link poses, particle states) + the Session's episode counters, controller targets and graded rows +
+# this service's settle record; load = scene.reset(that state) and the rest restored. Genesis keeps solver warm starts and
+# the contact list outside SimState, so a load is not bit-exact with the run it was saved from (the next control step
+# recomputes contacts); a crash resume replays the same ops at the same rows.
+_EPISODE_E = ("settle", "final_window", "final_window_end", "episode_control_steps")
+
+
+def ops_reset() -> None:
+    S.reset()
+    S.record_start()
+    for k in _EPISODE_E:
+        E.pop(k, None)
+
+
+def ops_save() -> dict:
+    return {"sim": S.scene.get_state(), "n_steps": int(S.n_steps), "episode_done": bool(S.episode_done),
+            "targets": np.array(S._targets, copy=True), "env_steps": int(S.env._step_count),
+            "rec": list(S._recording) if S._recording is not None else None,
+            "E": {k: json.loads(json.dumps(E[k])) for k in _EPISODE_E if k in E}}
+
+
+def ops_load(snap: dict) -> None:
+    S.scene.reset(snap["sim"])
+    if hasattr(S.scene, "_init_state"):
+        S.scene._init_state = S.S0         # scene.reset(state) registers the state as the scene's initial one
+    S.n_steps, S.episode_done = snap["n_steps"], snap["episode_done"]
+    S._targets = np.array(snap["targets"], copy=True); S.env._step_count = snap["env_steps"]
+    S._recording = list(snap["rec"]) if snap["rec"] is not None else None
+    for k in _EPISODE_E:
+        E.pop(k, None)
+    E.update(json.loads(json.dumps(snap["E"])))
+
+
+OPS = (L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset, save=ops_save, load=ops_load)
+       if L.STATE_OPS else None)
+if OPS is not None:
+    SPEC["episode"] += ("; with POST /reset or /load_state a new episode starts after any end but a success or the end of "
+                        "the agent's phase, and only the last episode is graded")
 L.check_spec(SPEC)                      # refuse to start with an incomplete spec or a forbidden field
 
 
@@ -575,10 +643,15 @@ def end_from_signal() -> None:
 # ---------------------------------------------------------------- start, or resume after a crash
 S.record_start()                        # before begin(): a resume replay of the journal is recorded too
 EP.begin(state=E, step=S.step, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC,
-         start_event={"task": TASK, "eval_index": S.eval_index, "backend": BACKEND}, on_end=end_from_signal)
+         start_event={"task": TASK, "eval_index": S.eval_index, "backend": BACKEND}, on_end=end_from_signal, ops=OPS)
 with LOCK:                              # a SIGUSR1 remembered during the resume may already be ending the episode
     write_final()
 open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  state_ops=OPS,
+                  **({"object_poses": object_poses,
+                      "object_pose_spec": {"frame": "RoboWits world frame (/spec world: that of ee_pose, proprio tcp_pose and "
+                                                    "/kinematics)", "quaternion_order": "wxyz", "objects": list(OBJECTS)}}
+                     if L.OBJECT_POSES else {})))

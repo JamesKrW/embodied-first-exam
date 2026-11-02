@@ -9,6 +9,7 @@ journal and resets where the committed resets did (their journal rows are checkp
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -254,7 +255,7 @@ SPEC = {
     },
 }
 
-if RESET_BUDGET:
+if RESET_BUDGET and not L.STATE_OPS:  # with RCB_STATE_OPS=1 the shared layer serves /reset and describes it
     SPEC["reset"] = (
         f"POST /reset (JSON or RCB1 {{cameras, video_fps, depth}}; no physics) abandons the running episode, or follows "
         f"one that has ended, and starts a new one from the same frozen starting state, {RESET_BUDGET} times in all; it "
@@ -306,7 +307,7 @@ def finish(reason: str) -> None:
     if REPLAYING["on"]:
         return
     EP.log({"ev": "end", "reason": reason, "success": bool(E["success"]), "control_steps": clock(),
-            "episode": E["resets"] + 1, "journal_rows": EP.rows})
+            "episode": OPS.episode if OPS is not None else E["resets"] + 1, "journal_rows": EP.rows})
 
 
 def execute(action, recorder=None) -> bool:
@@ -441,7 +442,7 @@ def kinematics(request):
 
 
 def reset_counters() -> dict:
-    if not RESET_BUDGET:
+    if not RESET_BUDGET or OPS is not None:  # with RCB_STATE_OPS=1 the shared layer adds its own counters
         return {}
     left = 0 if (E["success"] or E.get("exiting")) else RESET_BUDGET - E["resets"]
     return {"episode": E["resets"] + 1, "resets_left": left, "control_steps_total": EP.rows}
@@ -491,6 +492,94 @@ def do_reset(meta):
     return response(recorder, "frames", fps, reset_id=E["resets"])
 
 
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
+# RCB_EXPOSE_OBJECT_POSES=1: the task objects' world poses (wxyz), as the cameras see them (no physics, no mj_forward).
+# The essential families name them as Session.state()["objects"] does; the other families' objects are the moving bodies
+# that are no part of the robot (a free body, or an articulated part: its body pose, never its joint angle).
+ROBOT_ROOTS = {int(MD.body_rootid[int(MD.jnt_bodyid[joint])]) for joint in JIDS}
+
+
+def object_names() -> list:
+    if hasattr(S, "_moving_bodies"):
+        return sorted(S._moving_bodies)
+    return [MD.body(index).name for index in range(1, MD.nbody)
+            if int(MD.body_rootid[index]) not in ROBOT_ROOTS and int(MD.body_jntnum[index]) > 0
+            and MD.body_mocapid[index] < 0 and MD.body(index).name]
+
+
+OBJECTS = {name: MD.body(name).id for name in object_names()} if L.OBJECT_POSES else {}
+
+
+def object_poses() -> dict:
+    return {name: L.pose_entry(D.xpos[index], D.xquat[index]) for name, index in OBJECTS.items()}
+
+
+# RCB_STATE_OPS=1: reset = Session.reset() (the frozen start, the same state hash as a fresh process) and the graded rows
+# cleared; a snapshot = MuJoCo's integration state and warning counters, a copy of the Session's own attributes (the
+# checker's stages, holds and latches, step counter, the family's histories; MuJoCo objects are shared, never copied)
+# and a copy of the graded rows: loading it continues exactly as the saved episode would have.
+_MJ_STATE = mujoco.mjtState.mjSTATE_INTEGRATION
+
+
+def _mujoco_object(value) -> bool:
+    """A MuJoCo object, or an array over MuJoCo's memory (a view of MjData / MjModel)."""
+    if isinstance(value, np.ndarray):
+        while isinstance(value, np.ndarray):
+            value = value.base
+        return type(value).__name__ == "PyCapsule"
+    return type(value).__module__.split(".")[0] == "mujoco"
+
+
+def _shared(root) -> dict:
+    """A deepcopy memo that keeps every MuJoCo object (model, data, their views, renderers) and the Session shared."""
+    memo, seen, todo = {id(S): S}, set(), [root]
+    while todo:
+        value = todo.pop()
+        if id(value) in seen or isinstance(value, (str, bytes, int, float, bool, type(None))):
+            continue
+        seen.add(id(value))
+        if _mujoco_object(value):
+            memo[id(value)] = value
+        elif isinstance(value, np.ndarray):
+            continue
+        elif isinstance(value, dict):
+            todo.extend(value.values())
+        elif isinstance(value, (list, tuple, set, frozenset)):
+            todo.extend(value)
+        elif hasattr(value, "__dict__") and not isinstance(value, type):
+            todo.extend(vars(value).values())
+    return memo
+
+
+def _session_attrs() -> dict:
+    return {key: value for key, value in vars(S).items() if not _mujoco_object(value) and "render" not in key}
+
+
+def ops_reset() -> None:
+    S.reset()
+    ROWS.clear()
+
+
+def ops_save():
+    state = np.empty(mujoco.mj_stateSize(MD, _MJ_STATE))
+    mujoco.mj_getState(MD, D, state, _MJ_STATE)
+    attrs = _session_attrs()
+    return {"physics": state, "warnings": [(w.number, w.lastinfo) for w in D.warning],
+            "session": copy.deepcopy(attrs, _shared(attrs)), "rows": [row.copy() for row in ROWS]}
+
+
+def ops_load(snap) -> None:
+    mujoco.mj_setState(MD, D, snap["physics"], _MJ_STATE)
+    for warning, (number, info) in zip(D.warning, snap["warnings"]):
+        warning.number, warning.lastinfo = number, info
+    mujoco.mj_forward(MD, D)
+    vars(S).update(copy.deepcopy(snap["session"], _shared(snap["session"])))
+    ROWS[:] = [row.copy() for row in snap["rows"]]
+
+
+OPS = L.StateOps(budget=RESET_BUDGET, reset=ops_reset, save=ops_save, load=ops_load) if L.STATE_OPS else None
+
+
 def end_episode():
     with LOCK:
         E["exiting"] = True
@@ -514,6 +603,8 @@ def end_episode():
                 "reset_budget": RESET_BUDGET,
                 "control_steps_total": EP.rows,
                 "start_sha": next((event.get("state_sha") for event in EP.events() if event.get("ev") == "start"), None),
+                **(OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows)
+                   if OPS is not None else {}),
                 **EP.final_fields(),
             },
         )
@@ -532,6 +623,15 @@ def _resume_resets() -> None:
         S.reset()
         ROWS.clear()
         E.update(done=False, reason=None, success=False)
+
+
+def replay_exec(row) -> None:
+    """A journaled row during a resume with RCB_STATE_OPS=1 (the layer replays the resets, saves and loads)."""
+    REPLAYING["on"] = True
+    try:
+        execute(row)
+    finally:
+        REPLAYING["on"] = False
 
 
 def replay_row(row) -> None:
@@ -587,12 +687,13 @@ else:
 
 RESUMED = EP.begin(
     state=E,
-    step=replay_row if RESET_BUDGET else execute,
-    state_sha=resume_sha if RESET_BUDGET else S.state_sha,
+    step=replay_exec if OPS is not None else (replay_row if RESET_BUDGET else execute),
+    state_sha=resume_sha if RESET_BUDGET and OPS is None else S.state_sha,
     proprio=proprio_row,
     spec=SPEC,
     start_event={"task": TASK, "hand": HAND, **INSTANCE},
     on_end=end_episode,
+    ops=OPS,
 )
 if RESUMED and E["resets"]:  # Episode.begin looks for an "end" of any episode: only the current one's counts
     _ends = [event for event in EP.events() if event.get("ev") == "end"
@@ -611,7 +712,7 @@ def make_handler(svc: L.Service):
 
     class Handler(base):
         def do_POST(self):
-            if self.path != "/reset" or not RESET_BUDGET:
+            if self.path != "/reset" or not RESET_BUDGET or OPS is not None:
                 return super().do_POST()
             try:
                 meta, _ = self._body()
@@ -675,6 +776,10 @@ serve(
         episode=EP,
         state_sha=S.state_sha,
         proprio=proprio_row,
+        state_ops=OPS,
+        **({"object_poses": object_poses,
+            "object_pose_spec": {"frame": "world (the frame of /kinematics and proprio tcp_pose)",
+                                 "quaternion_order": "wxyz", "objects": list(OBJECTS)}} if L.OBJECT_POSES else {}),
     ),
     port=int(os.environ.get("RCB_PORT", "8000")),
 )

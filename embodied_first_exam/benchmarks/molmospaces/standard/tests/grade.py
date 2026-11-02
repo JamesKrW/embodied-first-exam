@@ -27,6 +27,18 @@ def write(ok, out):
     print(out)
 
 
+def state_ops_fields(d: dict, ok: bool) -> dict:
+    """The unlimited-reset ablation's record (RCB_STATE_OPS=1: final.json then has saves and loads; {} without it):
+    resets, saves, loads, the budget, first_success (no reset and no load before the success: a load begins a new
+    episode, as a reset does) and, for a success, resets_at_success / loads_at_success."""
+    if "saves" not in d:
+        return {}
+    n = lambda k: int(float(d.get(k) or 0))  # noqa: E731
+    return {"resets": n("resets"), "saves": n("saves"), "loads": n("loads"), "reset_budget": n("reset_budget"),
+            "first_success": int(ok and n("resets") + n("loads") == 0),
+            **({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d} if ok else {})}
+
+
 def grade(d: dict):
     finalized = bool(d.get("finalized"))
     # the collect hook writes `finalized` with its verdict (and the service with a give-up): without it the file is the
@@ -39,6 +51,7 @@ def grade(d: dict):
     ok = live and bool(d.get("success")) and reason != "error" and not mismatch and not d.get("gave_up") and not infra
     num = lambda k: float(d.get(k) or 0)  # noqa: E731
     return ok, {
+        **state_ops_fields(d, ok),
         "success": int(ok),
         "live_success": int(live),
         "graded_by_live": 1,

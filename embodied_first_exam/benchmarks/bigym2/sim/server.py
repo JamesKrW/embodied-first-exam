@@ -18,6 +18,16 @@ InstanceMismatch, and start_sha (the start this image accepts) is checked by rcb
 What leaves this process: the three onboard cameras' images and upstream's low-dimensional observation (the robot's
 joint angles and velocities, gripper states, the pelvis pose its base controller tracks). Never an object's pose, the
 success check or its parts.
+
+Ablations (off unless the task sets them; nothing here runs without them):
+  rcb_service.OBJECT_POSES  object_poses(): every free body of the scene (the task's props; the robot's base moves on
+                            slide joints, so none is the robot's), by body name, in MuJoCo's world frame: the room's, the
+                            frame of proprio's pelvis_x, pelvis_y, pelvis_z, pelvis_yaw; read off qpos; quaternions w x y z.
+  rcb_service.STATE_OPS     save_state() / load_state(): the episode's sim rows since the frozen start, re-run from a
+                            reset on load (upstream's env, its whole-body controller and its success timers keep state
+                            no array snapshot reaches; the same rows from the same start give the same state, which the
+                            service's own crash recovery relies on). Exact (the state hash is checked after the re-run);
+                            a load costs one control step per saved row.
 """
 from __future__ import annotations
 
@@ -28,6 +38,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rcb_bigym2 import CAMERAS, Episode, load_instance, replay  # noqa: E402
+import rcb_service  # noqa: E402
 from rcb_service import InstanceMismatch, main  # noqa: E402
 
 ACTION = "whole_body"
@@ -54,6 +65,13 @@ class BiGym2:
         self.mounts = self.instance["t0"]["cameras"]
         self.facts = self.instance["t0"]["robot"]  # the robot's description: joint axes, camera mounts
         self.cmd = self.ep.hold_row()
+        self._rows: list = []                      # rcb_service.STATE_OPS: the sim rows since the frozen start
+        if rcb_service.OBJECT_POSES:               # the props: every free joint's body outside the robot's namespace
+            import mujoco
+            m, ns = self.ep.model, getattr(self.ep.tools.robot, "namespace", "") or "\0"
+            self._props = [(m.body(int(m.jnt_bodyid[j])).name, int(m.jnt_qposadr[j])) for j in range(m.njnt)
+                           if m.jnt_type[j] == mujoco.mjtJoint.mjJNT_FREE
+                           and not m.body(int(m.jnt_bodyid[j])).name.startswith(ns)]
 
     # ------------------------------------------------------------------ the rcb_service.Sim contract
     def spec(self) -> dict:
@@ -125,11 +143,35 @@ class BiGym2:
     def step(self, row: np.ndarray) -> tuple[bool, bool, dict]:
         done = self.ep.step(row)
         self.cmd = np.asarray(row, dtype=np.float64)
+        if rcb_service.STATE_OPS:
+            self._rows.append(self.cmd.copy())
         return done, self.ep.success(), ({"outcome": self.ep.outcome()} if done else {})
 
     def reset(self) -> None:
         self.ep.reset()
         self.cmd = self.ep.hold_row()
+        if rcb_service.STATE_OPS:
+            self._rows = []
+
+    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, OBJECT_POSES)
+    def object_pose_spec(self) -> dict:
+        return {"frame": "MuJoCo's world frame, the room's (z up; the frame of proprio's pelvis_x, pelvis_y, pelvis_z, "
+                         "pelvis_yaw)", "quaternion_order": "wxyz", "objects": [n for n, _ in self._props]}
+
+    def object_poses(self) -> dict:
+        q = self.ep.data.qpos
+        return {n: rcb_service.pose_entry(q[a:a + 3], np.asarray(q[a + 3:a + 7]) / np.linalg.norm(q[a + 3:a + 7]))
+                for n, a in self._props}
+
+    def save_state(self) -> dict:
+        return {"rows": np.asarray(self._rows, dtype=np.float64).reshape(-1, self.raw_dim), "sha": self.state_sha()}
+
+    def load_state(self, snap: dict) -> None:
+        self.reset()
+        for row in snap["rows"]:
+            self.step(row)
+        if self.state_sha() != snap["sha"]:
+            raise RuntimeError("re-running the saved rows did not reach the saved state")
 
     def state_sha(self) -> str:
         return self.ep.state_sha()

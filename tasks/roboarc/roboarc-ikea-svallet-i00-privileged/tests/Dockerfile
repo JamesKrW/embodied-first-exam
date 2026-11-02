@@ -7,7 +7,7 @@ FROM ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0
 RUN apt-get update && apt-get install -y --no-install-recommends libosmesa6=25.0.7-2+deb13u1 && rm -rf /var/lib/apt/lists/*  && pip install --no-cache-dir --no-deps PyOpenGL==3.1.10 imageio==2.37.0 imageio-ffmpeg==0.6.0 pillow==12.3.0
 ENV MUJOCO_GL=osmesa PYOPENGL_PLATFORM=osmesa
 COPY video_view.json test.sh runtime_binding.json /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.4.0@sha256:09c2edb7f498299584a839c6abc665072731abb0009a95e1c9bc6f0fb2997682 /privileged/environment/rcb_ikea.py /privileged/tests/grade.py /privileged/tests/render_video.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.4.0-resetpose@sha256:3ab58e65b7eafdf1d5e15c56a8e711041eb7938661e13ba9a84c75b92012b909 /privileged/environment/rcb_ikea.py /privileged/tests/grade.py /privileged/tests/render_video.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests

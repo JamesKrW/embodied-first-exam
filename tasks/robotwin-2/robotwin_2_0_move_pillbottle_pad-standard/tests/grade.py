@@ -39,6 +39,10 @@ def main():
                "video_pending": int(bool(d.get("video_pending"))), "live_video": int(bool(d.get("live_video"))), "live_frames": int(d.get("live_frames") or 0),
                "infra_error": int(infra), "sim_error": int(reason == "error"), "sim_crashed_on_call": int(reason == "sim_crashed_on_call"),
                "instance_mismatch": int(mismatch), "sim_startups": _startups(), "grader_error": int(bool(d.get("finalize_error")))}
+        if "saves" in d:   # the unlimited-reset ablation (RCB_STATE_OPS=1): a load begins a new episode too; numbers only
+            out.update(resets=int(d.get("resets") or 0), reset_budget=int(d.get("reset_budget") or 0), saves=int(d.get("saves") or 0),
+                       loads=int(d.get("loads") or 0), first_success=int(ok and int(d.get("resets") or 0) + int(d.get("loads") or 0) == 0))
+            if ok: out.update({k: int(d[k]) for k in ("resets_at_success", "loads_at_success") if k in d})
     except Exception:  # noqa: BLE001 — an unreadable final.json is not the agent's failure
         traceback.print_exc()
         write(False, {**FAIL, "infra_error": 1, "grader_error": 1, "sim_startups": _startups()}); return

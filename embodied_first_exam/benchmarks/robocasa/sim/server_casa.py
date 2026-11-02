@@ -36,6 +36,7 @@ A request is validated as a whole before any physics: whatever is wrong with it 
 
 from __future__ import annotations
 
+import copy
 import errno
 import faulthandler
 import importlib
@@ -68,9 +69,30 @@ MAX_FRAMES_PER_CALL = 3000  # frames x cameras per response: bounds the service'
 WALL_CLOCK_S = float(os.environ.get("RCB_WALL_CLOCK_S", "3600"))
 MAX_BODY = 64 * 1024 * 1024
 MAX_RESP = 256 * 1024 * 1024
+# The unlimited-reset ablation (off unless the task sets RCB_STATE_OPS=1; nothing changes when off): POST /reset
+# (RCB_RESET_BUDGET, read only then) and, beside it, POST /save_state and /load_state (snapshot: casa_tool.snapshot of
+# the env, the session's own per-episode state and the graded rows, in memory); every reset and load begins a new
+# episode, only the last one is graded; meta and /status add episode, resets_left, control_steps_total, saves and loads;
+# final.json adds resets, saves, loads, episodes, episodes_log, first_success and, for a success, resets_at_success and
+# loads_at_success; a crash resume replays every reset, save and load at its journal row.
+STATE_OPS = os.environ.get("RCB_STATE_OPS") == "1"
+RESET_BUDGET = max(0, int(os.environ.get("RCB_RESET_BUDGET", "0") or 0)) if STATE_OPS else 0
+MAX_HANDLES = int(os.environ.get("RCB_MAX_STATE_HANDLES", "32"))
+CAN_SAVE = STATE_OPS and bool(RESET_BUDGET)
+# The object-pose ablation (off unless the task sets RCB_EXPOSE_OBJECT_POSES=1; nothing changes when off): every meta
+# (/submit, /observe, /reset, /load_state) adds "objects", the task objects' poses at the state the answer ends in, and
+# /spec adds "object_poses" (frame, quaternion order, names).
+OBJECT_POSES = os.environ.get("RCB_EXPOSE_OBJECT_POSES") == "1"
 LOCK = threading.Lock()
 E = {"ready": False, "calls": 0, "rows": 0, "done": False, "reason": None, "t0": time.time(), "finalized": False}
 E["t_first"] = None  # the agent's first request (its clock starts there: _touch, _agent_time)
+if STATE_OPS:
+    # resets: /reset calls that started a new episode; journal_rows: control steps executed over the whole trial
+    # (record.f64's length); ep_start: where the current episode begins in it; stopping: the agent's time is up (no
+    # reset any more); saves / loads: /save_state and /load_state calls that took effect; start_sha: the frozen start's
+    # state hash, which every reset must bring the scene back to
+    E.update(resets=0, ep_start=0, journal_rows=0, stopping=False, saves=0, loads=0, start_sha=None)
+HANDLES: dict = {}  # RCB_STATE_OPS: handle -> (simulator snapshot, the graded rows), LRU order
 
 # SIGUSR1 (the collect hook's "episode over") may arrive before the service is ready, e.g. during a resume replay; its
 # default action would kill the process. Until the real handler is installed, only remember it.
@@ -315,7 +337,7 @@ SPEC = {
     "proprio_layout": PROPRIO_LAYOUT,
     "frames": "world frame: metres, z up; robot-mounted cameras move with the robot (calibration in every response)",
     "budget": {
-        "reset": 0,
+        "reset": RESET_BUDGET,
         "wall_clock_s": WALL_CLOCK_S,
         "clock": (
             "meta time_s / time_left_s count from your first request to the service (any endpoint), not from the "
@@ -327,6 +349,85 @@ SPEC = {
     },
     "episode": "runs until your time is up; the state after the last executed control step is graded",
 }
+if RESET_BUDGET:
+    SPEC["reset"] = ("POST /reset abandons the running episode and starts a new one from the same starting state, "
+                     "budget.reset times in all; only the last episode is graded (its state after the last executed "
+                     "control step). The clock (time_left_s) keeps running. meta and /status add episode, resets_left "
+                     "and control_steps_total")
+    SPEC["episode"] += "; with resets, only the last episode is scored"
+
+
+def pose_entry(pos, quat=None, size=None, digits: int = 5) -> dict:
+    """One object of meta["objects"]: {"pos": [x, y, z], "quat": [4] or absent, "size": [...] or absent}, plain floats."""
+    out = {"pos": [round(float(v), digits) for v in np.asarray(pos, dtype=np.float64).reshape(-1)]}
+    if quat is not None:
+        out["quat"] = [round(float(v), digits) for v in np.asarray(quat, dtype=np.float64).reshape(-1)]
+    if size is not None:
+        out["size"] = [round(float(v), digits) for v in np.asarray(size, dtype=np.float64).reshape(-1)]
+    return out
+
+
+POSE_NOTE = (
+    "object_poses (an ablation of this run): every /submit, /observe and /reset answer's meta carries "
+    "\"objects\" = {name: {\"pos\": [x, y, z] (m), \"quat\": [4] (quaternion_order), \"size\": [...] where "
+    "given}}, each object's pose in `frame` at the state the answer ends in"
+)
+
+
+def _pose_bodies() -> dict:
+    """The task objects whose poses RCB_EXPOSE_OBJECT_POSES=1 exposes: the env's objects (env.objects, named as the
+    instance's object_cfgs and the privileged state()'s "objects"), each by its root body."""
+    return {name: S.model.body(obj.root_body).id for name, obj in S.env.objects.items()}
+
+
+POSE_BODIES = _pose_bodies() if OBJECT_POSES else {}
+
+
+def object_poses() -> dict:
+    """Each task object's root-body pose in the world frame: data.xpos and data.xquat (w x y z), as the privileged
+    state()'s bodies."""
+    d = S.data
+    return {n: pose_entry(d.xpos[b], d.xquat[b]) for n, b in POSE_BODIES.items()}
+
+
+if OBJECT_POSES:
+    SPEC["object_poses"] = {
+        "units": "m",
+        "frame": "world (metres, z up): the frame of camera_calibration's cam2world_gl and of proprio's eef positions; "
+        "quat is w x y z",
+        "quaternion_order": "wxyz",
+        "objects": list(POSE_BODIES),
+        "note": POSE_NOTE,
+    }
+if CAN_SAVE:
+    SPEC["state_ops"] = (
+        "POST /save_state ({}) stores the current state of the running episode in this service "
+        "and answers JSON {\"handle\": \"s<k>\", \"step\": control steps of the episode, ...}: the "
+        "handle is all you get, never the state's contents. POST /load_state {\"handle\": h, "
+        "cameras, video} restores a state saved earlier in this trial and starts a new episode "
+        "there (answered as /reset is); nothing else can be loaded. The task's success rule is "
+        f"checked again from your next command on. At most {MAX_HANDLES} handles are kept: saving "
+        "more drops the least recently used one (loading it is a 409). Saves and loads do not "
+        "count against budget.reset; a success ends the trial (409 after it)"
+    )
+
+
+def _reset_counters() -> dict:
+    if not RESET_BUDGET:
+        return {}
+    return {
+        "episode": E["resets"] + E["loads"] + 1,
+        "control_steps_total": E["journal_rows"],
+        "resets_left": 0 if E["stopping"] else RESET_BUDGET - E["resets"],
+        **({"saves": E["saves"], "loads": E["loads"]} if CAN_SAVE else {}),
+    }
+
+
+def _journal_pos() -> dict:
+    """RCB_STATE_OPS: where a checkpoint (a completed call's log line) sits in the journal: what a resume replays and how
+    many resets, saves and loads came before it."""
+    return {"journal_rows": E["journal_rows"], "ep_start": E["ep_start"], "resets": E["resets"], "saves": E["saves"],
+            "loads": E["loads"]}
 
 
 def _agent_time() -> float:
@@ -346,7 +447,7 @@ def _touch() -> None:
 
 
 def meta_common() -> dict:
-    return {
+    out = {
         "calls": E["calls"],
         "rows": E["rows"],
         "control_steps": len(RECORD),
@@ -359,7 +460,11 @@ def meta_common() -> dict:
         "cameras": calib(),  # robot-mounted cameras move: their calibration is current
         "done": E["done"],
         "reason": E["reason"],
+        **_reset_counters(),
     }
+    if OBJECT_POSES:
+        out["objects"] = object_poses()
+    return out
 
 
 def log(ev: dict) -> None:
@@ -381,6 +486,13 @@ def write_final(extra: dict | None = None) -> None:
     }
     d.update(E.get("verdict") or {})
     d.update(extra or {})
+    if STATE_OPS:
+        d.update(reset_budget=RESET_BUDGET, resets=E["resets"], saves=E["saves"], loads=E["loads"],
+                 episodes=E["resets"] + E["loads"] + 1, control_steps_total=E["journal_rows"])
+        if "success" in d:  # the first attempt: graded only when no reset or load came after it
+            d["first_success"] = bool(d["success"]) and E["resets"] + E["loads"] == 0
+        if d.get("success"):  # the graded episode is the last one
+            d.update(resets_at_success=E["resets"], loads_at_success=E["loads"])
     _dump_final(d)
 
 
@@ -463,6 +575,8 @@ def _ctrl_step(tg, rec) -> bool:
     row = np.asarray(S.targets, float).copy()
     RECORD.append(row)
     RECF.write(row.tobytes())
+    if STATE_OPS:
+        E["journal_rows"] += 1
     rec.tick()
     if MAX_CONTROL_STEPS and len(RECORD) >= MAX_CONTROL_STEPS:
         finish("step limit")
@@ -630,6 +744,7 @@ def run_submit(q: dict):
             "task": task_info(),
             "rows_total": E["rows"],
             "state_sha": S.state_sha(),
+            **(_journal_pos() if STATE_OPS else {}),
         }
     )
     d = os.path.join(DATA, "calls", f"{E['calls']:06d}")
@@ -660,10 +775,255 @@ def run_observe(q: dict):
             "control_steps": len(RECORD),
             "rows_total": E["rows"],
             "state_sha": S.state_sha(),
+            **(_journal_pos() if STATE_OPS else {}),
         }
     )
     out = {**meta_common(), "obs_id": E["calls"], "seconds": seconds, "ok": True}
     return out, rec.parts(video if seconds > 0 else ("frames" if video == "mp4" else video), fps)
+
+
+# ---- RCB_STATE_OPS: /reset, /save_state and /load_state (as server_mj.py's)
+def parse_reset(meta: dict) -> dict:
+    """Validate a /reset or /load_state request's frames (cameras, video, include_depth; no physics)."""
+    cams = _cameras(meta, list(CAMS))
+    fps = _fps(meta)
+    video = meta.get("video")
+    video = "frames" if video is None else video
+    if not isinstance(video, str) or video not in ("mp4", "frames", "both", "none"):
+        raise ValueError("video must be mp4|frames|both|none")
+    depth = bool(meta.get("include_depth", False))
+    _frame_budget(cams, fps, 0, depth)
+    return {"cams": cams, "fps": fps, "video": "frames" if video == "mp4" else video, "depth": depth}
+
+
+class Refused(Exception):
+    """A request refused before anything changed (409, or `code`)."""
+
+    def __init__(self, body: dict, code: int = 409):
+        super().__init__(body.get("error"))
+        self.body = body
+        self.code = code
+
+
+def check_reset() -> None:
+    """409 when no new episode may start: the agent's time is up, or the budget is spent."""
+    if E["stopping"] or E.get("finalizing"):
+        raise Refused({"error": "trial finished: your time is up", "reason": E["reason"], "resets_left": 0})
+    if E["resets"] >= RESET_BUDGET:
+        raise Refused({"error": "reset budget exhausted", "reason": "reset budget exhausted", "budget": RESET_BUDGET,
+                       "resets_left": 0})
+
+
+def check_ops(meta: dict, path: str) -> dict:
+    """A save's or load's checks, all of them, before anything changes (as check_reset's)."""
+    if E["stopping"] or E.get("finalizing"):
+        raise Refused({"error": "trial finished: your time is up", "reason": E["reason"]})
+    if path == "/save_state":
+        if E["done"]:
+            raise Refused({"error": "the episode has ended: reset or load a saved state first", "reason": E["reason"]})
+        return {}
+    h = meta.get("handle")
+    if not isinstance(h, str):
+        raise Refused({"error": "load_state needs {\"handle\": \"s<k>\"} from an earlier /save_state"}, 400)
+    if h not in HANDLES:
+        raise Refused({"error": f"unknown handle {h!r}: not saved in this trial, or dropped (at most {MAX_HANDLES} "
+                                "are kept)", "handle": h})
+    return {"handle": h}
+
+
+_OWN = ("actions", "success", "initial_success", "reward", "targets")  # the session's per-episode state
+
+
+def _new_renderers() -> None:
+    """The scene was rebuilt (new model and data): the cached renderers belong to the old one."""
+    for k, r in _R.items():
+        if r is not None:
+            try:
+                r.close()
+            except Exception:  # noqa: BLE001
+                pass
+        _R[k] = None
+
+
+def reset_sim() -> None:
+    """Back to the frozen start as Session.reset() does, but in place: casa_tool.restore(env, frozen) on the env that
+    exists (model fields, the task's Python state, the RNGs, MuJoCo's integration state), then the reset's one success
+    check. A scene the in-place restore does not bring back to the frozen start's state hash is rebuilt
+    (Session.reset(): the env made afresh from the instance, seconds)."""
+    TOOL.restore(S.env, S.frozen)
+    S.actions = []
+    S.success = bool(S.env._check_success())
+    S.initial_success = S.success
+    S.reward = 0.0
+    S.targets = S.initial_command()
+    if E["start_sha"] and S.state_sha() != E["start_sha"]:
+        log({"ev": "reset_rebuild", "in_place_sha": S.state_sha()})
+        S.reset()
+        _new_renderers()
+
+
+def sim_save() -> dict:
+    """The env's whole state as casa_tool.snapshot takes it (MuJoCo's integration state, the model fields a kitchen's
+    reset rewrites, every JSON-encodable attribute of the env, its fixtures, robots, controllers, grippers, buffers and
+    observables, the attribute names, the RNGs) and the session's own per-episode state."""
+    return {"env": TOOL.snapshot(S.env), "own": {k: copy.deepcopy(getattr(S, k)) for k in _OWN}, "sha": S.state_sha()}
+
+
+def sim_load(snap: dict) -> None:
+    TOOL.restore(S.env, snap["env"])
+    for k, v in snap["own"].items():
+        setattr(S, k, copy.deepcopy(v))
+
+
+def _keep(h: str, snap) -> None:
+    HANDLES.pop(h, None)
+    HANDLES[h] = snap
+    while len(HANDLES) > MAX_HANDLES:
+        HANDLES.pop(next(iter(HANDLES)))
+
+
+def _give_up_live(reason: str) -> None:
+    """A reset that did not bring the scene back to the frozen start: no trial of this task can go on from here. The
+    service gives up at once (instance_mismatch, infrastructure), finalized, and refuses every call after this one."""
+    E.update(done=True, reason=reason, gave_up=True, finalized=True, t_end=time.time())
+    E["verdict"] = {"success": False, "live_success": False, "infra_error": 1, "instance_mismatch": 1, "gave_up": True,
+                    "video_pending": False}
+    log({"ev": "restart_refused", "reason": reason, **_journal_pos()})
+    write_final()
+    raise Refused({"error": "the sim service gave up on this trial", "reason": reason, "gave_up": True})
+
+
+def do_reset(q: dict):
+    """Abandon the running episode (it ends with reason "reset" unless it had ended already) and start a new one from
+    the frozen start state. The journal keeps every episode's rows; RECORD (what is graded) restarts empty."""
+    if not E["done"]:
+        finish("reset")
+    try:
+        reset_sim()
+    except Exception:  # the simulator failed to start the new episode: the trial ends on a simulator error
+        E["done"] = True
+        E["reason"] = "error"
+        log({"ev": "end", "reason": "error", "reset_failed": True, "control_steps": len(RECORD), **_journal_pos()})
+        write_final()
+        raise
+    E["resets"] += 1
+    E["ep_start"] = E["journal_rows"]
+    RECORD.clear()
+    E["done"] = False
+    E["reason"] = None
+    E["t_end"] = None
+    sha = S.state_sha()
+    if E["start_sha"] and sha != E["start_sha"]:
+        _give_up_live(f"instance_mismatch: a reset brought the scene to {sha[:16]}, the frozen start is {E['start_sha'][:16]}")
+    rec = Recorder(q["cams"], q["fps"], q["depth"])
+    rec.tick(force=True)
+    E["calls"] += 1
+    RECF.flush()
+    log({"ev": "reset", "call": E["calls"], "cameras": q["cams"], "control_steps": 0, "rows_total": E["rows"],
+         **_journal_pos(), "state_sha": sha})
+    write_final()
+    return {**meta_common(), "reset_id": E["calls"], "ok": True}, rec.parts(q["video"], q["fps"])
+
+
+def do_save(_q: dict):
+    snap = (sim_save(), [r.copy() for r in RECORD])
+    E["saves"] += 1
+    h = f"s{E['saves']}"
+    _keep(h, snap)
+    E["calls"] += 1
+    RECF.flush()
+    log({"ev": "save", "call": E["calls"], "handle": h, "control_steps": len(RECORD), "rows_total": E["rows"],
+         **_journal_pos(), "state_sha": snap[0]["sha"]})
+    return {"handle": h, "step": len(RECORD), "calls": E["calls"], "rows": E["rows"], "control_steps": len(RECORD),
+            "done": E["done"], "reason": E["reason"], **_reset_counters()}, None
+
+
+def do_load(q: dict):
+    """Abandon the running episode (reason "load" unless it had ended already) and start a new one at the saved state.
+    The journal keeps every episode's rows; RECORD (what is graded) becomes the saved episode's rows."""
+    if not E["done"]:
+        finish("load")
+    h = q["handle"]
+    snap = HANDLES[h]
+    _keep(h, snap)  # a load counts as a use
+    try:
+        sim_load(snap[0])
+    except Exception:  # the simulator failed to start the new episode: the trial ends on a simulator error
+        E["done"] = True
+        E["reason"] = "error"
+        log({"ev": "end", "reason": "error", "load_failed": True, "control_steps": len(RECORD), **_journal_pos()})
+        write_final()
+        raise
+    E["loads"] += 1
+    E["ep_start"] = E["journal_rows"]
+    RECORD[:] = [r.copy() for r in snap[1]]
+    E["done"] = False
+    E["reason"] = None
+    E["t_end"] = None
+    rec = Recorder(q["cams"], q["fps"], q["depth"])
+    rec.tick(force=True)
+    E["calls"] += 1
+    RECF.flush()
+    sha = S.state_sha()
+    log({"ev": "load", "call": E["calls"], "handle": h, "cameras": q["cams"], "control_steps": len(RECORD),
+         "rows_total": E["rows"], **_journal_pos(), "state_sha": sha, "restored_exact": sha == snap[0]["sha"]})
+    write_final()
+    return {**meta_common(), "ok": True, "handle": h}, rec.parts(q["video"], q["fps"])
+
+
+def _replay_ops(R: np.ndarray, ops: list) -> None:
+    """A resume after resets, saves or loads (RCB_STATE_OPS): the whole journal from the frozen start, every reset, save
+    and load at the journal row its checkpoint logged (ops: the completed calls' checkpoints, in order), as live."""
+    rows, j = [], 0
+    HANDLES.clear()
+    E["saves"] = E["loads"] = 0
+
+    def apply(e):
+        nonlocal rows
+        if e["ev"] == "reset":
+            reset_sim()
+            rows = []
+        elif e["ev"] == "save":
+            E["saves"] += 1
+            _keep(e["handle"], (sim_save(), [r.copy() for r in rows]))
+        else:
+            snap = HANDLES[e["handle"]]
+            _keep(e["handle"], snap)
+            sim_load(snap[0])
+            E["loads"] += 1
+            rows = [r.copy() for r in snap[1]]
+
+    for i, row in enumerate(R):
+        while j < len(ops) and int(ops[j]["journal_rows"]) <= i:
+            apply(ops[j])
+            j += 1
+        S.step(row)
+        rows.append(row.copy())
+    while j < len(ops):
+        apply(ops[j])
+        j += 1
+    RECORD[:] = rows
+
+
+def episodes_log(ev: list) -> list:
+    """One entry per episode of the trial, from the service's own log: the first begins at the agent's first request,
+    each later one at the checkpoint of the reset or load that began it; an episode ends at its last "end" event (a
+    reset lost with its crashed call did not end it: a later end replaces it); times on the agent's clock."""
+    base = E["t_first"] if E["t_first"] is not None else next((float(e["ts"]) for e in ev if e.get("ev") == "start"), 0.0)
+    t = lambda e: round(max(0.0, float(e["ts"]) - base), 2)  # noqa: E731
+    out, cur = [], {"episode": 1, "began": "start", "t_start_s": 0.0, "row0": 0, "t_end_s": None, "control_steps": 0,
+                    "ended": None}
+    for e in ev:
+        if "journal_rows" not in e:
+            continue
+        if e.get("ev") in ("reset", "load"):
+            out.append(cur)
+            cur = {"episode": cur["episode"] + 1, "began": e["ev"], "t_start_s": t(e), "row0": int(e["journal_rows"]),
+                   "t_end_s": None, "control_steps": 0, "ended": None}
+        elif e.get("ev") == "end":
+            cur.update(t_end_s=t(e), ended=e.get("reason"), control_steps=int(e["journal_rows"]) - cur["row0"])
+    out.append(cur)
+    return [{k: v for k, v in x.items() if k != "row0"} for x in out]
 
 
 def _render_video(A: np.ndarray) -> None:
@@ -703,6 +1063,8 @@ def finalize() -> None:
     simulator error (whose state is the partial step's, not the last executed one). Nothing is replayed to grade it.
     The trajectory and the verdict with "finalized": true are written (one atomic write of final.json); then, and only
     then, the optional video is rendered from the trajectory."""
+    if STATE_OPS and E.get("gave_up"):  # the verdict (a give-up) is on disk already
+        return
     with LOCK:
         A = None
         try:
@@ -731,6 +1093,8 @@ def finalize() -> None:
                 "video_pending": True,
                 "video_source": "render",
             }
+            if STATE_OPS:
+                E["verdict"]["episodes_log"] = episodes_log(_events())
         except Exception as exc:  # noqa: BLE001
             traceback.print_exc()
             log({"ev": "finalize_error", "error": repr(exc)})
@@ -753,7 +1117,7 @@ def finish(reason: str) -> None:
     E["done"] = True
     E["reason"] = reason
     E["t_end"] = time.time()
-    log({"ev": "end", "reason": reason, "control_steps": len(RECORD)})
+    log({"ev": "end", "reason": reason, "control_steps": len(RECORD), **(_journal_pos() if STATE_OPS else {})})
     write_final()
 
 
@@ -817,13 +1181,15 @@ class Hd(BaseHTTPRequestHandler):
                     "done": E["done"],
                     "reason": E["reason"],
                     "elapsed_s": round(time.time() - E["t0"], 1),
+                    **_reset_counters(),
                 },
             )
         return self._json(404, {"error": "no such endpoint"})
 
     def do_POST(self):
         _touch()
-        if self.path not in ("/submit", "/observe"):
+        ops = (("/reset",) if RESET_BUDGET else ()) + (("/save_state", "/load_state") if CAN_SAVE else ())
+        if self.path not in ("/submit", "/observe") + ops:
             return self._json(404, {"error": "no such endpoint"})
         try:
             self._n = int(self.headers.get("Content-Length", 0) or 0)
@@ -847,8 +1213,13 @@ class Hd(BaseHTTPRequestHandler):
     def _serve(self):
         meta, parts = self._req
         submit = self.path == "/submit"
+        if STATE_OPS and E.get("gave_up"):
+            return self._json(409, {"error": "the sim service gave up on this trial", "reason": E["reason"], "gave_up": True})
         if submit and E["done"]:
-            return self._json(409, {"error": "episode finished", "reason": E["reason"]})
+            return self._json(409, {"error": "episode finished", "reason": E["reason"],
+                                    **({"resets_left": _reset_counters()["resets_left"]} if RESET_BUDGET else {})})
+        if self.path in ("/reset", "/save_state", "/load_state"):
+            return self._serve_op(meta)
         # 1. Validation: nothing has run yet, so whatever is wrong here is the request's fault and a 400; it never ends
         #    the episode (PROTOCOL §4.6). ValueError carries the explanation; any other exception is a field of a type
         #    the checks did not expect.
@@ -868,9 +1239,36 @@ class Hd(BaseHTTPRequestHandler):
             return self._json(500, {"error": "simulator error", "detail": repr(exc)[:200]})
         return self._rcb1(out, blobs)
 
+    def _serve_op(self, meta):
+        """RCB_STATE_OPS: /reset, /save_state, /load_state. Checks (409 / 400) and validation first, nothing changed."""
+        try:
+            op = (check_reset() or {}) if self.path == "/reset" else check_ops(meta, self.path)
+        except Refused as exc:
+            return self._json(exc.code, exc.body)
+        try:
+            q = parse_reset(meta) if self.path != "/save_state" else {}
+        except ValueError as exc:
+            return self._json(400, {"error": str(exc)[:500]})
+        except Exception as exc:  # noqa: BLE001
+            return self._json(400, {"error": f"malformed request ({type(exc).__name__}: {str(exc)[:200]})"})
+        try:
+            out, blobs = {"/reset": do_reset, "/save_state": do_save, "/load_state": do_load}[self.path]({**q, **op})
+        except Refused as exc:  # a reset that missed the frozen start: the service gave up
+            return self._json(exc.code, exc.body)
+        except Exception as exc:  # noqa: BLE001
+            traceback.print_exc()
+            log({"ev": "error", "error": repr(exc)})
+            finish("error")  # a simulator error ends the episode
+            return self._json(500, {"error": "simulator error", "detail": repr(exc)[:200]})
+        if blobs is None:  # a JSON answer (/save_state)
+            return self._json(200, out)
+        return self._rcb1(out, blobs)
+
 
 def _end_from_signal():
     with LOCK:
+        if STATE_OPS:
+            E["stopping"] = True  # the agent's time is up: no new episode after this one
         if not E["done"]:
             finish("timeout")
     start_finalize()
@@ -914,6 +1312,8 @@ def _resume_or_start() -> None:
         except OSError:
             pass
         sha = S.state_sha()
+        if STATE_OPS:
+            E["start_sha"] = sha
         log({"ev": "start", "tool": TOOL.__name__, "state_sha": sha, "protocol": PROTOCOL})
         bad = _start_mismatch(sha)
         if bad:  # before the port is bound: the agent is never served a scene that is not the task's
@@ -930,9 +1330,13 @@ def _resume_or_start() -> None:
     if len(resumes) >= MAX_RESUMES:
         all_in_calls = crashes_in_calls == len(resumes) + 1
         _give_up("sim_crashed_on_call" if all_in_calls else "sim_crashed", infra=not all_in_calls)
-    done = [e for e in ev if e.get("ev") in ("submit", "observe") and "state_sha" in e]
+    kinds = ("submit", "observe") + (("reset", "save", "load") if STATE_OPS else ())
+    done = [e for e in ev if e.get("ev") in kinds and "state_sha" in e]
     last = done[-1] if done else starts[0]
     n = int(last.get("control_steps", 0))
+    if STATE_OPS:  # journal rows (every episode) at that checkpoint
+        n = int(last.get("journal_rows", n))
+        E["start_sha"] = starts[0].get("state_sha")
     try:
         R = np.fromfile(REC_PATH, dtype=np.float64)
     except OSError:
@@ -940,9 +1344,13 @@ def _resume_or_start() -> None:
     if R.size < n * N:
         _give_up("resume_failed: journal shorter than the log", infra=True)
     R = R[: n * N].reshape(n, N)
-    for row in R:
-        S.step(row)
-        RECORD.append(row.copy())
+    with_ops = STATE_OPS and any(e.get("ev") in ("reset", "save", "load") for e in done)
+    if with_ops:  # resets, saves or loads: the whole journal, every op at its row
+        _replay_ops(R, [e for e in done if e.get("ev") in ("reset", "save", "load")])
+    else:
+        for row in R:
+            S.step(row)
+            RECORD.append(row.copy())
     if S.state_sha() != last["state_sha"]:
         _give_up("resume_failed: replayed state differs from the logged one", infra=True)
     R.tofile(REC_PATH)  # drop the steps of the call that was in flight
@@ -955,6 +1363,14 @@ def _resume_or_start() -> None:
     # the episode's end, if it is within the last completed call: an end past it (the step limit hit by the call that was
     # in flight) was lost with that call, as the call itself
     ended = [e for e in ev if e.get("ev") == "end" and int(e.get("control_steps") or 0) <= n]
+    if STATE_OPS:  # the current episode's end: after the reset or load that began it, never a lost reset's or load's
+        k0 = max((i for i, e in enumerate(ev) if e is last), default=0)
+        b = max((i for i, e in enumerate(ev[: k0 + 1]) if e.get("ev") in ("reset", "load") and "state_sha" in e), default=-1)
+        ended = [e for e in ev[b + 1 :] if e.get("ev") == "end" and e.get("reason") not in ("reset", "load")
+                 and int(e.get("journal_rows", e.get("control_steps")) or 0) <= n]
+        E["resets"], E["ep_start"], E["journal_rows"] = int(last.get("resets", 0)), int(last.get("ep_start", 0)), n
+        E["saves"], E["loads"] = int(last.get("saves", E["saves"])), int(last.get("loads", E["loads"]))
+        E["stopping"] = any(e.get("ev") == "end" and e.get("reason") == "timeout" for e in ev)
     if ended:
         E["done"] = True
         E["reason"] = ended[-1].get("reason")

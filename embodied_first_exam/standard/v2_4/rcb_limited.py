@@ -450,7 +450,7 @@ def check_spec(spec: dict) -> None:
         raise RuntimeError(f"/spec misses {miss}")
     if spec["protocol"] != PROTOCOL:
         raise RuntimeError(f"/spec protocol {spec['protocol']!r} != {PROTOCOL}")
-    bad = forbidden_keys(spec, skip=())
+    bad = forbidden_keys(spec, skip=("object_poses",) if OBJECT_POSES else ())
     if bad:
         raise RuntimeError(f"/spec names forbidden fields: {bad}")
     pos = static_positions(spec["static"])
@@ -542,6 +542,170 @@ def _write_json(path: str, obj: dict) -> None:
         os.fsync(directory)
     finally:
         os.close(directory)
+
+
+# ---------------------------------------------------------------- ablations (off by default: nothing changes when off)
+# RCB_EXPOSE_OBJECT_POSES=1 (the object-pose ablation): every /submit, /observe, /reset and /load_state answer's meta adds
+# "objects" = Service.object_poses() at the state the answer ends in, and /spec adds "object_poses" (frame, quaternion
+# order, names: Service.object_pose_spec). A service without them refuses to start with the switch on.
+# RCB_STATE_OPS=1 (the unlimited-reset ablation): the layer serves POST /reset (RCB_RESET_BUDGET times), /save_state and
+# /load_state (StateOps), counts them, logs one entry per episode (a reset or a load begins a new one) and replays them on
+# a crash resume; final.json adds resets_at_success, loads_at_success, saves, loads and episodes_log (state_ops_fields).
+OBJECT_POSES = os.environ.get("RCB_EXPOSE_OBJECT_POSES") == "1"
+STATE_OPS = os.environ.get("RCB_STATE_OPS") == "1"
+MAX_HANDLES = int(os.environ.get("RCB_MAX_STATE_HANDLES", "32"))
+POSE_NOTE = ("object_poses (an ablation of this run): every /submit, /observe, /reset and /load_state answer's meta "
+             "carries \"objects\" = {name: {\"pos\": [x, y, z] (m), \"quat\": [4] (quaternion_order), \"size\": [...] "
+             "where given}}, each object's pose in `frame` at the state the answer ends in")
+
+
+def pose_entry(pos, quat=None, size=None, digits: int = 5) -> dict:
+    """One object of meta["objects"]: {"pos": [x, y, z], "quat": [4] or absent, "size": [...] or absent}, plain floats."""
+    out = {"pos": [round(float(v), digits) for v in np.asarray(pos, dtype=np.float64).reshape(-1)]}
+    if quat is not None:
+        out["quat"] = [round(float(v), digits) for v in np.asarray(quat, dtype=np.float64).reshape(-1)]
+    if size is not None:
+        out["size"] = [round(float(v), digits) for v in np.asarray(size, dtype=np.float64).reshape(-1)]
+    return out
+
+
+class Refusal(Exception):
+    """A state op the layer turns down before anything changes (HTTP code, JSON body)."""
+
+    def __init__(self, code: int, body: dict):
+        super().__init__(body.get("error")); self.code, self.body = code, body
+
+
+class StateOps:
+    """The reset ablation's state operations (RCB_STATE_OPS=1), served by the layer for an adapter that hands it:
+        reset()        the simulator back to the frozen start AND the adapter's per-episode state cleared (its graded rows,
+                       recorder, latches, counters); no journal row
+        save() -> obj  an in-memory snapshot of the full simulator state AND that per-episode state (a copy of the graded
+                       rows from the frozen start included, so the graded episode stays a replayable path); optional
+        load(obj)      restore one; optional (save and load together, or neither: reset-only)
+    The layer owns the rest: the budget (RCB_RESET_BUDGET resets; saves and loads are not counted against it), the
+    handles (opaque "s<k>", at most MAX_HANDLES held, least recently used dropped: loading a dropped one is a 409), the
+    409s (after a success, once the agent's time is up, after the trial was given up; a save while the episode has ended),
+    the episode's E keys (done, reason, success, t_end cleared by a reset or a load), the counters, the episode log and
+    the replay of every op after a crash (an op is logged with the journal row it happened at)."""
+
+    def __init__(self, *, budget: int, reset: Callable, save: Callable | None = None, load: Callable | None = None,
+                 max_handles: int = MAX_HANDLES):
+        if (save is None) != (load is None):
+            raise ValueError("StateOps: save and load come together")
+        self.budget, self.reset_fn, self.save_fn, self.load_fn = int(budget), reset, save, load
+        self.max_handles = int(max_handles)
+        self.resets = self.saves = self.loads = 0
+        self.handles: dict = {}              # handle -> snapshot, oldest use first
+        self.episode = 1
+        self.ep_rows0 = 0                    # the journal row the running episode began at
+
+    @property
+    def can_save(self) -> bool:
+        return self.save_fn is not None
+
+    def spec(self) -> dict:
+        out = {"reset": ("POST /reset (JSON body as /observe's: cameras, video, depth) abandons the running episode, or follows "
+                         f"one that has ended, and starts a new one from the same starting state, {self.budget} times in "
+                         "all; only the last episode is graded, and a success ends the trial (409 after it). It answers "
+                         "as /observe with seconds 0 does. meta and /status add episode, resets_left, saves, loads and "
+                         "control_steps_total")}
+        if self.can_save:
+            out["state_ops"] = ("POST /save_state ({}) stores the current state of the running episode in this service and "
+                                "answers {\"handle\": \"s<k>\", \"step\": control steps of the episode, \"episode\"}: the "
+                                "handle is all you get, never the state's contents. POST /load_state {\"handle\": h, cameras, "
+                                "video, depth} restores a state saved earlier in this trial and starts a new episode there "
+                                "(answered as /observe with seconds 0); nothing else can be loaded. The task's success rule "
+                                f"is checked again from your next command on. At most {self.max_handles} handles are kept: "
+                                "saving more drops the least recently used one (loading it is a 409). Saves and loads do "
+                                "not count against the reset budget; a success ends the trial (409 after it)")
+        return out
+
+    def counters(self, state: dict) -> dict:
+        over = bool(state.get("exiting")) or bool(state.get("success") and state.get("done"))
+        return {"episode": self.episode, "resets_left": 0 if over else self.budget - self.resets, "saves": self.saves,
+                "loads": self.loads}
+
+    def check(self, op: str, state: dict, body: dict) -> Any:
+        """Every refusal before anything changes; returns the snapshot for a load."""
+        if state.get("exiting") or state.get("finalized"):
+            raise Refusal(409, {"error": "trial finished: your time is up", "reason": state.get("reason"), "resets_left": 0})
+        if state.get("success") and state.get("done"):
+            raise Refusal(409, {"error": "trial finished: an episode succeeded", "reason": state.get("reason"),
+                                "resets_left": 0})
+        if op == "reset" and self.resets >= self.budget:
+            raise Refusal(409, {"error": "reset budget exhausted", "budget": self.budget, "resets_left": 0})
+        if op in ("save", "load") and not self.can_save:
+            raise Refusal(404, {"error": "no such endpoint"})
+        if op == "save" and state.get("done"):
+            raise Refusal(409, {"error": "the episode has ended: reset or load a saved state first",
+                                "reason": state.get("reason")})
+        if op == "load":
+            h = body.get("handle")
+            if not isinstance(h, str):
+                raise ValueError("load_state needs {\"handle\": \"s<k>\"} from an earlier /save_state")
+            if h not in self.handles:
+                raise Refusal(409, {"error": f"unknown handle {h!r}: not saved in this trial, or dropped (at most "
+                                             f"{self.max_handles} are kept)", "handle": h})
+            return self.handles[h]
+        return None
+
+    def _end_episode(self, state: dict, log: Callable, rows: int, why: str) -> None:
+        log({"ev": "episode_end", "episode": self.episode, "ended": state.get("reason") if state.get("done") else why,
+             "control_steps": rows - self.ep_rows0})
+
+    def apply(self, op: str, state: dict, rows: int, log: Callable | None, handle: str | None = None,
+              snap: Any = None) -> dict:
+        """Run one op (live, or replayed after a crash with log=None). rows = the journal rows so far."""
+        if op == "save":
+            obj = self.save_fn()
+            self.saves += 1
+            h = handle or f"s{self.saves}"
+            self.handles[h] = obj
+            while len(self.handles) > self.max_handles:
+                self.handles.pop(next(iter(self.handles)))
+            if log:
+                log({"ev": "op", "op": "save", "at": rows, "handle": h, "episode": self.episode})
+            return {"handle": h}
+        if log:
+            self._end_episode(state, log, rows, op)
+        if op == "reset":
+            self.reset_fn()
+            self.resets += 1
+        else:
+            self.handles[handle] = self.handles.pop(handle)       # a load counts as a use
+            self.load_fn(snap if snap is not None else self.handles[handle])
+            self.loads += 1
+        self.episode += 1
+        self.ep_rows0 = rows
+        state.update(done=False, reason=None, t_end=None)
+        if "success" in state:
+            state["success"] = False
+        if log:
+            log({"ev": "op", "op": op, "at": rows, "handle": handle, "episode": self.episode})
+        return {}
+
+    def replay(self, e: dict, state: dict, rows: int) -> None:
+        self.apply(e["op"], state, rows, None, handle=e.get("handle"))
+
+    def fields(self, success: bool, reason: str | None, events: list, t_first: float | None, rows: int) -> dict:
+        """final.json / episode.json: resets_at_success and loads_at_success (only for a success), saves, loads and
+        episodes_log (per episode: its start and end on the agent's clock, control steps, how it began and ended)."""
+        base = t_first if t_first is not None else next((float(e["ts"]) for e in events if e.get("ev") == "start"), 0.0)
+        t = lambda e: round(max(0.0, float(e["ts"]) - base), 2)  # noqa: E731
+        log, cur = [], {"episode": 1, "began": "start", "t_start_s": 0.0}
+        for e in events:
+            if e.get("ev") == "episode_end" and e.get("episode") == cur["episode"]:
+                log.append({**cur, "t_end_s": t(e), "control_steps": int(e.get("control_steps") or 0), "ended": e.get("ended")})
+            elif e.get("ev") == "op" and e.get("op") in ("reset", "load") and e.get("episode") == cur["episode"] + 1:
+                cur = {"episode": int(e["episode"]), "began": e["op"], "t_start_s": t(e)}
+        log.append({**cur, "t_end_s": round(max(0.0, time.time() - base), 2), "control_steps": rows - self.ep_rows0,
+                    "ended": reason})
+        out = {"resets": self.resets, "saves": self.saves, "loads": self.loads, "reset_budget": self.budget,
+               "episodes": self.episode, "episodes_log": log}
+        if success:
+            out.update(resets_at_success=self.resets, loads_at_success=self.loads)
+        return out
 
 
 def final_verdict(data: str) -> dict | None:
@@ -755,7 +919,7 @@ class Episode:
 
     # ---- start or resume
     def begin(self, *, state: dict, step: Callable, state_sha: Callable, proprio: Callable, spec: dict,
-              start_event: dict | None = None, on_end: Callable | None = None, step_ticks: Callable | None = None) -> bool:
+              start_event: dict | None = None, on_end: Callable | None = None, step_ticks: Callable | None = None, ops: StateOps | None = None) -> bool:
         """Start the episode, or resume it after a crash. `step(row)` executes one journaled row on the simulator (the
         recorder on, no rendering needed); `on_end` is what the collect hook's SIGUSR1 runs (in a thread). Returns True
         if the episode was resumed."""
@@ -835,11 +999,19 @@ class Episode:
                     raise ValueError("incomplete tick journal")
             except (ValueError, OSError):
                 self.give_up("resume_failed: actual tick journal missing", infra=True)
+        # the state ops (RCB_STATE_OPS) of the calls that completed (logged before the last checkpoint), at their rows
+        ck = max((k for k, e in enumerate(ev) if e.get("ev") == "checkpoint"), default=-1)
+        opq = [e for k, e in enumerate(ev) if e.get("ev") == "op" and k < ck] if ops is not None else []
+        j = 0
         for i, row in enumerate(R):
+            while j < len(opq) and int(opq[j]["at"]) <= i:
+                ops.replay(opq[j], state, i); j += 1
             if ticks is None:
                 step(row)
             else:
                 step_ticks(row, int(ticks[i]))
+        while j < len(opq):
+            ops.replay(opq[j], state, n); j += 1
         if ticks is not None:
             ticks.tofile(self.f_ticks)
         replay_s = time.time() - t
@@ -863,6 +1035,11 @@ class Episode:
             state[key] = v
         state["t0"] = float(starts[0]["ts"])
         ended = [e for e in ev if e.get("ev") == "end" and int(e.get("control_steps") or 0) <= n]   # not the lost call's
+        if ops is not None:                          # with state ops the last checkpoint says how the episode stands
+            state["done"] = bool(last.get("done")); state["reason"] = last.get("reason")
+            if "success" in state:
+                state["success"] = bool(last.get("success"))
+            ended = []
         if ended:
             state["done"] = True; state["reason"] = ended[-1].get("reason"); state["t_end"] = float(ended[-1]["ts"])
             state["episode_control_steps"] = int(ended[-1].get("control_steps") or n)
@@ -987,14 +1164,31 @@ class Service:
 
     def __init__(self, *, spec: dict, lock, state: dict, submit: Callable, observe: Callable, kinematics: Callable,
                  status: Callable, on_submit_error: Callable, log: Callable, max_resp: int = MAX_RESP,
-                 episode: Episode | None = None, state_sha: Callable | None = None, proprio: Callable | None = None):
+                 episode: Episode | None = None, state_sha: Callable | None = None, proprio: Callable | None = None,
+                 object_poses: Callable | None = None, object_pose_spec: dict | None = None,
+                 state_ops: StateOps | None = None, observe_now: Callable | None = None):
         self.spec, self.lock, self.state, self.submit, self.observe = spec, lock, state, submit, observe
         self.kinematics, self.status, self.on_submit_error, self.log, self.max_resp = kinematics, status, on_submit_error, log, max_resp
         self.episode, self.state_sha, self.proprio = episode, state_sha, proprio
         self.kin_calls = 0
+        # the ablations' hooks (module comment above OBJECT_POSES): object_poses() -> {name: pose_entry(...)};
+        # state_ops: StateOps; observe_now(meta) -> (meta_out, parts), the answer to a reset / load (default: observe
+        # with seconds 0)
+        self.object_poses, self.object_pose_spec, self.ops = object_poses, object_pose_spec, state_ops
+        self.observe_now = observe_now or (lambda m: observe({**m, "seconds": 0}))
+        if OBJECT_POSES and (object_poses is None or object_pose_spec is None):
+            raise RuntimeError("RCB_EXPOSE_OBJECT_POSES=1 but this service hands no object_poses / object_pose_spec")
+        if STATE_OPS and state_ops is None:
+            raise RuntimeError("RCB_STATE_OPS=1 but this service hands no StateOps")
 
 
 def make_handler(svc: Service):
+    if OBJECT_POSES and "object_poses" not in svc.spec:
+        svc.spec["object_poses"] = {"units": "m", **svc.object_pose_spec, "note": POSE_NOTE}
+    if svc.ops is not None:
+        svc.spec.update(svc.ops.spec())
+        if isinstance(svc.spec.get("budget"), dict):
+            svc.spec["budget"]["reset"] = svc.ops.budget
     class H(BaseHTTPRequestHandler):
         def _send(self, code: int, ctype: str, body: bytes) -> None:
             try:
@@ -1043,10 +1237,70 @@ def make_handler(svc: Service):
                 return self._json(200, svc.spec)
             if self.path == "/status":
                 st = svc.status()
+                if svc.ops is not None:
+                    st = {**st, **svc.ops.counters(svc.state), "control_steps_total": svc.episode.rows if svc.episode else None}
                 return self._json(200, {**st, "resumes": svc.episode.resumes} if svc.episode else st)
             return self._json(404, {"error": "no such endpoint"})
 
+        def _state_op(self):
+            """/reset, /save_state, /load_state (StateOps; RCB_STATE_OPS=1)."""
+            op = {"/reset": "reset", "/save_state": "save", "/load_state": "load"}[self.path]
+            try:
+                body, _ = self._body()
+            except Exception as exc:  # noqa: BLE001
+                return self._json(413 if "too large" in str(exc) else 400, {"error": str(exc)[:200]})
+            E, ep, ops = svc.state, svc.episode, svc.ops
+            with svc.lock:
+                try:
+                    snap = ops.check(op, E, body)
+                    view = {k: body[k] for k in ("cameras", "video_fps", "video", "depth", "include_depth") if k in body}
+                    if op != "save" and "cameras" in view and not (isinstance(view["cameras"], list)
+                                                                     and all(isinstance(c, str) for c in view["cameras"])):
+                        raise ValueError("cameras must be a list of camera names")      # a malformed view: 400 first
+                except Refusal as r:
+                    return self._json(r.code, r.body)
+                except ValueError as exc:
+                    return self._json(400, {"error": str(exc)})
+                cid = ep.call_begin(self.path, self.connection) if ep else 0
+                try:
+                    E["calls"] = int(E.get("calls") or 0) + 1
+                    res = ops.apply(op, E, ep.rows if ep else 0, ep.log if ep else svc.log,
+                                    handle=body.get("handle") if op == "load" else None, snap=snap)
+                    if ep:
+                        ep._ck = None                    # the state changed without a journal row: hash it anew
+                    if op == "save":
+                        out, blobs = None, None
+                    else:
+                        calls = E["calls"]                 # the op is one call, whether observe_now counts one or not
+                        out, blobs = svc.observe_now({**view, "video": view.get("video", "frames")})
+                        E["calls"] = calls
+                        if "calls" in out:
+                            out = {**out, "calls": calls}
+                except Exception as exc:  # noqa: BLE001 -- a simulator that cannot start the new episode: infrastructure
+                    traceback.print_exc(); E["error"] = repr(exc)
+                    svc.log({"ev": "error", "path": self.path, "error": repr(exc)})
+                    E.update(done=True, reason="error", state_op_failed=True)
+                    if "success" in E:
+                        E["success"] = False
+                    return self._json(500, {"error": "simulator error", "detail": repr(exc)[:200]})
+                finally:
+                    if ep:
+                        try:
+                            ep.checkpoint(E, svc.state_sha, svc.proprio)
+                        except Exception:  # noqa: BLE001
+                            traceback.print_exc()
+                        ep.call_end(cid, self.path)
+                counters = {**ops.counters(E), "control_steps_total": ep.rows if ep else None}
+                if op == "save":
+                    return self._json(200, {**res, "step": (ep.rows if ep else 0) - ops.ep_rows0, **counters})
+                out = {**out, **counters}
+                if OBJECT_POSES:
+                    out["objects"] = svc.object_poses()
+            return self._rcb1(out, blobs)
+
         def do_POST(self):
+            if svc.ops is not None and self.path in ("/reset", "/save_state", "/load_state"):
+                return self._state_op()
             if self.path not in ("/submit", "/observe", "/kinematics"):
                 return self._json(404, {"error": "no such endpoint"})
             try:
@@ -1136,6 +1390,11 @@ def make_handler(svc: Service):
                         if operation_path:
                             _write_json(operation_path, {"operation_id": operation, "status": "error" if err else "completed",
                                                        "rows_before": rows0, "committed_rows": ep.rows, "stopped": stopped})
+                if err is None and out is not None:
+                    if svc.ops is not None:
+                        out = {**out, **svc.ops.counters(E), "control_steps_total": ep.rows if ep else None}
+                    if OBJECT_POSES:
+                        out["objects"] = svc.object_poses()
             if err is not None:
                 return self._json(*err)
             return self._rcb1({**out, "stopped": stopped, "operation_id": operation}, blobs)

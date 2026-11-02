@@ -227,7 +227,7 @@ class _Views:
         return getattr(self._sim, name)
 
     def _fresh(self) -> None:
-        key = (self._svc.journal_rows, self._svc.resets)
+        key = (self._svc.journal_rows, self._svc.resets, self._svc.loads)   # a load changes the state without a row
         if key != self._key:
             self._key, self._rgb, self._dep, self._prop = key, {}, {}, None
 
@@ -490,7 +490,8 @@ class RealtimeService(Service):
             return ("reply", *self._spec_reply)
         if method == "GET" and path == "/status":
             return ("/status", None)
-        if method != "POST" or path not in ("/submit", "/observe") + (("/reset",) if self.reset_budget else ()):
+        if method != "POST" or path not in ("/submit", "/observe") + (("/reset",) if self.reset_budget else ()) \
+                + (("/save_state", "/load_state") if self.can_save else ()):
             return self._refusal(Refused(404, {"error": "no such endpoint"}))
         if n < 0:
             return self._refusal(Refused(400, {"error": "bad Content-Length"}))
@@ -527,6 +528,11 @@ class RealtimeService(Service):
                 self._reset_view({})
             except Refused as exc:
                 return exc
+        if path in ("/save_state", "/load_state") and (self.success or self.stopping or self.finalized):
+            try:
+                self._ops_view({}, "save")
+            except Refused as exc:
+                return exc
         return None
 
     def _prepare(self, path: str, body: bytes):
@@ -540,8 +546,10 @@ class RealtimeService(Service):
             return self._check_submit(meta, actions)
         if path == "/observe":
             return self._check_observe(meta)
-        with bad_request():                          # /reset: its view; the budget is the simulator thread's to check
-            self._view(meta, "frames")
+        if path == "/save_state":                    # nothing to check before the simulator thread
+            return meta
+        with bad_request():                          # /reset, /load_state: their view; the budget / handle is the
+            self._view(meta, "frames")               # simulator thread's to check
         return meta
 
     def _decode_rt(self, body: bytes) -> tuple[dict, object]:
@@ -684,8 +692,8 @@ class RealtimeService(Service):
             if route == "/status":
                 return job.finish("raw", *self._reply_json(200, self.status()))
             try:
-                {"/submit": self._rt_submit, "/observe": self._rt_observe,
-                 "/reset": self._rt_reset}[route](job.req[1], job)
+                {"/submit": self._rt_submit, "/observe": self._rt_observe, "/reset": self._rt_reset,
+                 "/save_state": self._rt_save, "/load_state": self._rt_load}[route](job.req[1], job)
             except Refused as exc:                   # 409, or a 400 only the episode's state decides: nothing changed
                 self._count(refused=1)
                 job.finish("raw", *self._reply_json(exc.code, exc.body))
@@ -874,6 +882,19 @@ class RealtimeService(Service):
         self._stop_clock("reset")
         job.finish("rcb1", {**out, **self._realtime_counters()}, prts)
 
+    def _rt_save(self, meta: dict, job: _Job) -> None:
+        """RCB_STATE_OPS: the state at this control step boundary; the clock runs on."""
+        out, _ = self._save_state(meta, {})
+        job.finish("raw", *self._reply_json(200, {**out, **self._realtime_counters()}))
+
+    def _rt_load(self, meta: dict, job: _Job) -> None:
+        """RCB_STATE_OPS: as a reset, to a saved state: the watches are answered, the new episode starts paused."""
+        self._ops_view(meta, "load")                 # a refused load (409, 400) changes nothing: the watches go on
+        self._release_watches()
+        out, prts = self._load_state(meta, {})
+        self._stop_clock("load")
+        job.finish("rcb1", {**out, **self._realtime_counters()}, prts)
+
     # ------------------------------------------------------------------ the loop (simulator thread) and HTTP
     def poll(self) -> None:
         """After SIGUSR1: end the episode, answer the pending watches, finalize (Service.poll, plus the watches)."""
@@ -889,7 +910,7 @@ class RealtimeService(Service):
         route, req = (job.req + (None, None))[:2]
         if route in ("/submit", "/observe"):
             return bool(req["view"][0])
-        return route == "/reset" and not (isinstance(req.get("cameras"), list) and not req["cameras"])
+        return route in ("/reset", "/load_state") and not (isinstance(req.get("cameras"), list) and not req["cameras"])
 
     def _may_serve(self, job: _Job, behind: bool, now: float) -> bool:
         if not self.running or self.done or self.stopping:

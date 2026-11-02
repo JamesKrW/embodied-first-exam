@@ -25,6 +25,15 @@ The verdict is the live episode's: step() reports KinDER's own goal check (`term
 step and the episode ends there, so nothing is replayed to grade it; render_video() re-runs the trajectory once, after
 the verdict, to film it. start_sha is the frozen instance's recorded scene_sha (the state hash right after reset), which
 rcb_service checks when an episode begins; a KinDER that no longer builds the instance is InstanceMismatch.
+
+Ablations (off unless the task sets them; nothing here runs without them), TidyBot only:
+  rcb_service.OBJECT_POSES  object_poses(): KinDER's movable objects (its object-centric state's mujoco_movable_object,
+                            by name, as the privileged twin's state() has them), in the odometry frame (turned by the
+                            service's own transform, as the base's pose is); quaternions w x y z; size: KinDER's bounding
+                            box dimensions (bb_x, bb_y, bb_z, m, in the object's own frame).
+  rcb_service.STATE_OPS     save_state() / load_state(): every array of MuJoCo's data (derived quantities included: the
+                            arm's PD reads the bias forces before it steps), KinDER's cached object-centric state and
+                            counters, this Session's observation and step count, the gripper command held: exact.
 """
 from __future__ import annotations
 
@@ -37,6 +46,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rcb_kinder import CAMERA_HW, GL_BACKEND, Session  # noqa: E402
+import rcb_service  # noqa: E402
 from rcb_service import InstanceMismatch, main  # noqa: E402
 
 CAMERAS = ("robot_base", "robot_wrist")       # the robot's own cameras
@@ -52,6 +62,37 @@ BASE_FRAME = "the base frame: x forward, y left, z up, origin on the floor under
 ODOMETRY = {"frame": "where the base started the episode: origin on the floor under the base's centre, x the way it "
                      "faced, y left, z up; noise-free"}
 ARM = [f"arm_{i}" for i in range(1, 8)]
+MOVABLE = "mujoco_movable_object"            # KinDER's type of the objects a task moves (object_types.py)
+
+
+def _qmul(a, b) -> np.ndarray:
+    """Hamilton product of two w x y z quaternions."""
+    w1, x1, y1, z1 = a
+    w2, x2, y2, z2 = b
+    return np.array([w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2, w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+                     w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2, w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2])
+
+
+def _mj_save(d) -> dict:
+    """Every array of a MuJoCo MjData, as the last step left it (derived quantities too), and its time."""
+    out = {"time": float(d.time)}
+    for n in dir(d):
+        if not n.startswith("_") and n != "plugin_data":
+            v = getattr(d, n, None)
+            if isinstance(v, np.ndarray):
+                out[n] = v.copy()
+    return out
+
+
+def _mj_load(d, snap: dict) -> None:
+    """_mj_save()'s arrays back into a data of the same model (KinDER rebuilds an identical one on every reset), in
+    place (arrays sized by the step's contacts and constraints are recomputed by the next step)."""
+    for n, v in snap.items():
+        if n != "time":
+            a = getattr(d, n)
+            if a.shape == v.shape and a.flags.writeable:
+                a[...] = v
+    d.time = snap["time"]
 
 
 def rot(yaw: float) -> np.ndarray:
@@ -272,6 +313,49 @@ class TidyBot(_Robot):
     def reset(self) -> None:
         super().reset()
         self._grip = self._robot()["pos_gripper"]
+
+    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, OBJECT_POSES)
+    def object_pose_spec(self) -> dict:
+        return {"frame": "odometry (where the base started the episode: origin on the floor under the base's centre, x "
+                         "the way it faced, y left, z up)",
+                "quaternion_order": "wxyz", "objects": [o.name for o in self.s.state() if o.type.name == MOVABLE],
+                "size": "bb_x, bb_y, bb_z: the object's bounding box dimensions in its own frame, m"}
+
+    def object_poses(self) -> dict:
+        st = self.s.state()
+        x0, y0, th0 = self._start
+        R = rot(-th0)
+        turn = np.array([math.cos(th0 / 2), 0.0, 0.0, -math.sin(th0 / 2)])   # a turn by -th0 about z
+        out = {}
+        for o in st:
+            if o.type.name != MOVABLE:
+                continue
+            f = {k: float(st.get(o, k)) for k in ("x", "y", "z", "qw", "qx", "qy", "qz", "bb_x", "bb_y", "bb_z")}
+            q = np.array([f["qw"], f["qx"], f["qy"], f["qz"]])
+            out[o.name] = rcb_service.pose_entry([*(R @ [f["x"] - x0, f["y"] - y0]), f["z"]],
+                                                 _qmul(turn, q / np.linalg.norm(q)), [f["bb_x"], f["bb_y"], f["bb_z"]])
+        return out
+
+    def _oc(self):
+        return self.s.env.unwrapped._object_centric_env
+
+    def save_state(self) -> dict:
+        oc = self._oc()
+        rc = getattr(oc, "_reward_calculator", None)
+        return {"data": _mj_save(self.s.data), "t": int(self.s.t), "obs": np.array(self.s._obs, copy=True),
+                "current": oc._current_state.copy(), "timestep": oc._robot_env.timestep,
+                "reward_step": getattr(rc, "episode_step", None), "grip": self._grip}
+
+    def load_state(self, snap: dict) -> None:
+        oc = self._oc()
+        _mj_load(self.s.data, snap["data"])
+        oc._current_state = snap["current"].copy()
+        oc._robot_env.timestep = snap["timestep"]
+        rc = getattr(oc, "_reward_calculator", None)
+        if rc is not None and snap["reward_step"] is not None:
+            rc.episode_step = snap["reward_step"]
+        self.s.t, self.s._obs = snap["t"], np.array(snap["obs"], copy=True)
+        self._grip = snap["grip"]
 
 
 class Kinova(_Robot):

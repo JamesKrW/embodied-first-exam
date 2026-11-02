@@ -187,6 +187,51 @@ episode and starts a new one from the same frozen state, `N` times in all; `/sta
 when the budget is spent. Only the last episode is graded. With N = 0 (or no declaration) `/reset` is 404. The reset
 budget is part of a result's configuration: results with different budgets are not ranked together (running.md).
 
+### Reset, save and load (an ablation, `RCB_STATE_OPS=1`)
+Not part of the protocol's official configuration: a switch every eai-standard service of this branch reads from its
+`sim` environment, off by default (then nothing here applies and every answer is as above). The ablation's task dirs
+set `RCB_STATE_OPS: "1"` and a reset budget of 1000 in the `sim` service and add the instruction section
+`## This run: unlimited resets, save and load` (`scripts/ablation_tasks.py`). With it on:
+- **`/reset`** is served as in "Optional reset capability" with the task's `RCB_RESET_BUDGET`, by every service that can
+  return to its frozen start (on the 2.2 / 2.4 layers through `Service(state_ops=StateOps(...))`).
+- **`POST /save_state`** (JSON `{}`) stores the current state of the running episode inside the service and answers JSON
+  `{"handle": "s<k>", "step": <control steps of the episode>, ...counters}`: an opaque handle, never the state's
+  contents. Refused (409) once the episode has ended.
+- **`POST /load_state`** (`{"handle", cameras, video, depth}`) restores a state saved earlier in the same trial and starts
+  a new episode there, answered as `/reset` is; an unknown or dropped handle is a 409, a missing one a 400. The task's
+  success rule is not evaluated at the load: it is checked again from the next command on. The graded path of a loaded
+  episode is the path that led to the saved state (from the frozen start) followed by the rows after the load, so it
+  replays from the frozen start.
+- At most `RCB_MAX_STATE_HANDLES` (default 32) handles are kept per trial; saving one more drops the least recently used.
+  Saves and loads do not count against the reset budget. After a success or once the agent's time is up every reset,
+  save and load is a 409. In standard-realtime the clock stops at a load, as at a reset; a save does not stop it.
+- A service whose simulator cannot snapshot its state serves `/reset` only: `/spec` then has no `state_ops`, and
+  `/save_state` / `/load_state` are 404.
+- `meta` and `/status` add `episode`, `resets_left`, `saves`, `loads` and `control_steps_total`. `final.json` adds
+  `saves`, `loads`, `episodes` and `episodes_log` (one entry per episode: `episode`, `began` = start / reset / load,
+  `t_start_s`, `t_end_s`, `control_steps`, `ended`) and, on a success only, `resets_at_success` and
+  `loads_at_success`; `first_success` requires that no reset and no load was made. The graders copy `saves`, `loads`,
+  `resets_at_success` and `loads_at_success` into `reward.json`.
+- Crash recovery replays every reset, save and load at its journal row, from the frozen start.
+- Shared implementation: `rcb_service.py` (2.1, and 2.3 through `rcb_realtime.py`: the adapter's `save_state()` /
+  `load_state()`), `rcb_limited.py` (2.2, 2.4: `StateOps`; `toy_server.py` is the reference adapter); tests
+  `embodied_first_exam/standard/ablation_selftest.py`, `embodied_first_exam/standard/v2_1/selftest.py`,
+  `embodied_first_exam/standard/realtime/ablation_selftest.py`.
+
+### Object poses (an ablation, `RCB_EXPOSE_OBJECT_POSES=1`)
+Not part of the protocol's official configuration, and against "Never provided" (object poses) on purpose: a switch
+every eai-standard service of this branch reads from its `sim` environment, off by default. The ablation's task dirs set
+`RCB_EXPOSE_OBJECT_POSES: "1"` in the `sim` service and add the instruction section `## This run: object poses`. With it on:
+- Every `/submit`, `/observe`, `/reset` and `/load_state` answer's `meta` carries `objects` = `{name: {"pos": [x, y, z]
+  (m), "quat": [4], "size": [...]}}`, each object's pose at the state the answer ends in; `quat` is absent where the task
+  has no orientation for it (a deformable's centroid), `size` present only where the privileged twin gives one.
+- `/spec.object_poses` = `{units, frame, quaternion_order, objects, note}`. The objects are the privileged twin's objects
+  (same names) or else the scene's non-robot free bodies; only poses: no velocities, goals, regions, predicate values or
+  thresholds. The frame is the one the service already gives the robot's poses in (world, or the robot / odometry frame
+  where the service withholds world).
+- The 2.2 / 2.4 layers' spec check accepts that one key; an adapter without the hook refuses to start with the switch on
+  (2.1: the adapter's `object_poses()` / `object_pose_spec()`; 2.2 / 2.4: `Service(object_poses=..., object_pose_spec=...)`).
+
 ## Part 2 — `eai-standard/2.2`: capabilities added to 2.1
 
 > 2.2 is a minor version of `eai-standard/2.1` (Part 1): everything there holds unless

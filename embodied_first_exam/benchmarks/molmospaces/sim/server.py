@@ -231,7 +231,9 @@ def dump() -> None:
         family=INST["family"],
     )
     L._write_json(os.path.join(DATA, "episode.json"), {**summary(), "live_sha": E["live_sha"],
-                                                       "startup": EP.n_startups, "pid": os.getpid()})   # finalize.sh's late-exit check
+                                                       "startup": EP.n_startups, "pid": os.getpid(),   # finalize.sh's late-exit check
+                                                       **(OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"),
+                                                                     EP.rows) if OPS is not None else {})})
     write_final()
 
 
@@ -491,6 +493,93 @@ def replay_row(row) -> None:
     ROWS.append(np.asarray(row, dtype=np.float64))
 
 
+# ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
+# RCB_EXPOSE_OBJECT_POSES=1: the task's named objects (upstream's pickup_obj_candidates, else pickup_obj_name), each the
+# MuJoCo body of that name (the privileged twin's Session.state()["bodies"] key; a body named "<name>/..." when none is
+# named exactly so), world frame (spec.world), position + quaternion wxyz (MuJoCo xpos / xquat).
+# RCB_STATE_OPS=1: save = MuJoCo's full integration state (mj_getState, mjSTATE_INTEGRATION: time, qpos, qvel, act,
+# warm start, ctrl, applied forces, mocap, eq_active, user data) plus the plain-data attributes of upstream's task, env,
+# robot and controllers (episode_step_count, controller targets, ...) and the random generators, and the graded rows;
+# load = mj_setState + mj_forward (derived quantities for the answer's frames) and the rest restored; exact for the
+# physics that follows (MuJoCo on the CPU). reset = load of the snapshot taken at the frozen start, before any row.
+def _pose_bodies() -> dict:
+    t = INST["episode"]["task"]
+    names = list(t.get("pickup_obj_candidates") or ([t["pickup_obj_name"]] if t.get("pickup_obj_name") else []))
+    m = S.env.current_model
+    all_names = [m.body(i).name for i in range(m.nbody)]
+    out = {}
+    for n in names:
+        hit = [i for i, b in enumerate(all_names) if b == n] or \
+              sorted((i for i, b in enumerate(all_names) if b.startswith(n + "/")), key=lambda i: all_names[i].count("/"))
+        if hit:
+            out[all_names[hit[0]]] = hit[0]
+        else:
+            EP.log({"ev": "object_pose_unresolved", "name": n})
+    return out
+
+
+POSE_BODIES = _pose_bodies() if L.OBJECT_POSES else {}
+POSE_SPEC = {"frame": "the simulator's world frame (spec.world), each object's body frame (MuJoCo xpos / xquat)",
+             "quaternion_order": "wxyz", "objects": list(POSE_BODIES)}
+
+
+def object_poses() -> dict:
+    d = S.env.current_data
+    return {n: L.pose_entry(d.xpos[i], d.xquat[i]) for n, i in POSE_BODIES.items()}
+
+
+def _plain(v, depth: int = 0) -> bool:
+    if v is None or isinstance(v, (bool, int, float, str, np.ndarray, np.generic, np.random.Generator, np.random.RandomState)):
+        return True
+    if depth >= 3:
+        return False
+    if isinstance(v, (list, tuple, set, frozenset)) or type(v).__name__ == "deque":
+        return all(_plain(x, depth + 1) for x in v)
+    if isinstance(v, dict):
+        return all(isinstance(k, (str, int)) and _plain(x, depth + 1) for k, x in v.items())
+    return False
+
+
+def _py_parts() -> list:
+    return [S.task, S.env, S.robot] + list(getattr(S.robot, "controllers", {}).values())
+
+
+def ops_save():
+    import copy, random
+    import mujoco
+    m, d = S.env.current_model, S.env.current_data
+    spec = mujoco.mjtState.mjSTATE_INTEGRATION
+    st = np.empty(mujoco.mj_stateSize(m, spec), dtype=np.float64)
+    mujoco.mj_getState(m, d, st, spec)
+    return {"mj": st, "py": [{k: copy.deepcopy(v) for k, v in vars(o).items() if _plain(v)} for o in _py_parts()],
+            "np_random": np.random.get_state(), "random": random.getstate(), "rows": [r.copy() for r in ROWS]}
+
+
+def ops_load(snap) -> None:
+    import copy, random
+    import mujoco
+    m, d = S.env.current_model, S.env.current_data
+    mujoco.mj_setState(m, d, snap["mj"].copy(), mujoco.mjtState.mjSTATE_INTEGRATION)
+    for o, saved in zip(_py_parts(), snap["py"]):
+        for k, v in saved.items():
+            setattr(o, k, copy.deepcopy(v))
+    np.random.set_state(snap["np_random"]); random.setstate(snap["random"])
+    mujoco.mj_forward(m, d)
+    ROWS[:] = [r.copy() for r in snap["rows"]]
+    for k in ("episode_control_steps", "dumped", "live_sha"):
+        E.pop(k, None)
+    for f in ("episode.json", "trajectory.npz"):   # the ended episode's record is not the new episode's
+        try:
+            os.remove(os.path.join(DATA, f))
+        except OSError:
+            pass
+
+
+S0 = ops_save() if L.STATE_OPS else None        # the frozen start (checked above), before a resume replays anything
+OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=lambda: ops_load(S0), save=ops_save,
+                 load=ops_load) if L.STATE_OPS else None
+
+
 resumed = EP.begin(
     state=E,
     step=replay_row,
@@ -499,6 +588,7 @@ resumed = EP.begin(
     spec=SPEC,
     on_end=end_from_signal,
     start_event={"family": INST["family"], "instance": INST["instance"], "cameras": CAMS},
+    **({"ops": OPS} if OPS is not None else {}),
 )
 if E["done"]:
     dump()  # resumed after the episode had ended: the record is rewritten from the replay
@@ -528,6 +618,8 @@ L.serve(
         episode=EP,
         state_sha=S.state_sha,
         proprio=proprio_row,
+        **({"state_ops": OPS} if OPS is not None else {}),
+        **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {}),
     ),
     port=int(os.environ.get("RCB_PORT", "8000")),
 )

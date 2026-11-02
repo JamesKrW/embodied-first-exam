@@ -12,6 +12,8 @@ import hashlib, os, sys, threading, time
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+if os.environ.get("RCB_TOY_LAYER") == "2.4":               # the same adapter on the 2.4 layer (ablation_selftest.py)
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "v2_4"))
 import rcb_limited as L  # noqa: E402
 
 DATA = os.environ.get("RCB_DATA", "/data"); os.makedirs(os.path.join(DATA, "calls"), exist_ok=True)
@@ -91,10 +93,36 @@ def grab(cams, want_depth):
     return {c: img for c in cams}, ({c: np.ones((8, 8), np.float32) for c in cams} if want_depth else {})
 
 
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches): the block's pose for
+# RCB_EXPOSE_OBJECT_POSES=1, and reset / save / load for RCB_STATE_OPS=1. A snapshot holds the simulator's whole state AND
+# the adapter's per-episode state (the graded rows from the frozen start), so the graded episode stays a replayable path.
+def object_poses() -> dict:
+    return {"block": L.pose_entry(S.block, [1.0, 0.0, 0.0, 0.0])}
+
+
+def ops_reset() -> None:
+    S.q = np.zeros(N); S.target = np.zeros(N); S.block = np.array([0.5, 0.0, 0.0]); S.n_steps = 0; S.rec = []
+
+
+def ops_save():
+    return {"q": S.q.copy(), "target": S.target.copy(), "block": S.block.copy(), "n_steps": S.n_steps, "rec": list(S.rec)}
+
+
+def ops_load(snap) -> None:
+    S.q, S.target, S.block = snap["q"].copy(), snap["target"].copy(), snap["block"].copy()
+    S.n_steps, S.rec = snap["n_steps"], list(snap["rec"])
+
+
+OPS = L.StateOps(budget=int(os.environ.get("RCB_RESET_BUDGET") or 0), reset=ops_reset, save=ops_save, load=ops_load) \
+    if L.STATE_OPS else None
+
+
 def write_final() -> None:
     fin = L._read_json(os.path.join(DATA, "final.json"))
     if L.final_verdict(DATA):
         return
+    if OPS is not None:
+        fin.update(OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows))
     fin.update({"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": ctrl_steps(), "done": E["done"],
                 "reason": E["reason"], "protocol": L.PROTOCOL, "finalized": bool(E.get("finalized")), "live_success": bool(E["success"]),
                 **({"graded_by": "live", "replays": 0} if E.get("finalized") else {}),
@@ -119,7 +147,7 @@ def ctrl_step(a, rec) -> bool:
 
 def clock() -> dict:
     """meta time_s / time_left_s: the agent's clock, from its first request (rcb_limited.agent_time), as every adapter."""
-    t = L.agent_time(E)
+    t = L.agent_time(E) if hasattr(L, "agent_time") else time.time() - E["t0"]   # (the 2.4 layer has no agent_time)
     return {"time_s": round(t, 2), "time_left_s": max(0.0, round(SPEC["budget"]["wall_clock_s"] - t, 1))}
 
 
@@ -180,11 +208,15 @@ def end_episode() -> None:
 
 
 S.rec = []                                                  # record_start: the resume replay is recorded too
-EP.begin(state=E, step=S.step, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC, start_event={"task": "toy"}, on_end=end_episode)
+EP.begin(state=E, step=S.step, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC, start_event={"task": "toy"}, on_end=end_episode,
+         ops=OPS)
 with LOCK:                                                  # a SIGUSR1 kept during the resume is being served already
     E["ready"] = True; write_final()
 open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{L.PROTOCOL} toy sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=lambda req: {"ok": True, "op": req["op"]},
                   status=status, on_submit_error=lambda exc: finish("error"), log=EP.log, episode=EP, state_sha=S.state_sha,
-                  proprio=proprio_row), port=int(os.environ.get("RCB_TOY_PORT", "8000")))
+                  proprio=proprio_row, state_ops=OPS,
+                  **({"object_poses": object_poses, "object_pose_spec": {"frame": "toy", "quaternion_order": "wxyz", "objects": ["block"]}}
+                     if L.OBJECT_POSES else {})),
+        port=int(os.environ.get("RCB_TOY_PORT", "8000")))

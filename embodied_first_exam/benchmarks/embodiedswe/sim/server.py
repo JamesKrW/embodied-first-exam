@@ -590,6 +590,28 @@ def replay_row(row) -> None:
     native_step(np.asarray(row, dtype=np.float64)); RIG.after_replay(row)
 
 
+# ---------------------------------------------------------------- the object-pose ablation (rcb_limited "ablations"; off
+# unless the task sets RCB_EXPOSE_OBJECT_POSES=1): every rigid object and articulation of Isaac Lab's scene (its
+# get_state(is_relative=False) keys) but the robot, its root pose in the world frame (spec.world), quaternion wxyz.
+# The unlimited-reset ablation is not offered here (no in-process reset of this scene repeats its GPU PhysX start), so
+# RCB_STATE_OPS=1 makes the layer refuse to start this service.
+POSE_KINDS = ("rigid_object", "articulation")
+
+
+def _root_poses() -> dict:
+    st = env.iscene.get_state(is_relative=False)
+    return {n: v["root_pose"][0].detach().to("cpu").double().numpy() for k in POSE_KINDS for n, v in (st.get(k) or {}).items()
+            if n != "robot" and isinstance(v, dict) and "root_pose" in v}
+
+
+POSE_SPEC = {"frame": "world (spec.world: the simulator's world frame, the ee_pose action's frame), each object's root",
+             "quaternion_order": "wxyz", "objects": sorted(_root_poses()) if L.OBJECT_POSES else []}
+
+
+def object_poses() -> dict:
+    return {n: L.pose_entry(p[:3], p[3:7]) for n, p in sorted(_root_poses().items())}
+
+
 E["tgt"] = [float(v) for v in RIG.hold()]
 TRAJ.frame()
 VIDEO.offer(0)
@@ -602,4 +624,5 @@ E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready: {PRESET} (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("infra_error" if isinstance(exc, InfraError) else "error"), log=log, episode=EP, state_sha=lambda: R.state_sha(env), proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("infra_error" if isinstance(exc, InfraError) else "error"), log=log, episode=EP, state_sha=lambda: R.state_sha(env), proprio=proprio_row,
+                  **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})))

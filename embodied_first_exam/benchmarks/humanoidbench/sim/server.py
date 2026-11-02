@@ -17,9 +17,19 @@ Settings come from environment/docker-compose.yaml:
                            free camera, metres and degrees); empty: the recording camera frozen at t=0
   RCB_IMAGE_HW             the side of every camera's image in pixels; empty: upstream's 256
   RCB_RESET_BUDGET, RCB_WALL_CLOCK_S, RCB_DATA   the service's own (rcb_service.main)
+
+Ablations (off unless the task sets them; nothing here runs without them):
+  rcb_service.OBJECT_POSES  object_poses(): every free body that is not the robot (the task's props), by body name, in the
+                            pelvis frame now (the frame of /spec's joint axes and links and of the IMU: x forward, y left,
+                            z up), read off qpos; quaternions w x y z. The root pose itself is still never given.
+  rcb_service.STATE_OPS     save_state() / load_state(): every array of MuJoCo's data (derived quantities included), the
+                            model arrays tasks write (body_pos, body_quat, geom_rgba), the task's own state (vars(task),
+                            as Session's frozen instance keeps it), the time limit's step count, the episode's return
+                            and step count, and the command in force: exact, in memory.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import itertools
 import math
@@ -36,6 +46,7 @@ import mujoco  # noqa: E402
 from rcb_rewards import restore  # noqa: E402
 
 restore()  # the scoring formula lives in this sidecar only, and must be back before a Session is opened
+import rcb_service  # noqa: E402
 from rcb_service import InstanceMismatch, main  # noqa: E402
 from humanoid_bench.tasks import Task  # noqa: E402
 
@@ -47,6 +58,37 @@ CAMERAS = ("left_eye_camera", "right_eye_camera")
 HEAD_NEAR_M = 0.01
 DEPTH_MAX_M = 10.0   # how far the depth reaches (a RealSense D435i, the H1's head RGB-D camera, reads to about 10 m)
 IMU = ("imu_gyro_x", "imu_gyro_y", "imu_gyro_z", "imu_gravity_x", "imu_gravity_y", "imu_gravity_z")
+TASK_SHARED = ("_env", "robot", "unwrapped")   # the task's back-references (rcb_hb._TASK_STATE_SKIP): never copied
+
+
+def _qmul(a, b) -> np.ndarray:
+    """Hamilton product of two w x y z quaternions."""
+    w1, x1, y1, z1 = a
+    w2, x2, y2, z2 = b
+    return np.array([w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2, w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+                     w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2, w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2])
+
+
+def _mj_save(d) -> dict:
+    """Every array of a MuJoCo MjData, as the last step left it (derived quantities too), and its time."""
+    out = {"time": float(d.time)}
+    for n in dir(d):
+        if not n.startswith("_") and n != "plugin_data":
+            v = getattr(d, n, None)
+            if isinstance(v, np.ndarray):
+                out[n] = v.copy()
+    return out
+
+
+def _mj_load(d, snap: dict) -> None:
+    """_mj_save()'s arrays back into the same model's data, in place (arrays sized by the step's contacts and
+    constraints are recomputed by the next step)."""
+    for n, v in snap.items():
+        if n != "time":
+            a = getattr(d, n)
+            if a.shape == v.shape and a.flags.writeable:
+                a[...] = v
+    d.time = snap["time"]
 
 
 class HumanoidBench:
@@ -90,6 +132,10 @@ class HumanoidBench:
         self._axes, self._anchors, self._links, self._camera_facts = self._hardware()
         self.image_hw = list(self._render(CAMERAS[0]).shape[:2])   # also warms up the GL context
         self.cmd = self._command_now()
+        if rcb_service.OBJECT_POSES:   # the props: every free joint but the root's (joint 0, the pelvis)
+            self._props = [(m.body(int(m.jnt_bodyid[j])).name, int(m.jnt_qposadr[j])) for j in range(1, m.njnt)
+                           if m.jnt_type[j] == mujoco.mjtJoint.mjJNT_FREE
+                           and m.body_rootid[int(m.jnt_bodyid[j])] != m.body("pelvis").id]
 
     def _command_now(self) -> np.ndarray:
         """The servo targets the actuators hold now, in the action's normalised units."""
@@ -275,6 +321,60 @@ class HumanoidBench:
 
     def state_sha(self) -> str:
         return self.s.state_sha()
+
+    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, OBJECT_POSES)
+    def object_pose_spec(self) -> dict:
+        return {"frame": "the pelvis now: origin at the pelvis, x forward, y left, z up (the frame of the joint axes, "
+                         "links and IMU); the poses move with the robot",
+                "quaternion_order": "wxyz", "objects": [n for n, _ in self._props]}
+
+    def object_poses(self) -> dict:
+        q = self.s.data.qpos
+        p0, q0 = np.asarray(q[0:3], dtype=np.float64), np.asarray(q[3:7], dtype=np.float64)
+        q0 = q0 / np.linalg.norm(q0)
+        inv = q0 * [1.0, -1.0, -1.0, -1.0]
+        R = np.zeros(9)
+        mujoco.mju_quat2Mat(R, q0)
+        R = R.reshape(3, 3)
+        out = {}
+        for name, a in self._props:
+            qo = np.asarray(q[a + 3:a + 7], dtype=np.float64)
+            out[name] = rcb_service.pose_entry(R.T @ (np.asarray(q[a:a + 3]) - p0), _qmul(inv, qo / np.linalg.norm(qo)))
+        return out
+
+    def _shared(self) -> dict:
+        """A deep copy's memo: what the task's state refers to but is not part of it (the env, the robot, MuJoCo)."""
+        low = self.s.low
+        return {id(o): o for o in (low, low.robot, low.task, self.s.env, self.s.model, self.s.data,
+                                   getattr(low, "mujoco_renderer", None)) if o is not None}
+
+    def _time_limits(self) -> list:
+        """The gym wrappers with a step count (TimeLimit), outermost first."""
+        out, e = [], self.s.env
+        while e is not None and e is not self.s.low:
+            if hasattr(e, "_elapsed_steps"):
+                out.append(e)
+            e = getattr(e, "env", None)
+        return out
+
+    def save_state(self) -> dict:
+        s, m, task = self.s, self.s.model, self.s.low.task
+        return {"data": _mj_save(s.data), "body_pos": m.body_pos.copy(), "body_quat": m.body_quat.copy(),
+                "geom_rgba": m.geom_rgba.copy(),
+                "task": copy.deepcopy({k: v for k, v in vars(task).items() if k not in TASK_SHARED}, self._shared()),
+                "elapsed": [w._elapsed_steps for w in self._time_limits()], "ret": s._ret, "steps": s._steps,
+                "last_info": copy.deepcopy(s._last_info, self._shared()), "cmd": self.cmd.copy()}
+
+    def load_state(self, snap: dict) -> None:
+        s, m = self.s, self.s.model
+        m.body_pos[:], m.body_quat[:], m.geom_rgba[:] = snap["body_pos"], snap["body_quat"], snap["geom_rgba"]
+        vars(s.low.task).update(copy.deepcopy(snap["task"], self._shared()))
+        _mj_load(s.data, snap["data"])
+        for w, n in zip(self._time_limits(), snap["elapsed"]):
+            w._elapsed_steps = n
+        s._ret, s._steps = snap["ret"], snap["steps"]
+        s._last_info = copy.deepcopy(snap["last_info"], self._shared())
+        self.cmd = snap["cmd"].copy()
 
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None:
         self.s.save_trajectory(rows, path, meta)

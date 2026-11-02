@@ -21,6 +21,11 @@ Settings come from environment/docker-compose.yaml:
   RCB_VIDEO_TIMEOUT_S     how long the video pass may take in all (5400 s, the collect hook's wait)
   RCB_IMAGE_HW            the side of every camera's image in pixels (256)
   RCB_RESET_BUDGET, RCB_WALL_CLOCK_S, RCB_DATA   the service's own (rcb_service.main)
+
+Ablation (off unless the task sets it; nothing here runs without it): with rcb_service.OBJECT_POSES, object_poses() gives
+the privileged twin's objects (Session.state()["objects"]: the scene's movable objects, its names; no fixture), position and
+orientation only (Session.entity_pose), in the world frame of /spec "frames"; quaternions w x y z. No save_state(): one
+episode per process, so no reset either.
 """
 
 from __future__ import annotations
@@ -37,6 +42,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import lmx_tool  # noqa: E402
+import rcb_service  # noqa: E402
 from rcb_service import main  # noqa: E402
 
 CAMERAS = ("agentview", "wrist")
@@ -168,6 +174,20 @@ class LiberoMax:
 
     def state_sha(self) -> str:
         return self.s.state_sha()
+
+    # ---------------------------------------------------------------- ablation (rcb_service.OBJECT_POSES)
+    def object_pose_spec(self) -> dict:
+        base = self.s.robot_base()["pos"]
+        return {"frame": f"world frame: metres; the robot's base is at ({', '.join(f'{v:g}' for v in base)}) facing +x: x "
+                         "forward, y to the robot's left, z up", "quaternion_order": "wxyz",
+                "objects": list(self.s.env.objects_dict)}
+
+    def object_poses(self) -> dict:
+        out = {}
+        for n in self.s.env.objects_dict:
+            e = self.s.entity_pose(n)
+            out[n] = rcb_service.pose_entry(e["pos"], e["quat_wxyz"])
+        return out
 
     # ---------------------------------------------------------------- the verdict's record and the video
     def live_verdict(self, rows: np.ndarray, success: bool) -> dict:

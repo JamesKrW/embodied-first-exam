@@ -33,6 +33,18 @@ for f in ("live.mp4", "live.last.png", "trajectory.npz", "episode.jsonl"):
 def num(k):
     try: return float(d.get(k) or 0)
     except (TypeError, ValueError): return 0.0
+def state_ops_fields(d, ok):
+    """The unlimited-reset ablation's record (the service writes it with RCB_STATE_OPS=1): saves and loads, and for a
+    success resets_at_success / loads_at_success; first_success = a success with no reset and no load. Numbers only; {}
+    without the switch."""
+    if "loads" not in d:
+        return {}
+    n = lambda k: int(d.get(k) or 0)  # noqa: E731
+    out = {"resets": n("resets"), "reset_budget": n("reset_budget"), "saves": n("saves"), "loads": n("loads"),
+           "first_success": int(bool(ok) and n("resets") + n("loads") == 0)}
+    if ok:
+        out.update({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d})
+    return out
 unfinished = not d.get("finalized")                        # the collect hook never completed final.json
 infra = bool(d.get("infra_error")) or unfinished
 sim_error = d.get("reason") == "error"                     # PROTOCOL §4: a simulator error is the agent's 0, whatever success came before
@@ -49,4 +61,4 @@ write(ok, {"success": int(ok), "live_success": int(bool(d.get("success"))), "gra
            "sim_crashed_on_call": int(d.get("reason") == "sim_crashed_on_call"),
            "sim_startups": int(num("sim_startups")), "resumes": int(num("resumes")),
            "resume_state_mismatch": int(num("resume_state_mismatch")), "resume_max_tcp_dev_m": num("resume_max_tcp_dev_m"),
-           "resume_max_joint_dev": num("resume_max_joint_dev")})
+           "resume_max_joint_dev": num("resume_max_joint_dev"), **state_ops_fields(d, ok)})

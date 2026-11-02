@@ -81,6 +81,12 @@ class Toy:
     def reset(self):
         self.x, self.n = 0.0, 0
 
+    def save_state(self):
+        return (self.x, self.n)
+
+    def load_state(self, snap):
+        self.x, self.n = snap
+
     def state_sha(self):
         return hashlib.sha256(np.array([self.x, self.n]).tobytes()).hexdigest()[:12]
 
@@ -158,6 +164,70 @@ def test(path: Path) -> None:
           f"{tag}: a failed first video changed the verdict: {fin}")
 
 
+def test_state_ops(path: Path) -> None:
+    """RCB_STATE_OPS=1 (the reset ablation): /save_state and /load_state beside the reset, a load begins a new episode
+    whose graded rows are the saved path's plus its own, the counters and final.json fields, the 409s after a success,
+    and a crash resume that replays every op; with the switch off final.json has none of the new keys."""
+    tag = path.relative_to(ROOT)
+    fin, _ = run(load(path), [[[0.2, 0], [0.1, 1]], "reset", [[0.5, 0], [0.6, 0]]])
+    check(not ({"resets_at_success", "episodes_log", "saves", "loads"} & set(fin)), f"{tag}: switch off wrote ops keys: {fin}")
+    os.environ["RCB_STATE_OPS"] = "1"
+    try:
+        S = load(path, "_ops")
+    finally:
+        del os.environ["RCB_STATE_OPS"]
+    check({"resets_at_success", "loads_at_success", "saves", "loads", "episodes_log"} <= S.RESERVED, f"{tag}: ops keys not RESERVED")
+    d = tempfile.mkdtemp()
+    try:
+        svc = S.Service(Toy(), data=d, reset_budget=5)
+        svc.start()
+        step = lambda rows: [svc._step("joints", np.array(r, float)) for r in rows]  # noqa: E731
+        step([[0.3, 0], [0.3, 0]]); svc._checkpoint("submit")
+        h = svc._save_state({}, {})[0]["handle"]
+        check(h == "s1" and svc.spec.get("state_ops"), f"{tag}: save {h}")
+        step([[-0.4, 0]]); svc._checkpoint("submit")
+        out, _ = svc._load_state({"handle": "s1", "cameras": []}, {})
+        check(out["episode"] == 2 and out["loads"] == 1 and abs(svc.sim.x - 0.6) < 1e-9 and len(svc.episode) == 2,
+              f"{tag}: load {out} x={svc.sim.x} rows={len(svc.episode)}")
+        try:
+            svc._load_state({"handle": "s7"}, {}); check(False, f"{tag}: unknown handle loaded")
+        except S.Refused as r:
+            check(r.code == 409, f"{tag}: unknown handle code {r.code}")
+        step([[0.1, 0]]); svc._checkpoint("submit")
+        sha = svc.sim.state_sha()
+        # a crash: a fresh service on the same record resumes by replaying rows, save and load
+        svc2 = S.Service(Toy(), data=d, reset_budget=5)
+        svc2.start()
+        check(svc2.sim.state_sha() == sha and svc2.loads == 1 and svc2.saves == 1 and "s1" in svc2.handles
+              and len(svc2.episode) == 3, f"{tag}: resume after ops: loads {svc2.loads} rows {len(svc2.episode)}")
+        svc2._load_state({"handle": "s1", "cameras": []}, {})
+        for r in [[0.5, 0]]:
+            svc2._step("joints", np.array(r, float))
+        check(svc2.done and svc2.success, f"{tag}: success after the second load")
+        for fn, body in ((svc2._save_state, {}), (svc2._load_state, {"handle": "s1"}), (svc2._reset, {})):
+            try:
+                fn(body, {}); check(False, f"{tag}: {fn.__name__} after a success")
+            except S.Refused as r:
+                check(r.code == 409, f"{tag}: {fn.__name__} after a success: {r.code}")
+        svc2.stopping = True
+        svc2.poll()
+        fin = json.load(open(os.path.join(d, "final.json")))
+        check(fin["success"] and fin["loads_at_success"] == 2 and fin["resets_at_success"] == 0 and fin["saves"] == 1
+              and fin["episodes"] == 3 and fin["first_success"] is False and fin["n_actions"] == 3,
+              f"{tag}: final with ops: {fin}")
+        check([(e["began"], e["ended"], e["control_steps"]) for e in fin["episodes_log"]]
+              == [("start", "load", 3), ("load", "load", 1), ("load", "success", 1)], f"{tag}: episodes_log {fin['episodes_log']}")
+    finally:
+        shutil.rmtree(d)
+
+
+def load(path: Path, suffix: str = ""):
+    spec = importlib.util.spec_from_file_location(f"rcb_service_{hashlib.sha1(str(path).encode()).hexdigest()[:8]}{suffix}", path)
+    S = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(S)
+    return S
+
+
 def main() -> None:
     copies: dict[str, list[Path]] = {}
     for p in sorted((ROOT / "embodied_first_exam/benchmarks").glob("*/*/rcb_service.py")):
@@ -169,6 +239,8 @@ def main() -> None:
                   + ", ".join(str(p.relative_to(ROOT)) for p in paths))
             continue
         test(paths[0])
+        if "RCB_STATE_OPS" in paths[0].read_text():
+            test_state_ops(paths[0])
         tested += len(paths)
     check(tested > 0, "no rcb_service.py copy with the first-attempt record")
     if fails:

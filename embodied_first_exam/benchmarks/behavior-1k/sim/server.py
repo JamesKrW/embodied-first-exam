@@ -105,7 +105,8 @@ def dump() -> None:
         "settle_steps": int(E.get("settle_steps") or 0), "settled_success": bool(E.get("settled_success")),
         "q_score": st.get("q_score"), "goal_first_step": st.get("goal_first_step"), "graded_by": "live", "replays": 0,
         "startup": EP.n_startups, "pid": os.getpid(),   # which service start wrote it (finalize.sh's late-exit check)
-        **EP.final_fields()})
+        **EP.final_fields(),
+        **(OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows) if OPS is not None else {})})
     write_final()
 
 
@@ -659,6 +660,112 @@ def _end_from_signal():
 REPLAY = {"skipped": 0}
 
 
+# ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
+# RCB_EXPOSE_OBJECT_POSES=1: the task's BDDL scope objects (Session.objects(), the privileged twin's names: the robot and
+# the substances excluded), world frame, position + quaternion xyzw (spec.world). An object a transition rule creates
+# appears once it exists; one it removes disappears.
+# RCB_STATE_OPS=1: reset = Session.reset() (ev.reset + og.sim.load_state of the frozen start; approximate in-process);
+# save / load = og.sim.dump_state(serialized=True) / load_state (approximate: PhysX's solver and contact caches are not
+# in it) plus the session's per-episode state (the success and fall windows, the latches, the last action, the recorded
+# rows, OmniGibson's episode step counter). A task whose transition rules create or remove objects changes the scene's
+# object registry, which a serialized state does not carry: the op is logged with "object_set_changed" when it differs.
+POSE_NAMES = sorted(S.objects()) if L.OBJECT_POSES else []
+POSE_SPEC = {"frame": "OmniGibson world frame (spec.world; the ee_pose action's and the proprio poses' frame), each object's "
+                      "base link", "quaternion_order": "xyzw", "objects": POSE_NAMES}
+
+
+def object_poses() -> dict:
+    return {n: L.pose_entry(o["position"], o["orientation_xyzw"]) for n, o in S.objects().items()}
+
+
+def _step_owner():
+    """The OmniGibson Environment that holds the episode's step counter (episode_steps), under the evaluator's wrappers."""
+    e = S.env
+    for _ in range(6):
+        if e is None:
+            return None
+        if "_current_step" in getattr(e, "__dict__", {}):
+            return e
+        e = getattr(e, "env", None)
+    return None
+
+
+def _object_set() -> list:
+    try:
+        return sorted(o.name for o in S.env.scene.objects)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+OBJ0 = _object_set() if L.STATE_OPS else []
+EP_KEYS = ("episode_control_steps", "dumped", "acts", "n_actions", "live_sha", "settle_steps", "settled_success")
+
+
+def _new_episode_files() -> None:
+    """The ended episode's record (episode.json, trajectory.npz, written when it ended) is not the new episode's."""
+    for k in EP_KEYS:
+        E.pop(k, None)
+    for f in ("episode.json", "trajectory.npz"):
+        try:
+            os.remove(os.path.join(DATA, f))
+        except OSError:
+            pass
+
+
+def _render() -> None:
+    try:
+        S.og.sim.render()                # the frames the answer carries show the restored state (no physics step)
+    except Exception as exc:  # noqa: BLE001
+        log({"ev": "state_op_render_error", "error": repr(exc)[:200]})
+
+
+def ops_reset() -> None:
+    objs = _object_set()
+    S.reset()
+    S.record_start()
+    _new_episode_files()
+    if objs != OBJ0:
+        log({"ev": "object_set_changed", "op": "reset", "objects": len(objs), "start_objects": len(OBJ0)})
+    _render()
+
+
+def ops_save():
+    import copy
+    own = _step_owner()
+    return {"sim": S._flat_state().clone(),      # the serialized state, as the frozen start S0 is kept
+            "objects": _object_set(), "current_step": int(own._current_step) if own is not None else None,
+            "fall": copy.deepcopy(S._fall), "rest": copy.deepcopy(S._rest), "rest_info": copy.deepcopy(S._rest_info),
+            "goal_first_step": S.goal_first_step, "breakdown": S.breakdown, "end_reason": S.end_reason,
+            "episode_done": S.episode_done, "stepped": S._stepped,
+            "last_action": None if S._last_action is None else S._last_action.clone(),
+            "rec": list(S._recording) if S._recording is not None else []}
+
+
+def ops_load(snap) -> None:
+    import copy
+    objs = _object_set()
+    S.og.sim.load_state(snap["sim"].clone(), serialized=True)          # as Session.reset() loads S0
+    own = _step_owner()
+    if own is not None and snap["current_step"] is not None:
+        own._current_step = int(snap["current_step"])
+    else:                                # control_steps then keep counting from before the load
+        log({"ev": "state_op_step_counter_not_restored"})
+    S._fall, S._rest, S._rest_info = copy.deepcopy(snap["fall"]), copy.deepcopy(snap["rest"]), copy.deepcopy(snap["rest_info"])
+    S.goal_first_step, S.breakdown, S.end_reason = snap["goal_first_step"], snap["breakdown"], snap["end_reason"]
+    S.episode_done, S._stepped = bool(snap["episode_done"]), bool(snap["stepped"])
+    S._last_action = None if snap["last_action"] is None else snap["last_action"].clone()
+    S._policy.reset()
+    S._recording = list(snap["rec"])
+    _new_episode_files()
+    if objs != snap["objects"]:
+        log({"ev": "object_set_changed", "op": "load", "objects": len(objs), "saved_objects": len(snap["objects"])})
+    _render()
+
+
+OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset, save=ops_save,
+                 load=ops_load) if L.STATE_OPS else None
+
+
 def replay_row(row) -> None:
     """One journaled row during a resume. OmniGibson's rollouts are not bit-exact (resume class `approx`), so the replayed
     episode can end (the goal holds, the robot has fallen over) a few rows before the logged one did: the rows the scene
@@ -674,7 +781,8 @@ L.check_spec(SPEC)                      # before the episode starts: a bad /spec
 EP.scene_built()                        # the scene and everything the service needs exist: the startup watchdog stands down
 S.record_start()                        # the trajectory: a resume's journal replay is recorded too
 resumed = EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC,
-                   start_event={"task": TASK, "instance_id": S.instance_id, "cameras": CAMS}, on_end=_end_from_signal)
+                   start_event={"task": TASK, "instance_id": S.instance_id, "cameras": CAMS}, on_end=_end_from_signal,
+                   **({"ops": OPS} if OPS is not None else {}))
 if resumed and S.episode_done and not E["done"]:
     # the replayed episode ended although the logged one had not: with the goal holding it is a success like any other
     # (the resumed live episode is the verdict); anything else (a fall the live run did not have) is the resume's
@@ -699,7 +807,9 @@ open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at call ' + str(E['calls']) if resumed else ''})", flush=True)
 HTTPD["serving"] = True
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  **({"state_ops": OPS} if OPS is not None else {}),
+                  **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})))
 # the end signal stopped the loop (_end_from_signal): the agent's phase is over
 with LOCK:
     try:

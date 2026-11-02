@@ -67,10 +67,20 @@ FIRST_REASON = {"success": 1, "failed": 2, "reset": 3, "timeout": 4, "error": 5}
 
 
 def first_attempt(d: dict, ok: bool, infra: bool) -> dict:
-    resets = int(num(d.get("resets")))
+    resets = int(num(d.get("resets"))) + int(num(d.get("loads")))   # a load (RCB_STATE_OPS) begins a new episode too
     first = ok if resets == 0 else bool(d.get("first_success")) and not infra
     why = d.get("first_reason") if "first_reason" in d else (d.get("reason") if resets == 0 else None)
     return {"first_success": int(first), "first_reason_code": FIRST_REASON.get(str(why), 9) if why else 0}
+
+
+def reset_log_fields(d: dict, ok: bool) -> dict:
+    """The unlimited-reset ablation's record (the service writes it with RCB_STATE_OPS=1): saves and loads, and for a
+    success resets_at_success / loads_at_success, the /reset and /load_state calls made before the graded episode
+    began. Numbers only; {} without the switch."""
+    out = {k: int(num(d[k])) for k in ("saves", "loads") if k in d}
+    if ok:
+        out.update({k: int(num(d[k])) for k in ("resets_at_success", "loads_at_success") if k in d})
+    return out
 
 
 # Every branch writes these keys (PROTOCOL §2.6): a missing or unreadable final.json as well as a graded one.
@@ -107,7 +117,8 @@ def main() -> None:
                "calls": int(d.get("calls") or 0), "rows": int(d.get("rows") or 0), "resets": int(d.get("resets") or 0),
                "reset_budget": int(d.get("reset_budget") or 0),
                "sim_startups": int(d.get("sim_startups") or 0), "elapsed_s": float(d.get("elapsed_s") or 0.0),
-               "video_rendered": int(bool(d.get("video"))), **first_attempt(d, ok, infra), **realtime_fields(d)}
+               "video_rendered": int(bool(d.get("video"))), **first_attempt(d, ok, infra), **realtime_fields(d),
+               **reset_log_fields(d, ok)}
     except Exception:  # noqa: BLE001 -- an unreadable final.json is the grader's failure, not the agent's
         traceback.print_exc()
         write(False, {**BASE, "infra_error": 1, "grader_error": 1})

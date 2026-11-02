@@ -37,7 +37,13 @@ def num(k):
 unfinished = not d.get("finalized")                        # the collect hook never completed final.json
 infra = bool(d.get("infra_error")) or unfinished
 ok = bool(d.get("success")) and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
-write(ok, {"success": int(ok), "live_success": int(bool(d.get("success"))), "graded_by_live": 1, "replays": 0,
+# the unlimited-reset ablation's record (RCB_STATE_OPS=1: final.json then has saves and loads; nothing without it): a load
+# begins a new episode, as a reset does, so first_success needs neither
+OPS = {} if "saves" not in d else {
+    "resets": int(num("resets")), "saves": int(num("saves")), "loads": int(num("loads")), "reset_budget": int(num("reset_budget")),
+    "first_success": int(ok and int(num("resets")) + int(num("loads")) == 0),
+    **({k: int(num(k)) for k in ("resets_at_success", "loads_at_success") if k in d} if ok else {})}
+write(ok, {**OPS, "success": int(ok), "live_success": int(bool(d.get("success"))), "graded_by_live": 1, "replays": 0,
            "finalized": int(not unfinished), "missing_log": 0, "n_actions": int(num("n_actions")), "sim_steps": int(num("control_steps")),
            "physics_steps": int(num("physics_steps")), "steps": int(num("steps")), "elapsed_s": num("elapsed_s"),
            "settle_steps": int(num("settle_steps")), "settle_error": int(bool(d.get("settle_error"))), "video_rendered": int(bool(d.get("video"))), "video_frames": int(num("video_frames")),

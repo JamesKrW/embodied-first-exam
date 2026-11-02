@@ -2,8 +2,8 @@
 # only the declared artifacts (/app/output/) arrive from the agent.
 FROM ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0
 COPY test.sh instance.npz /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:robocasa365-files-0.5.0@sha256:ecf24cf62b905572241b9746d50055bc7f6526194ef6b31266dc02027681ad0d /privileged/environment/casa_tool.py /tests/casa_tool.py
-COPY --from=ghcr.io/mll-lab-nu/efe:robocasa-files-0.4.0@sha256:27cef7b3d1e57adb7d835fe8650a539f0354e5c8ff11be2a1115e540998c080c /privileged/tests/grade.py /tests/grade.py
+COPY --from=ghcr.io/mll-lab-nu/efe:robocasa365-files-0.5.0-resetpose@sha256:715799ef9a4a6a2cbc2872fcb196ae75ce2f69d9dd72121861cd458d30a136c9 /privileged/environment/casa_tool.py /tests/casa_tool.py
+COPY --from=ghcr.io/mll-lab-nu/efe:robocasa-files-0.4.0-resetpose@sha256:f8b81b951fb0fc0aa40f270670473d448d4be89c9959c400f06e6271b7df13d4 /privileged/tests/grade.py /tests/grade.py
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests

@@ -17,6 +17,16 @@ condition) at every control step and the episode ends there, so nothing is repla
 the trajectory once, after the verdict, to film it. The frozen start: vlb_tool.Session refuses a scene whose initial
 state or compiled model differs from instance.json (InstanceMismatch here), and start_sha (the instance's
 initial_state_sha256) is checked by rcb_service when an episode begins.
+
+Ablations (off unless the task sets them; nothing here runs without them):
+  rcb_service.OBJECT_POSES  object_poses(): the privileged twin's entities (Session.state()["entities"], its names),
+                            position and orientation only, in the world frame of /spec "frames"; quaternions w x y z.
+  rcb_service.STATE_OPS     save_state() / load_state(): every array of MuJoCo's data (derived quantities included), the
+                            plain values (flags, counters, numbers) of the environment, the native task, its entities and
+                            its condition tree (the event flags state_sha hashes among them), and the Session's targets,
+                            recorded rows and end flag. In memory, by name, so a state saved before a reset (which
+                            rebuilds the scene) loads into the rebuilt one. MuJoCo's state is exact; the task's Python state
+                            is exact as far as it is held in plain values.
 """
 
 from __future__ import annotations
@@ -28,6 +38,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vlb_tool  # noqa: E402
+import rcb_service  # noqa: E402
 from rcb_service import InstanceMismatch, main  # noqa: E402
 
 CAMERAS = ("forward", "left", "right", "wrist")
@@ -44,6 +55,50 @@ def frame(spec: dict) -> str:
 
 # The Panda's documented joint limits (rad). VLABench's model sets none (its arm actuators accept any angle), so they
 # are given as facts, not enforced.
+PLAIN = (bool, int, float, np.bool_, np.number)   # the attribute values save_state() keeps (never an object or array)
+
+
+def _mj_save(d) -> dict:
+    """Every array of a MuJoCo MjData, as the last step left it (derived quantities too), and its time."""
+    out = {"time": float(d.time)}
+    for n in dir(d):
+        if not n.startswith("_") and n != "plugin_data":
+            v = getattr(d, n, None)
+            if isinstance(v, np.ndarray):
+                out[n] = v.copy()
+    return out
+
+
+def _mj_load(d, snap: dict) -> None:
+    """_mj_save()'s arrays back into a data of the same model (reset() rebuilds an identical one), in place (arrays
+    sized by the step's contacts and constraints are recomputed by the next step)."""
+    for n, v in snap.items():
+        if n != "time":
+            a = getattr(d, n)
+            if a.shape == v.shape and a.flags.writeable:
+                a[...] = v
+    d.time = snap["time"]
+
+
+def _logic_objects(env) -> dict:
+    """The objects whose plain attribute values are the native task's state, by a name stable across rebuilds: the
+    environment, the task, each entity, each node of the task's condition tree (vlb_tool.logic_state's walk)."""
+    out = {"env": env, "task": env.task, **{f"entity/{n}": e for n, e in sorted(env.task.entities.items())}}
+
+    def walk(obj, prefix):
+        if obj is None:
+            return
+        out[prefix] = obj
+        for attr in ("conditions", "condition_sets", "_conditions"):
+            children = getattr(obj, attr, [])
+            if isinstance(children, (list, tuple)):
+                for i, child in enumerate(children):
+                    walk(child, f"{prefix}/{i}")
+
+    walk(env.task.conditions, "conditions")
+    return out
+
+
 PANDA_LIMITS = [[-2.8973, 2.8973], [-1.7628, 1.7628], [-2.8973, 2.8973], [-3.0718, -0.0698], [-2.8973, 2.8973],
                 [-0.0175, 3.7525], [-2.8973, 2.8973]]  # fmt: skip
 
@@ -162,6 +217,29 @@ class VLABench:
 
     def state_sha(self) -> str:
         return self.s.state_sha()
+
+    # ---------------------------------------------------------------- ablations (rcb_service.STATE_OPS, OBJECT_POSES)
+    def object_pose_spec(self) -> dict:
+        return {"frame": frame(self.s.spec), "quaternion_order": "wxyz", "objects": list(self.s.env.task.entities)}
+
+    def object_poses(self) -> dict:
+        ph = self.s.physics
+        return {n: rcb_service.pose_entry(e.get_xpos(ph), e.get_xqaut(ph)) for n, e in self.s.env.task.entities.items()}
+
+    def save_state(self) -> dict:
+        s = self.s
+        logic = {k: {a: v for a, v in vars(o).items() if isinstance(v, PLAIN)} for k, o in _logic_objects(s.env).items()}
+        return {"data": _mj_save(s.physics.data.ptr), "logic": logic, "targets": s.targets.copy(),
+                "actions": [a.copy() for a in s.actions], "done": bool(s.done)}
+
+    def load_state(self, snap: dict) -> None:
+        s = self.s
+        objs = _logic_objects(s.env)
+        for k, values in snap["logic"].items():
+            for a, v in values.items():
+                setattr(objs[k], a, v)
+        _mj_load(s.physics.data.ptr, snap["data"])
+        s.targets, s.actions, s.done = snap["targets"].copy(), [a.copy() for a in snap["actions"]], snap["done"]
 
     # ---------------------------------------------------------------- evidence (the verdict is the live episode's)
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None:

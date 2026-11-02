@@ -27,9 +27,18 @@ filmed).
 
 Settings (environment/docker-compose.yaml): RCB_INSTANCE (the frozen instance), RCB_TEXTS (texts.json: the task text),
 RCB_DATA, RCB_RESET_BUDGET, RCB_WALL_CLOCK_S (rcb_service).
+
+Ablations (off unless the task sets them; nothing here runs without them):
+  rcb_service.OBJECT_POSES  object_poses(): the privileged twin's objects (Session.objects(), its names), position and
+                            orientation only, in the scene's world frame (the frame of the TCP and tool poses);
+                            quaternions w x y z.
+  rcb_service.STATE_OPS     save_state() / load_state(): Session.snapshot() / restore() (the environment's own exact
+                            snapshot; restoring one that is not the current state re-runs its rows from a seeded reset)
+                            and the command in force.
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 import sys
@@ -42,6 +51,7 @@ os.environ["RCB_SESSION_LOG"] = ""
 import rcb_pandadyn as M  # noqa: E402
 
 M.SESSION_LOG = ""           # the sidecar's Session is not the agent's interaction log
+import rcb_service  # noqa: E402
 from rcb_service import main  # noqa: E402
 
 JOINTS = [f"joint{i}" for i in range(1, 8)]
@@ -170,6 +180,21 @@ class PandaDyn:
 
     def state_sha(self) -> str:
         return self.s.state_sha()
+
+    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, OBJECT_POSES)
+    def object_pose_spec(self) -> dict:
+        return {"frame": "the scene's world frame (z up, the table top is the plane z = 0; the frame of the TCP and tool "
+                         "poses)", "quaternion_order": "wxyz", "objects": list(self.s.u.objects)}
+
+    def object_poses(self) -> dict:
+        return {n: rcb_service.pose_entry(o["position"], o["orientation_wxyz"]) for n, o in self.s.objects().items()}
+
+    def save_state(self) -> dict:
+        return {"session": self.s.snapshot(), "cmd": self.cmd.copy()}
+
+    def load_state(self, snap: dict) -> None:
+        self.s.restore(copy.deepcopy(snap["session"]))   # a copy: the snapshot can be loaded again
+        self.cmd = snap["cmd"].copy()
 
     def live_verdict(self, rows: np.ndarray, success: bool) -> dict:
         """The benchmark's own record of the live episode as it ended (no "success": the task's check already is the

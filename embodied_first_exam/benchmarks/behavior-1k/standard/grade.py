@@ -56,6 +56,11 @@ try:
            "resume_max_joint_dev": num("resume_max_joint_dev"), "gave_up": int(bool(d.get("gave_up"))),
            # an infrastructure failure, not the agent's 0 (the module docstring lists the cases)
            "infra_error": int(infra), "grader_error": 0}
+    if "saves" in d:   # the unlimited-reset ablation's record (RCB_STATE_OPS=1): a load begins a new episode, as a reset does
+        n = lambda k: int(float(d.get(k) or 0))  # noqa: E731
+        out.update({"resets": n("resets"), "saves": n("saves"), "loads": n("loads"), "reset_budget": n("reset_budget"),
+                    "first_success": int(ok and n("resets") + n("loads") == 0),
+                    **({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d} if ok else {})})
 except Exception:  # noqa: BLE001 -- an unreadable final.json is not the agent's failure
     traceback.print_exc()
     write(False, {**NONE, "missing_log": 0, "infra_error": 1, "grader_error": 1}); raise SystemExit

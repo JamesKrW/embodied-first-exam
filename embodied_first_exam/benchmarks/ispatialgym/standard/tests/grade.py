@@ -17,6 +17,18 @@ def write(ok, out):
     open(f"{LOG}/reward.txt", "w").write("1\n" if ok else "0\n"); json.dump(out, open(f"{LOG}/reward.json", "w")); print(out)
 
 
+def state_ops_fields(d: dict, ok: bool) -> dict:
+    """The unlimited-reset ablation's record (RCB_STATE_OPS=1: final.json then has saves and loads; {} without it):
+    resets, saves, loads, the budget, first_success (no reset and no load before the success: a load begins a new
+    episode, as a reset does) and, for a success, resets_at_success / loads_at_success."""
+    if "saves" not in d:
+        return {}
+    n = lambda k: int(float(d.get(k) or 0))  # noqa: E731
+    return {"resets": n("resets"), "saves": n("saves"), "loads": n("loads"), "reset_budget": n("reset_budget"),
+            "first_success": int(ok and n("resets") + n("loads") == 0),
+            **({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d} if ok else {})}
+
+
 def grade(d: dict) -> tuple[bool, dict]:
     """(success, reward.json) of a final.json."""
     if not isinstance(d, dict): raise ValueError(f"final.json is not an object: {type(d).__name__}")
@@ -26,7 +38,7 @@ def grade(d: dict) -> tuple[bool, dict]:
     infra = bool(d.get("infra_error")) or not finalized
     live = bool(d.get("live_success", d.get("success")))
     ok = live and bool(d.get("success")) and not d.get("gave_up") and not infra and reason != "error"   # PROTOCOL §4: a simulator error is the agent's 0
-    return ok, {
+    return ok, {**state_ops_fields(d, ok),
         "success": int(ok), "live_success": int(live), "graded_by_live": 1, "replays": 0,
         "finalized": int(finalized), "missing_log": 0, "n_actions": int(d.get("n_actions") or 0), "sim_steps": int(d.get("control_steps") or 0),
         "max_steps": int(d.get("max_steps") or 0), "steps": int(d.get("steps") or 0), "elapsed_s": num("elapsed_s"),

@@ -23,6 +23,18 @@ for f in ("replay.mp4", "replay.last.png", "trajectory.npz", "episode.jsonl", "s
         if os.path.exists(f"{DATA}/{f}"): shutil.copy(f"{DATA}/{f}", f"{LOG}/{f}")
     except OSError as exc:
         print(f"[grade] {f} not copied: {exc!r}")
+def state_ops_fields(d, ok):
+    """The unlimited-reset ablation's record (the service writes it with RCB_STATE_OPS=1): saves and loads, and for a
+    success resets_at_success / loads_at_success; first_success = a success with no reset and no load. Numbers only; {}
+    without the switch."""
+    if "loads" not in d:
+        return {}
+    n = lambda k: int(d.get(k) or 0)  # noqa: E731
+    out = {"resets": n("resets"), "reset_budget": n("reset_budget"), "saves": n("saves"), "loads": n("loads"),
+           "first_success": int(bool(ok) and n("resets") + n("loads") == 0)}
+    if ok:
+        out.update({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d})
+    return out
 gpu = os.environ.get("RCB_ROBOWITS_BACKEND", "cpu") == "gpu"
 reason = str(d.get("reason") or "")
 sim_error = reason == "error"                          # the live episode ended with a simulator error (PROTOCOL §4.6): the agent's 0
@@ -46,4 +58,4 @@ write(ok, {"success": int(ok), "live_success": int(bool(d.get("live_success", d.
            "settle_passed": int(bool((d.get("settle") or {}).get("success"))), "final_window": num("final_window"),
            "gave_up": int(bool(d.get("gave_up"))), "sim_startups": num("sim_startups"), "resumes": num("resumes"),
            "resume_state_mismatch": num("resume_state_mismatch"), "resume_max_tcp_dev_m": num("resume_max_tcp_dev_m", float),
-           "resume_max_joint_dev": num("resume_max_joint_dev", float), "grader_error": int(grade_error)})
+           "resume_max_joint_dev": num("resume_max_joint_dev", float), "grader_error": int(grade_error), **state_ops_fields(d, ok)})

@@ -61,28 +61,33 @@ def main() -> None:
     infra = bool(d.get("infra_error")) or finalize_error or not d.get("finalized")
     # the service's verdict (live success, not solved at the start, no simulator error), and the live check itself
     ok = d.get("graded_by") == "live" and d.get("success") is True and live and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
-    write(
-        {
-            "success": int(ok),
-            "live_success": int(live),
-            "graded_by_live": 1,
-            "replays": 0,
-            "initial_success": int(bool(d.get("initial_success"))),
-            "finalized": int(bool(d.get("finalized"))),
-            "control_steps": num(d.get("control_steps"), int),
-            "n_actions": num(d.get("n_actions"), int),
-            "sim_steps": num(d.get("control_steps"), int),
-            "calls": num(d.get("calls"), int),
-            "elapsed_s": num(d.get("elapsed_s")),
-            "final_reward": num(d.get("final_reward")),
-            "video_rendered": int(bool(d.get("video"))),
-            "sim_error": int(d.get("reason") == "error"),
-            "sim_crashed_on_call": int(d.get("reason") == "sim_crashed_on_call"),
-            "missing_log": 0,
-            "infra_error": int(infra),
-            "grader_error": int(finalize_error),
-        }
-    )
+    out = {
+        "success": int(ok),
+        "live_success": int(live),
+        "graded_by_live": 1,
+        "replays": 0,
+        "initial_success": int(bool(d.get("initial_success"))),
+        "finalized": int(bool(d.get("finalized"))),
+        "control_steps": num(d.get("control_steps"), int),
+        "n_actions": num(d.get("n_actions"), int),
+        "sim_steps": num(d.get("control_steps"), int),
+        "calls": num(d.get("calls"), int),
+        "elapsed_s": num(d.get("elapsed_s")),
+        "final_reward": num(d.get("final_reward")),
+        "video_rendered": int(bool(d.get("video"))),
+        "sim_error": int(d.get("reason") == "error"),
+        "sim_crashed_on_call": int(d.get("reason") == "sim_crashed_on_call"),
+        "missing_log": 0,
+        "infra_error": int(infra),
+        "grader_error": int(finalize_error),
+    }
+    if "saves" in d:  # the unlimited-reset ablation (RCB_STATE_OPS=1): a load begins a new episode too; numbers only
+        resets, loads = num(d.get("resets"), int), num(d.get("loads"), int)
+        out.update(resets=resets, reset_budget=num(d.get("reset_budget"), int), saves=num(d.get("saves"), int),
+                   loads=loads, first_success=int(ok and resets + loads == 0))
+        if ok:  # only for a success
+            out.update({k: num(d[k], int) for k in ("resets_at_success", "loads_at_success") if k in d})
+    write(out)
 
 
 if __name__ == "__main__":

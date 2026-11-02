@@ -82,7 +82,7 @@ def dump() -> None:
     L._write_json(os.path.join(DATA, "episode.json"),
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
-                   "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **INSTANCE_CHECK, **EP.final_fields()})
+                   "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **INSTANCE_CHECK, **ops_fields(), **EP.final_fields()})
     write_final()
     VIDEO.last(ctrl_steps(), frame=S._video_frame)   # the end state, rendered once if no call rendered it (after the verdict)
 
@@ -204,6 +204,91 @@ SPEC = {
     "depth": {"modes": list(L.DEPTH_MODES), "default": "none", "kind": "z-depth", "unit": "m", "invalid": 0, "max_m": L.DEPTH_MAX_M,
               "frames_encoding": "uint16 mm, zlib", "noise": L.DEPTH_NOISE},
 }
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
+# RCB_EXPOSE_OBJECT_POSES=1: the task objects as Session.objects() names them, in the world frame of /spec world (that of
+# ee_pose, proprio tcp_pose and /kinematics): the root (the centre of the object's box) and its orientation (wxyz), and
+# the box's extents in the object's own frame (YAMLab's asset_size.json).
+OBJECTS = S.object_names() if L.OBJECT_POSES else []
+OBJECT_SIZE = {n: S.object_size(n) for n in OBJECTS}
+
+
+def object_poses() -> dict:
+    out = {}
+    for n in OBJECTS:
+        pos, quat = S.object_pose(n)
+        out[n] = L.pose_entry(pos, quat, size=OBJECT_SIZE[n])
+    return out
+
+
+# RCB_STATE_OPS=1: reset = Session.reset() (env.reset_to(the frozen state): Isaac Lab's reset events, the scene state
+# written, YAMLab's stage flags and counters cleared; approximate in-process, PhysX keeps contact data across a restore)
+# with a new recording of the graded rows and a new live video. save = the scene state (InteractiveScene.get_state, the
+# layout of instance.json's initial_state) + YAMLab's success-check latches and counters + the Session's episode
+# counters, controller targets and graded rows; load = the same restore path with that state (approximate likewise), the
+# latches put back, and the left-finger friction raised again when the saved episode had raised it (HangMugOnTree's
+# one-shot friction events; the reset events set it low). The live video restarts at a reset or a load: only the running
+# episode's frames are kept.
+_CHECK_STATE = ("stage1_success", "stage2_success", "stage3_success", "_prev_stage1_success", "_prev_stage2_success",
+                "_prev_stage3_success", "_consecutive_pick_steps", "_consecutive_ontop_steps", "_consecutive_handover_steps",
+                "_consecutive_hang_steps", "_stage3_anchor_mug_pos", "_success_reward_given", "_stage2_reward_given",
+                "_stage3_reward_given", "_friction_raised", "_friction_released")
+_EPISODE_E = ("episode_control_steps", "dumped", "n_actions", "live_sha")
+
+
+def _ops_clear_e() -> None:
+    for k in _EPISODE_E:
+        E.pop(k, None)
+
+
+def ops_reset() -> None:
+    S.reset()
+    S.record_start()
+    _ops_clear_e()
+    if E["ready"]:          # live (a crash resume's replay leaves the frames on disk to the resume)
+        VIDEO.truncate(-1)
+        VIDEO.offer(0)
+
+
+def ops_save() -> dict:
+    env = S.env
+    return {"scene": S._tree_to_lists(env.scene.get_state(is_relative=True)),
+            "check": {k: getattr(env, k).detach().clone() for k in _CHECK_STATE if S.th.is_tensor(getattr(env, k, None))},
+            "n_steps": int(S.n_steps), "episode_done": bool(S.episode_done), "end_reason": S.end_reason,
+            "targets": np.array(S._targets, copy=True), "rec": list(S._recording) if S._recording is not None else None}
+
+
+def ops_load(snap: dict) -> None:
+    env = S.env
+    S.n_steps = snap["n_steps"]                # before the restore: its render mark is keyed by the step
+    S._restore(snap["scene"])
+    for k, v in snap["check"].items():
+        getattr(env, k).copy_(v)
+    raised = snap["check"].get("_friction_raised"); released = snap["check"].get("_friction_released")
+    if raised is not None and released is not None and bool(raised[0]) and not bool(released[0]):
+        env.event_manager.apply(mode="left_grasp", env_ids=S.th.tensor([0], device=env.device))
+    S.episode_done, S.end_reason, S._pristine = snap["episode_done"], snap["end_reason"], False
+    S._targets = np.array(snap["targets"], copy=True)
+    S._recording = list(snap["rec"]) if snap["rec"] is not None else None
+    _ops_clear_e()
+    if E["ready"]:
+        VIDEO.truncate(-1)
+        VIDEO.offer(ctrl_steps())
+
+
+OPS = (L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset, save=ops_save, load=ops_load)
+       if L.STATE_OPS else None)
+
+
+def ops_fields() -> dict:
+    """episode.json's record of the state ops (RCB_STATE_OPS=1; {} without)."""
+    if OPS is None:
+        return {}
+    return OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows)
+
+
+if OPS is not None:
+    SPEC["episode"] = SPEC["episode"].replace("one episode, no reset: it", "an episode") + (
+        "; POST /reset (`reset`) or /load_state starts a new one, only the last is graded")
 L.check_spec(SPEC)       # a spec that misses a 2.2 field or names a forbidden one never starts the episode
 EP.scene_built()         # the watchdog stands down: a long resume replay below is not a hung build
 
@@ -531,11 +616,16 @@ def replay_row(row) -> None:
 S.record_start()         # the resume replay is recorded too: trajectory.npz is the whole episode
 VIDEO.offer(0)           # the start state (rendered for /spec's images; a restarted service has it on disk already)
 resumed = EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
-         start_event={"task": TASK, "assets": S.assets, "cameras": CAMS, "kinematics_check": S.kinematics_check})
+         start_event={"task": TASK, "assets": S.assets, "cameras": CAMS, "kinematics_check": S.kinematics_check}, ops=OPS)
 if resumed:
     VIDEO.truncate(ctrl_steps())   # frames of the call lost in the crash show rolled-back states
 E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  state_ops=OPS,
+                  **({"object_poses": object_poses,
+                      "object_pose_spec": {"frame": "the workstation's world frame (/spec world: that of ee_pose, proprio tcp_pose "
+                                                    "and /kinematics)", "quaternion_order": "wxyz", "objects": OBJECTS}}
+                     if L.OBJECT_POSES else {})))

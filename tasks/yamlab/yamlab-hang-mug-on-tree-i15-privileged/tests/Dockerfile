@@ -87,7 +87,7 @@ WORKDIR /app
 # the verdict.
 FROM yamlab-base
 COPY instance.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:yamlab-files-0.5.0@sha256:9484e8430cdafaf6602e4eade3101ab299d5e278d4a14f1f3ccff5c0bd529896 /privileged/environment/rcb_yamlab.py /privileged/tests/grade.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:yamlab-files-0.5.0-resetpose@sha256:00e2f3d2c05f5e9b2444783c978eaf00aeda7f4767ccb4fe43dabd41747c2b98 /privileged/environment/rcb_yamlab.py /privileged/tests/grade.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests

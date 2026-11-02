@@ -2,7 +2,7 @@
 # frozen instance. Nothing the agent did in its container reaches this one: Harbor uploads only /app/output/.
 FROM ghcr.io/mll-lab-nu/efe:molmospaces-0.2.5
 COPY instance.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:molmospaces-files-0.3.0@sha256:9fafad0888023b251e737ddd4745cc99e527106168442e3dfdb1f4268dfe902a /privileged/environment/rcb_molmospaces.py /privileged/tests/grade.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:molmospaces-files-0.3.0-resetpose@sha256:846a98e65b1d5207798274d5258106aad148f3c2176ca3a707b48b43e23e2be2 /privileged/environment/rcb_molmospaces.py /privileged/tests/grade.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests

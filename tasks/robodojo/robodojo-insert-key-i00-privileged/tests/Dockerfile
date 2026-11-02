@@ -110,7 +110,7 @@ WORKDIR /app
 # the verdict.
 FROM robodojo-base
 COPY instance.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:robodojo-files-0.5.0@sha256:bce8870cd1d41104e48e532bbcb91402a9497b6d636b36b3317aaa728c22284f /privileged/environment/rcb_robodojo.py /privileged/tests/grade.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:robodojo-files-0.5.0-resetpose@sha256:bed2dc2d5a1011158f81fafca8caa130c90d6698c6bfaef74e08ae173fa04c41 /privileged/environment/rcb_robodojo.py /privileged/tests/grade.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests

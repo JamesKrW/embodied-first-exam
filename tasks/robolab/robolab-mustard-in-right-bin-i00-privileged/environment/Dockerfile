@@ -63,7 +63,7 @@ FROM robolab-base
 # Nothing at run time reads it (only that example script does); the agent's image does not keep it.
 RUN rm -rf /opt/robolab/examples/recorded_data
 COPY instance.json /app/instance.json
-COPY --from=ghcr.io/mll-lab-nu/efe:robolab-files-0.5.1@sha256:1b44eaf28f2c896a82241ba1a90e8a2b02f8e142c236b06fd302c87664588025 /rcb_robolab.py /opt/tools/rcb_robolab.py
+COPY --from=ghcr.io/mll-lab-nu/efe:robolab-files-0.5.1-resetpose@sha256:6618f2506349040ff91a7121e3d7ff60a343dfd076d5dbcb75ac96e230e23c92 /rcb_robolab.py /opt/tools/rcb_robolab.py
 ENV PYTHONPATH=/opt/tools
 RUN mkdir -p /app/output
 WORKDIR /app

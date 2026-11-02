@@ -49,4 +49,10 @@ if "progress" in d:
 else:
     out.update({k: (int(v) if isinstance(v, bool) else v) for k, v in d.items() if isinstance(v, (int, float, bool)) and k not in out and k not in BASE})
     reward = 1.0 if ok else 0.0
+if "saves" in d:   # the unlimited-reset ablation (RCB_STATE_OPS=1): a load begins a new episode too; numbers only
+    out.update(saves=int(d.get("saves") or 0), loads=int(d.get("loads") or 0),
+               first_success=int(ok and int(d.get("resets") or 0) + int(d.get("loads") or 0) == 0))
+    for k in ("resets_at_success", "loads_at_success"):   # only for a success
+        if ok and k in d: out[k] = int(d[k])
+        else: out.pop(k, None)
 write(reward, out)

@@ -25,7 +25,7 @@ Differences from the RoboLab service, all from the task:
   (PhysX on the CPU and the CPU brush models repeat bit for bit in a fresh process); the last ee_pose tip target is persisted
   (the start of the next `ee_pose` line)."""
 from __future__ import annotations
-import importlib, json, math, os, signal, sys, threading, time, traceback
+import copy, importlib, json, math, os, signal, sys, threading, time, traceback
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -106,7 +106,7 @@ def dump() -> list | None:
     ok = bool(live.get("success")) and err is None
     rec = {"steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
            "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": True, "task": TASK, "protocol": PROTOCOL,
-           "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields(), "live": numbers(live)}
+           "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **ops_fields(ok), **EP.final_fields(), "live": numbers(live)}
     json.dump(rec, open(os.path.join(DATA, "episode.json"), "w"))
     verdict = {**rec, "success": ok, "live_success": ok, "graded_by": "live", "replays": 0, "finalized": True,
                "success_rule": {k: float(v) for k, v in S.inst["target"]["success"].items()},
@@ -558,15 +558,80 @@ def _end_from_signal():
     os._exit(0)          # run.sh keeps the container up for the collect hook
 
 
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches). RCB_EXPOSE_OBJECT_POSES=1 has
+# nothing to expose (the sheets, wells and plate are fixed; /spec static places them) and is not served.
+# RCB_STATE_OPS=1: reset = Session.reset() (the frozen instance: env.reset(seed=0) with the start joints, blank sheets and
+# a dry brush, exact), a new recording of the graded rows, no ee_pose target. save / load (not for the MyPaint media,
+# whose brush engine keeps its stroke state in libmypaint, out of reach: reset only there): ManiSkill's sim state
+# (get_state_dict: every actor's and articulation's pose, velocities and joints; approximate, PhysX keeps solver state
+# of its own) + a copy of the painter (every sheet's ink, the strokes, the stroke in progress, the brush's state, ink load
+# and counters) + the Session's episode counters, controller targets and graded rows + the last ee_pose target.
+_STATIC_PAINTER = ("cfg", "sheets", "wells")
+_EPISODE_E = ("episode_control_steps", "dumped", "n_actions", "live_sha", "trajectory_error", "canvas_error")
+
+
+def _tensors(x):
+    return {k: _tensors(v) for k, v in x.items()} if isinstance(x, dict) else x.clone()
+
+
+def _painter_memo() -> dict:
+    p = S.painter
+    return {id(getattr(p, k)): getattr(p, k) for k in _STATIC_PAINTER if hasattr(p, k)}
+
+
+def ops_reset() -> None:
+    S.reset()
+    S.record_start()
+    for k in _EPISODE_E:
+        E.pop(k, None)
+    E["tip_target"] = None
+
+
+def ops_save() -> dict:
+    p = S.painter
+    get = getattr(S.u, "get_state_dict", None)
+    return {"sim": _tensors(get()) if get else S.u.get_state().clone(),
+            "painter": copy.deepcopy({k: v for k, v in vars(p).items() if k not in _STATIC_PAINTER}, _painter_memo()),
+            "n_steps": int(S.n_steps), "targets": np.array(S._targets, copy=True), "since_reset": list(S._since_reset),
+            "rec": list(S._recording) if S._recording is not None else None,
+            "tip_target": None if E.get("tip_target") is None else tuple(np.array(v, copy=True) for v in E["tip_target"])}
+
+
+def ops_load(snap: dict) -> None:
+    put = getattr(S.u, "set_state_dict", None)
+    (put or S.u.set_state)(_tensors(snap["sim"]))
+    vars(S.painter).update(copy.deepcopy(snap["painter"], _painter_memo()))
+    S.n_steps = snap["n_steps"]; S._targets = np.array(snap["targets"], copy=True)
+    S._since_reset = list(snap["since_reset"])
+    S._recording = list(snap["rec"]) if snap["rec"] is not None else None
+    S._frame_version = -1                # the sheets' textures and the tuft colour are uploaded again
+    for k in _EPISODE_E:
+        E.pop(k, None)
+    E["tip_target"] = None if snap["tip_target"] is None else tuple(np.array(v, copy=True) for v in snap["tip_target"])
+
+
+_SNAPSHOT = S.medium != "mypaint"
+OPS = (L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset,
+                  save=ops_save if _SNAPSHOT else None, load=ops_load if _SNAPSHOT else None) if L.STATE_OPS else None)
+
+
+def ops_fields(success: bool) -> dict:
+    """The verdict's record of the state ops (RCB_STATE_OPS=1; {} without)."""
+    if OPS is None:
+        return {}
+    return OPS.fields(bool(success), E["reason"], EP.events(), E.get("t_first"), EP.rows)
+
+
 L.check_spec(SPEC)                     # a spec that misses a 2.2 field or names a forbidden one never serves
 EP.scene_built()                       # the startup watchdog stands down: a long resume replay is not a hang
 S.record_start()                       # before begin(): a resume's journal replay is part of the recorded trajectory
 resumed = EP.begin(state=E, step=S.step, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC,
-                   start_event={"task": TASK, "instance_sha": S.instance_sha, "cameras": CAMS}, on_end=_end_from_signal)
+                   start_event={"task": TASK, "instance_sha": S.instance_sha, "cameras": CAMS}, on_end=_end_from_signal, ops=OPS)
 if E.get("tip_target") is not None:    # restored from the checkpoint (JSON lists): back to (position, quaternion) arrays
     E["tip_target"] = tuple(np.asarray(v, np.float64) for v in E["tip_target"])
 E["ready"] = True; write_final()
 open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at control step %d' % ctrl_steps() if resumed else ''})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  state_ops=OPS))

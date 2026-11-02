@@ -97,7 +97,7 @@ def dump() -> None:
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": S.env_id, "protocol": PROTOCOL,
                    "n_actions": E.get("n_actions"), "hold_pad_rows": E.get("hold_pad_rows", 0), "live_sha": E.get("live_sha"),
-                   "determinism_verdict_mode": VERDICT, **INSTANCE_CHECK, **EP.final_fields()})
+                   "determinism_verdict_mode": VERDICT, **INSTANCE_CHECK, **ops_fields(), **EP.final_fields()})
     write_final()
 
 
@@ -187,6 +187,53 @@ SPEC = {
     "depth": {"modes": list(L.DEPTH_MODES), "default": "none", "kind": "z-depth", "unit": "m", "invalid": 0, "max_m": L.DEPTH_MAX_M,
               "frames_encoding": "uint16 mm, zlib", "noise": L.DEPTH_NOISE},
 }
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
+# RCB_EXPOSE_OBJECT_POSES=1: every articulation but the robot and every rigid object, as Session.objects() names them:
+# the root's position (relative to the environment's origin, the frame of /spec world, ee_pose and proprio) and
+# orientation (wxyz); no joint state of an articulated object. Isaac Lab resets the scene inside the step that ends an
+# episode, so once it has ended the poses are the end state's (the Session's end capture, as proprio), or none at all.
+OBJECTS = list(S.objects()) if L.OBJECT_POSES else []
+
+
+def object_poses() -> dict:
+    if S.done:
+        snap = (S._end or {}).get("snap")
+        if not snap:
+            return {}
+        roots = {n: (snap["art"][n][0] if n in snap["art"] else snap["rig"].get(n)) for n in OBJECTS}
+    else:
+        sc = S.env.scene
+        roots = {n: M._np((sc.articulations[n] if n in sc.articulations else sc.rigid_objects[n]).data.root_state_w[0])
+                 for n in OBJECTS}
+    o = M._np(S.env.scene.env_origins[0])
+    return {n: L.pose_entry(np.asarray(r[:3], dtype=np.float64) - o, r[3:7]) for n, r in roots.items() if r is not None}
+
+
+# RCB_STATE_OPS=1, reset only: Session.reset() (AM-Bench's seeded env.reset, the frozen start; approximate in-process:
+# only the first episode of a process is bit-identical to a fresh one) with a new list of the graded rows. No save /
+# load: Isaac Lab on GPU PhysX has no state snapshot that restores the controller's and the scene's full state.
+_EPISODE_E = ("episode_control_steps", "dumped", "n_actions", "live_sha", "hold_pad_rows")
+
+
+def ops_reset() -> None:
+    S.reset()
+    for k in _EPISODE_E:
+        E.pop(k, None)
+
+
+OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset) if L.STATE_OPS else None
+
+
+def ops_fields() -> dict:
+    """episode.json's record of the state ops (RCB_STATE_OPS=1; {} without)."""
+    if OPS is None:
+        return {}
+    return OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows)
+
+
+if OPS is not None:
+    SPEC["episode"] = SPEC["episode"].replace("One episode, no reset: it", "An episode") + (
+        "; POST /reset (`reset`) starts a new one, only the last is graded")
 L.check_spec(SPEC)       # a spec that misses a 2.2 field or names a forbidden one never starts the episode
 EP.scene_built()         # the watchdog stands down: a long resume replay below is not a hung build
 
@@ -472,9 +519,15 @@ def replay_row(row) -> None:
 # restarted is not the episode's physics).
 print("[rcb] the episode's physics starts (live_gpu_faults are counted from here)", flush=True)
 EP.begin(state=E, step=replay_row, state_sha=lambda: S.status()["state_sha"], proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
-         start_event={"task": S.env_id, "cameras": CAMS, "kinematics_check": S.kinematics_check, "dropped_events": S.dropped_events})
+         start_event={"task": S.env_id, "cameras": CAMS, "kinematics_check": S.kinematics_check, "dropped_events": S.dropped_events},
+         ops=OPS)
 E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=lambda: S.status()["state_sha"], proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=lambda: S.status()["state_sha"], proprio=proprio_row,
+                  state_ops=OPS,
+                  **({"object_poses": object_poses,
+                      "object_pose_spec": {"frame": "the world frame relative to the environment's origin (/spec world: that of "
+                                                    "ee_pose and proprio tcp_pose); after an episode has ended, its end state",
+                                           "quaternion_order": "wxyz", "objects": OBJECTS}} if L.OBJECT_POSES else {})))

@@ -19,6 +19,20 @@ BASE = {"success": 0, "live_success": 0, "graded_by_live": 1, "replays": 0, "inf
         "grader_error": 0, "finalized": 0, "missing_log": 0}
 
 
+def state_ops_fields(data: dict, success: bool) -> dict:
+    """The unlimited-reset ablation's record (the service writes it with RCB_STATE_OPS=1): saves and loads, and for a
+    success resets_at_success / loads_at_success; first_success = a success with no reset and no load. Numbers only; {}
+    without the switch."""
+    if "loads" not in data:
+        return {}
+    count = lambda key: int(data.get(key) or 0)  # noqa: E731
+    out = {"saves": count("saves"), "loads": count("loads"),
+           "first_success": int(success and count("resets") + count("loads") == 0)}
+    if success:
+        out.update({key: count(key) for key in ("resets_at_success", "loads_at_success") if key in data})
+    return out
+
+
 def verdict(data: dict) -> dict:
     live = data.get("graded_by") == "live"
     gave_up = bool(data.get("gave_up"))
@@ -51,6 +65,7 @@ def verdict(data: dict) -> dict:
         "hand_wuji": int(data.get("hand") == "wuji"),
         "resets": int(data.get("resets") or 0),
         "reset_budget": int(data.get("reset_budget") or 0),
+        **state_ops_fields(data, success),
     }
 
 

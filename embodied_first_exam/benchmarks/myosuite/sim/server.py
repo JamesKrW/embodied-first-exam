@@ -26,6 +26,7 @@ the episode begins: a fresh start whose built scene does not hash to the instanc
 infrastructure failure (`instance_mismatch`) before the agent is served."""
 
 import contextlib
+import copy
 import json
 import math
 import os
@@ -461,7 +462,7 @@ if TASK_INFO.get("reference"):  # MyoDex: the reference motion is the goal (rela
         "meaning": "the reference pose of the manipulated item per control step: its centre of mass relative to where "
         "it starts (world axes) and its orientation (world frame, wxyz)",
     }
-if RESET_BUDGET:
+if RESET_BUDGET and not L.STATE_OPS:  # with RCB_STATE_OPS=1 the shared layer serves /reset and describes it
     SPEC["reset"] = (
         f"POST /reset (JSON or RCB1 {{cameras, video_fps, depth}}; no physics) abandons the running episode, or follows "
         f"one that has ended, and starts a new one from the same frozen starting state, {RESET_BUDGET} times in all; it "
@@ -550,7 +551,7 @@ def finish(reason: str) -> None:
     E["success"] = bool(S.success) and reason != "error"
     EP.log(
         {"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "success": bool(E["success"]),
-         "episode": E["resets"] + 1, "journal_rows": EP.rows}
+         "episode": OPS.episode if OPS is not None else E["resets"] + 1, "journal_rows": EP.rows}
     )
     dump()
 
@@ -565,7 +566,7 @@ def dump() -> None:
         os.path.join(DATA, "trajectory.npz"),
         meta={"source": "standard-mode episode", "reason": E["reason"]},
     )
-    L._write_json(os.path.join(DATA, "episode.json"), {**summary(), "live_sha": E["live_sha"]})
+    L._write_json(os.path.join(DATA, "episode.json"), {**summary(), "live_sha": E["live_sha"], **ops_fields()})
     write_final()
 
 
@@ -780,7 +781,7 @@ def do_observe(meta: dict):
 
 
 def reset_counters() -> dict:
-    if not RESET_BUDGET:
+    if not RESET_BUDGET or OPS is not None:  # with RCB_STATE_OPS=1 the shared layer adds its own counters
         return {}
     left = 0 if (E["success"] or E.get("exiting")) else RESET_BUDGET - E["resets"]
     return {"episode": E["resets"] + 1, "resets_left": left, "control_steps_total": EP.rows}
@@ -847,6 +848,99 @@ def end_from_signal() -> None:
     os._exit(0)
 
 
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
+# RCB_EXPOSE_OBJECT_POSES=1: the task's objects, the bodies the task's observation dict reads (obs_dict obj_* /
+# curr_obj_*, object1 / object2, ball): every body moved by a joint that is not the body's own, mocap bodies (opponents,
+# goalkeepers, goal markers) left out. Their MuJoCo body pose (xpos, xquat) in the world frame, as rendered.
+OBJECT_LABELS = {"baoding": ("object1", "object2"), "soccer": ("ball",)}
+
+
+def _object_bodies() -> dict:
+    ids = [b for b in range(1, MD.nbody) if int(MD.body_mocapid[b]) < 0 and int(MD.body_jntnum[b]) > 0
+           and any(j not in OWN_JOINTS for j in range(int(MD.body_jntadr[b]), int(MD.body_jntadr[b]) + int(MD.body_jntnum[b])))]
+    labels = OBJECT_LABELS.get(TASK, ("object",) if len(ids) == 1 else tuple(MD.body(b).name for b in ids))
+    return dict(zip(labels, ids))
+
+
+OBJECTS = _object_bodies() if L.OBJECT_POSES else {}
+
+
+def object_poses() -> dict:
+    d = S.data
+    return {name: L.pose_entry(d.xpos[b], d.xquat[b]) for name, b in OBJECTS.items()}
+
+
+# RCB_STATE_OPS=1: reset = Session.reset() (the frozen instance) and the episode's record cleared. A snapshot holds what
+# the Session's own snapshot holds, taken so that a load continues exactly as the saved episode would have: the integration
+# state, sensor readings and warnings of the robot's MjData and of each mirror (MyoSuite steps the robot's and refreshes
+# the mirrors with its own controls), the model arrays a reset or a step edits, the env's plain attributes (obs_dict,
+# rwd_dict, ...) as they were, its Python-side objects (as Session.reset restores them: controllers, opponent policies,
+# the reference cursor), the robot's sensor cache, the random generator, the Session's episode counters (steps, hold
+# run, track errors, verdict) and a copy of the graded rows.
+_SESSION_EPISODE = ("steps", "done", "success", "reason", "solved_run", "last_info", "track_ok", "track_max", "_track0")
+_MJ_STATE = mujoco.mjtState.mjSTATE_INTEGRATION
+
+
+def _datas() -> list:
+    b = S.base
+    return [b.robot.mj_data, S.data] + ([b.obsd_mj_data] if b.obsd_mj_data is not S.data else [])
+
+
+def ops_reset() -> None:
+    S.reset()
+    ROWS.clear()
+    E.update(t_end=None, episode_control_steps=None, dumped=False)
+
+
+def ops_save():
+    datas = []
+    for d in _datas():
+        state = np.empty(mujoco.mj_stateSize(MD, _MJ_STATE))
+        mujoco.mj_getState(MD, d, state, _MJ_STATE)
+        datas.append((state, d.sensordata.copy(), [(w.number, w.lastinfo) for w in d.warning]))
+    frozen = S._snapshot["model"]
+    return {"datas": datas,
+            "model": {k: v.copy() for k, v in M._model_arrays(MD).items() if not np.array_equal(v, frozen.get(k))},
+            "attrs": {k: copy.deepcopy(v) for k, v in vars(S.base).items()
+                      if not k.startswith("__") and M._plain(v) and k != "mujoco_render_frames"},
+            "extras": S._copy_extras(), "sensor_cache": copy.deepcopy(getattr(S.base.robot, "_sensor_cache", None)),
+            "rng": copy.deepcopy(S._rng().bit_generator.state),
+            "episode": copy.deepcopy({k: getattr(S, k) for k in _SESSION_EPISODE if hasattr(S, k)}),
+            "rows": [r.copy() for r in ROWS]}
+
+
+def ops_load(snap) -> None:
+    live = M._model_arrays(MD)
+    for k, v in {**S._snapshot["model"], **snap["model"]}.items():
+        if k in live and live[k].shape == v.shape:
+            live[k][...] = v
+    for d, (state, sensors, warnings) in zip(_datas(), snap["datas"]):
+        mujoco.mj_setState(MD, d, state, _MJ_STATE)
+        mujoco.mj_forward(MD, d)
+        d.sensordata[:] = sensors
+        for w, (number, info) in zip(d.warning, warnings):
+            w.number, w.lastinfo = number, info
+    for k, v in {**snap["attrs"], **snap["extras"]}.items():
+        setattr(S.base, k, copy.deepcopy(v))
+    if snap["sensor_cache"] is not None:
+        S.base.robot._sensor_cache = copy.deepcopy(snap["sensor_cache"])
+    S._rng().bit_generator.state = copy.deepcopy(snap["rng"])
+    for k, v in copy.deepcopy(snap["episode"]).items():
+        setattr(S, k, v)
+    ROWS[:] = [r.copy() for r in snap["rows"]]
+    E.update(t_end=None, episode_control_steps=None, dumped=False)
+
+
+OPS = L.StateOps(budget=RESET_BUDGET, reset=ops_reset, save=ops_save, load=ops_load) if L.STATE_OPS else None
+
+
+def ops_fields() -> dict:
+    """episode.json's record of the state ops (RCB_STATE_OPS=1; {} without): it overrides episodes / resets."""
+    if OPS is None:
+        return {}
+    return OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows)
+
+
 # A resume replays the journal from the frozen instance and resets where the committed resets did: their journal rows
 # are in the last checkpoint (`persist`), the one Episode.begin resumes from.
 _CPS = [e for e in EP.events() if e.get("ev") == "checkpoint"]
@@ -891,6 +985,7 @@ RESUMED = EP.begin(
     spec=SPEC,
     on_end=end_from_signal,
     start_event={"task": TASK, "env": S.env_id, "cameras": CAMS, "instance_sha": S.instance_sha},
+    ops=OPS,
 )
 if RESUMED and E["resets"]:  # Episode.begin looks for an "end" of any episode: only the current one's counts
     _ends = [e for e in EP.events() if e.get("ev") == "end" and int(e.get("episode") or 1) == E["resets"] + 1
@@ -916,7 +1011,7 @@ def make_handler(svc: L.Service):
 
     class H(base):
         def do_POST(self):
-            if self.path != "/reset" or not RESET_BUDGET:
+            if self.path != "/reset" or not RESET_BUDGET or OPS is not None:
                 return super().do_POST()
             try:
                 meta, _ = self._body()
@@ -981,6 +1076,10 @@ try:
             episode=EP,
             state_sha=S.state_sha,
             proprio=proprio_row,
+            state_ops=OPS,
+            **({"object_poses": object_poses,
+                "object_pose_spec": {"frame": "MyoSuite's world frame (z up; the frame of root_pose)",
+                                     "quaternion_order": "wxyz", "objects": list(OBJECTS)}} if OBJECTS else {}),
         ),
         port=int(os.environ.get("RCB_PORT", "8000")),
     )

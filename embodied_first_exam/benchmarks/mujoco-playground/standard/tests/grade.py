@@ -49,6 +49,18 @@ unfinished = not d.get("finalized") or not (live or d.get("gave_up"))
 infra = bool(d.get("infra_error")) or unfinished or bool(d.get("instance_mismatch"))
 ok = bool(d.get("success")) and live and not infra and d.get("reason") != "error"   # PROTOCOL §4: a simulator error is the agent's 0
 num = lambda k: float(d.get(k) or 0)  # noqa: E731
+def state_ops_fields(d, ok):
+    """The unlimited-reset ablation's record (the service writes it with RCB_STATE_OPS=1): saves and loads, and for a
+    success resets_at_success / loads_at_success; first_success = a success with no reset and no load. Numbers only; {}
+    without the switch."""
+    if "loads" not in d:
+        return {}
+    n = lambda k: int(d.get(k) or 0)  # noqa: E731
+    out = {"resets": n("resets"), "reset_budget": n("reset_budget"), "saves": n("saves"), "loads": n("loads"),
+           "first_success": int(bool(ok) and n("resets") + n("loads") == 0)}
+    if ok:
+        out.update({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d})
+    return out
 write(
     ok,
     {
@@ -88,5 +100,6 @@ write(
         "episodes": int(d.get("episodes") or 1),
         "resume_state_mismatch": int(d.get("resume_state_mismatch") or 0),
         "resume_max_joint_dev": num("resume_max_joint_dev"),
+        **state_ops_fields(d, ok),
     },
 )

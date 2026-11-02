@@ -132,7 +132,8 @@ def dump() -> None:
         "success_step": st["success_step"], "symbolic_success": st["symbolic_success"], "geometric_success": st["geometric_success"],
         "error_metric": st["error_metric"], "graded_by": "live", "replays": 0,
         "startup": EP.n_startups, "pid": os.getpid(),   # which service start wrote it (finalize.sh's late-exit check)
-        **EP.final_fields()})
+        **EP.final_fields(),
+        **(OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows) if OPS is not None else {})})
     write_final()
 
 
@@ -392,6 +393,123 @@ def _end_from_signal():
 REPLAY = {"skipped": 0}
 
 
+# ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
+# RCB_EXPOSE_OBJECT_POSES=1: the instance's physical objects (loader.physical, the names of instance.json and facts.json)
+# without the robot (agent.*) and the floor, in the odometry frame every other pose of this service is in
+# (S.odom @ world pose), position + quaternion xyzw (spec.world). Nothing of goal.json.
+# RCB_STATE_OPS=1: reset = Session.reset() (upstream's reset and re-restores; approximate in-process); save / load =
+# og.sim.dump_state(serialized=True) / load_state (approximate: PhysX's solver and contact caches are not in it) plus the
+# session's episode (control steps n, the success latch, the recorded rows, the last command), upstream's task-side
+# evaluation history (the plain-data attributes of the task, its termination conditions and reward functions: the
+# settle-eval window) and OmniGibson's episode step counter. max_steps is a budget per episode: a reset starts a new
+# one at 0 control steps, a load continues the saved episode's count (the replay after a crash does the same at the
+# journal row each op was made at).
+POSE_NAMES = sorted(k for k in S.loader.physical if not k.startswith(("agent.", "floor."))) if L.OBJECT_POSES else []
+POSE_SPEC = {"frame": "odometry: the robot's base_link at the start of the episode (spec.world), each object's base link",
+             "quaternion_order": "xyzw", "objects": POSE_NAMES}
+
+
+def object_poses() -> dict:
+    out = {}
+    for k in POSE_NAMES:
+        obj = S.loader.physical.get(k)
+        if obj is None:
+            continue
+        p7 = M._pose7(S.odom @ M._T_of(*[M._np(x) for x in obj.get_position_orientation()]))
+        out[k] = L.pose_entry(p7[:3], p7[3:])
+    return out
+
+
+def _step_owner():
+    """The OmniGibson Environment that holds the episode's step counter (episode_steps), under any wrapper."""
+    e = S.env
+    for _ in range(6):
+        if e is None:
+            return None
+        if "_current_step" in getattr(e, "__dict__", {}):
+            return e
+        e = getattr(e, "env", None)
+    return None
+
+
+def _plain(v, depth: int = 0) -> bool:
+    if v is None or isinstance(v, (bool, int, float, str, np.ndarray, np.generic)):
+        return True
+    if type(v).__module__.startswith("torch") and type(v).__name__ == "Tensor":
+        return True
+    if depth >= 3:
+        return False
+    if isinstance(v, (list, tuple, set, frozenset)) or type(v).__name__ == "deque":
+        return all(_plain(x, depth + 1) for x in v)
+    if isinstance(v, dict):
+        return all(isinstance(k, (str, int)) and _plain(x, depth + 1) for k, x in v.items())
+    return False
+
+
+def _eval_parts() -> list:
+    t = S.task
+    parts = [t]
+    for a in ("_termination_conditions", "_reward_functions"):
+        parts += list((getattr(t, a, None) or {}).values())
+    return parts
+
+
+def _eval_state() -> list:
+    import copy
+    return [{k: copy.deepcopy(v) for k, v in vars(o).items() if _plain(v)} for o in _eval_parts()]
+
+
+def _new_episode_files() -> None:
+    """The ended episode's record (episode.json, trajectory.npz, written when it ended) is not the new episode's."""
+    for k in ("dumped", "n_actions", "live_sha"):
+        E.pop(k, None)
+    for f in ("episode.json", "trajectory.npz"):
+        try:
+            os.remove(os.path.join(DATA, f))
+        except OSError:
+            pass
+
+
+def ops_reset() -> None:
+    S.reset()
+    _new_episode_files()
+
+
+def ops_save():
+    import copy
+    own = _step_owner()
+    st = S.og.sim.dump_state(serialized=True)
+    if isinstance(st, dict):
+        st = S.th.cat([S.th.as_tensor(v).flatten() for v in st.values()])
+    return {"sim": S.th.as_tensor(st).detach().cpu().clone(), "current_step": int(own._current_step) if own is not None else None,
+            "eval": _eval_state(), "n": S.n, "success": S.success, "done": S.done, "reason": S.reason,
+            "isg": copy.deepcopy(S.isg), "success_step": S.success_step, "last": S._last.copy(), "rows": list(S.rows)}
+
+
+def ops_load(snap) -> None:
+    import copy
+    S.og.sim.load_state(snap["sim"].clone(), serialized=True)
+    own = _step_owner()
+    if own is not None and snap["current_step"] is not None:
+        own._current_step = int(snap["current_step"])
+    for o, saved in zip(_eval_parts(), snap["eval"]):
+        for k, v in saved.items():
+            setattr(o, k, copy.deepcopy(v))
+    S.n, S.success, S.done, S.reason = snap["n"], snap["success"], snap["done"], snap["reason"]
+    S.isg, S.success_step, S._last, S.rows = copy.deepcopy(snap["isg"]), snap["success_step"], snap["last"].copy(), list(snap["rows"])
+    S.robot.apply_action(S.th.as_tensor(S._last))      # the saved command, as Session.reset() applies the hold's
+    try:
+        S.og.sim.render()                               # the frames of the answer show the loaded state (no physics step)
+        S.obs = S.SE.get_obs(S.env)[0]
+    except Exception as exc:  # noqa: BLE001
+        log({"ev": "state_op_render_error", "error": repr(exc)[:200]})
+    _new_episode_files()
+
+
+OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset, save=ops_save,
+                 load=ops_load) if L.STATE_OPS else None
+
+
 def replay_row(row) -> None:
     """One journaled row during a resume (rollouts are not bit-exact across processes): a row the episode can no longer
     take, because the replay already ended it, is skipped; what that means is decided right after the replay."""
@@ -404,7 +522,8 @@ def replay_row(row) -> None:
 L.check_spec(SPEC)                      # before the episode starts: a bad /spec must not cost a resume
 EP.scene_built()
 resumed = EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC,
-                   start_event={"subtask": S.up["subtask"], "start_sha": S.start_sha, "cameras": CAMS}, on_end=_end_from_signal)
+                   start_event={"subtask": S.up["subtask"], "start_sha": S.start_sha, "cameras": CAMS}, on_end=_end_from_signal,
+                   **({"ops": OPS} if OPS is not None else {}))
 if resumed and S.done and not E["done"]:
     log({"ev": "resume_ended_early", "skipped_rows": REPLAY["skipped"], "end_reason": S.reason, "success": S.success})
     if S.success:
@@ -425,4 +544,6 @@ E["ready"] = True; write_final()
 open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at call ' + str(E['calls']) if resumed else ''})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  **({"state_ops": OPS} if OPS is not None else {}),
+                  **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})))

@@ -21,6 +21,7 @@ this simulator when the episode ends); the collect hook (finalize.sh) makes it e
 instance is checked when the service builds it: a scene whose start state does not hash to the instance's recorded
 `state_sha` gets no episode (instance_mismatch, an infrastructure failure)."""
 
+import copy
 import math
 import os
 import sys
@@ -249,7 +250,7 @@ SPEC = {
     "depth": {"modes": list(L.DEPTH_MODES), "default": "none", "kind": "z-depth", "unit": "m", "invalid": 0,
               "max_m": L.DEPTH_MAX_M, "frames_encoding": "uint16 mm, zlib", "noise": L.DEPTH_NOISE},
 }
-if RESET_BUDGET:
+if RESET_BUDGET and not L.STATE_OPS:  # with RCB_STATE_OPS=1 the shared layer serves /reset and describes it
     SPEC["reset"] = (
         f"POST /reset (JSON or RCB1 {{cameras, video_fps, depth}}; no physics) abandons the running episode, or follows "
         f"one that has ended, and starts a new one from the same frozen starting state, {RESET_BUDGET} times in all; it "
@@ -332,7 +333,7 @@ def finish(reason: str) -> None:
     except Exception:  # noqa: BLE001
         traceback.print_exc()
     EP.log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "success": bool(E["success"]),
-            "episode": E["resets"] + 1, "journal_rows": EP.rows})
+            "episode": OPS.episode if OPS is not None else E["resets"] + 1, "journal_rows": EP.rows})
     dump()
 
 
@@ -343,7 +344,7 @@ def dump() -> None:
     E["live_sha"] = S.state_sha()
     np.savez(os.path.join(DATA, "trajectory.npz"), actions=np.asarray(ROWS, dtype=np.float64).reshape(-1, Q.N),
              env=S.env, action_layout=",".join(S.joint_names))
-    L._write_json(os.path.join(DATA, "episode.json"), {**summary(), "live_sha": E["live_sha"]})
+    L._write_json(os.path.join(DATA, "episode.json"), {**summary(), "live_sha": E["live_sha"], **ops_fields()})
     write_final()
 
 
@@ -531,7 +532,7 @@ def do_observe(meta: dict):
 
 
 def reset_counters() -> dict:
-    if not RESET_BUDGET:
+    if not RESET_BUDGET or OPS is not None:  # with RCB_STATE_OPS=1 the shared layer adds its own counters
         return {}
     left = 0 if (E["success"] or E.get("exiting")) else RESET_BUDGET - E["resets"]
     return {"episode": E["resets"] + 1, "resets_left": left, "control_steps_total": EP.rows}
@@ -595,6 +596,49 @@ def end_from_signal() -> None:
     os._exit(0)
 
 
+# The reset ablation's hooks (RCB_STATE_OPS=1; rcb_limited "ablations"). No object-pose hook: the quadruped tasks have no
+# objects. reset = Session.reset() (the frozen t = 0 state, settle included) and the episode's record cleared; a snapshot
+# = MuJoCo's integration state and warning counters, the Session's episode state (targets, step counter, the fall, the
+# tracking / gait / pose logs the check reads) and a copy of the graded rows: loading it continues exactly as the saved
+# episode would have (MuJoCo's derived readings are recomputed from the restored state).
+_MJ_STATE = mujoco.mjtState.mjSTATE_INTEGRATION
+_EPISODE_ATTRS = ("targets", "steps", "fell_at", "log", "gait_log", "pose_log")
+
+
+def ops_reset() -> None:
+    S.reset()
+    ROWS.clear()
+    E.update(t_end=None, episode_control_steps=None, dumped=False, check=None)
+
+
+def ops_save():
+    state = np.empty(mujoco.mj_stateSize(M, _MJ_STATE))
+    mujoco.mj_getState(M, S.data, state, _MJ_STATE)
+    return {"physics": state, "warnings": [(w.number, w.lastinfo) for w in S.data.warning],
+            "session": copy.deepcopy({k: getattr(S, k) for k in _EPISODE_ATTRS}), "rows": [r.copy() for r in ROWS]}
+
+
+def ops_load(snap) -> None:
+    mujoco.mj_setState(M, S.data, snap["physics"], _MJ_STATE)
+    for w, (number, info) in zip(S.data.warning, snap["warnings"]):
+        w.number, w.lastinfo = number, info
+    mujoco.mj_forward(M, S.data)
+    for k, v in copy.deepcopy(snap["session"]).items():
+        setattr(S, k, v)
+    ROWS[:] = [r.copy() for r in snap["rows"]]
+    E.update(t_end=None, episode_control_steps=None, dumped=False, check=None)
+
+
+OPS = L.StateOps(budget=RESET_BUDGET, reset=ops_reset, save=ops_save, load=ops_load) if L.STATE_OPS else None
+
+
+def ops_fields() -> dict:
+    """episode.json's record of the state ops (RCB_STATE_OPS=1; {} without): it overrides episodes / resets."""
+    if OPS is None:
+        return {}
+    return OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows)
+
+
 # A resume replays the journal from the frozen instance and resets where the committed resets did: their journal rows
 # are in the last checkpoint (`persist`), the one Episode.begin resumes from.
 _CPS = [e for e in EP.events() if e.get("ev") == "checkpoint"]
@@ -622,8 +666,11 @@ def resume_sha() -> str:
 
 
 RESUMED = EP.begin(state=E, step=replay_row, state_sha=resume_sha, proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
-                   start_event={"env": S.env, "seed": S.inst.get("seed"), "cameras": CAMS})
-if RESUMED:  # Episode.begin looks for an "end" of any episode: only the current one's counts, never a lost reset's
+                   start_event={"env": S.env, "seed": S.inst.get("seed"), "cameras": CAMS}, ops=OPS)
+if RESUMED and OPS is not None:  # the layer restored done / reason / success from the last checkpoint
+    if E["done"]:
+        E.update(episode_control_steps=ctrl_steps(), check={k: v for k, v in S.check().items() if k != "segments"})
+elif RESUMED:  # Episode.begin looks for an "end" of any episode: only the current one's counts, never a lost reset's
     # (a crash inside the first reset, too: the abandoned episode runs on)
     _ends = [e for e in EP.events() if e.get("ev") == "end" and int(e.get("episode") or 1) == E["resets"] + 1
              and e.get("reason") != "reset" and int(e.get("journal_rows") or 0) <= EP.rows]
@@ -646,7 +693,7 @@ def make_handler(svc: L.Service):
 
     class H(base):
         def do_POST(self):
-            if self.path != "/reset" or not RESET_BUDGET:
+            if self.path != "/reset" or not RESET_BUDGET or OPS is not None:
                 return super().do_POST()
             try:
                 meta, _ = self._body()
@@ -698,4 +745,4 @@ def serve(svc: L.Service, port: int) -> None:
 
 serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                 on_submit_error=lambda exc: finish("error"), log=EP.log, episode=EP, state_sha=S.state_sha,
-                proprio=proprio_row), port=int(os.environ.get("RCB_PORT", "8000")))
+                proprio=proprio_row, state_ops=OPS), port=int(os.environ.get("RCB_PORT", "8000")))

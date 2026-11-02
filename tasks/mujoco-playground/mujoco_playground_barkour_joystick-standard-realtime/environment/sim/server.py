@@ -32,6 +32,10 @@ mounts the library under NVIDIA_DRIVER_CAPABILITIES=graphics but not always the 
 
 Settings (environment/docker-compose.yaml): RCB_INSTANCE (the frozen instance.json), RCB_DATA, RCB_RESET_BUDGET,
 RCB_WALL_CLOCK_S, RCB_SLOWDOWN (rcb_realtime / rcb_service), RCB_GL.
+
+Ablations (rcb_service.STATE_OPS, rcb_service.OBJECT_POSES; off unless the task sets them): save_state() / load_state()
+keep every array of MuJoCo's data (the step's derived quantities included) and the episode's bookkeeping (targets,
+control steps, the fall, the logs the check reads), exact; the scene has no object, so object_poses() is empty.
 """
 from __future__ import annotations
 
@@ -78,6 +82,28 @@ from rcb_service import main  # noqa: E402
 GL_BACKEND = os.environ.get("MUJOCO_GL", "?")
 CAM_W, CAM_H = 320, 240                    # the standard twin's
 GL2CV = np.diag([1.0, -1.0, -1.0])
+
+
+def _mj_save(d) -> dict:
+    """Every array of a MuJoCo MjData, as the last step left it (derived quantities too), and its time."""
+    out = {"time": float(d.time)}
+    for n in dir(d):
+        if not n.startswith("_") and n != "plugin_data":
+            v = getattr(d, n, None)
+            if isinstance(v, np.ndarray):
+                out[n] = v.copy()
+    return out
+
+
+def _mj_load(d, snap: dict) -> None:
+    """_mj_save()'s arrays back into the same model's data, in place (arrays sized by the step's contacts and
+    constraints are recomputed by the next step)."""
+    for n, v in snap.items():
+        if n != "time":
+            a = getattr(d, n)
+            if a.shape == v.shape and a.flags.writeable:
+                a[...] = v
+    d.time = snap["time"]
 
 
 class Quadruped:
@@ -226,6 +252,27 @@ class Quadruped:
 
     def state_sha(self) -> str:
         return self.s.state_sha()
+
+    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, OBJECT_POSES)
+    def save_state(self) -> dict:
+        s = self.s
+        return {"data": _mj_save(s.data), "targets": s.targets.copy(), "steps": int(s.steps), "fell_at": s.fell_at,
+                "log": list(s.log), "gait_log": list(s.gait_log), "pose_log": list(s.pose_log),
+                "trace": None if s._trace is None else list(s._trace), "cmd": self.cmd.copy()}
+
+    def load_state(self, snap: dict) -> None:
+        s = self.s
+        _mj_load(s.data, snap["data"])
+        s.targets, s.steps, s.fell_at = snap["targets"].copy(), int(snap["steps"]), snap["fell_at"]
+        s.log, s.gait_log, s.pose_log = list(snap["log"]), list(snap["gait_log"]), list(snap["pose_log"])
+        s._trace = None if snap["trace"] is None else list(snap["trace"])
+        self.cmd = snap["cmd"].copy()
+
+    def object_poses(self) -> dict:
+        return {}
+
+    def object_pose_spec(self) -> dict:
+        return {"frame": "none: this scene has no object besides the robot", "quaternion_order": "wxyz", "objects": []}
 
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None:
         self.s.save_trajectory(rows, path, meta)

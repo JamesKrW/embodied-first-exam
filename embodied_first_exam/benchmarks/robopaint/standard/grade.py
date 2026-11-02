@@ -26,6 +26,20 @@ def write(ok, out):
     open(f"{LOG}/reward.txt", "w").write("1\n" if ok else "0\n"); json.dump(out, open(f"{LOG}/reward.json", "w")); print(out)
 
 
+def state_ops_fields(d, ok):
+    """The unlimited-reset ablation's record (the service writes it with RCB_STATE_OPS=1): saves and loads, and for a
+    success resets_at_success / loads_at_success; first_success = a success with no reset and no load. Numbers only; {}
+    without the switch."""
+    if "loads" not in d:
+        return {}
+    n = lambda k: int(d.get(k) or 0)  # noqa: E731
+    out = {"resets": n("resets"), "reset_budget": n("reset_budget"), "saves": n("saves"), "loads": n("loads"),
+           "first_success": int(bool(ok) and n("resets") + n("loads") == 0)}
+    if ok:
+        out.update({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d})
+    return out
+
+
 def verdict(d):
     m = d.get("metrics") or {}
     live_verdict = d.get("graded_by") == "live"
@@ -46,7 +60,8 @@ def verdict(d):
                 "video_rendered": int(bool(d.get("video"))),
                 **{k: float(d.get(k) or 0) for k in RECOVERY}, "gave_up": int(bool(d.get("gave_up"))),
                 "instance_mismatch": int(str(d.get("reason") or "").startswith("instance_mismatch")),
-                "sim_error": int(sim_error), "missing_log": 0, "infra_error": int(infra), "grader_error": int(grade_error)}
+                "sim_error": int(sim_error), "missing_log": 0, "infra_error": int(infra), "grader_error": int(grade_error),
+                **state_ops_fields(d, ok)}
 
 
 def main():

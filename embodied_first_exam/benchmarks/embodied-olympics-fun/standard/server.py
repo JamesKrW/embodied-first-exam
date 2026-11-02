@@ -17,6 +17,19 @@ What leaves this process: the robot's own sensors (its two head cameras, with de
 and motor torques, its two IMUs, whether each hand holds something), the venue's fixed camera, and, once an
 attempt is over, the referee's call (meta["outcome"]: "success" or the rule that ended the attempt) with the number of
 the task's stages reached. Never an object's pose, the robot's position in the venue, or the referee's state during an episode.
+
+Ablations (off unless the task sets them; nothing here runs without them):
+  rcb_service.OBJECT_POSES  object_poses(): every free body of the venue that is not the robot (World.free: balls, bars,
+                            implements, cones, the family's props; a family without one gives {}), by body name, in the
+                            robot's starting frame (the frame of /spec's camera pose_t0: origin on the floor under the
+                            pelvis at t = 0, x the way it faced, y left, z up), read off qpos; quaternions w x y z. A prop
+                            the robot carries (a pole, a rope's handle, a ski) moves with it. Never the referee's state.
+  rcb_service.STATE_OPS     save_state() / load_state(): the episode's sim rows since the frozen start, re-run from a
+                            reset on load: the world's controllers, policies, grips, the family's own state and the
+                            referee's latches and record are all part of what they rebuild (the same rows from the same
+                            start give the same state, which the service's own crash recovery relies on). Exact (the
+                            state hash, which covers the referee's record, is checked after the re-run); a load costs one
+                            control step per saved row.
 """
 from __future__ import annotations
 
@@ -43,6 +56,14 @@ def _meta_with_call(self) -> dict:
 
 rcb_service.Service.meta = _meta_with_call
 
+
+def _qmul(a, b) -> np.ndarray:
+    """Hamilton product of two w x y z quaternions."""
+    w1, x1, y1, z1 = a
+    w2, x2, y2, z2 = b
+    return np.array([w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2, w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+                     w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2, w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2])
+
 DEPTH_CAMERAS = ("head_left",)      # the G1's head depth camera (Intel RealSense D435i)
 DEPTH_MAX_M = 10.0
 
@@ -67,6 +88,7 @@ class RoboFun:
         self.raw_dim = self.ep.raw_dim
         self.mounts, self.facts = t0["cameras"], t0["robot"]
         self.data = os.environ.get("RCB_DATA", "/data")
+        self._rows: list = []                      # rcb_service.STATE_OPS: the sim rows since the frozen start
 
     # ------------------------------------------------------------------ the rcb_service.Sim contract
     def spec(self) -> dict:
@@ -156,10 +178,42 @@ class RoboFun:
 
     def step(self, row: np.ndarray) -> tuple[bool, bool, dict]:
         done = self.ep.step_raw(row)
+        if rcb_service.STATE_OPS:
+            self._rows.append(np.array(row, dtype=np.float64))
         return done, self.ep.success(), (self.referee_call() if done else {})
 
     def reset(self) -> None:
         self.ep.reset()
+        if rcb_service.STATE_OPS:
+            self._rows = []
+
+    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, OBJECT_POSES)
+    def object_pose_spec(self) -> dict:
+        return {"frame": "the robot at t = 0 (as /spec's camera pose_t0): origin on the floor under the pelvis, x the way "
+                         "it faced, y left, z up", "quaternion_order": "wxyz", "objects": list(self.ep.world.free)}
+
+    def object_poses(self) -> dict:
+        w = self.ep.world
+        x0, y0, yaw0 = w.task.start
+        c, s = np.cos(yaw0), np.sin(yaw0)
+        Y = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+        turn = np.array([np.cos(yaw0 / 2), 0.0, 0.0, -np.sin(yaw0 / 2)])   # a turn by -yaw0 about z
+        q, out = w.d.qpos, {}
+        for name, (qa, _) in w.free.items():
+            qo = np.asarray(q[qa + 3:qa + 7], dtype=np.float64)
+            out[name] = rcb_service.pose_entry(Y.T @ (np.asarray(q[qa:qa + 3]) - [x0, y0, 0.0]),
+                                               _qmul(turn, qo / np.linalg.norm(qo)))
+        return out
+
+    def save_state(self) -> dict:
+        return {"rows": np.asarray(self._rows, dtype=np.float64).reshape(-1, self.raw_dim), "sha": self.state_sha()}
+
+    def load_state(self, snap: dict) -> None:
+        self.reset()
+        for row in snap["rows"]:
+            self.step(row)
+        if self.state_sha() != snap["sha"]:
+            raise RuntimeError("re-running the saved rows did not reach the saved state")
 
     def state_sha(self) -> str:
         return self.ep.state_sha()

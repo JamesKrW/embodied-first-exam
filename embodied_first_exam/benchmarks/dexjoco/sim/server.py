@@ -23,6 +23,7 @@ verdict into final.json (nothing is replayed to grade it: owner, 2026-10-17) and
 trajectory. The frozen instance is checked when the episode begins: a scene that does not rebuild to the instance's
 recorded state hash gets no episode (instance_mismatch, an infrastructure failure)."""
 
+import copy
 import math
 import os
 import sys
@@ -417,6 +418,9 @@ SPEC = {
     "depth": {"modes": list(L.DEPTH_MODES), "default": "none", "kind": "z-depth", "unit": "m", "invalid": 0,
               "max_m": L.DEPTH_MAX_M, "frames_encoding": "uint16 mm, zlib", "noise": L.DEPTH_NOISE},
 }
+if L.STATE_OPS:   # the reset ablation: the shared layer serves /reset, /save_state and /load_state and describes them
+    SPEC["episode"] = ("an episode ends at the first success, at a task failure (see task_text), or when your time is "
+                       "over; POST /reset or /load_state starts a new one (`reset`, `state_ops`), only the last is graded")
 L.check_spec(SPEC)  # a spec that misses a 2.2 field or names a forbidden one never starts the episode
 EP.scene_built()
 
@@ -491,7 +495,7 @@ def dump() -> None:
     E["live_sha"] = S.state_sha()
     S.save_trajectory(np.asarray(ROWS, dtype=np.float64).reshape(-1, ADIM), os.path.join(DATA, "trajectory.npz"),
                       {"source": "standard-mode episode", "reason": E["reason"]}, max_rows=None)   # no hand-in cap here
-    L._write_json(os.path.join(DATA, "episode.json"), {**summary(), "live_sha": E["live_sha"]})
+    L._write_json(os.path.join(DATA, "episode.json"), {**summary(), "live_sha": E["live_sha"], **ops_fields()})
     write_final()
 
 
@@ -749,6 +753,67 @@ def end_from_signal() -> None:
     os._exit(0)
 
 
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
+# RCB_EXPOSE_OBJECT_POSES=1: the task's objects as Session.objects() names them, those that are poses: a body's position
+# and orientation (xpos, xquat), a site's position (no orientation, as Session.objects() gives it); joint angles, geoms
+# and the target region are left out. World frame, as /kinematics and proprio tcp_pose.
+OBJECTS = {name: (kind, ref) for name, (kind, ref) in M.OBJECTS.get(TASK, {}).items() if kind in ("body", "site")}
+
+
+def object_poses() -> dict:
+    out = {}
+    for name, (kind, ref) in OBJECTS.items():
+        if kind == "body":
+            b = D.body(ref)
+            out[name] = L.pose_entry(b.xpos, b.xquat)
+        else:
+            out[name] = L.pose_entry(D.site(ref).xpos)
+    return out
+
+
+# RCB_STATE_OPS=1: reset = Session.reset() (the frozen instance) and the episode's record cleared. A snapshot = the
+# Session's own snapshot (integration state, mocap, controls, the env's plain attributes; the model arrays that differ
+# from the frozen instance's), MuJoCo's sensor readings and warning counters, the Session's episode state (steps, the
+# hold counter, verdict) and a copy of the graded rows: loading it continues exactly as the saved episode would have.
+_SESSION_EPISODE = ("steps", "done", "success", "reason", "last_info", "_rcb_count")
+
+
+def ops_reset() -> None:
+    S.reset()
+    ROWS.clear()
+    E.update(t_end=None, episode_control_steps=None, dumped=False)
+
+
+def ops_save():
+    snap = S.snapshot()
+    frozen = S._snapshot["model"]
+    snap["model"] = {k: v for k, v in snap["model"].items() if not np.array_equal(v, frozen.get(k))}
+    return {"session": snap, "sensors": D.sensordata.copy(), "warnings": [(w.number, w.lastinfo) for w in D.warning],
+            "episode": copy.deepcopy({k: getattr(S, k) for k in _SESSION_EPISODE}), "rows": [r.copy() for r in ROWS]}
+
+
+def ops_load(snap) -> None:
+    S.restore({**snap["session"], "model": {**S._snapshot["model"], **snap["session"]["model"]}})
+    D.sensordata[:] = snap["sensors"]
+    for w, (number, info) in zip(D.warning, snap["warnings"]):
+        w.number, w.lastinfo = number, info
+    for k, v in copy.deepcopy(snap["episode"]).items():
+        setattr(S, k, v)
+    ROWS[:] = [r.copy() for r in snap["rows"]]
+    E.update(t_end=None, episode_control_steps=None, dumped=False)
+
+
+OPS = (L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset, save=ops_save, load=ops_load)
+       if L.STATE_OPS else None)
+
+
+def ops_fields() -> dict:
+    """episode.json's record of the state ops (RCB_STATE_OPS=1; {} without)."""
+    if OPS is None:
+        return {}
+    return OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows)
+
+
 def replay_row(row) -> None:
     """A journaled row during a resume."""
     S.step(row)
@@ -756,7 +821,8 @@ def replay_row(row) -> None:
 
 
 EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
-         start_event={"task": TASK, "instance_sha": S.instance_sha, "instance_ok": bool(S.instance_exact), "cameras": CAMS, **THREADS})
+         start_event={"task": TASK, "instance_sha": S.instance_sha, "instance_ok": bool(S.instance_exact), "cameras": CAMS, **THREADS},
+         ops=OPS)
 if E["done"]:
     dump()  # resumed after the episode had ended: the record is rewritten from the replay
 E["ready"] = True
@@ -765,4 +831,8 @@ open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{L.PROTOCOL} DexJoCo sim ready ({TASK}; startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=EP.log, episode=EP, state_sha=S.state_sha,
-                  proprio=proprio_row), port=int(os.environ.get("RCB_PORT", "8000")))
+                  proprio=proprio_row, state_ops=OPS,
+                  **({"object_poses": object_poses,
+                      "object_pose_spec": {"frame": "world (DexJoCo's world frame, as /kinematics and proprio tcp_pose)",
+                                           "quaternion_order": "wxyz", "objects": list(OBJECTS)}} if L.OBJECT_POSES else {})),
+       port=int(os.environ.get("RCB_PORT", "8000")))

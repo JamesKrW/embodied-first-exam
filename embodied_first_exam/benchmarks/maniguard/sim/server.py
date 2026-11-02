@@ -98,7 +98,7 @@ def dump() -> None:
         **{k: v for k, v in live.items() if k != "success"}, "safety_violated": live.get("counted_violation"), **INSTANCE_CHECK,
         "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
         "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
-        "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields()})
+        "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **ops_fields(), **EP.final_fields()})
     write_final()
     VIDEO.last(ctrl_steps())  # after the verdict is on disk: a render that fails or hangs here never costs it
 
@@ -443,17 +443,64 @@ def replay_row(row) -> None:
         S.step(np.asarray(row, dtype=np.float32)); VIDEO.offer(ctrl_steps())   # slots already on disk are skipped
 
 
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
+# RCB_EXPOSE_OBJECT_POSES=1: every scene object but the robot, as Session.objects() names them, the goal region's marker
+# left out: position and orientation (world frame, quaternion xyzw as everywhere in this service) and size = the
+# extents of its axis-aligned bounding box (world axes), the privileged twin's aabb.
+def _goal_marker(name: str) -> bool:
+    return name.startswith("goal_region__") or name == (S.region or {}).get("marker_name")
+
+
+OBJECTS = [n for n in S.objects() if not _goal_marker(n)] if L.OBJECT_POSES else []
+
+
+def object_poses() -> dict:
+    objs = S.objects()
+    return {n: L.pose_entry(objs[n]["position"], objs[n]["orientation_xyzw"],
+                            np.subtract(objs[n]["aabb"][1], objs[n]["aabb"][0])) for n in OBJECTS if n in objs}
+
+
+# RCB_STATE_OPS=1, reset only: Session.reset() (OmniGibson's load_state of the frozen start S0, approximate in-process:
+# PhysX keeps hidden solver state), a new recording of the graded rows and a new live video. No save / load: OmniGibson's
+# state dump leaves out the assisted and sticky grasps' constraints, and the safety monitor keeps the live environment.
+def ops_reset() -> None:
+    S.reset()
+    S.record_start()
+    E.update(t_end=None, episode_control_steps=None, dumped=False, n_actions=None, live_sha=None)
+    if E["ready"]:          # live (a crash resume's replay leaves the frames on disk to the resume)
+        VIDEO.truncate(-1)
+        VIDEO.offer(0)
+
+
+OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset) if L.STATE_OPS else None
+
+
+def ops_fields() -> dict:
+    """episode.json's record of the state ops (RCB_STATE_OPS=1; {} without)."""
+    if OPS is None:
+        return {}
+    return OPS.fields(bool(E["success"]), E["reason"], EP.events(), E.get("t_first"), EP.rows)
+
+
+if OPS is not None:
+    SPEC["episode"] = SPEC["episode"].replace("one episode, no reset: it", "an episode") + (
+        "; POST /reset starts a new one (`reset`), only the last is graded")
 L.check_spec(SPEC)                      # before the episode starts: a bad /spec must not cost a resume
 EP.scene_built()                        # the scene and everything the service needs exist: the startup watchdog stands down
 VIDEO = live_video.LiveVideo(DATA, ctrl_hz=CTRL_HZ, frame=lambda: S.render_grid(VIDEO_CAMS, cols=len(VIDEO_CAMS)), log=EP.log)
 VIDEO.offer(0)                          # the start state (a restarted service has it on disk already)
 S.record_start()                        # the trajectory: a resume's journal replay is recorded too
 resumed = EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC,
-                   start_event={"task": TASK, "cameras": CAMS, "instance_sha": S.instance_sha}, on_end=_end_from_signal)
+                   start_event={"task": TASK, "cameras": CAMS, "instance_sha": S.instance_sha}, on_end=_end_from_signal, ops=OPS)
 if resumed:
     VIDEO.truncate(ctrl_steps())       # frames of the call lost in the crash show rolled-back states
 E["ready"] = True; write_final()
 open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at call ' + str(E['calls']) if resumed else ''})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  state_ops=OPS,
+                  **({"object_poses": object_poses,
+                      "object_pose_spec": {"frame": "world (the scene's world frame, as proprio tcp_pose and /kinematics); size = "
+                                                    "axis-aligned bounding box extents along the world axes",
+                                           "quaternion_order": "xyzw", "objects": OBJECTS}} if L.OBJECT_POSES else {})))
