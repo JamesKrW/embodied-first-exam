@@ -10,7 +10,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.4.0-nosignal@sha256:9c8e3
      /privileged/environment/rcb_ikea.py \
      /sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0-nosignal@sha256:38e8c14e0aad8b8057d65c04eca6aeaeb4273f7a2a4f546514ae78ea05dd3821 /nyx_direct.py /srv/nyx_direct.py
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0-nosignal2@sha256:afef6dc0e2fe4a8025139c1efcff649baa7fd3c38b46eedff1b40e663855ebbe /nyx_direct.py /srv/nyx_direct.py
 COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-nosignal@sha256:9d9eb71b2baafac8d8a7975a78cca8e0e4f4ffd0aab700ed137653aa5f4e59d5 \
      /rcb1.py \
      /v2_4/rcb_limited.py \

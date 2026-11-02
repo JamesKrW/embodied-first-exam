@@ -78,7 +78,7 @@ def ctrl_steps() -> int:
 # (rcb_topogym.SIMULATOR_INSTABILITY: a cloth particle faster than PARTICLE_SPEED_LIMIT_M_S, before the task's own failure
 # predicates). A simulator error the agent's call raised (reason "error") is the agent's 0 (PROTOCOL §4).
 INFRA_REASONS = ("simulator_instability",)
-if L.HIDE_SUCCESS:      # (hide) the task ended on its own success although rcb_topogym turned its goal off: never graded
+if L.HIDE_SUCCESS:      # (hide) the task ended on its own success although its goal was turned off (below): never graded
     INFRA_REASONS += ("hide_switch_failed",)
 
 
@@ -173,8 +173,71 @@ def finish(reason: str) -> None:
 
 # ---------------------------------------------------------------- scene
 import rcb_topogym as M  # noqa: E402
+if L.HIDE_SUCCESS:
+    # (hide) The no-success-signal ablation, installed here and not in rcb_topogym.py (the instances' runtime binding pins
+    # that file's bytes, tooling_sha256). The task's goal never ends the episode: TopoGym's TaskDefinition.update judges
+    # success only while the task's `goal_complete` switch is on and keeps its stability window either way, so the switch
+    # goes off once the scene is built and checked; the task's failure predicates and the breakdown rules end the episode
+    # as before. goal_now() is the state's success (the window complete now); at the end the service holds the last
+    # command with the switch on again for up to one window (hold_window(): the time already held counted). The families
+    # with a final-settling check (rcb_topogym._settle_only_when_reached) skip evaluate_settling during the episode (it ran
+    # only on goal ticks: their cost told the goal apart); it gates only the goal, never a failure or anything the agent
+    # sees; enable_goal() turns it on and restarts the window for the end hold.
+    from types import MethodType as _MethodType
+
+    def _settle_only_when_reached_hidden(task) -> bool:
+        if task.final_settling_spec() is None:
+            return False
+
+        def _evaluate_terminal(self, state, private, reference):
+            reached, failure, metrics, private = self.evaluate_transition(state, private)
+            spec = self.final_settling_spec()
+            next_reference = None
+            if spec is not None and not failure and reached and self._rcb_settling:
+                from topogym.evaluation.terminal import evaluate_settling
+                settled, measurements, next_reference = evaluate_settling(state, spec, reference)
+                status = metrics.get("evaluation_status", "available")
+                if status not in {"available", "unavailable"}:
+                    raise ValueError("Invalid task evaluation status")
+                status = "available" if status == measurements["evaluation_status"] == "available" else "unavailable"
+                metrics = {**metrics, "final_settling": measurements, "evaluation_status": status}
+                reached = bool(reached and settled and status == "available")
+                if not reached:
+                    next_reference = None
+            return reached, failure, metrics, private, next_reference
+        task._rcb_settling = False
+        task._evaluate_terminal = _MethodType(_evaluate_terminal, task)
+        return True
+    M._settle_only_when_reached = _settle_only_when_reached_hidden
+
+    def _goal_now(self) -> bool:
+        """The task's success on the state now: its goal held through the whole stability window (TaskDefinition.update's
+        `succeeded` without the goal_complete switch); never after the task's own end."""
+        t = self.env._task
+        if self.episode_end is not None:
+            return self.episode_end == "success"
+        return bool(t._goal_active and t.stable_time_s + 1e-12 >= float(t.config.get("stable_duration_s", .5)))
+
+    def _hold_window(self) -> int:
+        """Control steps left of one stability window from now, the time the goal has already held counted."""
+        t = self.env._task
+        left = float(t.config.get("stable_duration_s", .5)) - (float(t.stable_time_s) if t._goal_active else 0.0)
+        # one control step more: a window that starts on the next tick counts that tick as 0 (TaskDefinition.update)
+        return max(1, int(math.ceil(left * self.control_hz - 1e-9))) + 1
+
+    def _enable_goal(self) -> None:
+        """The goal_complete switch on again: the task's next update that completes the window is its success. A
+        final-settling family turns its settling on and restarts the window (the episode's window had no settling)."""
+        t = self.env._task
+        t.goal_complete = True
+        if self.settle_only_when_reached:
+            t._rcb_settling = True
+            t.stable_time_s, t._goal_active, t._settling_reference = 0.0, False, None
+    M.Session.goal_now, M.Session.hold_window, M.Session.enable_goal = _goal_now, _hold_window, _enable_goal
 try:
     S = M.Session(TASK, instance=INSTANCE, strict=True)
+    if L.HIDE_SUCCESS:      # (hide) after the instance checks: the goal no longer ends the episode
+        S.env._task.goal_complete = False
     M.atomic_json(os.path.join(DATA, "startup_binding.json"), dict(
         instance_exact=S.instance_exact, runtime_binding=S.runtime_binding,
         instance_generated=bool(getattr(S, "instance_generated", False)), instance_sha=S.instance_sha,
@@ -508,7 +571,7 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder, *, row_start=False, notes: list | 
                 notes.append({"row": ri, "index": int(ARM[arm][1]), "reason": text})
     stop = EP.journal(S.hold_action(), physics_steps=S.last_step_ticks) if S.n_steps != before else EP.poll_stop()
     rec.tick()
-    if L.HIDE_SUCCESS and S.n_steps != before:    # (hide) the state's success, never shown (rcb_topogym.HIDE_SUCCESS)
+    if L.HIDE_SUCCESS and S.n_steps != before:    # (hide) the state's success, never shown (goal_now, above)
         L.hidden_success(E, S.goal_now(), log, ctrl_steps())
     if S.episode_end is not None and "end_row" not in E and S._recording is not None:
         E["end_row"] = len(S._recording)      # the row at which the live episode ended (success or a failure predicate)
