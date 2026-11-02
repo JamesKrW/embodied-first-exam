@@ -22,6 +22,7 @@ services:
     command: python /srv/rcb_realtime.py
     restart: on-failure:6                               # a crash resumes the same episode, paused, never a reset
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_TASK: bookshelf_simple
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "Put each of the five red-tinted objects (the other seven are grey) onto its place on the bookshelf, shown as a translucent copy of it in the same colour, one at a time, palest first and darkest last."

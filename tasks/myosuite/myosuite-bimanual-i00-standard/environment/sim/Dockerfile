@@ -3,13 +3,13 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:myosuite-0.1.1
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:myosuite-files-0.4.0@sha256:3bb4826f99a51edabdd6ff29b6948bfbeb4332222f6ae7a6d85601268a309143 \
+COPY --from=ghcr.io/mll-lab-nu/efe:myosuite-files-0.4.0-nosignal@sha256:5bf5ae29389700958f1e04eb332810f7208850c29b9d1553e6de377220f103e8 \
      /sim/finalize.sh \
      /privileged/environment/rcb_myosuite.py \
      /sim/server.py \
      /sim/video.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:90253c4cb419668f84c6728dc6d6e23ea55ef8d7f7e7835a5eb65015729f91b0 \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-nosignal@sha256:9d9eb71b2baafac8d8a7975a78cca8e0e4f4ffd0aab700ed137653aa5f4e59d5 \
      /rcb1.py \
      /rcb_limited.py \
      /run.sh \

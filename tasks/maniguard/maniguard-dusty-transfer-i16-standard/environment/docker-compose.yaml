@@ -31,6 +31,7 @@ services:
     command: sh /srv/run.sh
     restart: on-failure:6
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       OMP_NUM_THREADS: "8"
       MKL_NUM_THREADS: "8"
       RCB_TASK: dusty_transfer/task_0016

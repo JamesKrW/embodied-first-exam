@@ -21,6 +21,7 @@ services:
     tmpfs:
       - /tmp                                            # robosuite writes its log there
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_INSTANCE: /srv/instance.json
       RCB_TASK_TEXT: "Open the top layer of the drawer and put the bowl inside."
       RCB_EPISODE: "Ends when the task succeeds (reason \"success\"), after 9000 control steps (\"failed\"), when your time is up (\"timeout\"), or on a simulator error (\"error\")."

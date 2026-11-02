@@ -22,6 +22,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_INSTANCE: /srv/instance.json
       RCB_TASK_TEXT: "Get the fifty small dark-red cubes scattered on the floor into the translucent grey box marked on the floor at the end of the kitchen island (the free-standing white-topped counter) nearest the robot; a wiper stands on the floor near the cubes."
       RCB_WALL_CLOCK_S: "1800.0"

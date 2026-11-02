@@ -20,6 +20,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6          # a crash retries; mid-episode the service resumes the same episode from its journal (never a reset; server.py)
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_TASK: place_bread_skillet
       RCB_INSTANCE: /srv/instance.json
       PYTHONPATH: /srv:/opt/RoboTwin

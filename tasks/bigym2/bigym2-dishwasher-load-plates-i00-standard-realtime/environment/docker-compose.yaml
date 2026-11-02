@@ -21,6 +21,7 @@ services:
     command: python /srv/rcb_realtime.py
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_INSTANCE: /srv/instance.json
       RCB_TASK_TEXT: "Take the plates from the dish rack and gently slot them into the dishwasher's lower rack."
       RCB_EPISODE: "one episode, no reset: it succeeds when this has held for 1 s (50 control steps): each of the two plates stands on edge in the dishwasher's lower rack: its face toward your left or right (its axis within 20 degrees of the robot's left or right at the start), touching the lower rack, held by neither gripper; both plates at once (held = a finger of the gripper touching the object); a plate touching the floor ends the episode as a failure; a fall (pelvis tilted beyond ~53 degrees or below 0.30 m) fails it without ending it; it ends at the success, a failure, the pelvis 10 m from the scene's origin, a simulator error, or after 3150 control steps"

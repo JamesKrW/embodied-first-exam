@@ -177,6 +177,25 @@ torque (N m) at the wrist flange in the flange's frame, the hand's own weight in
 
 The columns: `left_q_joint1`, `left_q_joint2`, `left_q_joint3`, `left_q_joint4`, `left_q_joint5`, `left_q_joint6`, `left_dq_joint1`, `left_dq_joint2`, `left_dq_joint3`, `left_dq_joint4`, `left_dq_joint5`, `left_dq_joint6`, `left_gripper`, `left_gripper_opening_m`, `left_tcp_x`, `left_tcp_y`, `left_tcp_z`, `left_tcp_qw`, `left_tcp_qx`, `left_tcp_qy`, `left_tcp_qz`, `left_ft_fx`, `left_ft_fy`, `left_ft_fz`, `left_ft_tx`, `left_ft_ty`, `left_ft_tz`, `right_q_joint1`, `right_q_joint2`, `right_q_joint3`, `right_q_joint4`, `right_q_joint5`, `right_q_joint6`, `right_dq_joint1`, `right_dq_joint2`, `right_dq_joint3`, `right_dq_joint4`, `right_dq_joint5`, `right_dq_joint6`, `right_gripper`, `right_gripper_opening_m`, `right_tcp_x`, `right_tcp_y`, `right_tcp_z`, `right_tcp_qw`, `right_tcp_qx`, `right_tcp_qy`, `right_tcp_qz`, `right_ft_fx`, `right_ft_fy`, `right_ft_fz`, `right_ft_tx`, `right_ft_ty`, `right_ft_tz`, `time_s`.
 
+## This run: no success signal
+
+This run changes how the episode ends. This section overrides anything above, and anything in `/spec`, that says a
+success ends the episode, that `meta["reason"]` can be `"success"`, or that a success refuses later calls or resets.
+
+- The robot never tells you whether you have succeeded: reaching the goal changes no response, status, error or
+  counter, and the episode does not end there.
+- You decide when you are done: send `POST /finish` with an empty JSON body (`{}`) to the service, on the same base
+  URL as your other calls (`http://sim:8000` or `http://localhost:8000`; in Python, for example
+  `requests.post(base + "/finish", json={})`). The state at that moment is graded with the task's success rule (with
+  the task's settle or hold time described above, run from that state). After `/finish` every call is refused (409).
+- If you do not call it, the state when your session ends (you stop, or your time runs out) is graded.
+- A success reached earlier and then undone does not count: only the state at the end is graded. An event the task
+  records once it happens (for example a scored goal or a completed stage sequence) stays part of that state, also
+  when one of the task's failure rules ends the episode after it. Resets work as described above, within the budget,
+  and only the episode that ends with `/finish` or at the end of your session is graded.
+- The episode still ends on its own on a simulator error, at the task's technical step limit (graded as it stands),
+  and where the task's own rules end it as a failure (for example a fall), as described above.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

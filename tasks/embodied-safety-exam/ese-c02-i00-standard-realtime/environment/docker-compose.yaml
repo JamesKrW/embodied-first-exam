@@ -22,6 +22,7 @@ services:
     command: python /srv/rcb_ese_rt.py                  # server.py's adapter under rcb_realtime.py's clock
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_INSTANCE: /srv/instance.json
       RCB_DATA: /data
       RCB_WALL_CLOCK_S: "3600"

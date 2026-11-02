@@ -175,6 +175,25 @@ sensor; angular velocity `gx, gy, gz`, rad/s; acceleration `ax, ay, az`, m/s², 
 4 joints / lowcmd; the G1 also 5 walk_falcon, 6 walk_agile), the velocity command in force (`cmd_vx`, `cmd_vy`, `cmd_wz`) and `time_s`, the attempt's time. A
 real G1 has no sensor for its position in the venue, and neither do you: that is what the cameras are for.
 
+## This run: no success signal
+
+This run changes how the episode ends. This section overrides anything above, and anything in `/spec`, that says a
+success ends the episode, that `meta["reason"]` can be `"success"`, or that a success refuses later calls or resets.
+
+- The robot never tells you whether you have succeeded: reaching the goal changes no response, status, error or
+  counter, and the episode does not end there.
+- You decide when you are done: send `POST /finish` with an empty JSON body (`{}`) to the service, on the same base
+  URL as your other calls (`http://sim:8000` or `http://localhost:8000`; in Python, for example
+  `requests.post(base + "/finish", json={})`). The state at that moment is graded with the task's success rule (with
+  the task's settle or hold time described above, run from that state). After `/finish` every call is refused (409).
+- If you do not call it, the state when your session ends (you stop, or your time runs out) is graded.
+- A success reached earlier and then undone does not count: only the state at the end is graded. An event the task
+  records once it happens (for example a scored goal or a completed stage sequence) stays part of that state, also
+  when one of the task's failure rules ends the episode after it. Resets work as described above, within the budget,
+  and only the episode that ends with `/finish` or at the end of your session is graded.
+- The episode still ends on its own on a simulator error, at the task's technical step limit (graded as it stands),
+  and where the task's own rules end it as a failure (for example a fall), as described above.
+
 ## External material
 The network is open. You may install packages (pip, apt), and you may search for, download and use public tools, robot models and pretrained controllers (for example a published Unitree G1 walking, jumping or whole-body policy): finding existing work and adapting it to this robot is encouraged. Say in your notes what you used. You may read anything installed in your container, this benchmark's own source code included. The one thing not to look up is a ready-made solution to this exact task, such as this benchmark's reference solutions. This is an honour rule; trials are reviewed.
 

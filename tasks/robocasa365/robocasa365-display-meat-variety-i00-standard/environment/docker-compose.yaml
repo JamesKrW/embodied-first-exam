@@ -20,6 +20,7 @@ services:
     command: python /srv/server_casa.py
     restart: on-failure:6
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_TOOL: casa_tool
       RCB_INSTANCE: /srv/instance.npz
       RCB_STARTUP_TIMEOUT_S: "600"

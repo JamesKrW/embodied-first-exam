@@ -170,6 +170,25 @@ the wrist flange in the flange's frame, the hand's own weight included; `time_s`
 
 The columns: `q_shoulder_pan_joint`, `q_shoulder_lift_joint`, `q_elbow_joint`, `q_wrist_1_joint`, `q_wrist_2_joint`, `q_wrist_3_joint`, `dq_shoulder_pan_joint`, `dq_shoulder_lift_joint`, `dq_elbow_joint`, `dq_wrist_1_joint`, `dq_wrist_2_joint`, `dq_wrist_3_joint`, `gripper`, `gripper_opening_m`, `tcp_x`, `tcp_y`, `tcp_z`, `tcp_qw`, `tcp_qx`, `tcp_qy`, `tcp_qz`, `ft_fx`, `ft_fy`, `ft_fz`, `ft_tx`, `ft_ty`, `ft_tz`, `time_s`.
 
+## This run: no success signal
+
+This run changes how the episode ends. This section overrides anything above, and anything in `/spec`, that says a
+success ends the episode, that `meta["reason"]` can be `"success"`, or that a success refuses later calls or resets.
+
+- The robot never tells you whether you have succeeded: reaching the goal changes no response, status, error or
+  counter, and the episode does not end there.
+- You decide when you are done: send `POST /finish` with an empty JSON body (`{}`) to the service, on the same base
+  URL as your other calls (`http://sim:8000` or `http://localhost:8000`; in Python, for example
+  `requests.post(base + "/finish", json={})`). The state at that moment is graded with the task's success rule (with
+  the task's settle or hold time described above, run from that state). After `/finish` every call is refused (409).
+- If you do not call it, the state when your session ends (you stop, or your time runs out) is graded.
+- A success reached earlier and then undone does not count: only the state at the end is graded. An event the task
+  records once it happens (for example a scored goal or a completed stage sequence) stays part of that state, also
+  when one of the task's failure rules ends the episode after it. Resets work as described above, within the budget,
+  and only the episode that ends with `/finish` or at the end of your session is graded.
+- The episode still ends on its own on a simulator error, at the task's technical step limit (graded as it stands),
+  and where the task's own rules end it as a failure (for example a fall), as described above.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

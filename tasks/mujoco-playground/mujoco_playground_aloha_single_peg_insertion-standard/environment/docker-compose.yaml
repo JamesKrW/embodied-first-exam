@@ -20,6 +20,7 @@ services:
     command: python /srv/server_mj.py
     restart: on-failure:6
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_TOOL: rcb_aloha
       RCB_INSTANCE: /srv/instance.json
       PYTHONPATH: /srv

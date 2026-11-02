@@ -26,6 +26,7 @@ services:
     command: python /srv/rcb_realtime.py
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_INSTANCE: /srv/instance.json
       RCB_DATA: /data
       OMP_NUM_THREADS: "1"                              # one thread per numeric library: the world steps on one core

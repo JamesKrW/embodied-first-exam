@@ -28,6 +28,7 @@ services:
     command: sh /srv/run.sh
     restart: on-failure:6
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_TASK: sweep_blocks_random
       RCB_INSTANCE: /srv/instance.json
       RCB_TOOL: /srv/rcb_robodojo.py

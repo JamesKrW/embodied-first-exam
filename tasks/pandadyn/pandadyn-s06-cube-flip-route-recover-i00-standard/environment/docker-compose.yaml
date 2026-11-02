@@ -27,6 +27,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6          # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_INSTANCE: /srv/instance.json
       RCB_TEXTS: /srv/texts.json
       RCB_DATA: /data

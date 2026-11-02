@@ -76,6 +76,9 @@ import mujoco  # noqa: E402
 from rcb_service import main  # noqa: E402
 
 GL_BACKEND = os.environ.get("MUJOCO_GL", "?")
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1; off by default): only the termination rule ends an episode here;
+# the horizon is the service's step cap (max_control_steps), judged on the state it leaves, whatever the check says
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 CAM_W, CAM_H = 320, 240                    # the standard twin's
 GL2CV = np.diag([1.0, -1.0, -1.0])
 
@@ -218,6 +221,8 @@ class Quadruped:
         s = self.s
         fell = s.kind in ("joystick", "stand_on_two") and s.fell_at is not None
         success = bool(chk["success"]) and (s.kind != "joystick" or s.done)
+        if HIDE_SUCCESS:
+            return bool(fell), success and not fell, {}
         return bool(fell or s.done or success), success, {}
 
     def reset(self) -> None:

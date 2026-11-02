@@ -3,12 +3,12 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:molmospaces-0.2.5
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:molmospaces-files-0.3.0@sha256:9fafad0888023b251e737ddd4745cc99e527106168442e3dfdb1f4268dfe902a \
+COPY --from=ghcr.io/mll-lab-nu/efe:molmospaces-files-0.3.0-nosignal@sha256:4f339b0a7445840cb33724e01de5c842c8a85c6aac8992323e028634da152c84 \
      /sim/finalize.sh \
      /privileged/environment/rcb_molmospaces.py \
      /sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0@sha256:90253c4cb419668f84c6728dc6d6e23ea55ef8d7f7e7835a5eb65015729f91b0 \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-nosignal@sha256:9d9eb71b2baafac8d8a7975a78cca8e0e4f4ffd0aab700ed137653aa5f4e59d5 \
      /rcb1.py \
      /rcb_limited.py \
      /run.sh \

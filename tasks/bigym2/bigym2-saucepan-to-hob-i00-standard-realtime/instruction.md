@@ -89,6 +89,25 @@ client's docstring explains the protocol with another benchmark's examples (`joi
 ## Proprioception
 Each row (`meta["proprio"]["now"]`, `res.proprio`) has, in `spec()["proprio_layout"]` order: the positions (`*_pos`) of the 3 waist joints (they show the lean you command), each arm's 7 joints (rad) and its gripper's 2 finger joints (slides, m), and the pelvis (`pelvis_x_pos`, `pelvis_y_pos`, `pelvis_z_pos` in m and `pelvis_rz_pos`, its heading, in rad: the room's frame, z up, heading 0 along the room's +x axis and counter-clockwise positive): 25 values; then their velocities (`*_vel`, per second) in the same order; then `left_gripper_state` and `right_gripper_state` (0 open .. 1 closed); then the pelvis pose again as the base controller tracks it (`pelvis_x`, `pelvis_y`, `pelvis_z`, `pelvis_yaw`). This is BiGym's own low-dimensional observation, the one its learned policies receive.
 
+## This run: no success signal
+
+This run changes how the episode ends. This section overrides anything above, and anything in `/spec`, that says a
+success ends the episode, that `meta["reason"]` can be `"success"`, or that a success refuses later calls or resets.
+
+- The robot never tells you whether you have succeeded: reaching the goal changes no response, status, error or
+  counter, and the episode does not end there.
+- You decide when you are done: send `POST /finish` with an empty JSON body (`{}`) to the service, on the same base
+  URL as your other calls (`http://sim:8000` or `http://localhost:8000`; in Python, for example
+  `requests.post(base + "/finish", json={})`). The state at that moment is graded with the task's success rule (with
+  the task's settle or hold time described above, run from that state). After `/finish` every call is refused (409).
+- If you do not call it, the state when your session ends (you stop, or your time runs out) is graded.
+- A success reached earlier and then undone does not count: only the state at the end is graded. An event the task
+  records once it happens (for example a scored goal or a completed stage sequence) stays part of that state, also
+  when one of the task's failure rules ends the episode after it. Resets work as described above, within the budget,
+  and only the episode that ends with `/finish` or at the end of your session is graded.
+- The episode still ends on its own on a simulator error, at the task's technical step limit (graded as it stands),
+  and where the task's own rules end it as a failure (for example a fall), as described above.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 
