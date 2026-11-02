@@ -13,7 +13,7 @@ Both hands hang from the same six-axis wrist stage (origin above the counter), w
 The robot service runs the hand named by `DEXHAND_HAND` on the sim service (default `sharpa`); the agent cannot switch it during an episode. `spec()["hand"]` names it, and `spec()["action_types"]["joint_position"]` gives the row width (`28` for `sharpa`, `26` for `wuji`) and the exact order. The episode record names the hand; the service grades the episode it ran with that hand.
 
 ## Episodes and resets
-You have **20 resets** (`spec["budget"]["reset"]`, which is authoritative: if it says 0, there is no reset
+You have **1000 resets** (`spec["budget"]["reset"]`, which is authoritative: if it says 0, there is no reset
 and the one episode is the run). A reset puts the robot and every object back in the same frozen starting state and
 starts a new episode, either abandoning the running one or after one has ended; it takes no simulated time and
 returns the start's images and proprioception:
@@ -103,6 +103,44 @@ counts. The episode ends immediately with failure, checked after every 2 ms phys
 
 Later actions cannot undo a failure. Only hand and wrist-stage actuator targets are allowed; there are no welds,
 attachments, scripted object motion or object forces.
+
+## This run: unlimited resets, save and load
+
+This run changes the reset budget and adds two calls. This section overrides anything above, and anything in `/spec`,
+that says there is no reset, one episode only, or fewer resets.
+
+- You have 1000 resets (`spec()["budget"]["reset"]` is 1000): in practice as many as your time allows.
+- `POST /reset` on the same base URL as your other calls (`http://sim:8000` or `http://localhost:8000`), with a JSON body
+  such as `{"cameras": []}` (in Python, for example `requests.post(base + "/reset", json={"cameras": []})`; the
+  client's `_post("/reset", {"cameras": []}, [], 60)` where it has no `reset()`). It abandons the running episode, or
+  follows one that has ended (a failure or a fall included), and starts a new episode from the same starting state.
+  The answer carries the new episode's first frames; `meta` and `GET /status` add `episode`, `resets_left`, `saves`,
+  `loads` and `control_steps_total`.
+- Where `/spec` has `state_ops`, two more calls exist (its text is the full rule):
+  - `POST /save_state` with `{}` stores the current state in the service and answers JSON
+    `{"handle": "s1", "step": ...}`. The handle is all you get, never the state's contents.
+  - `POST /load_state` with `{"handle": "s1", "cameras": []}` restores a state saved earlier in this run and starts a
+    new episode there; it answers as `/reset` does. At most 32 handles are kept (the least recently used one is
+    dropped). Saves and loads do not use up resets.
+  Where `/spec` has no `state_ops`, this task offers resets only.
+- Your time keeps running across resets and loads (in standard-realtime the robot's clock pauses after a reset or a
+  load until your next command).
+- Only the last episode is graded: from the starting state, or for a loaded episode the path that led to the saved
+  state followed by what you did after the load. The success rule is checked again from your next command on. A
+  success still ends the run: no reset, save or load after it.
+
+## This run: object poses
+
+This run gives you the objects' poses. This section overrides anything above, and anything in `/spec`, that says
+object poses are never given.
+
+- Every answer of `/submit`, `/observe` and `/reset` (and `/load_state` where it exists) has
+  `meta["objects"]`: `{name: {"pos": [x, y, z], "quat": [4 numbers], "size": [...]}}`, each object's pose at the
+  state the answer ends in. `quat` is absent for objects with no orientation (a cloth or a fluid gives its centroid),
+  `size` only where the task gives one.
+- `spec()["object_poses"]` names the objects, the frame the poses are in (the frame of the robot poses this service
+  already gives you) and the quaternion order. The units are metres.
+- Nothing else changes: the goal, the success rule and its thresholds are not given.
 
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.

@@ -26,6 +26,9 @@ services:
     command: sh /srv/run.sh
     restart: on-failure:6          # N >= 3 (docs/protocol/standard_mode.md); a resume continues the episode
     environment:
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
+      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
       RCB_TASK: stegesund
       RCB_DATA: /data
       RCB_WALL_CLOCK_S: "10800"   # the agent's wall clock, from its first request (= [agent] timeout_sec), server.py

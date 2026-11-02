@@ -27,6 +27,8 @@ services:
     command: python /srv/rcb_realtime.py
     restart: on-failure:6          # N >= 3 (docs/protocol/standard_mode.md); a resume continues the episode, paused
     environment:
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
+      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
       RCB_INSTANCE: /srv/instance.json
       RCB_TEXTS: /srv/texts.json
       RCB_DATA: /data
@@ -35,7 +37,7 @@ services:
       PYTHONPATH: /srv:/opt/pandadyn
       RCB_SESSION_LOG: ""           # the sidecar's own Session must not write the agent-side interaction log
       RCB_SLOWDOWN: "${RCB_SLOWDOWN:-3}"                # S = 3: the world runs at 1/S of real speed (this family's measured RTF 0.71-1.01; PROTOCOL §2)
-      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-3}"        # 3 resets (tasks/pandadyn/README.md, "Reset budget"); 0: one episode
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
     deploy:
       resources:
         reservations:

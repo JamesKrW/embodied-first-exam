@@ -22,12 +22,14 @@ services:
     command: python /srv/server.py
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
+      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
       RCB_INSTANCE: /srv/instance.json
       RCB_TASK_TEXT: "Move all 50 small dark-red cubes from the yellow bin into the green bin; a scoop is in the scene."
       RCB_WALL_CLOCK_S: "1800.0"
       # Knobs: ${NAME:-default} takes NAME from the shell that runs harbor. The defaults are the standard
       # configuration; results under other settings are reported separately.
-      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-0}"        # KinDER standard's default (tasks/kinder/README.md); 0: one episode
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
       RCB_OBS_DEPTH: "${RCB_OBS_DEPTH:-1}"              # 1: depth (m) with robot_wrist, the Gen3's RGB-D camera
       RCB_OBS_ROOM_CAMERA: "${RCB_OBS_ROOM_CAMERA:-0}"  # 1: + room_camera, fixed in the room, never overhead
       NVIDIA_DRIVER_CAPABILITIES: compute,graphics,utility

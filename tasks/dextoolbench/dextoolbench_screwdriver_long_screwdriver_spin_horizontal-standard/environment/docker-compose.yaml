@@ -20,11 +20,13 @@ services:
     command: python /srv/server_mj.py
     restart: on-failure:6
     environment:
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
+      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
       RCB_TOOL: rcb_dtb
       RCB_INSTANCE: /srv/instance.json
       RCB_DTB_GOAL_TIMEOUT_S: "0"
       RCB_MAX_CONTROL_STEPS: "360000"
-      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-20}"   # DexToolBench standard: 20 resets (PROTOCOL §2); 0: one episode
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
       RCB_START_SHA: "09bbb164fcc5"   # the frozen start's state hash: an episode on another start is refused (instance_mismatch)
       PYTHONPATH: /srv
       RCB_MJ_ROOT: /opt/rcb_mj
