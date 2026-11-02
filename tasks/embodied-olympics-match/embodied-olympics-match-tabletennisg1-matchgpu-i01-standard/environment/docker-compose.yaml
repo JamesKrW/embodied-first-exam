@@ -81,7 +81,7 @@ services:
       RCB_WALL_CLOCK_S: "7200"
   practice:
     cpus: 8   # rcb-monitor
-    mem_limit: 4096m   # rcb-monitor
+    mem_limit: 8192m   # rcb-monitor
     pids_limit: 512   # rcb-monitor
     build:
       context: sim

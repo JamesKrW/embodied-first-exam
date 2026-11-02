@@ -39,7 +39,7 @@ Caps per container (PROTOCOL §6).
 |---|---|---|---|---|---|
 | `main` (the agent's) | 8 | 16 GiB | 2048 | no GPU | 10 GiB |
 | `sim` | 12 | 8 GiB | 1024 | no GPU | — |
-| `practice` | 8 | 4 GiB | 512 | no GPU | — |
+| `practice` | 8 | 8 GiB | 512 | no GPU | — |
 | `practice_player` | 1 | 1 GiB | 64 | no GPU | — |
 | verifier | no cap | no cap | no cap | no GPU | no cap |
 

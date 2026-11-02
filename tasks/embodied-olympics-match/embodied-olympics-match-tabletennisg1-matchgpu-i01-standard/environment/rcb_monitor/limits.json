@@ -10,7 +10,7 @@
   },
   "practice": {
    "cpus": 8.0,
-   "memory_gb": 4.0,
+   "memory_gb": 8.0,
    "pids": 512
   },
   "practice_player": {
