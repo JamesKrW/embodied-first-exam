@@ -17,6 +17,7 @@ services:
     command: sh /srv/run.sh
     restart: on-failure:6
     environment:
+      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
       RCB_TASK: essential_two_object
       RCB_DATA: /data
       RCB_WALL_CLOCK_S: "3600"

@@ -27,6 +27,7 @@ services:
     command: python /srv/rcb_realtime.py
     restart: on-failure:6          # N >= 3 (docs/protocol/standard_mode.md); a resume continues the episode, paused
     environment:
+      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
       RCB_INSTANCE: /srv/instance.json
       RCB_TEXTS: /srv/texts.json
       RCB_DATA: /data

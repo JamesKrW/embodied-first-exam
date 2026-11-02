@@ -209,6 +209,19 @@ sensor; angular velocity `gx, gy, gz`, rad/s; acceleration `ax, ay, az`, m/s², 
 4 joints / lowcmd; the G1 also 5 walk_falcon, 6 walk_agile), the velocity command in force (`cmd_vx`, `cmd_vy`, `cmd_wz`) and `time_s`, the attempt's time. A
 real G1 has no sensor for its position in the venue, and neither do you: that is what the cameras are for.
 
+## This run: object poses
+
+This run gives you the objects' poses. This section overrides anything above, and anything in `/spec`, that says
+object poses are never given.
+
+- Every answer of `/submit`, `/observe` and `/reset` (and `/load_state` where it exists) has
+  `meta["objects"]`: `{name: {"pos": [x, y, z], "quat": [4 numbers], "size": [...]}}`, each object's pose at the
+  state the answer ends in. `quat` is absent for objects with no orientation (a cloth or a fluid gives its centroid),
+  `size` only where the task gives one.
+- `spec()["object_poses"]` names the objects, the frame the poses are in (the frame of the robot poses this service
+  already gives you) and the quaternion order. The units are metres.
+- Nothing else changes: the goal, the success rule and its thresholds are not given.
+
 ## External material
 The network is open. You may install packages (pip, apt), and you may search for, download and use public tools, robot models and pretrained controllers (for example a published Unitree G1 walking, jumping or whole-body policy): finding existing work and adapting it to this robot is encouraged. Say in your notes what you used. You may read anything installed in your container, this benchmark's own source code included. The one thing not to look up is a ready-made solution to this exact task, such as this benchmark's reference solutions. This is an honour rule; trials are reviewed.
 

@@ -86,6 +86,19 @@ Cameras: `egocentric_mirrored_camera` (static, facing the robot across the table
 
 Objects here: a grey bin, a mug, a mustard bottle, a bowl, a ranch dressing bottle, two red BBQ sauce bottles, a box of oatmeal raisin cookies, a tuna can, a Soft Scrub bottle, a wooden block and a coffee pot. The Robotiq opens to 8.5 cm. The episode ends by itself the moment the success condition above holds.
 
+## This run: object poses
+
+This run gives you the objects' poses. This section overrides anything above, and anything in `/spec`, that says
+object poses are never given.
+
+- Every answer of `/submit`, `/observe` and `/reset` (and `/load_state` where it exists) has
+  `meta["objects"]`: `{name: {"pos": [x, y, z], "quat": [4 numbers], "size": [...]}}`, each object's pose at the
+  state the answer ends in. `quat` is absent for objects with no orientation (a cloth or a fluid gives its centroid),
+  `size` only where the task gives one.
+- `spec()["object_poses"]` names the objects, the frame the poses are in (the frame of the robot poses this service
+  already gives you) and the quaternion order. The units are metres.
+- Nothing else changes: the goal, the success rule and its thresholds are not given.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

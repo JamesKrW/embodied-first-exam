@@ -89,6 +89,19 @@ client's docstring explains the protocol with another benchmark's examples (`joi
 ## Proprioception
 Each row (`meta["proprio"]["now"]`, `res.proprio`) has, in `spec()["proprio_layout"]` order: the positions (`*_pos`) of the 3 waist joints (they show the lean you command), each arm's 7 joints (rad) and its gripper's 2 finger joints (slides, m), and the pelvis (`pelvis_x_pos`, `pelvis_y_pos`, `pelvis_z_pos` in m and `pelvis_rz_pos`, its heading, in rad: the room's frame, z up, heading 0 along the room's +x axis and counter-clockwise positive): 25 values; then their velocities (`*_vel`, per second) in the same order; then `left_gripper_state` and `right_gripper_state` (0 open .. 1 closed); then the pelvis pose again as the base controller tracks it (`pelvis_x`, `pelvis_y`, `pelvis_z`, `pelvis_yaw`). This is BiGym's own low-dimensional observation, the one its learned policies receive.
 
+## This run: object poses
+
+This run gives you the objects' poses. This section overrides anything above, and anything in `/spec`, that says
+object poses are never given.
+
+- Every answer of `/submit`, `/observe` and `/reset` (and `/load_state` where it exists) has
+  `meta["objects"]`: `{name: {"pos": [x, y, z], "quat": [4 numbers], "size": [...]}}`, each object's pose at the
+  state the answer ends in. `quat` is absent for objects with no orientation (a cloth or a fluid gives its centroid),
+  `size` only where the task gives one.
+- `spec()["object_poses"]` names the objects, the frame the poses are in (the frame of the robot poses this service
+  already gives you) and the quaternion order. The units are metres.
+- Nothing else changes: the goal, the success rule and its thresholds are not given.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 
