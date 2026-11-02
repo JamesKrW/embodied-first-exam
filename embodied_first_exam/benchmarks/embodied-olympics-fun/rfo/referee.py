@@ -203,7 +203,7 @@ class Referee:
     def digest(self) -> list:
         return [self.ph, self.events, self.stages, self.failed, self.success, self.done,
                 sorted(self.metrics.items()), sorted(self._hold.items()), self.w.task.digest()] + (
-                    [self.won] if HIDE_SUCCESS else [])
+                    ["won"] if HIDE_SUCCESS and self.won else [])   # (hide) nothing until the latch: the frozen start's hash
 
     # ------------------------------------------------------------------ contacts
     def _scan(self) -> None:
