@@ -60,7 +60,8 @@ def write_final() -> None:
     L._write_json(os.path.join(DATA, "final.json"),
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": E["done"], "task": TASK,
-                   "protocol": PROTOCOL, "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields()})
+                   "protocol": PROTOCOL, "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields(),
+                   **L.hide_fields(E)})
 
 
 def dump() -> None:
@@ -78,14 +79,47 @@ def dump() -> None:
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
                    "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), "settle_steps": E.get("settle_steps"),
-                   **({"settle_error": E["settle_error"]} if E.get("settle_error") else {}), **INSTANCE_CHECK, **EP.final_fields()})
+                   **({"settle_error": E["settle_error"]} if E.get("settle_error") else {}), **INSTANCE_CHECK, **EP.final_fields(),
+                   **L.hide_fields(E)})
     write_final()
     VIDEO.last(ctrl_steps())  # after the verdict is on disk: a render that fails or hangs here never costs it
+
+
+def finish_hidden(reason: str) -> None:
+    """(hide) The end judged on its state (L.END_STATE_REASONS): the hold of the last command, as at a timeout below, for
+    up to SETTLE_STEPS control steps while RoboLab's term is checked (stopping when it holds, or at the runaway guard);
+    the term's value then is the verdict. A simulator error is judged as without the switch: the term as it stands, no
+    hold."""
+    E["success"] = False
+    if reason == "error":
+        try: E["success"] = bool(check_success())
+        except Exception: pass
+        return
+    if reason not in L.END_STATE_REASONS:
+        return
+    try:
+        ok = check_success()
+        if not ok and not S.episode_done and ctrl_steps():
+            hold = np.asarray(S.hold_action(), dtype=np.float32); n = 0
+            while n < M.SETTLE_STEPS and not S.episode_done and not ok:
+                n += 1; S.step(hold); EP.journal(hold); VIDEO.offer(ctrl_steps()); ok = check_success()
+            E["settle_steps"] = n
+        E["success"] = bool(ok)
+    except Exception as exc:  # noqa: BLE001 -- a simulator error during the hold: recorded; the term is judged as it stands
+        traceback.print_exc(); E["settle_error"] = repr(exc)[:300]; log({"ev": "settle_error", "error": E["settle_error"]})
+        try: E["success"] = bool(check_success())
+        except Exception: E["success"] = False
 
 
 def finish(reason: str) -> None:
     if E["done"]: return
     E["done"] = True; E["reason"] = reason; E["t_end"] = time.time()
+    if L.HIDE_SUCCESS:
+        finish_hidden(reason)
+        E["episode_control_steps"] = ctrl_steps()
+        log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "elapsed_s": round(E["t_end"] - E["t0"], 1), "success": bool(E["success"])})
+        dump()
+        return
     if reason == "timeout" and not E["success"] and not S.episode_done and ctrl_steps():
         # the agent's phase is over: the last command is held for up to SETTLE_STEPS control steps on the live simulator
         # (journaled and recorded: the trajectory holds them) while RoboLab's term is checked, as the privileged grader's
@@ -209,6 +243,8 @@ EP.scene_built()         # the watchdog stands down: a long resume replay below 
 
 
 def check_success() -> bool:
+    if L.HIDE_SUCCESS:   # (hide) the success term's value after the last control step (it never terminates the env)
+        return S.success_now()
     res = S.env.get_env_results()[0]
     ok = res.get("success")
     if ok is None:
@@ -343,6 +379,10 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder) -> bool:
     (RoboLab's success term also terminates it), or the service stops the call (max_call_wall_s, the client hung up)."""
     a = np.asarray(a, dtype=np.float32)                    # the exact row Session.step executes (and records)
     over = S.step(a); stop = EP.journal(a); rec.tick(); VIDEO.offer(ctrl_steps())
+    if L.HIDE_SUCCESS:   # (hide) the term only records the state's success; the runaway guard is the cap (judged)
+        L.hidden_success(E, check_success(), log, ctrl_steps())
+        if over: finish("step_limit")
+        return E["done"] or stop
     if over: finish("success" if check_success() else "step_guard")
     return E["done"] or stop
 
@@ -427,7 +467,8 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
     if typ == "joint_position": run_joint_position(A, dt, interp, rec, clipped)
     else: run_ee_pose(A, rec, plan)
     rec.tick(force=True, last=True)
-    succ = E["success"] or check_success(); E["success"] = succ
+    succ = bool(E.get("now_success")) if L.HIDE_SUCCESS else (E["success"] or check_success())   # (hide) never latched
+    if not L.HIDE_SUCCESS: E["success"] = succ
     out = {**meta_common(cams), "chunk_id": E["calls"], "type": typ, "executed_rows": E["step"] - step0, "control_steps_chunk": ctrl_steps() - before,
            "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": plan, "rejected": None, "ok": True,
            **({"frames_skipped": rec.skipped} if rec.skipped else {})}
@@ -435,7 +476,7 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
          "depth": rec.mode, **({"frames_skipped": rec.skipped} if rec.skipped else {}), "control_steps": ctrl_steps() - before, "n_clipped": len(clipped), "plan": plan[:50], "success": succ,
          **({"stopped": EP.stop_reason} if EP.stopping else {})})
     save_call_evidence(E["calls"], {k: v for k, v in out.items() if k != "cameras"}, rec)
-    if succ: finish("success")
+    if succ and not L.HIDE_SUCCESS: finish("success")
     out["done"] = E["done"]; out["reason"] = E["reason"]
     return out, rec.parts(video, fps)
 
@@ -458,8 +499,9 @@ def do_observe(meta: dict) -> tuple[dict, list]:
         for _ in range(int(round(seconds * CTRL_HZ))):
             if ctrl_step(hold, rec): break
         rec.tick(force=True, last=True)
-        succ = E["success"] or check_success(); E["success"] = succ
-        if succ: finish("success")
+        if not L.HIDE_SUCCESS:     # (hide) ctrl_step recorded the state's success: nothing ends here
+            succ = E["success"] or check_success(); E["success"] = succ
+            if succ: finish("success")
     else:
         rec.tick(force=True, last=True)                    # the current frames: no physics
     E["calls"] += 1
@@ -510,6 +552,10 @@ def serve(svc) -> None:
     thread after every request and every poll (0.5 s), and a collect hook's request is handled there."""
     svc.spec.setdefault("on_service_error", L.ON_SERVICE_ERROR)
     svc.spec.setdefault("max_call_wall_s", svc.episode.max_call_wall_s)
+    if L.HIDE_SUCCESS:   # as L.serve: fail closed without finish(), and the spec says the success is hidden
+        if svc.finish is None:
+            raise RuntimeError("RCB_HIDE_SUCCESS=1, but this service has no finish()")
+        svc.spec["success_signal"] = L.SUCCESS_SIGNAL_NOTE
     L.check_spec(svc.spec)
     srv = L.bind(8000, L.make_handler(svc))
     srv.service_actions = lambda: END_REQUESTED.is_set() and end_on_main_thread()
@@ -533,4 +579,5 @@ E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  **({"finish": lambda: finish("finished")} if L.HIDE_SUCCESS else {})))

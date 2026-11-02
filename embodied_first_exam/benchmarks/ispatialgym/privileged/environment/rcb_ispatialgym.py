@@ -54,6 +54,10 @@ SUBSTEPS = 4
 TOLERANCE_SCALE = 3.0       # run_isg --mode policy's default --tolerance-scale
 SETTLE_EVAL = True          # upstream's settle-eval (subset.toml): with it off, a blind sweep of a held object's poses succeeds
 SETTLE_STEPS = 45           # configs/eval.yaml settle_steps
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, standard mode only): the success never ends the episode, and
+# `success` is the settle-eval window as it stands at this step (upstream's SuccessTracker: the goal and every measured
+# target held for the last settle_steps steps, settled), not upstream's latched first success; only max_steps ends it
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 IMAGE_SIZE, HEAD_APERTURE_MM = 1080, 40.0   # configs/eval.yaml: evaluation camera profile isg-v1 (the goal images')
 TCP_FRAMES = {"left": "left_tcp", "right": "right_tcp"}
 GL2CV = np.diag([1.0, -1.0, -1.0, 1.0])     # camera frame, OpenGL axes (x right, y up, z back) -> OpenCV (x right, y down, z forward)
@@ -402,11 +406,29 @@ class Session:
         if not self.judge:
             return False
         self.isg = self._isg_info(info)                                  # upstream's reader (OmniGibson nests it)
+        if HIDE_SUCCESS:                                                 # (hide) the state's success, never an end
+            self.success = self.success_now()
+            if self.success and self.success_step is None:
+                self.success_step = self.n
+            if self.n >= self.max_steps:
+                self.done, self.reason = True, "max_steps"
+            return self.done
         if self.isg["official_success"]:
             self.success, self.done, self.reason, self.success_step = True, True, "success", self.n
         elif self.n >= self.max_steps:
             self.done, self.reason = True, "max_steps"
         return self.done
+
+    def success_now(self) -> bool:
+        """(hide) upstream's geometric success under settle-eval as the state is now: its SuccessTracker's goal-and-
+        measure run has reached settle_steps and the objects are settled at this step (without settle-eval: goal and
+        measure at this step), never latched."""
+        tr = getattr(self.task, "_tracker", None)
+        if tr is None or tr.last is None:
+            return False
+        if tr.settle_eval:
+            return bool(tr.last[3] and tr.gm_run >= tr.settle_steps)
+        return bool(tr.gm_run >= 1)
 
     def reset(self) -> None:
         """Back to the frozen start in this process (upstream's reset and re-restores: hinges, grasps, joint values). Only

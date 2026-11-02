@@ -390,6 +390,15 @@ SPEC = {
               "source": "MuJoCo's OpenGL depth buffer at the same camera and pixels as the RGB (the RGB is Nyx's; distance along the "
                         "optical axis)"},
 }
+if L.HIDE_SUCCESS:      # (hide) a success ends nothing (success_signal): the settled check runs once, at the end
+    SPEC["episode"] = (
+        "one episode, no reset. It ends when you POST /finish (success_signal; graded on the state then: the task's success "
+        "requirements AND the terminal rules: no robot link touches any part, every part at rest (at most "
+        f"{R.REST_LIN_M_S:g} m/s and {R.REST_ANG_RAD_S:g} rad/s), no simulator breakdown so far; then, on a copy, the last "
+        f"executed row held {R.SETTLE_S:g} s more and the same checked again), on a simulator breakdown (reason "
+        "sim_breakdown, no success: a non-finite state, a MuJoCo BADQACC / BADQPOS / BADQVEL warning, a part contact deeper "
+        f"than {R.BREAKDOWN_DEPTH_M * 1000:g} mm), when the wall-clock budget is used up (reason timeout; graded as /finish "
+        "is), or on a simulator error. The live episode is the verdict: nothing is replayed to grade it")
 L.check_spec(SPEC)
 
 
@@ -428,7 +437,7 @@ def write_final() -> None:
         "elapsed_s": round(agent_time(), 1), "service_time_s": round(service_time(), 1),
         "reason": E["reason"], "done": E["done"], "task": TASK, "protocol": PROTOCOL,
         "finalized": False, "n_actions": E.get("n_actions"), "live_rows": E.get("live_rows"), "live_sha": E.get("live_sha"),
-        "live_verdict": E.get("verdict"), **EP.final_fields()})
+        "live_verdict": E.get("verdict"), **EP.final_fields(), **L.hide_fields(E)})
 
 
 LIVE = {"w": None, "next": 0.0, "frames": 0, "path": None, "last": None}
@@ -505,7 +514,8 @@ def episode_json() -> None:
         "service_time_s": round(service_time(), 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
         "n_actions": E.get("n_actions"), "live_rows": E.get("live_rows"), "live_sha": E.get("live_sha"), "live_verdict": E.get("verdict"),
         "live_video": LIVE["path"] and os.path.basename(LIVE["path"]), "live_video_frames": LIVE["frames"],
-        "settle_failed": E.get("settle_failed", 0), "settled_verdict": E.get("settled_verdict"), **EP.final_fields()})
+        "settle_failed": E.get("settle_failed", 0), "settled_verdict": E.get("settled_verdict"), **EP.final_fields(),
+        **L.hide_fields(E)})
 
 
 def verdict() -> dict:
@@ -545,6 +555,12 @@ def evaluate() -> bool:
     if E["done"]:
         return bool(E["success"])
     v = verdict()
+    if L.HIDE_SUCCESS:          # (hide) no settled check here (its snapshot hold is success-only work: latency) and no end
+        if v["breakdown"] is not None:
+            finish("sim_breakdown")
+        else:
+            L.hidden_success(E, v["success"], log, ctrl_steps())
+        return False
     if v["breakdown"] is not None:
         finish("sim_breakdown")
     elif v["success"]:
@@ -561,7 +577,14 @@ def finish(reason: str) -> None:
     if E["done"]:
         return
     E["done"] = True; E["reason"] = reason; E["t_end"] = time.time()
-    if not E["success"] and reason not in ("sim_breakdown", "error"):
+    if L.HIDE_SUCCESS:          # (hide) only an end-state end is judged: the state now AND settled (final_check on a copy)
+        E["success"] = False
+        if reason in L.END_STATE_REASONS:
+            try:
+                E["success"] = bool(verdict()["success"]) and bool(settled()["success"])
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
+    elif not E["success"] and reason not in ("sim_breakdown", "error"):
         try:
             E["success"] = bool(verdict()["success"]) and bool(settled()["success"])   # graded as it stands: the verdict
         except Exception:  # noqa: BLE001
@@ -1012,7 +1035,8 @@ print(f"{PROTOCOL} IKEA MuJoCo sim ready: task {TASK}, startup {EP.n_startups}, 
 threading.Thread(target=L.serve, daemon=True, args=(L.Service(
     spec=SPEC, lock=LOCK, state=E, submit=lambda meta, A: on_main(do_submit, meta, A), observe=lambda meta: on_main(do_observe, meta),
     kinematics=lambda req: on_main(do_kinematics, req), status=status, on_submit_error=lambda exc: on_main(fail, exc), log=log,
-    episode=EP, state_sha=lambda: on_main(s.state_sha), proprio=lambda: on_main(proprio_row)),)).start()
+    episode=EP, state_sha=lambda: on_main(s.state_sha), proprio=lambda: on_main(proprio_row),
+    **({"finish": lambda: on_main(finish, "finished"), "hidden_keys": ("settle_failed",)} if L.HIDE_SUCCESS else {})),)).start()
 while True:
     if deadline_reached():                      # between simulator jobs: never inside a call
         finish("timeout")

@@ -32,6 +32,12 @@ collect hook running out of time) changes the verdict. /data/video.pending exist
 
 A request is validated as a whole before any physics: whatever is wrong with it is a 400 and nothing ran (PROTOCOL
 §4.6). Only an error while the simulator executes is a 500, which ends the episode.
+
+The no-success-signal ablation (RCB_HIDE_SUCCESS=1; off by default, and then nothing below applies; docs/protocol/
+standard_mode.md "No success signal"): a success never ends the episode here anyway and nothing the agent sees shows it;
+the check Session.step() returns is logged ("hidden_success") only. POST /finish ends the episode ("finished"; then
+every call but GET /spec and /status is a 409); /finish, the agent's end (SIGUSR1, "timeout") and the step cap
+("step_limit") are judged on the state they leave, as above; an end on a simulator error is no success.
 """
 
 from __future__ import annotations
@@ -71,6 +77,16 @@ MAX_RESP = 256 * 1024 * 1024
 LOCK = threading.Lock()
 E = {"ready": False, "calls": 0, "rows": 0, "done": False, "reason": None, "t0": time.time(), "finalized": False}
 E["t_first"] = None  # the agent's first request (its clock starts there: _touch, _agent_time)
+# the no-success-signal ablation (module docstring): RCB_HIDE_SUCCESS=1, off by default
+HIDE = os.environ.get("RCB_HIDE_SUCCESS") == "1"
+END_STATE_REASONS = ("finished", "timeout", "step_limit")  # (hide) the ends judged on the state they leave
+SUCCESS_SIGNAL_NOTE = (
+    "hidden: the service never tells you whether you have succeeded and a success does not end the "
+    "episode; POST /finish (JSON {}) ends it and the state at that moment is graded (if you never "
+    "call it, the state when your session ends); after /finish every call is refused (409)"
+)
+if HIDE:  # (hide) the last control step's success (the state's), the first control step it held, /finish's time
+    E.update(now_success=False, seen_step=None, trial_seen=False, finish_t=None)
 
 # SIGUSR1 (the collect hook's "episode over") may arrive before the service is ready, e.g. during a resume replay; its
 # default action would kill the process. Until the real handler is installed, only remember it.
@@ -327,6 +343,9 @@ SPEC = {
     },
     "episode": "runs until your time is up; the state after the last executed control step is graded",
 }
+if HIDE:
+    SPEC["episode"] = "runs until you POST /finish or your time is up; the state after the last executed control step is graded"
+    SPEC["success_signal"] = SUCCESS_SIGNAL_NOTE
 
 
 def _agent_time() -> float:
@@ -381,6 +400,15 @@ def write_final(extra: dict | None = None) -> None:
     }
     d.update(E.get("verdict") or {})
     d.update(extra or {})
+    if HIDE:
+        d.update(
+            success_signal="hidden",
+            ended_by=E["reason"],
+            hidden_success_seen=E["seen_step"] is not None,
+            hidden_success_first_step=E["seen_step"],
+            trial_hidden_success_seen=E["trial_seen"],
+            finish_time_s=round(E["finish_t"] - E["t_first"], 1) if E["finish_t"] and E["t_first"] else None,
+        )
     _dump_final(d)
 
 
@@ -459,15 +487,26 @@ class Recorder:
 
 def _ctrl_step(tg, rec) -> bool:
     """One control step with action `tg`; returns True if the episode ended (technical cap only)."""
-    S.step(tg)
+    info = S.step(tg)
     row = np.asarray(S.targets, float).copy()
     RECORD.append(row)
     RECF.write(row.tobytes())
     rec.tick()
+    if HIDE:  # (hide) the state's success, from the report step() returns anyway: logged once, never shown
+        _hidden_success(info.get("success"))
     if MAX_CONTROL_STEPS and len(RECORD) >= MAX_CONTROL_STEPS:
-        finish("step limit")
+        finish("step_limit" if HIDE else "step limit")
         return True
     return False
+
+
+def _hidden_success(ok) -> None:
+    """(hide) Record the state's success after a control step; the first one is logged (a resume reads it back)."""
+    E["now_success"] = bool(ok)
+    if ok and E["seen_step"] is None:
+        E["seen_step"] = len(RECORD)
+        E["trial_seen"] = True
+        log({"ev": "hidden_success", "control_steps": len(RECORD)})
 
 
 def _number(meta: dict, key: str, default: float) -> float:
@@ -722,7 +761,7 @@ def finalize() -> None:
                 "replays": 0,
                 "live_success": live_ok,
                 "initial_success": initial,
-                "success": bool(live_ok and not initial and E["reason"] != "error"),
+                "success": bool(live_ok and not initial and (E["reason"] in END_STATE_REASONS if HIDE else E["reason"] != "error")),
                 "live_state_sha": live_sha,
                 "state_sha": live_sha,
                 "final_reward": float(live.get("reward") or 0.0),
@@ -823,7 +862,7 @@ class Hd(BaseHTTPRequestHandler):
 
     def do_POST(self):
         _touch()
-        if self.path not in ("/submit", "/observe"):
+        if self.path not in ("/submit", "/observe") + (("/finish",) if HIDE else ()):
             return self._json(404, {"error": "no such endpoint"})
         try:
             self._n = int(self.headers.get("Content-Length", 0) or 0)
@@ -846,6 +885,8 @@ class Hd(BaseHTTPRequestHandler):
 
     def _serve(self):
         meta, parts = self._req
+        if HIDE and (self.path == "/finish" or (self.path == "/observe" and E["done"] and E["reason"] == "finished")):
+            return self._finish_or_refuse()
         submit = self.path == "/submit"
         if submit and E["done"]:
             return self._json(409, {"error": "episode finished", "reason": E["reason"]})
@@ -867,6 +908,17 @@ class Hd(BaseHTTPRequestHandler):
             finish("error")  # protocol v1.0 §4.6: a simulator error ends the episode
             return self._json(500, {"error": "simulator error", "detail": repr(exc)[:200]})
         return self._rcb1(out, blobs)
+
+    def _finish_or_refuse(self):
+        """(hide) POST /finish: the agent ends the episode; the state it leaves is graded at the collect hook (finalize).
+        After the episode's end it is a 409, as /observe is after /finish."""
+        if E["done"] or E.get("finalizing") or self.path != "/finish":
+            return self._json(409, {"error": "episode finished", "reason": E["reason"]})
+        E["calls"] += 1
+        E["finish_t"] = time.time()
+        log({"ev": "finish", "call": E["calls"], "finish_t": E["finish_t"], "control_steps": len(RECORD)})
+        finish("finished")
+        return self._json(200, {**meta_common(), "ok": True})
 
 
 def _end_from_signal():
@@ -940,8 +992,9 @@ def _resume_or_start() -> None:
     if R.size < n * N:
         _give_up("resume_failed: journal shorter than the log", infra=True)
     R = R[: n * N].reshape(n, N)
+    info = None
     for row in R:
-        S.step(row)
+        info = S.step(row)
         RECORD.append(row.copy())
     if S.state_sha() != last["state_sha"]:
         _give_up("resume_failed: replayed state differs from the logged one", infra=True)
@@ -959,6 +1012,15 @@ def _resume_or_start() -> None:
         E["done"] = True
         E["reason"] = ended[-1].get("reason")
         E["t_end"] = float(ended[-1]["ts"])
+    if HIDE:  # (hide) the replayed state's success, the logged first success, /finish's time
+        E["now_success"] = bool(info is not None and info.get("success"))
+        seen = [e for e in ev if e.get("ev") == "hidden_success" and int(e.get("control_steps") or 0) <= n]
+        E["seen_step"] = int(seen[0]["control_steps"]) if seen else None
+        E["trial_seen"] = bool(seen)
+        fin_ev = [e for e in ev if e.get("ev") == "finish" and int(e.get("control_steps") or 0) <= n]
+        if fin_ev and E["done"] and E["reason"] == "finished":
+            E["finish_t"] = float(fin_ev[-1]["finish_t"])
+            E["calls"] = max(E["calls"], int(fin_ev[-1]["call"]))
     log(
         {
             "ev": "resumed",

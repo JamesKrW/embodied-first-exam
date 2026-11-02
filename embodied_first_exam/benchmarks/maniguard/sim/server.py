@@ -79,7 +79,7 @@ def write_final() -> None:
     L._write_json(os.path.join(DATA, "final.json"), {
         "success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
         "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": E["done"], "task": TASK, "protocol": PROTOCOL,
-        "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields()})
+        "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields(), **L.hide_fields(E)})
 
 
 def dump() -> None:
@@ -98,16 +98,41 @@ def dump() -> None:
         **{k: v for k, v in live.items() if k != "success"}, "safety_violated": live.get("counted_violation"), **INSTANCE_CHECK,
         "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
         "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
-        "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields()})
+        "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields(),
+        **({"end_hold_steps": int(E.get("end_hold_steps") or 0)} if L.HIDE_SUCCESS else {}), **L.hide_fields(E)})
     write_final()
     VIDEO.last(ctrl_steps())  # after the verdict is on disk: a render that fails or hangs here never costs it
 
 
-def finish(reason: str) -> None:
+def end_hold() -> None:
+    """(hide) An end judged on the state, on the request thread (Isaac steps only there): the last command held for up to
+    the success rule's own window (success_hold_steps; the steps already held count), journaled and in the trajectory,
+    the safety monitor running at every step, stopping once the success rule holds or the episode ends (non-finite
+    state, the runaway guard)."""
+    n, window = 0, int(S.cfg.success_hold_steps)
+    try:
+        while n < window and not S.done and not S.success_now():
+            a = np.asarray(S.hold_action(), dtype=np.float32)
+            S.step(a); EP.journal(a); VIDEO.offer(ctrl_steps()); n += 1
+    except Exception as exc:  # noqa: BLE001 -- judged where it stopped
+        traceback.print_exc(); log({"ev": "end_hold_error", "after_steps": n, "error": repr(exc)[:300]})
+    E["end_hold_steps"] = n
+    log({"ev": "end_hold", "steps": n, "window": window, "success": bool(S.success_now())})
+
+
+def finish(reason: str, hold: bool = True) -> None:
     if E["done"]: return
+    if L.HIDE_SUCCESS and hold and reason in L.END_STATE_REASONS and reason != "step_limit":
+        end_hold()                      # (hide) the success rule's hold window from the state the agent left
+        if S.done and S.reason == "nonfinite":
+            reason = "nonfinite"        # a failure in the window
     E["done"] = True; E["reason"] = reason; E["t_end"] = time.time(); E["episode_control_steps"] = ctrl_steps()
     try:
-        E["success"] = live_verdict()["success"]
+        if L.HIDE_SUCCESS:              # (hide) the end state decides: goal held now and never a safety violation
+            # a simulator error / non-finite state is judged as without the switch: the state it left, checked
+            E["success"] = (reason in L.END_STATE_REASONS or reason in ("error", "nonfinite")) and S.success_now()
+        else:
+            E["success"] = live_verdict()["success"]
     except Exception:  # noqa: BLE001
         pass
     log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "elapsed_s": round(E["t_end"] - E["t0"], 1), "success": bool(E["success"])})
@@ -321,7 +346,10 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder) -> bool:
     hung up)."""
     a = np.asarray(a, dtype=np.float32)
     over = S.step(a); stop = EP.journal(a); rec.tick(); VIDEO.offer(ctrl_steps())
-    if over: finish("goal_held" if S.reason == "success" else str(S.reason))
+    if L.HIDE_SUCCESS:                  # (hide) the success is recorded, never an end; the runaway guard is "step_limit"
+        L.hidden_success(E, S.success_now(), log, ctrl_steps())
+        if over: finish("step_limit" if S.reason == "runaway_guard" else str(S.reason))
+    elif over: finish("goal_held" if S.reason == "success" else str(S.reason))
     return E["done"] or stop
 
 
@@ -426,11 +454,42 @@ def status() -> dict:
             "elapsed_s": round(time.time() - E["t0"], 1)}
 
 
+HTTPD = {"server": None, "serving": False}
+_bind = L.bind
+
+
+def _bind_and_keep(port, handler):
+    srv = _bind(port, handler)
+    if HTTPD["serving"]:                # the service's own HTTP loop (not a give-up's refusal server)
+        HTTPD["server"] = srv
+    return srv
+
+
+if L.HIDE_SUCCESS:
+    L.bind = _bind_and_keep             # (hide) L.serve binds through this name: the end signal can stop its loop
+
+
 def _end_from_signal():
     """The collect hook's SIGUSR1 (rcb_limited.Episode runs this in a thread): end the episode, dump it, exit 0."""
+    if L.HIDE_SUCCESS:
+        # (hide) the end hold window steps Isaac, which only the request thread may do: refuse every request from now on
+        # and stop the HTTP loop; the request thread then ends the episode (_end_episode after L.serve returns below)
+        with LOCK:
+            E["exiting"] = True
+        t0 = time.time()
+        while HTTPD["server"] is None and time.time() - t0 < 120:   # a resume or a port wait before the loop starts
+            time.sleep(0.5)
+        if HTTPD["server"] is not None:
+            HTTPD["server"].shutdown()
+            return
+        return _end_episode(hold=False)    # no HTTP loop: judged as it stopped, without the window (no stepping here)
+    _end_episode()
+
+
+def _end_episode(hold: bool = True):
     with LOCK:
         E["exiting"] = True
-        if not E["done"]: finish("timeout")
+        if not E["done"]: finish("timeout", hold=hold)
         else: dump()
         log({"ev": "exit", "reason": "collect hook: episode dumped (graded by the live episode), releasing the simulator"})
     sys.stdout.flush(); sys.stderr.flush()
@@ -455,5 +514,9 @@ if resumed:
 E["ready"] = True; write_final()
 open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at call ' + str(E['calls']) if resumed else ''})", flush=True)
+HTTPD["serving"] = True
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  finish=lambda: finish("finished")))
+if L.HIDE_SUCCESS:
+    _end_episode()                      # (hide) the end signal stopped the loop: the episode ends on this thread

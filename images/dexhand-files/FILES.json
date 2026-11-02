@@ -1,5 +1,5 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0@sha256:f9bfacf8829c29d55552a1646f4af4878a958a06025452a1fa6ada74d530c556",
+ "image": "ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-nosignal@sha256:dce30005567a360f71a9bcd8ed758c4bdff8de1fede6bc2755fde3eaf1deabd7",
  "source": "embodied_first_exam/benchmarks/dexhand",
  "files": {
   "privileged/environment/arm_rig.py": "5b9e26e313c7a935dfbf04b34aec8047bd713677c638622b8baeaf09453c5a3a",
@@ -441,7 +441,7 @@
   "privileged/environment/object_assets/essential_two_object/walnut_b_normal.png": "8d4ee87bbfc16c85af1851cf4290bc9aca081d9d81cf10877615c69e94e23c83",
   "privileged/environment/object_assets/essential_two_object/walnut_b_visual.obj": "e730175ab006c4a90202796714fcebbc3e21a7e422ff4ac111e039649fabb9d0",
   "privileged/environment/replay.py": "3ebc9dfdc755539773ae6dd8bde064f6cbb1d83dc212597b8747d1138f438c71",
-  "privileged/environment/runtime.py": "da80940b841a3f5de89a262029ba832bb7fe11a5ac6b973bc6c3c38bf674210b",
+  "privileged/environment/runtime.py": "fcd7e3c362799d0416e17b468d33f603819822d592de02f7463694f8e4e9cd78",
   "privileged/environment/scene.py": "5a21a77f68ef5dc1cc20e1c286e9a3396f630ee0e7c79e6a1bb0a286f731ad85",
   "privileged/environment/scene_sharpa.xml": "807aeb90caa9ae142ffada70d0c45f0d71fc95b2a15b01f0d9318776688ffacd",
   "privileged/environment/shell.py": "1a7a9278094829df2c9325ed30f41e96a8ed21d5b6e97262e5d59f35ec661cc7",
@@ -597,7 +597,7 @@
   "sim/finalize.py": "e9f0ae2cb3f816614a164a0ceb2d87f5f8c0c5265a7504433a9f7abd113df8bd",
   "sim/finalize.sh": "7c347b83c53411c1c010b8a3fb5c2b27869ec597b5231ca125ebb72702a4ef38",
   "sim/rcb_dexhand.py": "3e1bd8364414fa26e2b83710665c44152a6c7d199851f6fab361a31aeb3b9742",
-  "sim/server.py": "8e6dd5515aebfe8082cb4302ece369ab2b3fcb4f623c642f6a3a9398f3bd104f",
+  "sim/server.py": "65d964b1f9d053179a0de62fe52e1df61386a26d19903bfd77729d5a50266ec9",
   "standard/tests/grade.py": "529e596131fd1c998711316464aa4227dbbd1dac1db6354d094945a64f1b3b4c"
  }
 }

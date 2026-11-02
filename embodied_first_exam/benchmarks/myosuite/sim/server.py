@@ -535,6 +535,7 @@ def summary() -> dict:
         "reset_budget": RESET_BUDGET,
         "control_steps_total": EP.rows,
         **EP.final_fields(),
+        **L.hide_fields(E),
     }
 
 
@@ -545,9 +546,19 @@ def finish(reason: str) -> None:
     E["done"] = True
     E["reason"] = reason
     E["t_end"] = time.time()
+    if L.HIDE_SUCCESS and reason in L.END_STATE_REASONS:
+        end_hold()   # (hide) the task's hold window, run from the end state
     E["episode_control_steps"] = ctrl_steps()
     # a simulator error ends the episode: the state after it is judged by nothing (PROTOCOL §4.6), never a success
     E["success"] = bool(S.success) and reason != "error"
+    if L.HIDE_SUCCESS:   # (hide) the end state decides (Session.end_goal); only the ends judged on their state count
+        try:
+            # event rules are a latch: their verdict at every end but an error (a later failure does not take it back)
+            E["success"] = (reason in L.END_STATE_REASONS or (S.rule == "event" and reason != "error")) and S.end_goal()
+        except Exception as exc:  # noqa: BLE001 -- the check failed on the simulator: judged a failure, recorded
+            traceback.print_exc()
+            E["success"] = False
+            EP.log({"ev": "end_check_error", "error": repr(exc)[:300]})
     EP.log(
         {"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "success": bool(E["success"]),
          "episode": E["resets"] + 1, "journal_rows": EP.rows}
@@ -569,12 +580,41 @@ def dump() -> None:
     write_final()
 
 
+def end_hold() -> None:
+    """(hide) At an end judged on its state (L.END_STATE_REASONS), for the hold / event rules: the goal must hold
+    hold_steps control steps in a row. The last command is held and stepped (journaled: the trajectory holds these
+    steps) for up to one hold window, the steps already held before the end (solved_run) counted; it stops when the
+    goal has held, or at the task's failure or the episode's own end (Session.done)."""
+    if S.rule in ("track", "event"):     # (event: the latch is the verdict; nothing to hold)
+        return
+    window, hold, k = S.hold_steps - S.solved_run, last_command(), 0
+    try:
+        while k < window and not S.done and not S.goal_now:
+            S.step(hold)
+            ROWS.append(np.asarray(hold, dtype=np.float64))
+            EP.journal(hold)
+            k += 1
+    except Exception as exc:  # noqa: BLE001 -- a simulator error during the hold: recorded; judged as it stands
+        traceback.print_exc()
+        E["hold_error"] = repr(exc)[:300]
+        EP.log({"ev": "hold_error", "error": E["hold_error"]})
+    E["hold_steps"] = k
+    EP.log({"ev": "end_hold", "steps": k, "window": window})
+
+
 def ctrl_step(a, rec) -> bool:
     """One executed control step, journaled. True when the call must stop here."""
     running = S.step(a)
     ROWS.append(np.asarray(a, dtype=np.float64))
     stop = EP.journal(a)
     rec.tick()
+    if L.HIDE_SUCCESS:
+        # (hide) the goal only records the state's success; the task's failure ends the episode (a failure), its own
+        # end (the reference's last step, baoding's targets' trajectory) is judged on its state (step_limit)
+        L.hidden_success(E, S.success if S.rule == "track" else S.goal_now, EP.log, ctrl_steps())
+        if not running:
+            finish("step_limit" if S.capped else (S.reason or "done"))
+        return E["done"] or stop
     if not running:
         finish(S.reason or "done")
     return E["done"] or stop
@@ -782,7 +822,10 @@ def do_observe(meta: dict):
 def reset_counters() -> dict:
     if not RESET_BUDGET:
         return {}
-    left = 0 if (E["success"] or E.get("exiting")) else RESET_BUDGET - E["resets"]
+    if L.HIDE_SUCCESS:   # (hide) never from the success: only the end of the trial (time up, POST /finish)
+        left = 0 if (E.get("exiting") or L.finished(E)) else RESET_BUDGET - E["resets"]
+    else:
+        left = 0 if (E["success"] or E.get("exiting")) else RESET_BUDGET - E["resets"]
     return {"episode": E["resets"] + 1, "resets_left": left, "control_steps_total": EP.rows}
 
 
@@ -812,7 +855,9 @@ def do_reset(meta: dict):
         cams, fps = cameras_of(meta), video_fps(meta)
         # a bad depth value is a 400 before anything changes (as the frame budget would be: one frame per camera here)
         L.check_frames(len(cams), 2, L.depth_mode(meta) in ("frames", "legacy"), MAX_FRAMES)
-    if E["success"]:
+    if L.finished(E):   # (hide) after POST /finish
+        raise Refused({"error": "episode finished", "reason": E["reason"], "resets_left": 0})
+    if E["success"] and not L.HIDE_SUCCESS:
         raise Refused({"error": "trial finished: an episode succeeded", "reason": E["reason"], "resets_left": 0})
     if E["resets"] >= RESET_BUDGET:
         raise Refused({"error": "reset budget exhausted", "reason": "reset budget exhausted", "budget": RESET_BUDGET,
@@ -823,6 +868,8 @@ def do_reset(meta: dict):
     E["resets"] += 1
     E["reset_at"] = list(E["reset_at"]) + [EP.rows]
     E.update(done=False, reason=None, success=False, t_end=None, episode_control_steps=None, dumped=False)
+    if L.HIDE_SUCCESS:   # (hide) the new episode's hidden success starts afresh (trial_seen stays)
+        E.update(now_success=False, seen_step=None, hold_steps=None, hold_error=None)
     EP._ck = None  # the state changed without a journal row: the checkpoint after this call must hash it anew
     E["calls"] += 1
     EP.log({"ev": "reset", "call": E["calls"], "episode": E["resets"] + 1, "journal_rows": EP.rows,
@@ -922,6 +969,8 @@ def make_handler(svc: L.Service):
                 meta, _ = self._body()
             except Exception as exc:  # noqa: BLE001
                 return self._json(413 if "too large" in str(exc) else 400, {"error": str(exc)[:200]})
+            if L.finished(E):   # (hide) after POST /finish every call but GET /spec and /status is a 409
+                return self._json(409, {"error": "episode finished", "reason": E.get("reason"), "resets_left": 0})
             with LOCK:
                 if E.get("exiting"):
                     return self._json(409, {"error": "trial finished: your time is up", "reason": E.get("reason"),
@@ -962,6 +1011,10 @@ def serve(svc: L.Service, port: int) -> None:
     service restarts is waited for, not a crash)."""
     svc.spec.setdefault("on_service_error", L.ON_SERVICE_ERROR)
     svc.spec.setdefault("max_call_wall_s", EP.max_call_wall_s)
+    if L.HIDE_SUCCESS:   # as L.serve: fail closed without finish(), and the spec says the success is hidden
+        if svc.finish is None:
+            raise RuntimeError("RCB_HIDE_SUCCESS=1, but this service has no finish()")
+        svc.spec["success_signal"] = L.SUCCESS_SIGNAL_NOTE
     L.check_spec(svc.spec)
     L.bind(port, make_handler(svc)).serve_forever()
 
@@ -981,6 +1034,7 @@ try:
             episode=EP,
             state_sha=S.state_sha,
             proprio=proprio_row,
+            **({"finish": lambda: finish("finished")} if L.HIDE_SUCCESS else {}),
         ),
         port=int(os.environ.get("RCB_PORT", "8000")),
     )

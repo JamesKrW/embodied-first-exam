@@ -671,6 +671,11 @@ ON_TABLE = ("take_measuring_spoon_out", "cooking_clear_plate")
 # row for SETTLE_STEPS more control steps (2 s), the success term still checked at every step, so that a release in the
 # last rows completes; a trajectory that ends holding the object goes on holding it.
 SETTLE_STEPS = 30
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, the standard-mode service only; off: nothing below changes): the
+# success term never terminates the env (a terminated RobolabEnv stops: the episode could not go on). Its function still
+# runs at every control step inside the termination manager, as without the switch; its value is kept
+# (Session.success_now) and the term reports False. Only the runaway guard ends the episode then.
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 
 ARM_SLICE = slice(0, 7)
 GRIP_INDEX = 7
@@ -960,6 +965,21 @@ class Session:
             term = cfg.terminations.success
             params = {k: v for k, v in dict(term.params).items() if k != "require_contact_with"}
             term.func = object_outside_of_and_on_surface; term.params = {**params, "surface": "table"}
+        if HIDE_SUCCESS:                    # (hide) the success term keeps its value and never terminates (see HIDE_SUCCESS)
+            self._hidden_term: dict = {"ok": None}
+            import functools
+            import inspect
+            term, box = cfg.terminations.success, self._hidden_term
+            f0 = term.func
+            if not inspect.isfunction(f0):  # a class term would be instantiated by the manager: not wrapped, fail closed
+                raise RuntimeError(f"RCB_HIDE_SUCCESS=1: the success term of {task} is not a function ({f0!r})")
+
+            @functools.wraps(f0)            # the manager checks the parameters against the signature (__wrapped__'s)
+            def _hidden_success_term(env, *args, **kwargs):
+                value = f0(env, *args, **kwargs)
+                box["ok"] = value
+                return torch.zeros_like(value)
+            term.func = _hidden_success_term
         if self.depth_enabled:              # every camera also renders z-depth (read by render_depth; never touches physics)
             from isaaclab.sensors import CameraCfg
             for name, cam in list(vars(cfg.scene).items()):
@@ -1105,6 +1125,8 @@ class Session:
         self._recording = None
         self.episode_done = False
         self.n_steps = 0
+        if HIDE_SUCCESS:
+            self._hidden_term["ok"] = None
         self._restore(self.initial_state)
         self._targets = self._current_targets()
 
@@ -1134,6 +1156,11 @@ class Session:
         if bool(self.env.all_terminated) or self.n_steps >= self.max_steps:
             self.episode_done = True
         return self.episode_done
+
+    def success_now(self) -> bool:
+        """(hide) The success term's value after the last control step (False before the first)."""
+        ok = self._hidden_term.get("ok")
+        return False if ok is None else bool(ok.reshape(-1)[0].item())
 
     def hold_action(self) -> np.ndarray:
         """The action that keeps the current joint targets and gripper command (what the robot does when idle)."""

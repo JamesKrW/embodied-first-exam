@@ -461,7 +461,8 @@ def summary() -> dict:
     return {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
             "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": E["done"],
             "task": TASK, "protocol": L.PROTOCOL, "n_actions": len(ROWS), "task_failure": int(str(E["reason"] or "").startswith("failure")),
-            "instance_ok": bool(S.instance_exact), **THREADS, **EP.final_fields()}
+            "instance_ok": bool(S.instance_exact), **THREADS, **EP.final_fields(),
+            **({"end_hold_steps": int(E.get("end_hold_steps") or 0)} if L.HIDE_SUCCESS else {}), **L.hide_fields(E)}
 
 
 def write_final() -> None:
@@ -474,12 +475,16 @@ def finish(reason: str) -> None:
     """The episode is over: record the live verdict and dump the trajectory for the collect hook."""
     if E["done"]:
         return
+    if L.HIDE_SUCCESS and reason in L.END_STATE_REASONS and reason != "step_limit":
+        reason = end_hold(reason)        # (hide) the check's own hold window from the end state; a failure in it ends it
     E["done"] = True
     E["reason"] = reason
     E["t_end"] = time.time()
     E["episode_control_steps"] = ctrl_steps()
     # a simulator error ends the episode: the state after it is judged by nothing (PROTOCOL §4.6), never a success
     E["success"] = bool(S.success) and reason != "error"
+    if L.HIDE_SUCCESS:                   # (hide) the end state decides: the success check as it stands
+        E["success"] = reason in L.END_STATE_REASONS and bool(S.success)
     EP.log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "success": bool(E["success"])})
     dump()
 
@@ -495,6 +500,27 @@ def dump() -> None:
     write_final()
 
 
+def end_hold(reason: str) -> str:
+    """(hide) An end judged on the state: the robot holds its targets for up to the success check's own hold window
+    (S.hold_window(); the steps already held count), journaled and in the trajectory, stopping at the success or at a
+    task failure (then the end is that failure). The reason the episode ends with."""
+    n, window = 0, S.hold_window()
+    try:
+        while n < window and not S.done and not S.success:
+            a = np.asarray(S.hold_action(), dtype=np.float64)
+            running = S.step(a)
+            ROWS.append(a.copy())
+            EP.journal(a)
+            n += 1
+            if not running:
+                reason = S.reason or "done"
+    except Exception as exc:  # noqa: BLE001 -- judged where it stopped
+        EP.log({"ev": "end_hold_error", "after_steps": n, "error": repr(exc)[:300]})
+    E["end_hold_steps"] = n
+    EP.log({"ev": "end_hold", "steps": n, "window": window, "success": bool(S.success)})
+    return reason
+
+
 def ctrl_step(a, rec) -> bool:
     """One executed control step (DexJoCo's own row), journaled. True when the call must stop here."""
     a = np.asarray(a, dtype=np.float64)
@@ -502,6 +528,8 @@ def ctrl_step(a, rec) -> bool:
     ROWS.append(a.copy())
     stop = EP.journal(a)
     rec.tick()
+    if L.HIDE_SUCCESS:                   # (hide) the success is recorded, never an end (S.step ends only on a failure)
+        L.hidden_success(E, S.success, EP.log, ctrl_steps())
     if not running:
         finish(S.reason or "done")
     return E["done"] or stop
@@ -765,4 +793,4 @@ open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{L.PROTOCOL} DexJoCo sim ready ({TASK}; startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=EP.log, episode=EP, state_sha=S.state_sha,
-                  proprio=proprio_row), port=int(os.environ.get("RCB_PORT", "8000")))
+                  proprio=proprio_row, finish=lambda: finish("finished")), port=int(os.environ.get("RCB_PORT", "8000")))

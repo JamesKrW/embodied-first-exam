@@ -49,6 +49,7 @@ MOUNT = {"overview": "static, looking at the whole workspace from the front righ
 
 class PandaDyn:
     """One frozen Panda Dynamic Scenes instance behind the rcb_service.Sim contract (see the module docstring)."""
+    latched_success = True   # (hide) the success is an event (rcb_service.py Service._finalize): a later failure keeps it
 
     def __init__(self, instance: str, texts: dict):
         self.instance, self.texts = instance, texts
@@ -60,6 +61,10 @@ class PandaDyn:
         self.control_dt = 1.0 / M.CONTROL_HZ
         self.max_control_steps = int(M.MAX_ROWS)                # the environment's cap; the task's horizon ends it first
         self.horizon_s = float(self.I["horizon_s"])
+        if M.HIDE_SUCCESS:
+            # (hide) the task's horizon is the episode's cap: it ends the episode as the step cap whether or not the task
+            # has succeeded (its own "timeout" failure fires only without a success, which would show the success)
+            self.max_control_steps = min(self.max_control_steps, int(round(self.horizon_s * M.CONTROL_HZ)))
         self.cameras = tuple(M.CAMERAS)
         self.depth_cameras = self.cameras
         self.layout = [f"{a}_{j}" for a in self.arms for j in JOINTS + ["aperture"]]
@@ -160,6 +165,12 @@ class PandaDyn:
     def step(self, row: np.ndarray) -> tuple[bool, bool, dict]:
         over = self.s.step(row)
         self.cmd = np.asarray(row, dtype=np.float64).copy()
+        if M.HIDE_SUCCESS:
+            # (hide) over = a failure event or the environment's cap (never the success, a latch in the task's ledger:
+            # the latched value is the state, and a later failure event takes it away); the horizon's "timeout" is the
+            # step cap's end (max_control_steps), not a failure
+            over = over and self.s.u.events.failure_reason != "timeout"
+            return bool(over), bool(self.s.success()), ({"why": self.s.end_reason()} if over else {})
         return bool(over), bool(self.s.success()), ({"why": self.s.end_reason()} if over else {})
 
     def reset(self) -> None:

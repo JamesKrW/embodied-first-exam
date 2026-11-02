@@ -73,7 +73,7 @@ def write_final() -> None:
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": E["done"],
                    "task": S.env_id, "protocol": PROTOCOL, "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"),
-                   **EP.final_fields()})
+                   **EP.final_fields(), **L.hide_fields(E)})
 
 
 def dump() -> None:
@@ -97,14 +97,17 @@ def dump() -> None:
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": S.env_id, "protocol": PROTOCOL,
                    "n_actions": E.get("n_actions"), "hold_pad_rows": E.get("hold_pad_rows", 0), "live_sha": E.get("live_sha"),
-                   "determinism_verdict_mode": VERDICT, **INSTANCE_CHECK, **EP.final_fields()})
+                   "determinism_verdict_mode": VERDICT, **INSTANCE_CHECK, **EP.final_fields(), **L.hide_fields(E)})
     write_final()
 
 
 def finish(reason: str) -> None:
     if E["done"]: return
     E["done"] = True; E["reason"] = reason; E["t_end"] = time.time(); E["episode_control_steps"] = ctrl_steps()
-    if not E["success"]:
+    if L.HIDE_SUCCESS:           # (hide) the end state decides (AM-Bench's check has no settle window): no latch
+        # a simulator error is judged as without the switch: the state it left, checked
+        E["success"] = (reason in L.END_STATE_REASONS or reason == "error") and bool(S.success())
+    elif not E["success"]:
         E["success"] = bool(S.success())
     log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "elapsed_s": round(E["t_end"] - E["t0"], 1), "success": bool(E["success"])})
     dump()
@@ -316,7 +319,10 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder) -> bool:
     (success, AM-Bench's time-out), or the service stops the call (max_call_wall_s, the client hung up)."""
     a = np.asarray(a, dtype=np.float64)                    # the exact row Session.step executes (and records)
     over = S.step(a); stop = EP.journal(a); rec.tick()
-    if over: finish(end_reason())
+    if L.HIDE_SUCCESS:                   # (hide) the success is recorded, never an end; the time-out / cap is "step_limit"
+        L.hidden_success(E, S.success(), log, ctrl_steps())
+        if over: finish("step_limit")
+    elif over: finish(end_reason())
     return E["done"] or stop
 
 
@@ -390,11 +396,15 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
     before = ctrl_steps(); rec.tick(force=True)
     run_ee_pose(A, dt, interp, rec, clipped)
     rec.tick(force=True, last=True)
-    succ = E["success"] or bool(S.success()); E["success"] = succ
+    if L.HIDE_SUCCESS:
+        succ = False                     # (hide) recorded per control step (hidden_success); nothing ends here
+    else:
+        succ = E["success"] or bool(S.success()); E["success"] = succ
     out = {**meta_common(cams), "chunk_id": E["calls"], "type": typ, "executed_rows": E["step"] - step0, "control_steps_chunk": ctrl_steps() - before,
            "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": [], "rejected": None, "ok": True}
     log({"ev": "submit", "call": E["calls"], "type": typ, "rows": E["step"] - step0, "dt": dt, "interpolate": interp, "cameras": cams, "note": note,
          "depth": rec.mode, "control_steps": ctrl_steps() - before, "n_clipped": len(clipped), "success": succ,
+         **({"now_success": bool(E.get("now_success"))} if L.HIDE_SUCCESS else {}),
          **({"stopped": EP.stop_reason} if EP.stopping else {})})
     save_call_evidence(E["calls"], {k: v for k, v in out.items() if k != "cameras"}, rec)
     if succ: finish("success")
@@ -420,8 +430,9 @@ def do_observe(meta: dict) -> tuple[dict, list]:
         for _ in range(int(round(seconds * CTRL_HZ))):
             if ctrl_step(hold, rec): break
         rec.tick(force=True, last=True)
-        succ = E["success"] or bool(S.success()); E["success"] = succ
-        if succ: finish("success")
+        if not L.HIDE_SUCCESS:           # (hide) recorded per control step (hidden_success); nothing ends here
+            succ = E["success"] or bool(S.success()); E["success"] = succ
+            if succ: finish("success")
     else:
         rec.tick(force=True, last=True)                    # the current frames: no physics
     E["calls"] += 1
@@ -447,7 +458,7 @@ def end_from_signal() -> None:
     """The collect hook's SIGUSR1 (rcb_limited.Episode runs this in a thread): end the episode, dump it, exit 0."""
     with LOCK:
         E["exiting"] = True
-        if not E["done"]: finish("time_up")         # the agent's time ran out with the episode still running
+        if not E["done"]: finish("timeout" if L.HIDE_SUCCESS else "time_up")   # the agent's time ran out (hide: judged on the state)
         else: dump()
         log({"ev": "exit", "reason": "collect hook: episode dumped (graded by the live episode), releasing the simulator"})
         if not os.path.exists(PID_FILE):   # a SIGUSR1 that came in during a resume: the hook still needs to see this process end
@@ -477,4 +488,5 @@ E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=lambda: S.status()["state_sha"], proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=lambda: S.status()["state_sha"], proprio=proprio_row,
+                  finish=lambda: finish("finished")))

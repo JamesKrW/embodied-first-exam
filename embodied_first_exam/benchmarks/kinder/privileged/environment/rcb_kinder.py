@@ -272,7 +272,7 @@ class Session:
                 _, success, _ = self.step(a)
                 if self.t % every == 0 or success:
                     frames.append(self.images([camera])[camera])
-                if success:
+                if success and os.environ.get("RCB_HIDE_SUCCESS") != "1":   # (hide) the episode ran on after it
                     break
         finally:
             self._rec = rec

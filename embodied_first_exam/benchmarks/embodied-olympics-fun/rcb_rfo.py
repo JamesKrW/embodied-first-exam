@@ -54,6 +54,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 SESSION_LOG = os.environ.get("RCB_SESSION_LOG", "/app/output/rcb_session_log.jsonl")
 MAX_ROWS = 40000                 # a trajectory may hold at most this many rows (no episode is longer than 400 s)
 IMAGE_HW = (270, 480)            # the cameras' default image: height, width (16:9, as the G1's head camera)
+# The no-success-signal ablation of the standard sidecar (RCB_HIDE_SUCCESS=1; rfo/referee.py): the referee latches the
+# success in ref.won without ending the attempt; success() is that latch with no failure (yet), the record's verdict()
+# the latch itself (the service keeps a latched success at a later failure: rcb_service.py Service._finalize)
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 
 
 def load_instance(path) -> dict:
@@ -123,10 +127,15 @@ class Episode:
         return self.actions.hold(self.world)
 
     def success(self) -> bool:
+        if HIDE_SUCCESS:
+            ref = self.world.ref
+            return bool(ref.won and ref.failed is None)
         return bool(self.world.success)
 
     def outcome(self) -> str | None:
         ref = self.world.ref
+        if HIDE_SUCCESS:                       # (hide) the record's call: a failure, else the latched success, else none
+            return ref.failed if ref.failed is not None else "success" if ref.won else None
         return None if not ref.done else "success" if ref.success else ref.failed
 
     def state_sha(self) -> str:
@@ -134,7 +143,8 @@ class Episode:
 
     def verdict(self) -> dict:
         ref = self.world.ref
-        return {"success": bool(ref.success), "done": bool(ref.done), "failed": ref.failed, "stages": list(ref.stages),
+        return {"success": bool(ref.won) if HIDE_SUCCESS else bool(ref.success), "done": bool(ref.done),
+                "failed": ref.failed, "stages": list(ref.stages),
                 "stages_total": len(self.world.task.stages), "progress": round(ref.progress(), 4),
                 "metrics": dict(ref.metrics), "steps": self.steps, "time_s": round(self.world.t, 2)}
 

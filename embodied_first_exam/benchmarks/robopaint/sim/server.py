@@ -71,7 +71,8 @@ def write_final() -> None:
     L._write_json(os.path.join(DATA, "final.json"),
                   {"steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": E["done"], "task": TASK,
-                   "protocol": PROTOCOL, "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields()})
+                   "protocol": PROTOCOL, "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields(),
+                   **L.hide_fields(E)})
 
 
 def numbers(d: dict) -> dict:
@@ -104,9 +105,14 @@ def dump() -> list | None:
     n = int(E.get("episode_control_steps") or 0)
     metrics = {k: v for k, v in numbers(live).items() if not isinstance(v, bool)}
     ok = bool(live.get("success")) and err is None
+    if L.HIDE_SUCCESS:   # (hide) only the ends judged on the state they leave, and a simulator error (judged as without
+        # the switch), can succeed (the sheet as it is then)
+        ok = ok and E["reason"] in L.END_STATE_REASONS + ("error",)
+        E["success"] = ok
     rec = {"steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
            "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": True, "task": TASK, "protocol": PROTOCOL,
-           "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields(), "live": numbers(live)}
+           "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields(), "live": numbers(live),
+           **L.hide_fields(E)}
     json.dump(rec, open(os.path.join(DATA, "episode.json"), "w"))
     verdict = {**rec, "success": ok, "live_success": ok, "graded_by": "live", "replays": 0, "finalized": True,
                "success_rule": {k: float(v) for k, v in S.inst["target"]["success"].items()},
@@ -357,7 +363,7 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder) -> bool:
     try:
         S.step(a)
     except M.PrimitiveError:
-        finish("step_guard"); return True
+        finish("step_limit" if L.HIDE_SUCCESS else "step_guard"); return True   # (hide) the cap: judged on the sheet
     stop = EP.journal(a)
     rec.tick()
     return E["done"] or stop
@@ -569,4 +575,5 @@ E["ready"] = True; write_final()
 open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at control step %d' % ctrl_steps() if resumed else ''})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  **({"finish": lambda: finish("finished")} if L.HIDE_SUCCESS else {})))

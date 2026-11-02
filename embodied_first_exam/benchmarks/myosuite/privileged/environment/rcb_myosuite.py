@@ -55,6 +55,14 @@ from typing import Any
 import numpy as np
 
 MAX_STEPS = 10_000_000          # runaway guard only; the wall clock is the budget
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, the standard-mode service only; off: nothing below changes): the
+# goal never ends the episode. Session.goal_now is the state's success (hold / event rules: the goal has held
+# hold_steps control steps in a row now), the task's failure (its `done` without the goal) still ends it, and the
+# episode's own end (the MyoDex reference's last step, baoding's targets' trajectory) sets `capped`: an end judged on
+# its state. Event rules are a latch: the first goal step (event_latch) is the verdict at any end but an error, a
+# later failure included; bimanual's contact-history check runs only at the end (Session.end_goal), on the history up to
+# that step.
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 # the task's `solved` must hold this long (consecutive control steps) to count. 1 s for a fixed goal, so passing
 # through it does not count; baoding's targets circle the palm once every 5 s, so there it is one full orbit (the balls
 # must really rotate: parking them where the moving targets sweep past was enough at 0.25 s).
@@ -416,6 +424,8 @@ class Session:
         self.reason: str | None = None
         self.solved_run = 0
         self.last_info: dict[str, Any] = {}
+        if HIDE_SUCCESS:
+            self.goal_now, self.capped, self.event_latch, self._latch_hist = False, False, False, None
 
     def reset(self) -> None:
         """Back to the frozen instance state (unlimited). Starts a new episode."""
@@ -454,11 +464,23 @@ class Session:
                 self.done, self.reason = True, "failure: " + _FAILURE.get(self.task, "task terminated")
             elif self.steps >= self.track_steps:
                 self.done = True
+                if HIDE_SUCCESS:     # (hide) the reference's last step: the episode's own end, judged on the motion
+                    self.capped = True
                 self.success = ok and self.track_ok >= TRACK_FRAC * self.track_steps and self.track_max <= TRACK_MAX_M
                 self.reason = "success" if self.success else (
                     f"failure: on track at {self.track_ok} of {self.track_steps} steps"
                     + ("" if ok else ", off track at the end")
                     + (f", {self.track_max:.3f} m off at worst" if self.track_max > TRACK_MAX_M else ""))
+        elif HIDE_SUCCESS:
+            # (hide) the goal held (event rules: hold_steps = 1) is the state's success, never an end; the failure is
+            # MyoSuite's `done` without it, as in the branches below (where a success on the same step wins)
+            self.goal_now = self.solved_run >= self.hold_steps
+            if self.rule == "event" and self.goal_now and not self.event_latch:
+                self.event_latch = True
+                if self.task == "bimanual":
+                    self._latch_hist = len(self.base.touch_history)
+            if failed and not self.goal_now:
+                self.done, self.reason = True, "failure: " + _FAILURE.get(self.task, "task terminated")
         elif self.solved_run >= self.hold_steps and self.task == "bimanual" and not self._bimanual_contacts_ok():
             self.done, self.reason = True, "failure: placed without a clean hand-over (MyoChallenge's contact check)"
         elif self.solved_run >= self.hold_steps:
@@ -471,7 +493,26 @@ class Session:
         n_goal = len(getattr(self.base, "goal", ())) if self.task == "baoding" else 0
         if not self.done and n_goal and self.steps >= n_goal:
             self.done, self.reason = True, f"failure: the targets' trajectory ends after {n_goal} control steps"
+            if HIDE_SUCCESS:     # (hide) the episode's own end: judged on its state
+                self.capped, self.reason = True, f"the targets' trajectory ends after {n_goal} control steps"
         return not self.done
+
+    def end_goal(self) -> bool:
+        """(hide) The task's success on the state the episode ends in: the goal held now (hold / event rules; bimanual
+        also passes MyoChallenge's contact-history check), or the MyoDex track over the whole reference; never after a
+        failure (MyoSuite's `done` without the goal)."""
+        if self.rule == "track":
+            return bool(self.success)
+        if self.rule == "event":     # the latch, any end (the caller excludes an error)
+            if not self.event_latch:
+                return False
+            if self.task != "bimanual":
+                return True
+            from myosuite.envs.myo.myochallenge.bimanual_v0 import evaluate_contact_trajectory
+            return evaluate_contact_trajectory(self.base.touch_history[:self._latch_hist]) is None
+        if self.done and not self.capped:
+            return False
+        return bool(self.goal_now) and (self.task != "bimanual" or self._bimanual_contacts_ok())
 
     def _bimanual_contacts_ok(self) -> bool:
         """MyoChallenge 2024's own evaluation of the object's contact history: the MyoHand held it, then the prosthesis,

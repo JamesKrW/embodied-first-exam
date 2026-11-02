@@ -1,13 +1,13 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0@sha256:e30e534e410bb5aa8820d0585348d96cab0551c2215d2835066d69d8558ff939",
+ "image": "ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-nosignal@sha256:fcde45565e0d64d11b6751311826418f7669b71b474a4bd488749bc29a5128a0",
  "source": "embodied_first_exam/benchmarks/embodied-olympics-fun",
  "files": {
   "grade.py": "45a72043fe35b6de3c201d7b08bc04a18905de504daf43cdd3e7640bd2319730",
-  "rcb_rfo.py": "3548cc68f5440a002c24baed6bb45f1c22f6fd24c190de7a7f2939ed684f6dfa",
+  "rcb_rfo.py": "429983ac85f45fc62227312dcd71bb14a06bccaf34d27d46b64d538375e20f50",
   "rfo/__init__.py": "eddb3f4e03968c348b96a32850e51a6d89caf048d0af3d682df5c8a43bbdc26f",
   "rfo/looks.py": "592465637847ae5e386fb6f99d78a63280892fbf8f19408a0f9c5de45b5eae6a",
   "rfo/realhand.py": "23c8a06c04d0f700030a862872937406f55d18e719c3c76815118ff6e12b72f3",
-  "rfo/referee.py": "6041c72846dd8fd29587d4e2a622c213ff6679f62ae63d6df5fd13eb1542f855",
+  "rfo/referee.py": "5057a2d242f26dd89128e5113e276b3b74d96796d86b1166b7854cb9bf80fba1",
   "rfo/scene.py": "09a36d3ab704906b0f6671ded06174de5bdbff6d5b24f96a9fda32fc557d74f4",
   "rfo/task.py": "b499f191cbd052823b64a465ced2973e367f8714aa06bd1be88b1f7be9a5d40a",
   "rfo/tasks/catch.py": "c9827456fc6e1f622085f9722fa4c6f755ff4c969a0ac99bc2e7a83cdcd9635f",
@@ -32,7 +32,7 @@
   "rfo/tasks/volleyball_set.py": "c60980a80984c9710e63f982b138734dc909f543707cbd0f940f219c82ae41ae",
   "rfo/tasks/volleyball_spike.py": "18d38a7004e1bb41ca02aac8dda6f759c1710172595048b2e878152b72113f1f",
   "rfo/world.py": "274d88cfce12a37169ad4318010a3710289f5394a7ee43a12de3f66824eb12cc",
-  "standard/rcb_service.py": "a6c50beec04bdb3b11885939dfe90a249506edcd5c462d2ac10816bbf2a71e2e",
-  "standard/server.py": "87c881fa1a3238b1637b998d516250b073ad5da8fe604f6367b88439cd53381d"
+  "standard/rcb_service.py": "af08b811b8ca8c081ce345e804ed85aec80b8e1795ce47129cec356e296fd825",
+  "standard/server.py": "56e32695f5954635af0c6c58ca35e7305af436f33f2c5991face0f4e97bba9ac"
  }
 }

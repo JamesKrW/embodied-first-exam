@@ -197,6 +197,7 @@ def summary() -> dict:
         "graded_by": "live",
         "replays": 0,
         **EP.final_fields(),
+        **L.hide_fields(E),
     }
 
 
@@ -211,6 +212,8 @@ def finish(reason: str) -> None:
     try:
         # a simulator error raised by the agent's actions (reason "error") leaves a post-exception state: never judged
         E["success"] = False if reason == "error" else S.success()
+        if L.HIDE_SUCCESS:               # (hide) the same end-state verdict, for the ends judged on the state
+            E["success"] = reason in L.END_STATE_REASONS and S.success()
     except Exception:  # noqa: BLE001
         traceback.print_exc()
     EP.log(
@@ -242,7 +245,7 @@ def ctrl_step(a, rec) -> bool:
     stop = EP.journal(a)
     rec.tick()
     if S.done:
-        finish("horizon")
+        finish("step_limit" if L.HIDE_SUCCESS else "horizon")   # (hide) the horizon: an episode cap
     return E["done"] or stop
 
 
@@ -338,7 +341,7 @@ def do_submit(meta: dict, A: np.ndarray):
         rec = recorder(cameras_of(meta), 5, meta)
         rec.tick(force=True, last=True)  # every response carries the last frames
         E["calls"] += 1
-        finish("done")
+        finish("finished" if L.HIDE_SUCCESS else "done")   # (hide) the agent's own end, as POST /finish
         return {
             **meta_common(cameras_of(meta)),
             "chunk_id": E["calls"],
@@ -528,6 +531,7 @@ L.serve(
         episode=EP,
         state_sha=S.state_sha,
         proprio=proprio_row,
+        finish=lambda: finish("finished"),
     ),
     port=int(os.environ.get("RCB_PORT", "8000")),
 )

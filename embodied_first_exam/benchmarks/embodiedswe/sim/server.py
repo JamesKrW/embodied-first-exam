@@ -235,7 +235,7 @@ def write_final() -> None:
     L._write_json(os.path.join(DATA, "final.json"),
                   {"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": E["done"], "task": PRESET,
-                   "protocol": PROTOCOL, "finalized": False, **EP.final_fields()})
+                   "protocol": PROTOCOL, "finalized": False, **EP.final_fields(), **L.hide_fields(E)})
 
 
 def verdict() -> dict:
@@ -283,7 +283,7 @@ def dump() -> None:
                    "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": PRESET, "protocol": PROTOCOL,
                    "n_actions": n, "success_seen_step": E.get("success_step"), **INSTANCE_CHECK, **EP.final_fields(),
-                   **({"infra_error": 1} if E["reason"] == "infra_error" else {})})
+                   **({"infra_error": 1} if E["reason"] == "infra_error" else {}), **L.hide_fields(E)})
     write_final()
     VIDEO.last(ctrl_steps(), frame=last_frame)
 
@@ -293,6 +293,13 @@ def finish(reason: str) -> None:
         return
     E["done"] = True; E["reason"] = reason; E["t_end"] = time.time()
     E["verdict"] = verdict(); E["success"] = bool(E["verdict"].get("success"))
+    if L.HIDE_SUCCESS:                   # (hide) the end state decides: the task's predicate on it (no settle window here)
+        try:
+            # a simulator / infrastructure error is judged as without the switch: the state it left, checked
+            ok = (reason in L.END_STATE_REASONS or reason in ("error", "infra_error")) and check_success()
+        except Exception:  # noqa: BLE001 -- the env broken by a failed step: no success
+            ok = False
+        E["verdict"] = {**E["verdict"], "success": bool(ok)}; E["success"] = bool(ok)
     log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "elapsed_s": round(E["t_end"] - E["t0"], 1),
          "success": E["success"], "progress": E["verdict"].get("progress")})
     dump()
@@ -461,7 +468,7 @@ def ctrl_step(target: np.ndarray, rec: L.Recorder) -> bool:
     if TOOL is not None and TOOL.touched:
         finish("tool_contact")
     elif ctrl_steps() >= R.MAX_STEPS:
-        finish("step_guard")
+        finish("step_limit" if L.HIDE_SUCCESS else "step_guard")   # (hide) the runaway cap: judged on the state
     return E["done"] or stop
 
 
@@ -513,7 +520,10 @@ def run_submit(A, dt, k, interp, cams, fps, video, note, depth) -> tuple[dict, l
         if stop:
             break
     rec.tick(force=True, last=True)
-    if not E["done"] and check_success():
+    if L.HIDE_SUCCESS:                   # (hide) recorded, never an end (the same check after every call as before)
+        if not E["done"]:
+            L.hidden_success(E, check_success(), log, ctrl_steps())
+    elif not E["done"] and check_success():
         E["success_step"] = ctrl_steps(); finish("success")
     out = {**meta_common(cams), "chunk_id": E["calls"], "type": "ee_pose", "executed_rows": E["step"] - step0,
            "control_steps_chunk": ctrl_steps() - before, "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS,
@@ -548,7 +558,10 @@ def run_observe(cams, seconds, steps, fps, video, depth) -> tuple[dict, list]:
             if ctrl_step(hold, rec):
                 break
         rec.tick(force=True, last=True)
-        if not E["done"] and check_success():
+        if L.HIDE_SUCCESS:               # (hide) recorded, never an end (the same check after every watch as before)
+            if not E["done"]:
+                L.hidden_success(E, check_success(), log, ctrl_steps())
+        elif not E["done"] and check_success():
             E["success_step"] = ctrl_steps(); finish("success")
     else:
         rec.tick(force=True, last=True)
@@ -602,4 +615,5 @@ E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready: {PRESET} (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("infra_error" if isinstance(exc, InfraError) else "error"), log=log, episode=EP, state_sha=lambda: R.state_sha(env), proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("infra_error" if isinstance(exc, InfraError) else "error"), log=log, episode=EP, state_sha=lambda: R.state_sha(env), proprio=proprio_row,
+                  finish=lambda: finish("finished")))

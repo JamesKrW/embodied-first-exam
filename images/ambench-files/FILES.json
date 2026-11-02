@@ -1,11 +1,11 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:ambench-files-0.5.0@sha256:796627b7d186da870cfbced06224babc5b7aabb9d732dffa4b7b02ae4198c9f7",
+ "image": "ghcr.io/mll-lab-nu/efe:ambench-files-0.5.0-nosignal@sha256:e470040e757df11d9f70fd8181edf4576f347eafed20d078b9cc878dd2538d9d",
  "source": "embodied_first_exam/benchmarks/ambench",
  "files": {
-  "privileged/environment/rcb_ambench.py": "53a7523ae39fb33344407c8c3ef910e7fc51a8a36b34bff7f4ee5e0aee8046c3",
+  "privileged/environment/rcb_ambench.py": "8d8b59317cc991ab8caea6cfb41c2550b978ee6e8a955a67266fd11d441f7b35",
   "privileged/tests/grade.py": "ceffdbeafd525914e98b2c04fbc3769ec0bf12e2aa0dbab8a5fc8789b33988b6",
   "sim/finalize.sh": "df8a40151457fbe75f97767d60809d39a8b9322fad8e8bfa18c3139133867f5a",
-  "sim/server.py": "80aa941b7a439bad1a84ddef2308d97aeda5eebe277875b09df37d9ee777cabd",
+  "sim/server.py": "f0853505a30b2ff2568255fda40e935bc146465daa3d0e90723a524d89ef9179",
   "standard/tests/grade.py": "e9b0df0f3e90c7d09c1fe1bb15fc82331a8e1773caaffe59803d8c0ff9653fec"
  }
 }

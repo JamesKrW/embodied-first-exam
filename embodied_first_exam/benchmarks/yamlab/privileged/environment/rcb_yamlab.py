@@ -115,6 +115,9 @@ TASKS: dict[str, dict[str, Any]] = {
 
 ACTION_DIM = 14
 CONTROL_HZ = 30                      # sim dt 1/120 s x decimation 4
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, the standard-mode service only; off: nothing below changes): the
+# latched stages never end the episode (Session.step); the fall and the runaway guard still do.
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 MAX_STEPS = 100_000                  # no step budget (the wall clock is); this only stops a runaway trajectory (~55 min of sim time)
 MAX_VIDEO_FRAMES = 9000              # the `replay` CLI's video holds at most this many frames (10 min at 15 fps): a longer
                                      # trajectory is filmed as a time lapse, so filming never multiplies a long replay's cost
@@ -607,7 +610,7 @@ class Session:
         self.n_steps += 1
         if self._video is not None and self.n_steps % self._video["every"] == 0:
             self._video_add()
-        if self.success():
+        if not HIDE_SUCCESS and self.success():   # (hide) the success is the caller's to read (Session.success)
             self.episode_done, self.end_reason = True, "success"
         elif self.fallen():
             self.episode_done, self.end_reason = True, f"{self.fallen()} fell off the table"

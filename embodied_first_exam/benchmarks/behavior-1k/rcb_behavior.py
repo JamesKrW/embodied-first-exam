@@ -103,6 +103,10 @@ FALL_REASON = "failure: the robot fell over"
 REST_STEPS = 30                 # 1 s at the 30 Hz control rate: the goal holds, released and at rest, this many steps in a row
 REST_SPEED_M_S = 0.05           # a goal object whose base link moves faster than this is not at rest
 SETTLE_STEPS = 150              # 5 s: after the last action the robot holds still (hold_action) up to this long (settle())
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, standard mode only): the success rule never ends the episode; its
+# window keeps counting and `succeeded` is whether goal + release + rest hold for REST_STEPS steps NOW (no latch); the
+# fall and breakdown rules run on as before; settle() stops once the window holds
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 # Simulator breakdown (2026-10-14, failure analysis item 25: NaN after tumbling, a body at z = 1.7e16 m with the episode
 # still running): the episode ends there, a failure recorded as `sim_breakdown` (2026-10-16: most breakdowns seen were
 # the agent's own tumbles, e.g. 23 GLM standard episodes ended on a NaN base orientation; whether a breakdown is
@@ -1401,6 +1405,8 @@ class Session:
     @property
     def succeeded(self) -> bool:
         """The success rule (REST_*): the BDDL goal has held for REST_STEPS control steps in a row, released and at rest."""
+        if HIDE_SUCCESS:                 # (hide) the window as it stands now, never latched
+            return bool(self._rest.run >= self._rest.hold)
         return bool(self._rest.done)
 
     def _goal_entities(self):
@@ -1416,7 +1422,7 @@ class Session:
         goal, held, moving = bool(self.env.task.success), [], []
         if goal and getattr(self, "goal_first_step", None) is None:
             self.goal_first_step = int(self.env.episode_steps)
-        if goal:
+        if goal or HIDE_SUCCESS:         # (hide) every step does the same reads: no extra work while the goal holds
             ag = getattr(self.robot, "_ag_obj_in_hand", None) or {}
             in_hand = {id(o) for o in ag.values() if o is not None}
             for name, obj in self._goal_entities():
@@ -1429,6 +1435,9 @@ class Session:
                     continue
         self._rest_info = {"held": held, "moving": moving}
         was = self._rest.done
+        if HIDE_SUCCESS:                 # (hide) the window counts on; a success never ends the episode
+            self._rest.update(goal, not held, not moving)
+            return False
         if self._rest.update(goal, not held, not moving) and not was:
             _slog("success", task=self.task, sim_steps=int(self.env.episode_steps), rest_steps=REST_STEPS)
             return True
@@ -1476,7 +1485,7 @@ class Session:
         The verifiers' replays do this after every trajectory (privileged and standard), so a
         trajectory need not wait out the rest window itself. Returns the control steps taken."""
         n = 0
-        while n < int(steps) and self._stepped and not self.episode_done:
+        while n < int(steps) and self._stepped and not self.episode_done and not (HIDE_SUCCESS and self.succeeded):
             self.step(self.hold_action()); n += 1
         return n
 

@@ -24,6 +24,10 @@ ACTION_DIMS = {"sharpa": 28, "wuji": 26}
 # Sharpa-named reset keys of the frozen instance and their Wuji counterparts (HAND_INTERFACE.md section 3).
 WUJI_RESET_KEYS = ("initial_fingers", "initial_hand_joints")  # replaced by essential.wuji_reset() for Wuji
 MAX_TRAJECTORY_ROWS = 50_000
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, standard mode only): a success does not stop the episode, so a step
+# after it runs (and the checker's invariants and guards with it); the checker's success is the terminal hold as it
+# stands now (it is revoked when the terminal conditions stop holding)
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 CONTROL_DT = 0.02
 FINGERS = ("thumb", "index", "middle", "ring", "pinky")
 # Task coordinates: along the fingers, across the palm, out of the palm.
@@ -323,7 +327,7 @@ class Session:
             a = a.copy()
             a = np.clip(a, limits[:, 0], limits[:, 1])
             a[:6] = essential.initial_wrist(self.spec)
-        if self.checker.failed or self.checker.success:
+        if self.checker.failed or (self.checker.success and not HIDE_SUCCESS):
             return self.status()
         self.data.ctrl[:] = a
         peaks = {}

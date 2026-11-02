@@ -35,6 +35,9 @@ import numpy as np
 UPSTREAM = "cf588fe60c0c7282174fe979f5913170cfe69017"
 SCHEMA = "eai-vlabench-trajectory/1"
 MAX_STEPS = 4000  # privileged deliverable: at most this many control steps
+# The no-success-signal ablation of the standard sidecar (RCB_HIDE_SUCCESS=1, sim/server.py; off by default): the native
+# task's termination (its success predicate) no longer ends the episode; status()["success"] is the state's
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 N = 9
 ACTION_NAMES = [f"joint{i}" for i in range(1, 8)] + ["finger1", "finger2"]
 SKILLS = (
@@ -231,6 +234,11 @@ class Session:
         self.actions.append(a.copy())
         self.targets = a.copy()
         self.done = bool(result.last())
+        if HIDE_SUCCESS and self.done:
+            # (hide) the native task terminated (time_limit is inf: its success predicate): dm_control's composer would
+            # reset the scene on the next step; the episode runs on from this state instead
+            self.env._reset_next_step = False
+            self.done = False
         return result
 
     def step(self, action) -> dict:

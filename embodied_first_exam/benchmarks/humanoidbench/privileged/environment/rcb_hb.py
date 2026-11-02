@@ -149,6 +149,8 @@ def _resolve_gl_backend() -> str:
 GL_BACKEND = _resolve_gl_backend()
 os.environ["MUJOCO_GL"] = GL_BACKEND
 os.environ["PYOPENGL_PLATFORM"] = GL_BACKEND
+# The no-success-signal ablation of the standard sidecar (RCB_HIDE_SUCCESS=1, sim/server.py; off by default)
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 
 
 class _Recording:
@@ -376,6 +378,8 @@ class Session:
         self._steps += 1
         self._sim_steps_total += 1
         self._last_info = info
+        if HIDE_SUCCESS:
+            self.last_terminated = bool(term)   # (hide) the task's own end, without the time limit's truncation
         return obs, (float(r) if self.scored else None), bool(term or trunc)
 
     @contextlib.contextmanager

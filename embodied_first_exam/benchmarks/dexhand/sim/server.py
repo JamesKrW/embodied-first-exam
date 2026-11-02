@@ -296,13 +296,152 @@ def extrinsics(cameras):
 
 REPLAYING = {"on": False}  # a crash resume is replaying journaled rows: their episode ends were logged live
 
+# ---------------------------------------------------------------- the no-success-signal ablation (RCB_HIDE_SUCCESS=1)
+# Nothing here runs with the switch off. The families' runtimes end the episode at the first success: Session.step is a
+# no-op once the checker's success (or failure) is set, and the checker stops evaluating, its failure rules included.
+# With the switch on, the success latch is lifted for every step (the step runs, the failure rules with it, exactly as
+# before the success), and set again after it:
+# - a staged checker that latches its success (`success = True` once the terminal hold is met) keeps it: the latched
+#   value is the state, and it is also the verdict when a failure rule ends the episode after it (the failure end
+#   itself looks the same with or without an earlier success);
+# - a family whose success is the terminal hold as it stands (STATE_SUCCESS; the shared runtime's essential checker,
+#   whose success is a property) is not latched: it is the state after every step.
+# A family's own step cap (CAP_FAILURES) ends as "step_limit", judged on the state. At an end judged on the state
+# (L.END_STATE_REASONS), the robot holds its last targets for up to one terminal hold window (HOLD_WINDOW, the family's
+# hold steps from instance.json; the steps already held count), stopping at the success or a failure.
+STATE_SUCCESS = {"assemble_hamburger", "remote_battery_swap", "vacuum_bin_reseat", "fan_guard_install"}
+CAP_FAILURES = ("episode_budget",)
+
+
+def _latch():
+    """(hide) Where the family's runtime keeps its success flag: (holder, key, is_dict), or None when it is a derived
+    property (the shared runtime's checker), which needs no lifting."""
+    checker = getattr(S, "checker", None)
+    st = getattr(checker, "state", None) if checker is not None else None
+    if isinstance(st, dict) and "success" in st:
+        return st, "success", True
+    if checker is not None and "success" in vars(checker):
+        return checker, "success", False
+    if "success" in vars(S):
+        return S, "success", False
+    return None
+
+
+def _latch_get() -> bool:
+    lat = LATCH["at"]
+    if lat is None:
+        return False
+    holder, key, is_dict = lat
+    return bool(holder[key] if is_dict else getattr(holder, key))
+
+
+def _latch_set(value: bool) -> None:
+    lat = LATCH["at"]
+    if lat is not None:
+        holder, key, is_dict = lat
+        if is_dict:
+            holder[key] = bool(value)
+        else:
+            setattr(holder, key, bool(value))
+
+
+def _hold_window() -> int:
+    """(hide) The family's terminal hold in control steps (instance.json: a `terminal` hold if it has stages, else its
+    hold steps / controls); 50 (jar_lid_open's HOLD_STEPS constant) when instance.json names none."""
+    try:
+        inst = json.loads((Path(__file__).resolve().parent / "instance.json").read_text())
+    except (OSError, ValueError):
+        inst = {}
+    found = []
+
+    def walk(x, path):
+        if isinstance(x, dict):
+            for k, v in x.items():
+                if isinstance(k, str) and k.endswith(("hold_steps", "hold_controls")) and isinstance(v, int) and v > 0:
+                    found.append((f"{path}/{k}", v))
+                walk(v, f"{path}/{k}")
+        elif isinstance(x, list):
+            for v in x:
+                walk(v, path)
+    walk(inst, "")
+    terminal = [v for path, v in found if "terminal" in path]
+    values = terminal or [v for _, v in found]
+    return int(max(values)) if values else 50
+
+
+def finished() -> bool:
+    """(hide) POST /finish ended the episode (also when a failure rule ended it in the end hold window after it)."""
+    return L.finished(E) or (L.HIDE_SUCCESS and bool(E.get("finish_t")))
+
+
+def latched() -> bool:
+    """(hide) The family's success is a latched staged check (its runtime keeps a success flag, STATE_SUCCESS aside)."""
+    return LATCH["at"] is not None and TASK not in STATE_SUCCESS
+
+
+LATCH = {"at": None}
+HOLD_WINDOW = 0
+if L.HIDE_SUCCESS:
+    LATCH["at"] = _latch()
+    HOLD_WINDOW = _hold_window()
+
+
+def execute_hidden(action, recorder=None, journal=False) -> bool:
+    """(hide) execute(): the step runs with the success latch lifted; the success is recorded (L.hidden_success), never an
+    end; a failure rule ends the episode (task_failure), the family's step cap ends it as "step_limit"."""
+    held = _latch_get()
+    if held:
+        _latch_set(False)
+    S.step(action)
+    ROWS.append(np.asarray(action, dtype=np.float64).copy())
+    stop = EP.journal(action) if (recorder is not None or journal) else False
+    state = S.status()
+    now = bool(state["success"])
+    failed = bool(state["failed"]) if "failed" in state else bool(state["done"] and not now)
+    failure = str(state.get("failure") or state.get("reason") or "") if failed else ""
+    cap = failed and failure in CAP_FAILURES
+    if latched():
+        now = bool(held or now)          # a latched staged success stays the state
+        if held and (cap or not failed):
+            _latch_set(True)
+    L.hidden_success(E, now, None if REPLAYING["on"] else EP.log, clock())
+    if failed:
+        finish("step_limit" if cap else "task_failure")
+    if recorder is not None:
+        recorder.tick()
+        return bool(E["done"] or stop)
+    return bool(E["done"])
+
+
+def end_hold() -> None:
+    """(hide) An end judged on the state: the last targets held for up to HOLD_WINDOW control steps (journaled, in the
+    trajectory), stopping at the success or when a failure rule ends the episode."""
+    n = 0
+    try:
+        while n < HOLD_WINDOW and not E["done"] and not E.get("now_success"):
+            execute_hidden(D.ctrl[:N].copy(), journal=True)
+            n += 1
+    except Exception as exc:  # noqa: BLE001 -- judged where it stopped
+        traceback.print_exc()
+        EP.log({"ev": "end_hold_error", "after_steps": n, "error": repr(exc)[:300]})
+    E["end_hold_steps"] = n
+    EP.log({"ev": "end_hold", "steps": n, "window": HOLD_WINDOW, "success": bool(E.get("now_success"))})
+
 
 def finish(reason: str) -> None:
     if E["done"]:
         return
+    if L.HIDE_SUCCESS and reason in L.END_STATE_REASONS and reason != "step_limit" and not REPLAYING["on"]:
+        end_hold()                       # (hide) the terminal hold window from the state the agent left
+        if E["done"]:                    # a failure rule ended it in the window
+            return
     E.update(done=True, reason=reason)
     if reason == "error":
         E["success"] = False   # a simulator error ends the episode: the state after it is never judged a success
+    elif L.HIDE_SUCCESS:       # (hide) the end state decides: the success as it stands (a latched staged one stays,
+        # also through a failure-rule end after it)
+        judged = reason in L.END_STATE_REASONS or (reason == "task_failure" and latched())
+        E["success"] = judged and bool(E.get("now_success"))
     if REPLAYING["on"]:
         return
     EP.log({"ev": "end", "reason": reason, "success": bool(E["success"]), "control_steps": clock(),
@@ -310,6 +449,8 @@ def finish(reason: str) -> None:
 
 
 def execute(action, recorder=None) -> bool:
+    if L.HIDE_SUCCESS:
+        return execute_hidden(action, recorder)
     S.step(action)
     ROWS.append(np.asarray(action, dtype=np.float64).copy())
     # journaled before the episode's end is logged, so the end's journal_rows counts the row that ended it
@@ -443,7 +584,10 @@ def kinematics(request):
 def reset_counters() -> dict:
     if not RESET_BUDGET:
         return {}
-    left = 0 if (E["success"] or E.get("exiting")) else RESET_BUDGET - E["resets"]
+    if L.HIDE_SUCCESS:          # (hide) a success never takes the resets away; /finish does
+        left = 0 if (E.get("exiting") or finished()) else RESET_BUDGET - E["resets"]
+    else:
+        left = 0 if (E["success"] or E.get("exiting")) else RESET_BUDGET - E["resets"]
     return {"episode": E["resets"] + 1, "resets_left": left, "control_steps_total": EP.rows}
 
 
@@ -473,7 +617,9 @@ def do_reset(meta):
         raise ValueError("the request must be a JSON object")
     # every field first: a malformed request is a 400 before anything changes (one frame per camera here)
     recorder, _, fps = options({key: meta[key] for key in ("cameras", "video_fps", "depth") if key in meta}, 0)
-    if E["success"]:
+    if finished():             # (hide) after POST /finish every call is a 409
+        raise Refused({"error": "episode finished", "reason": E["reason"], "resets_left": 0})
+    if E["success"] and not L.HIDE_SUCCESS:
         raise Refused({"error": "trial finished: an episode succeeded", "reason": E["reason"], "resets_left": 0})
     if E["resets"] >= RESET_BUDGET:
         raise Refused({"error": "reset budget exhausted", "reason": "reset budget exhausted", "budget": RESET_BUDGET,
@@ -484,6 +630,8 @@ def do_reset(meta):
     E["resets"] += 1
     E["reset_at"] = list(E["reset_at"]) + [EP.rows]
     E.update(done=False, reason=None, success=False)
+    if L.HIDE_SUCCESS:          # (hide) the new episode's own record; trial_seen stays
+        E.update(now_success=False, seen_step=None)
     EP._ck = None  # the state changed without a journal row: the checkpoint after this call must hash it anew
     E["calls"] += 1
     EP.log({"ev": "reset", "call": E["calls"], "episode": E["resets"] + 1, "journal_rows": EP.rows,
@@ -515,6 +663,9 @@ def end_episode():
                 "control_steps_total": EP.rows,
                 "start_sha": next((event.get("state_sha") for event in EP.events() if event.get("ev") == "start"), None),
                 **EP.final_fields(),
+                **({"end_hold_steps": int(E.get("end_hold_steps") or 0), "end_hold_window": HOLD_WINDOW}
+                   if L.HIDE_SUCCESS else {}),
+                **L.hide_fields(E),
             },
         )
         os._exit(0)
@@ -532,6 +683,8 @@ def _resume_resets() -> None:
         S.reset()
         ROWS.clear()
         E.update(done=False, reason=None, success=False)
+        if L.HIDE_SUCCESS:
+            E.update(now_success=False, seen_step=None)
 
 
 def replay_row(row) -> None:
@@ -621,6 +774,8 @@ def make_handler(svc: L.Service):
                 if E.get("exiting"):
                     return self._json(409, {"error": "trial finished: your time is up", "reason": E.get("reason"),
                                             "resets_left": 0})
+                if finished():         # (hide) after POST /finish every call is a 409, /reset too
+                    return self._json(409, {"error": "episode finished", "reason": E.get("reason"), "resets_left": 0})
                 cid = EP.call_begin(self.path, self.connection)
                 out = blobs = err = None
                 try:
@@ -656,6 +811,10 @@ def serve(svc: L.Service, port: int) -> None:
     """L.serve with this service's handler (the same spec defaults and check, and L.bind)."""
     svc.spec.setdefault("on_service_error", L.ON_SERVICE_ERROR)
     svc.spec.setdefault("max_call_wall_s", EP.max_call_wall_s)
+    if L.HIDE_SUCCESS:          # as L.serve: fail closed without finish(), and the spec says the success is hidden
+        if svc.finish is None:
+            raise RuntimeError("RCB_HIDE_SUCCESS=1, but this service has no finish()")
+        svc.spec["success_signal"] = L.SUCCESS_SIGNAL_NOTE
     L.check_spec(svc.spec)
     L.bind(port, make_handler(svc)).serve_forever()
 
@@ -675,6 +834,7 @@ serve(
         episode=EP,
         state_sha=S.state_sha,
         proprio=proprio_row,
+        finish=lambda: finish("finished"),
     ),
     port=int(os.environ.get("RCB_PORT", "8000")),
 )

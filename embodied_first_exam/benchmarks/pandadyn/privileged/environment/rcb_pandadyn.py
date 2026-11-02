@@ -69,6 +69,10 @@ ARM_DIM = 8                          # 7 joint targets (rad) + total aperture (m
 APERTURE_MAX = 0.08
 CAMERAS = {"overview": "overview", "closeup": "event"}      # our name -> the environment's human-render camera
 CAM_W, CAM_H = 640, 480
+# The no-success-signal ablation of the standard sidecars (RCB_HIDE_SUCCESS=1, sim/server.py; off by default): the task's
+# success (its event ledger's latch) no longer ends the episode: step() runs on after it and reports only a failure
+# event or the environment's step cap as the end
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 # Interaction log (privileged mode): every Session appends one line per session start / reset / replay / exit with the
 # control steps consumed, to RCB_SESSION_LOG (default /app/output/rcb_session_log.jsonl, collected with the artifacts).
 # The verifier reports it as self-reported cost and sets RCB_SESSION_LOG="" for its own sessions.
@@ -169,7 +173,10 @@ class Session:
     def step(self, row) -> bool:
         """One control step (10 ms of simulated time, 10 physics steps). `row`: D values (8 per arm, panda-0 first).
         Returns True when the episode is over (success or failure); a step after that executes nothing."""
-        if self.done:
+        if HIDE_SUCCESS:
+            if self.over():
+                return True
+        elif self.done:
             return True
         a, n = self.clip(row)
         self.n_clipped += n
@@ -180,7 +187,12 @@ class Session:
         self.done = bool(_np(term).reshape(-1)[0]) or self.truncated
         if self._video is not None:
             self._video_add()
-        return self.done
+        return self.over() if HIDE_SUCCESS else self.done
+
+    def over(self) -> bool:
+        """(hide) The episode's end without its success: a failure event (the task's horizon among them) or the
+        environment's step cap."""
+        return bool(self.u.events.failure_reason) or self.truncated
 
     def hold_action(self) -> np.ndarray:
         """A row that commands every arm to stay where it is now (its measured joints and aperture)."""

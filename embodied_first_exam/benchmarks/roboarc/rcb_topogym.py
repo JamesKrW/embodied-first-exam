@@ -199,6 +199,17 @@ def _slog(ev: str, **kw) -> None:
 
 
 DEFAULT_BACKEND = "cuda"          # robot_coding_bench's GPU-backend rule (determinism reported, not required); the physics device is the instance's
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, the standard-mode sidecar only: its live service and its video
+# pass; off: nothing below changes). The task's goal never ends the episode: TopoGym's TaskDefinition.update judges
+# success only while the task's `goal_complete` switch is on, and keeps its stability window (stable_time_s, the
+# confirmation) either way. Session turns the switch off once the scene is built, so the task's failure predicates and
+# the breakdown rules end the episode as before and the confirmation window keeps counting; goal_now() is the state's
+# success (the window complete now), and at the end the service holds the last command with the switch on again for up
+# to one window (hold_window(): the time already held counted), as the task's own confirmation. The families with a
+# final-settling check (_settle_only_when_reached) skip evaluate_settling during the episode (it ran only on goal ticks:
+# their cost told the goal apart); it gates only the goal (never a failure, nothing the agent sees), so the in-episode
+# window is the goal predicate's alone, and enable_goal() turns the settling on and restarts the window for the end hold.
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 MAX_STEPS = int(os.environ.get("RCB_MAX_STEPS", "200000"))   # runaway guard on a trajectory's length, not a budget
 
 # --------------------------------------------------------------------------- task family registry
@@ -2352,7 +2363,7 @@ def _settle_only_when_reached(task) -> bool:
         reached, failure, metrics, private = self.evaluate_transition(state, private)
         spec = self.final_settling_spec()
         next_reference = None
-        if spec is not None and not failure and reached:
+        if spec is not None and not failure and reached and (not HIDE_SUCCESS or self._rcb_settling):
             from topogym.evaluation.terminal import evaluate_settling
             settled, measurements, next_reference = evaluate_settling(state, spec, reference)
             status = metrics.get("evaluation_status", "available")
@@ -2364,6 +2375,8 @@ def _settle_only_when_reached(task) -> bool:
             if not reached:
                 next_reference = None
         return reached, failure, metrics, private, next_reference
+    if HIDE_SUCCESS:     # (hide) no settling during the episode; Session.enable_goal turns it on for the end hold
+        task._rcb_settling = False
     task._evaluate_terminal = MethodType(_evaluate_terminal, task)
     return True
 
@@ -3567,6 +3580,8 @@ class Session:
                     raise InstanceMismatch(msg + " and poses differ (asset / simulator drift?)")
                 _log("WARNING:", msg, "and poses differ")
         _log(f"instance ready in {time.time() - t0:.0f}s; state_sha={self.instance_sha}; max_steps={self.max_steps}")
+        if HIDE_SUCCESS:     # (hide) after the instance checks: the goal no longer ends the episode (see HIDE_SUCCESS)
+            self.env._task.goal_complete = False
 
     def _asset_identity(self):
         """Compare actual generated assets, normalizing only their temporary root."""
@@ -3896,6 +3911,30 @@ class Session:
 
     def success(self) -> bool:
         return bool(self.env.is_solved())
+
+    def goal_now(self) -> bool:
+        """(hide) The task's success on the state now: its goal held through the whole stability window (TaskDefinition.
+        update's `succeeded` without the goal_complete switch); never after the task's own end."""
+        t = self.env._task
+        if self.episode_end is not None:
+            return self.episode_end == "success"
+        return bool(t._goal_active and t.stable_time_s + 1e-12 >= float(t.config.get("stable_duration_s", .5)))
+
+    def hold_window(self) -> int:
+        """(hide) Control steps left of one stability window from now, the time the goal has already held counted."""
+        t = self.env._task
+        left = float(t.config.get("stable_duration_s", .5)) - (float(t.stable_time_s) if t._goal_active else 0.0)
+        # one control step more: a window that starts on the next tick counts that tick as 0 (TaskDefinition.update)
+        return max(1, int(math.ceil(left * self.control_hz - 1e-9))) + 1
+
+    def enable_goal(self) -> None:
+        """(hide) The goal_complete switch on again: the task's next update that completes the window is its success. A
+        final-settling family turns its settling on and restarts the window (the episode's window had no settling)."""
+        t = self.env._task
+        t.goal_complete = True
+        if self.settle_only_when_reached:
+            t._rcb_settling = True
+            t.stable_time_s, t._goal_active, t._settling_reference = 0.0, False, None
 
     def status(self) -> dict[str, Any]:
         """The episode so far. "review": its review events (deep task contacts, CONTACT_RULE; None: none): a success with

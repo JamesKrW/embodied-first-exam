@@ -264,6 +264,8 @@ def build_service():
             if isinstance(res, dict) and isinstance(res.get("answer"), str):
                 self.answer = res["answer"]
             done = self.s.ended
+            if server.HIDE_SUCCESS:            # (hide) judged at the episode's end only (server._end), never per step
+                return done, False, {}
             return done, bool(done and self.live_pass()), {}
 
         def verdict_extra(self) -> dict:

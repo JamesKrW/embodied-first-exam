@@ -48,6 +48,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 
 import numpy as np
 
@@ -63,6 +64,7 @@ _service_submit, _service_end, _service_status, _service_meta, _service_handle, 
     rcb_service.Service.handle, rcb_service.Service._counters, rcb_service.Service._write_final)
 _service_reset_view = rcb_service.Service._reset_view
 _service_resume = rcb_service.Service._resume
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"   # the no-success-signal ablation (_end below)
 EXITED = "exited"               # Embodied Safety Exam 0.5.4: the only word the agent gets about an episode once it has ended
 
 
@@ -133,6 +135,27 @@ def _submit(self, meta: dict, parts: dict):
 def _end(self, reason: str) -> None:
     if self.done:
         return
+    if getattr(self, "hide", False):
+        # The no-success-signal ablation (RCB_HIDE_SUCCESS=1; rcb_service's docstring): Embodied Safety Exam judges an
+        # episode only at its end, so the end state's verdict is taken here, before the layer's end checkpoint keeps it
+        # (now_success; rcb_service._finalize grades the end reasons that leave the state as the agent's). An exit (an
+        # action type that ends the episode: step() says done, never success) is the agent's own end, as POST /finish.
+        if reason == "failed" and self.sim.s.ended:
+            reason = "finished"
+            self.finish_t = self.finish_t or time.time()
+            self.log("exit", control_steps=len(self.episode))
+        ok = False
+        if reason in rcb_service.END_STATE_REASONS:
+            try:
+                ok = bool(self.sim.live_pass())
+            except Exception as exc:  # noqa: BLE001 -- a broken episode cannot be judged: it stays a failure
+                self.log("live_verdict_error", error=repr(exc)[:300])
+        self.now_success = ok
+        if ok and self.seen_step is None:
+            self.seen_step, self.trial_seen = len(self.episode), True
+            self.log("hidden_success", control_steps=len(self.episode), episode=self.resets + 1)
+        _service_end(self, reason)
+        return
     _service_end(self, reason)
     if reason in ("timeout", "failed") and not self.success:
         try:
@@ -201,7 +224,7 @@ def _resume(self, ev: list[dict]) -> None:
     dropped = trim() if callable(trim) else 0
     if dropped:
         self.log("picture_events_dropped", n=dropped)
-    if self.done and self.reason in ("timeout", "failed") and not self.success:
+    if self.done and self.reason in ("timeout", "failed") and not self.success and not getattr(self, "hide", False):
         # The process died between the episode's end (checkpoint "end", success false) and its judging (checkpoint
         # "judged"): the resumed episode stands where it ended, so judge it now, as _end would have.
         try:
@@ -431,6 +454,8 @@ class SafetyExam:
             info["blocked"] = True
             info["error"] = str(out.get("error"))
         done = self.s.ended
+        if HIDE_SUCCESS:                       # (hide) judged at the episode's end only (_end), never per step
+            return done, False, info
         return done, bool(done and self.live_pass()), info
 
     def reset(self) -> None:                     # no reset budget in Embodied Safety Exam; kept for the contract

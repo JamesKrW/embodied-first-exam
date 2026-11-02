@@ -17,6 +17,7 @@ physics."""
 from __future__ import annotations
 
 import math
+import os
 
 import numpy as np
 
@@ -41,6 +42,11 @@ GROUPS = {"feet": ("left_foot", "right_foot"), "shins": ("left_shin", "right_shi
           "right_arm": ("right_upper_arm", "right_forearm", "right_hand"),
           "arms": ("left_upper_arm", "left_forearm", "left_hand", "right_upper_arm", "right_forearm", "right_hand"),
           "trunk": ("pelvis", "torso", "head")}
+# The no-success-signal ablation of the standard sidecar (RCB_HIDE_SUCCESS=1, standard/server.py; off by default): the
+# success is latched in `won` and `success` stays False, so the referee, the task's rules and the world run on exactly
+# as if no success had been seen (every failure rule keeps judging and still ends the attempt), and an attempt
+# ends only by a failure (the time limit's "time" without a success is the service's step cap)
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 
 
 class Referee:
@@ -129,6 +135,8 @@ class Referee:
         self.failed: str | None = None
         self.success = False
         self.done = False
+        if HIDE_SUCCESS:
+            self.won = False                      # (hide) the latched success, never shown to the task or the agent
         self.metrics: dict[str, float] = {}
         self._hold: dict[str, int] = {}
         self._g1 = self._g2 = np.zeros(0, dtype=np.int64)
@@ -174,6 +182,11 @@ class Referee:
     def succeed(self) -> None:
         """The success: only with every stage latched (a task that calls it earlier has a bug, and gets no success)."""
         if self.failed is None and not self.success and len(self.stages) == len(self.w.task.stages):
+            if HIDE_SUCCESS:                      # latched, not shown: the attempt runs on as if not yet won
+                if not self.won:
+                    self.won = True
+                    self.event("success")
+                return
             self.success = True
             self.event("success")
 
@@ -189,7 +202,8 @@ class Referee:
 
     def digest(self) -> list:
         return [self.ph, self.events, self.stages, self.failed, self.success, self.done,
-                sorted(self.metrics.items()), sorted(self._hold.items()), self.w.task.digest()]
+                sorted(self.metrics.items()), sorted(self._hold.items()), self.w.task.digest()] + (
+                    [self.won] if HIDE_SUCCESS else [])
 
     # ------------------------------------------------------------------ contacts
     def _scan(self) -> None:
@@ -283,7 +297,7 @@ class Referee:
         task.step(w, self)
         if self.failed is None and not self.success and w.k * w.CONTROL_DT >= task.time_limit_s - 1e-9:
             task.timeout(w, self)
-            if self.failed is None and not self.success:
+            if self.failed is None and not self.success and not (HIDE_SUCCESS and self.won):
                 self.fail("time")
         if self.failed is not None or self.success:
             self.done = True

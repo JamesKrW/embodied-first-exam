@@ -489,6 +489,44 @@ def check_spec(spec: dict) -> None:
 # ---------------------------------------------------------------- crash recovery (PROTOCOL §4.7; docs/protocol/standard_mode.md)
 MAX_RESUMES = int(os.environ.get("RCB_MAX_RESUMES", "2"))
 STARTUP_TIMEOUT_S = float(os.environ.get("RCB_STARTUP_TIMEOUT_S", "900"))     # a task with a slower scene build sets more
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1; off by default, and then nothing of it applies;
+# docs/protocol/standard_mode.md "No success signal"): a success never ends the episode and changes nothing the agent can
+# see; the adapter records it with hidden_success() and judges the end state at the episode's end; POST /finish (the
+# adapter's Service(finish=...)) ends the episode ("finished"), and after it every call but GET /spec and /status is a 409.
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
+HIDDEN_STATE = ("now_success", "seen_step", "trial_seen", "finish_t")   # kept through a resume (Episode persist)
+END_STATE_REASONS = ("finished", "timeout", "step_limit")             # ends judged on the state they leave
+SUCCESS_SIGNAL_NOTE = ("hidden: the service never tells you whether you have succeeded and a success does not end the "
+                       "episode; POST /finish (JSON {}) ends it and the state at that moment is graded (if you never "
+                       "call it, the state when your session ends); after /finish every call is refused (409)")
+
+
+def hidden_success(state: dict, ok, log: Callable | None = None, step: int | None = None) -> None:
+    """(hide) The task's success as the state now is (after a control step or a call): kept as state["now_success"],
+    never latched and never shown; the first one of the episode is logged ("hidden_success")."""
+    state["now_success"] = bool(ok)
+    if ok and state.get("seen_step") is None:
+        state["seen_step"], state["trial_seen"] = (0 if step is None else int(step)), True
+        if log is not None:
+            log({"ev": "hidden_success", "control_steps": state["seen_step"]})
+
+
+def finished(state: dict) -> bool:
+    """(hide) The agent ended the episode with POST /finish: every call after it is a 409."""
+    return HIDE_SUCCESS and bool(state.get("done")) and state.get("reason") == "finished"
+
+
+def hide_fields(state: dict) -> dict:
+    """(hide) final.json's record of the ablation (evidence only; nothing without it)."""
+    if not HIDE_SUCCESS:
+        return {}
+    t0, ft = state.get("t_first"), state.get("finish_t")
+    return {"success_signal": "hidden", "ended_by": state.get("reason"),
+            "hidden_success_seen": state.get("seen_step") is not None,
+            "hidden_success_first_step": state.get("seen_step"), "trial_hidden_success_seen": bool(state.get("trial_seen")),
+            "finish_time_s": round(float(ft) - float(t0), 1) if ft and t0 else None}
+
+
 MAX_CALL_WALL_S = float(os.environ.get("RCB_MAX_CALL_WALL_S", "900"))         # < the client's 1800 s /submit read timeout
 RESUME_MAX_DEV_M = float(os.environ.get("RCB_RESUME_MAX_DEV_M", "0.05"))      # approx resumes: the gross-divergence guard
 ON_SERVICE_ERROR = ("a connection error means the service crashed: it restarts and resumes the SAME episode (never a reset) "
@@ -598,6 +636,8 @@ class Episode:
         if resume not in ("exact", "approx"):
             raise ValueError("resume must be 'exact' or 'approx'")
         self.data, self.dim, self.resume_class, self.persist = data, int(dim), resume, tuple(persist)
+        if HIDE_SUCCESS:                     # the hidden success goes through a resume with the episode
+            self.persist += tuple(k for k in HIDDEN_STATE if k not in self.persist)
         os.makedirs(data, exist_ok=True)
         p = lambda n: os.path.join(data, n)  # noqa: E731
         self.f_events, self.f_journal, self.f_final, self.f_pid, self.f_startups = (
@@ -951,11 +991,19 @@ class Service:
 
     def __init__(self, *, spec: dict, lock, state: dict, submit: Callable, observe: Callable, kinematics: Callable,
                  status: Callable, on_submit_error: Callable, log: Callable, max_resp: int = MAX_RESP,
-                 episode: Episode | None = None, state_sha: Callable | None = None, proprio: Callable | None = None):
+                 episode: Episode | None = None, state_sha: Callable | None = None, proprio: Callable | None = None,
+                 finish: Callable | None = None, hidden_keys=()):
         self.spec, self.lock, self.state, self.submit, self.observe = spec, lock, state, submit, observe
         self.kinematics, self.status, self.on_submit_error, self.log, self.max_resp = kinematics, status, on_submit_error, log, max_resp
         self.episode, self.state_sha, self.proprio = episode, state_sha, proprio
         self.kin_calls = 0
+        # (hide) finish(): the adapter ends the episode, reason "finished" (POST /finish); hidden_keys: meta / status keys
+        # that would tell the agent about the task's success or progress, dropped from every answer
+        self.finish, self.hidden_keys = finish, frozenset(hidden_keys or ())
+
+    def hide(self, d: dict) -> dict:
+        """(hide) An answer's meta or /status without the adapter's hidden_keys."""
+        return {k: v for k, v in d.items() if k not in self.hidden_keys} if HIDE_SUCCESS else d
 
     def touch(self) -> None:
         """Every HTTP request passes here: the first one starts the agent's clock (agent_time) and is logged, so that
@@ -1013,18 +1061,34 @@ def make_handler(svc: Service):
             if self.path == "/spec":
                 return self._json(200, svc.spec)
             if self.path == "/status":
-                st = svc.status()
+                st = svc.hide(svc.status())
                 return self._json(200, {**st, "resumes": svc.episode.resumes} if svc.episode else st)
             return self._json(404, {"error": "no such endpoint"})
 
         def do_POST(self):
-            if self.path not in ("/submit", "/observe", "/kinematics"):
+            if self.path not in ("/submit", "/observe", "/kinematics") + (("/finish",) if HIDE_SUCCESS else ()):
                 return self._json(404, {"error": "no such endpoint"})
             try:
                 meta, parts = self._body()
             except Exception as exc:  # noqa: BLE001
                 return self._json(413 if "too large" in str(exc) else 400, {"error": str(exc)[:200]})
             E, ep = svc.state, svc.episode
+            if finished(E) or (self.path == "/finish" and (E.get("done") or E.get("exiting"))):
+                return self._json(409, {"error": "episode finished", "reason": E.get("reason")})
+            if self.path == "/finish":              # (hide) the agent ends the episode: the state it leaves is graded
+                with svc.lock:
+                    if E.get("exiting") or E.get("done"):
+                        return self._json(409, {"error": "episode finished", "reason": E.get("reason")})
+                    cid = ep.call_begin(self.path) if ep else 0
+                    try:
+                        E["finish_t"] = time.time()
+                        svc.finish()
+                        if ep:
+                            ep.checkpoint(E, svc.state_sha, svc.proprio)
+                    finally:
+                        if ep:
+                            ep.call_end(cid, self.path)
+                    return self._json(200, {"ok": True, **svc.hide(svc.status())})
             if self.path == "/kinematics":          # stateless: never steps physics, never waits for the episode lock
                 cid = ep.call_begin(self.path) if ep else 0
                 try:
@@ -1073,7 +1137,7 @@ def make_handler(svc: Service):
                         ep.call_end(cid, self.path, **({"stopped": stopped} if stopped else {}))
             if err is not None:
                 return self._json(*err)
-            return self._rcb1({**out, "stopped": stopped}, blobs)
+            return self._rcb1({**svc.hide(out), "stopped": stopped}, blobs)
     return H
 
 
@@ -1082,6 +1146,11 @@ def serve(svc: Service, port: int = 8000) -> None:
     svc.spec.setdefault("on_service_error", ON_SERVICE_ERROR)
     if svc.episode is not None:
         svc.spec.setdefault("max_call_wall_s", svc.episode.max_call_wall_s)
+    if HIDE_SUCCESS:
+        if svc.finish is None:               # fail closed: an adapter without the ablation must not run it silently
+            raise RuntimeError("RCB_HIDE_SUCCESS=1, but this service has no finish(): it does not implement the "
+                               "no-success-signal ablation")
+        svc.spec["success_signal"] = SUCCESS_SIGNAL_NOTE
     check_spec(svc.spec)
     bind(port, make_handler(svc)).serve_forever()
 

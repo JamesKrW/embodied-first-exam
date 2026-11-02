@@ -63,6 +63,10 @@ from typing import Any, Callable
 import numpy as np
 
 MAX_STEPS = 10_000_000          # runaway guard only; the wall clock is the budget
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, standard mode only): a success does not end the episode; `success`
+# is the task's success check at the step just taken (the state's: a check with its own hold counter counts on), and
+# only a task failure ends it
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 # Privileged hand-in cap: rows of /app/output/trajectory.npz (1000 s of robot time at 50 Hz; the longest reference has
 # 1085 rows). The verifier replays a trajectory twice inside its timeout; the slowest family runs ~140 control steps/s.
 # The verifier scores a longer file 0 (bad_trajectory). The standard service's recorded episode has no such cap.
@@ -439,11 +443,23 @@ class Session:
             succeed = self._rcb_count >= 30
             failed = bool(terminated) and not bool(info.get("succeed", False)) and bool(self.base._trigger_pulled)
             terminated = failed                        # upstream's own success no longer ends the episode
+        if HIDE_SUCCESS:                             # (hide) the state's success, never an end
+            self.success = succeed
+            if terminated and not succeed:
+                self.done, self.reason = True, _failure_reason(self.task, info)
+            return not self.done
         if succeed:
             self.done, self.success, self.reason = True, True, "success"
         elif terminated:
             self.done, self.reason = True, _failure_reason(self.task, info)
         return not self.done
+
+    def hold_window(self) -> int:
+        """(hide) The success check's own hold window in control steps (0: the check has none): water_plant's 30 steps,
+        else DexJoCo's `_success_trigger_target` where the task counts one (fold_glasses: 50)."""
+        if self.task == "water_plant":
+            return 30
+        return int(getattr(self.base, "_success_trigger_target", 0) or 0)
 
     def hold_action(self) -> np.ndarray:
         """The action that keeps the current tcp targets and hand joint targets."""

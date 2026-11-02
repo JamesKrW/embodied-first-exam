@@ -75,7 +75,7 @@ def write_final() -> None:
     L._write_json(os.path.join(DATA, "final.json"), {
         "success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
         "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": E["done"], "task": TASK, "protocol": PROTOCOL,
-        "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields()})
+        "finalized": False, "n_actions": E.get("n_actions"), "live_sha": E.get("live_sha"), **EP.final_fields(), **L.hide_fields(E)})
 
 
 def dump() -> None:
@@ -105,7 +105,7 @@ def dump() -> None:
         "settle_steps": int(E.get("settle_steps") or 0), "settled_success": bool(E.get("settled_success")),
         "q_score": st.get("q_score"), "goal_first_step": st.get("goal_first_step"), "graded_by": "live", "replays": 0,
         "startup": EP.n_startups, "pid": os.getpid(),   # which service start wrote it (finalize.sh's late-exit check)
-        **EP.final_fields()})
+        **EP.final_fields(), **L.hide_fields(E)})
     write_final()
 
 
@@ -114,6 +114,10 @@ def finish(reason: str) -> None:
     E["done"] = True; E["reason"] = reason; E["t_end"] = time.time(); E["episode_control_steps"] = ctrl_steps()
     if reason == "error":               # a simulator error the agent's actions raised: the state after it is never judged
         E["success"] = False
+    elif L.HIDE_SUCCESS:                # (hide) the end state decides (after the settle window, run by the caller): no latch
+        # a simulator breakdown is judged as without the switch: the state it left, checked
+        try: E["success"] = (reason in L.END_STATE_REASONS or reason.startswith(M.BREAKDOWN_REASON)) and check_success()
+        except Exception: E["success"] = False
     elif not E["success"]:
         try: E["success"] = check_success()
         except Exception: pass
@@ -459,7 +463,10 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder) -> bool:
     also terminates it), or the layer stops the call (max_call_wall_s, the client hung up)."""
     term, trunc = S.step(a); stop = EP.journal(a)
     # the end first: an error in the recording below then cannot turn a completed rule into reason "error"
-    if term or trunc: finish("success" if check_success() else (S.end_reason or "step_guard"))
+    if L.HIDE_SUCCESS:                  # (hide) term is a fall / breakdown only; the runaway guard is "step_limit"
+        L.hidden_success(E, check_success(), log, ctrl_steps())
+        if term or trunc: finish(S.end_reason or "step_limit")
+    elif term or trunc: finish("success" if check_success() else (S.end_reason or "step_guard"))
     rec.tick(); video_step()
     return E["done"] or stop
 
@@ -535,7 +542,10 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
     if typ == "joint_position": run_joint_position(A, dt, interp, rec, clipped)
     else: run_ee_pose(A, rec, plan)
     rec.tick(force=True, last=True)
-    succ = E["success"] or check_success(); E["success"] = succ
+    if L.HIDE_SUCCESS:
+        succ = False                    # (hide) recorded per control step (hidden_success); nothing ends here
+    else:
+        succ = E["success"] or check_success(); E["success"] = succ
     out = {**meta_common(cams), "chunk_id": E["calls"], "type": typ, "executed_rows": E["step"] - step0, "control_steps_chunk": ctrl_steps() - before,
            "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": plan, "rejected": None, "ok": True,
            **({"frames_skipped": rec.skipped} if rec.skipped else {})}
@@ -560,8 +570,9 @@ def do_observe(meta: dict) -> tuple[dict, list]:
         for _ in range(int(round(seconds * CTRL_HZ))):
             if ctrl_step(hold, rec): break
         rec.tick(force=True, last=True)
-        succ = E["success"] or check_success(); E["success"] = succ
-        if succ: finish("success")
+        if not L.HIDE_SUCCESS:          # (hide) recorded per control step (hidden_success); nothing ends here
+            succ = E["success"] or check_success(); E["success"] = succ
+            if succ: finish("success")
     else:
         rec.tick(force=True, last=True)
     E["calls"] += 1
@@ -591,6 +602,8 @@ def end_live() -> None:
     same window after them)."""
     if E["done"]:
         dump(); return
+    if L.HIDE_SUCCESS:
+        return end_judged("timeout")
     E["acts"] = S.record_stop()
     n = 0
     cid = EP.call_begin("/settle")      # logged as a call: a crash of the process in the window counts as in the agent's calls
@@ -606,6 +619,29 @@ def end_live() -> None:
     E["settled_success"] = bool(ok and n > 0)
     log({"ev": "settle", "steps": n, "success": bool(ok), "end_reason": S.end_reason})
     finish("success" if ok else (S.end_reason or "timeout"))
+
+
+def end_judged(reason: str) -> None:
+    """(hide) An end judged on its state ("finished": POST /finish; "timeout": the collect hook's signal), lock held, on the
+    request thread: the same settle window as end_live, from the state the agent left, stopping once the success rule's
+    window holds (the goal held, released and at rest, for REST_STEPS steps in a row, counting the steps already held
+    before the end) or a failure rule ends the episode; then the verdict is the success rule on that state."""
+    E["acts"] = S.record_stop()
+    n = 0
+    cid = EP.call_begin("/settle")
+    try:
+        while (n < M.SETTLE_STEPS and E["acts"] is not None and len(E["acts"]) and not S.episode_done
+               and not check_success()):
+            S.step(np.asarray(S.hold_action().cpu(), dtype=np.float64).reshape(-1)); n += 1; video_step()
+    except Exception as exc:  # noqa: BLE001 -- the window could not run on: the episode is judged where it stopped
+        traceback.print_exc(); log({"ev": "settle_error", "after_steps": n, "error": repr(exc)[:300]})
+    finally:
+        EP.call_end(cid, "/settle", settle_steps=n)
+    E["settle_steps"] = n
+    ok = check_success()
+    E["settled_success"] = bool(ok and n > 0)
+    log({"ev": "settle", "steps": n, "success": bool(ok), "end_reason": S.end_reason})
+    finish(reason if ok else (S.end_reason or reason))
 
 
 def close_video() -> None:
@@ -680,7 +716,7 @@ if resumed and S.episode_done and not E["done"]:
     # (the resumed live episode is the verdict); anything else (a fall the live run did not have) is the resume's
     # divergence, not the agent's: no verdict on the agent (resume_failed, infra_error = 1)
     log({"ev": "resume_ended_early", "skipped_rows": REPLAY["skipped"], "end_reason": S.end_reason, "success": check_success()})
-    if check_success():
+    if check_success() and not L.HIDE_SUCCESS:   # (hide) a success never ends: an early end is a fall / breakdown
         E["ready"] = True
         with LOCK: finish("success")
         E["ready"] = False
@@ -699,7 +735,8 @@ open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at call ' + str(E['calls']) if resumed else ''})", flush=True)
 HTTPD["serving"] = True
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  finish=lambda: end_judged("finished")))
 # the end signal stopped the loop (_end_from_signal): the agent's phase is over
 with LOCK:
     try:

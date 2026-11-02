@@ -490,7 +490,8 @@ class RealtimeService(Service):
             return ("reply", *self._spec_reply)
         if method == "GET" and path == "/status":
             return ("/status", None)
-        if method != "POST" or path not in ("/submit", "/observe") + (("/reset",) if self.reset_budget else ()):
+        if method != "POST" or path not in ("/submit", "/observe") + (("/reset",) if self.reset_budget else ()) + (
+                ("/finish",) if self.hide else ()):
             return self._refusal(Refused(404, {"error": "no such endpoint"}))
         if n < 0:
             return self._refusal(Refused(400, {"error": "bad Content-Length"}))
@@ -522,6 +523,8 @@ class RealtimeService(Service):
         a request that races the episode's end may get either answer, as it always could)."""
         if path == "/submit" and (self.done or self.stopping):
             return self._conflict()
+        if path in ("/observe", "/finish") and (self._finished() or (path == "/finish" and (self.done or self.stopping))):
+            return self._conflict()
         if path == "/reset":
             try:
                 self._reset_view({})
@@ -540,6 +543,8 @@ class RealtimeService(Service):
             return self._check_submit(meta, actions)
         if path == "/observe":
             return self._check_observe(meta)
+        if path == "/finish":                        # (hide) nothing to check
+            return meta
         with bad_request():                          # /reset: its view; the budget is the simulator thread's to check
             self._view(meta, "frames")
         return meta
@@ -685,7 +690,7 @@ class RealtimeService(Service):
                 return job.finish("raw", *self._reply_json(200, self.status()))
             try:
                 {"/submit": self._rt_submit, "/observe": self._rt_observe,
-                 "/reset": self._rt_reset}[route](job.req[1], job)
+                 "/reset": self._rt_reset, "/finish": self._rt_finish}[route](job.req[1], job)
             except Refused as exc:                   # 409, or a 400 only the episode's state decides: nothing changed
                 self._count(refused=1)
                 job.finish("raw", *self._reply_json(exc.code, exc.body))
@@ -781,7 +786,16 @@ class RealtimeService(Service):
         self._save_call({**out, "note": req["note"]}, A)
         self._finish_rec(job, out, rec, rec.images_per_call(0))
 
+    def _rt_finish(self, meta: dict, job: _Job) -> None:
+        """(hide) POST /finish: the clock stops with the episode (_end), the pending watches are answered."""
+        out, _ = self._finish(meta, {})
+        self._release_watches()
+        self._save_call(out, None)
+        job.finish("raw", *self._reply_json(200, {**out, **self._realtime_counters()}))
+
     def _rt_observe(self, req: dict, job: _Job) -> None:
+        if self._finished():
+            raise self._conflict()
         with bad_request():
             seconds, (cams, fps, video, depth) = req["seconds"], req["view"]
             n = int(round(seconds / self.sim.control_dt)) if not (self.done or self.stopping) else 0

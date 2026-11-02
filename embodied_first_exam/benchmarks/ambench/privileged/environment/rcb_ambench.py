@@ -575,6 +575,18 @@ class Session:
                     print(f"[rcb_ambench] end-of-episode capture failed: {exc!r}", file=sys.stderr, flush=True); self._end = None
             return _reset_idx(env_ids)
         self.env._reset_idx = _keep_end_state
+        # The no-success-signal ablation (RCB_HIDE_SUCCESS=1, standard mode only): a success must not end the episode or
+        # change the world, so AM-Bench's `terminated` (its _get_success) is kept aside as the state's success and handed to
+        # Isaac Lab as False (no reset of the scene inside that step); the time-out still ends it as before
+        self.hide_success = os.environ.get("RCB_HIDE_SUCCESS") == "1"; self._hidden_term = None
+        if self.hide_success:
+            _get_dones = self.env._get_dones
+
+            def _dones_success_hidden(_get_dones=_get_dones):
+                term, trunc = _get_dones()
+                self._hidden_term = term.clone()
+                return torch.zeros_like(term), trunc
+            self.env._get_dones = _dones_success_hidden
         sync_ik(self.env, torch)
         sync_phases(self.env, torch)
         self.synced_views = sync_views(self.env, torch)
@@ -675,9 +687,14 @@ class Session:
             self._in_step = False
         self.rows.append(a)
         self.n_steps_total += 1
-        self.succeeded = bool(_np(term).reshape(-1)[0])
-        self.timed_out = bool(_np(trunc).reshape(-1)[0]) and not self.succeeded
-        self.done = self.succeeded or self.timed_out or self.n_steps >= MAX_STEPS
+        if self.hide_success:          # the state's success (never latched, never an end); only the time-out or the cap ends
+            self.succeeded = bool(_np(self._hidden_term).reshape(-1)[0]) if self._hidden_term is not None else False
+            self.timed_out = bool(_np(trunc).reshape(-1)[0])
+            self.done = self.timed_out or self.n_steps >= MAX_STEPS
+        else:
+            self.succeeded = bool(_np(term).reshape(-1)[0])
+            self.timed_out = bool(_np(trunc).reshape(-1)[0]) and not self.succeeded
+            self.done = self.succeeded or self.timed_out or self.n_steps >= MAX_STEPS
         if self._video is not None:
             self._video_add()
         return self.done
@@ -686,7 +703,7 @@ class Session:
         return self.succeeded
 
     def end_reason(self) -> str | None:
-        if self.succeeded:
+        if self.succeeded and not self.hide_success:     # (hide) a success is no end: only the time-out or the cap
             return "success"
         if self.timed_out:
             return "timeout"

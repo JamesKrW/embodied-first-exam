@@ -77,7 +77,8 @@ def write_final() -> None:
         "live_sha": E.get("live_sha"), "video": bool(E.get("video")),
         "video_done": bool(E.get("video_done")), "backend": BACKEND, "grade_error": bool(E.get("grade_error")),
         "instance_exact": E.get("instance_exact"), "settle": E.get("settle"), "agent_time_s": E.get("agent_time_s"),
-        "final_window": E.get("final_window"), **{k: E[k] for k in ("trajectory_error", "video_error", "finalize_error") if E.get(k)}, **EP.final_fields()})
+        "final_window": E.get("final_window"), **{k: E[k] for k in ("trajectory_error", "video_error", "finalize_error") if E.get(k)}, **EP.final_fields(),
+        **L.hide_fields(E)})
 
 
 VERDICT_KEYS = ("success", "graded_by", "grade_error", "n_actions", "live_sha", "reason", "settle", "final_window")
@@ -176,10 +177,37 @@ def settle(step) -> bool:
     return bool(r["success"])
 
 
+# (hide) the ends judged on the state they leave: the layer's, and the agent's own end of its session (the collect hook's
+# SIGUSR1 with time left, reason "agent_exit"; "timeout" otherwise)
+END_STATE = L.END_STATE_REASONS + ("agent_exit",)
+
+
+def finish_hidden(reason: str) -> None:
+    """(hide) The verdict on the end state: the settle window (Session.settle_check) from the state the end leaves, for the
+    ends judged on it; any other end (an error, the task's failure) is a failure. At the step cap the window cannot run
+    (Session.settle_check stops at the cap): judged a failure, as without the switch."""
+    E["success"] = False
+    if reason not in END_STATE:
+        return
+    # the window is the end of the agent's last call; POST /finish is that call already (the layer opened it)
+    cid = EP.call_begin("/settle") if reason != "finished" else None
+    try:
+        E["success"] = settle(journal_step)
+        E["final_window"] = int(E["settle"]["steps"])    # the recorded rows end with this window
+        E["final_window_end"] = ctrl_steps()
+    except Exception:  # noqa
+        traceback.print_exc()
+    finally:
+        if cid is not None:
+            EP.call_end(cid, "/settle")
+
+
 def finish(reason: str) -> None:
     if E["done"]: return
     E["done"] = True; E["reason"] = reason; E["t_end"] = time.time()
-    if not E["success"] and reason in ("timeout", "agent_exit"):
+    if L.HIDE_SUCCESS:
+        finish_hidden(reason)
+    elif not E["success"] and reason in ("timeout", "agent_exit"):
         # the agent phase is over: the last command is held for the settle window and the verdict taken there (as the
         # privileged grader does after the last action of a trajectory); never after a simulator error or at the step cap.
         # The window is the end of the agent's last call (docs/protocol/running.md): it runs as a call ("/settle"), so a crash of the
@@ -383,7 +411,7 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder) -> bool:
     past max_call_wall_s / its client hung up (EP.journal)."""
     row = np.asarray(a, dtype=np.float32)   # exactly what the simulator gets (Session.step casts to float32): the journal row
     guard = S.step(row); stop = EP.journal(row); rec.tick()
-    if guard: finish("step_guard")
+    if guard: finish("step_limit" if L.HIDE_SUCCESS else "step_guard")   # (hide) the cap: an end judged on its state
     return E["done"] or stop
 
 
@@ -502,10 +530,14 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
     if typ == "joint_position": run_joint_position(A, dt, interp, rec, clipped)
     else: run_ee_pose(A, rec, plan, clipped)
     succ = False; settled = None
-    if not E["done"] and not EP.stopping and check_success():
+    if L.HIDE_SUCCESS:
+        # (hide) the goal check every call already runs only records the state's success: no settle window in the call
+        # (its extra steps and its meta would tell), no latch; the window runs once, at the end (finish_hidden)
+        if not E["done"]: L.hidden_success(E, check_success(), log, ctrl_steps())
+    elif not E["done"] and not EP.stopping and check_success():
         succ = settle(lambda a: ctrl_step(a, rec)); settled = E["settle"]
     rec.tick(force=True, last=True)
-    E["success"] = E["success"] or succ
+    if not L.HIDE_SUCCESS: E["success"] = E["success"] or succ
     out = {**meta_common(cams), "chunk_id": E["calls"], "type": typ, "executed_rows": E["step"] - step0, "control_steps_chunk": ctrl_steps() - before,
            "physics_steps_chunk": (ctrl_steps() - before) * SUBSTEPS, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": plan, "rejected": None, "ok": True,
            **({"frames_skipped": rec.skipped} if rec.skipped else {}), **({"settle": settled} if settled else {})}
@@ -530,10 +562,12 @@ def do_observe(meta: dict) -> tuple[dict, list]:
         hold = np.asarray(S.hold_action(), dtype=np.float64)
         for _ in range(int(round(seconds * CTRL_HZ))):
             if ctrl_step(hold, rec): break
-        if not E["done"] and not EP.stopping and check_success():
+        if L.HIDE_SUCCESS:   # (hide) as in do_submit: recorded, no settle window in the call
+            if not E["done"]: L.hidden_success(E, check_success(), log, ctrl_steps())
+        elif not E["done"] and not EP.stopping and check_success():
             E["success"] = settle(lambda a: ctrl_step(a, rec)); settled = E["settle"]
         rec.tick(force=True, last=True)
-        if E["success"]: finish("success")  # settle() recorded the window (finish drops it if rows came after it)
+        if E["success"] and not L.HIDE_SUCCESS: finish("success")  # settle() recorded the window (finish drops it if rows came after it)
     E["calls"] += 1
     out = {**meta_common(cams), "obs_id": E["calls"], "seconds": seconds, "control_steps_watch": ctrl_steps() - before,
            "physics_steps_watch": (ctrl_steps() - before) * SUBSTEPS, "ok": True, **({"frames_skipped": rec.skipped} if rec.skipped else {}),
@@ -581,4 +615,5 @@ with LOCK:                              # a SIGUSR1 remembered during the resume
 open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
-                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row))
+                  on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
+                  **({"finish": lambda: finish("finished"), "hidden_keys": ("settle",)} if L.HIDE_SUCCESS else {})))

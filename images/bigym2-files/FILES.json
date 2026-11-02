@@ -1,10 +1,10 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:bigym2-files-0.4.0@sha256:fe8dd55600b32447391fbe16e1789a0df479ac6a17190ecf2f85cd59af9a5447",
+ "image": "ghcr.io/mll-lab-nu/efe:bigym2-files-0.4.0-nosignal@sha256:97cb9332f053652aaa3125e7b27eebc937d48e5990f58e2531a544668ff1cadf",
  "source": "embodied_first_exam/benchmarks/bigym2",
  "files": {
-  "privileged/environment/rcb_bigym2.py": "ef2345f5ec8806584617600edae10a9764ef9ad386bfc301b93d077e7f2cd636",
+  "privileged/environment/rcb_bigym2.py": "ac50901262cb3be0acabd9f0386082d4f035ce3aff7b27802f41239ab412a21b",
   "privileged/tests/grade.py": "fe5eaa42bf417b3b259ce975f96f288aad4ec83f06a3ed80321d75b2a65bc659",
-  "sim/rcb_service.py": "a6c50beec04bdb3b11885939dfe90a249506edcd5c462d2ac10816bbf2a71e2e",
-  "sim/server.py": "066c91719b5a97c84da41f0dfa79ae2d98baee606b9539ab49f29c7afca5e56a"
+  "sim/rcb_service.py": "af08b811b8ca8c081ce345e804ed85aec80b8e1795ce47129cec356e296fd825",
+  "sim/server.py": "06868114e28790436373b295c97e5e43ebd4b462327247152bd5d02a94cc08fd"
  }
 }

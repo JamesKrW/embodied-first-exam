@@ -63,6 +63,15 @@ command as the agent's (rcb_realtime.py). A reset whose scene does not rebuild e
 infrastructure in both (infra_error = 1: the agent's reset was legitimate); an error raised by the agent's own call
 is its 0. A verdict already on disk is never overwritten; a crash, a hang or a slow render
 of the video loses only the video.
+
+The no-success-signal ablation (RCB_HIDE_SUCCESS=1; off by default, and then nothing below applies; docs/protocol/
+standard_mode.md "No success signal"): a success never ends the episode and nothing the agent can see changes with it
+(done, reason, 409s, resets_left, executed rows, the adapter's hidden_info_keys); it is logged as "hidden_success" only.
+POST /finish ends the episode ("finished"; then every call but GET /spec and /status is a 409); the agent's end (the
+collect hook), the step cap ("step_limit") and /finish are judged on the state they leave: the last control step's
+success, then live_verdict() as always; an end by the task's own failure rule ("failed") or an error is no success. An
+adapter whose success is an event, not a state (`latched_success = True`), is judged by the graded episode's first
+success at every end but an error: a later failure rule does not take it away.
 """
 from __future__ import annotations
 
@@ -90,6 +99,9 @@ MAX_RESPONSE = 256 * 1024 * 1024      # responses above this drop frames/ and de
 MAX_VIDEO_FPS = 30
 MAX_FRAMES_PER_CALL = 3000            # images in one response (cameras x frames, depth counted again): bounds memory
 VIDEOS = ("mp4", "frames", "both", "none")
+SUCCESS_SIGNAL_NOTE = ("hidden: the service never tells you whether you have succeeded and a success does not end the "
+                       "episode; POST /finish (JSON {}) ends it and the state at that moment is graded (if you never "
+                       "call it, the state when your session ends); after /finish every call is refused (409)")
 ON_SERVICE_ERROR = ("if a call fails with a connection error or a 5xx, the service may have crashed and resumed the "
                     "same episode (never a reset): the state is the one after the last call that completed on the "
                     "service, which you may not have received; check GET /status before continuing")
@@ -149,7 +161,11 @@ RESERVED = frozenset({"protocol", "success", "live_success", "done", "reason", "
                       "finalized", "n_actions", "graded_by", "replays", "state_sha", "video", "video_pending",
                       "video_source", "live_rule", "live_verdict_error", "finalize_error", "infra_error",
                       "instance_mismatch", "ev", "ts", "deterministic", "replay_success", "live_sha", "first_success",
-                      "first_reason", "first_n_actions", "first_video"})
+                      "first_reason", "first_n_actions", "first_video", "success_signal", "ended_by",
+                      "hidden_success_seen", "hidden_success_first_step", "trial_hidden_success_seen", "finish_time_s"})
+# the ends the no-success-signal ablation judges on the state they leave (an end by the task's failure rule or an error
+# is no success, but for an adapter whose success is a latched event: Service._finalize)
+END_STATE_REASONS = ("finished", "timeout", "step_limit")
 
 
 def json_safe(d: dict) -> dict:
@@ -368,7 +384,7 @@ class Service:
 
     def __init__(self, sim, *, data: str = "/data", reset_budget: int = 0, wall_clock_s: float = 3600.0,
                  max_chunk_s: float = 10.0, max_watch_s: float = 30.0, max_frames_per_call: int = MAX_FRAMES_PER_CALL,
-                 max_resumes: int = 2):
+                 max_resumes: int = 2, hide_success: bool | None = None):
         if callable(getattr(sim, "verify", None)) and not getattr(sim, "replay_free", False):
             # A grading replay of its own is no longer called: an adapter that still has one would lose
             # whatever its replay applied, silently. It moves that rule to step() / live_verdict(), or says it has done
@@ -376,6 +392,13 @@ class Service:
             raise TypeError(f"{type(sim).__name__} defines verify(), which this service never calls: move its rule "
                             "to step() or live_verdict(), or set replay_free = True")
         self.sim, self.data = sim, data
+        # the no-success-signal ablation (module docstring): RCB_HIDE_SUCCESS=1, off by default
+        self.hide = os.environ.get("RCB_HIDE_SUCCESS") == "1" if hide_success is None else bool(hide_success)
+        self.now_success = False       # (hide) the last control step's success: the state's, not latched
+        self.seen_step = None          # (hide) the graded episode's first control step that succeeded
+        self.trial_seen = False        # (hide) any episode of the trial succeeded at some step
+        self.finish_t = None           # (hide) when POST /finish ended the episode
+        self.hidden_keys = frozenset(getattr(sim, "hidden_info_keys", ()) or ())
         self.reset_budget, self.wall_clock_s = int(reset_budget), float(wall_clock_s)
         self.max_chunk_s, self.max_watch_s = float(max_chunk_s), float(max_watch_s)
         self.max_frames, self.max_resumes = int(max_frames_per_call), int(max_resumes)
@@ -416,6 +439,11 @@ class Service:
             spec["reset"] = ("POST /reset abandons the running episode and starts a new one from the same starting "
                              "state, budget.reset times in all; only the last episode is graded, and a success ends "
                              "the trial")
+        if self.hide:
+            if self.reset_budget:
+                spec["reset"] = ("POST /reset abandons the running episode and starts a new one from the same starting "
+                                 "state, budget.reset times in all; only the last episode is graded")
+            spec["success_signal"] = SUCCESS_SIGNAL_NOTE
         return spec
 
     def clock(self) -> float:
@@ -426,7 +454,8 @@ class Service:
                "reason": self.reason}
         if self.reset_budget:
             out.update(episode=self.resets + 1, control_steps_total=self.journal_rows,
-                       resets_left=0 if self.success or self.stopping else self.reset_budget - self.resets)
+                       resets_left=0 if self.success or self.stopping or self.reason == "finished"
+                       else self.reset_budget - self.resets)
         return out
 
     def status(self) -> dict:
@@ -460,8 +489,15 @@ class Service:
             self._unwritten = []
         self.log(ev, **kw, calls=self.calls, rows=self.rows, resets=self.resets, ep_start=self.ep_start,
                  journal_rows=self.journal_rows, done=self.done, reason=self.reason, success=self.success,
-                 error_infra=self.error_infra, state_sha=self.sim.state_sha())
+                 error_infra=self.error_infra, state_sha=self.sim.state_sha(), **self._hidden())
         self._write_final()
+
+    def _hidden(self) -> dict:
+        """(hide) What a checkpoint keeps of the hidden success, for a resume; nothing without the ablation."""
+        if not self.hide:
+            return {}
+        return {"now_success": self.now_success, "seen_step": self.seen_step, "trial_seen": self.trial_seen,
+                "finish_t": self.finish_t}
 
     def _write_final(self) -> None:
         end = self.t_end or time.time()
@@ -479,6 +515,10 @@ class Service:
         # The first attempt: a success ends the trial, so it succeeded only when it is the graded episode
         d["first_success"] = bool(d["success"]) if self.resets == 0 else False
         d.setdefault("first_reason", self.reason if self.resets == 0 else None)
+        if self.hide:
+            d.update(success_signal="hidden", ended_by=self.reason, hidden_success_seen=self.seen_step is not None,
+                     hidden_success_first_step=self.seen_step, trial_hidden_success_seen=self.trial_seen,
+                     finish_time_s=round(self.finish_t - self.t0, 1) if self.finish_t and self.t0 else None)
         write_json_atomic(os.path.join(self.data, "final.json"), d)
 
     def _save_call(self, meta: dict, actions: np.ndarray | None) -> None:
@@ -537,7 +577,7 @@ class Service:
         # failure with no reset left. Then crashes after it cannot take that outcome away: past the restarts, the
         # episode is resumed and finalized as it ended (its own verdict, live_verdict() included), not given up.
         decided = bool(cp["done"]) and cp["reason"] != "reset" and (
-            bool(cp["success"]) or int(cp["resets"]) >= self.reset_budget)
+            bool(cp["success"]) or int(cp["resets"]) >= self.reset_budget or cp["reason"] == "finished")
         finalize_now = restarts > self.max_resumes and decided
         if restarts > self.max_resumes and not decided:
             agent = self._agent_crashes(ev, died, in_calls) >= restarts   # every crash was the agent's
@@ -558,6 +598,9 @@ class Service:
         self.ep_start, self.journal_rows = int(cp["ep_start"]), n
         self.episode = [r.copy() for r in rows[self.ep_start:]]
         self.done, self.reason, self.success = bool(cp["done"]), cp["reason"], bool(cp["success"])
+        if self.hide:
+            self.now_success, self.trial_seen = bool(cp.get("now_success")), bool(cp.get("trial_seen"))
+            self.seen_step, self.finish_t = cp.get("seen_step"), cp.get("finish_t")
         self.judged_before = any(e["ev"] == "live_verdict_begin" for e in ev)   # a process died in live_verdict()
         self.error_infra = bool(cp.get("error_infra", self.error_infra))
         if cp["ev"] == "end" and cp["reason"] == "reset":
@@ -616,6 +659,8 @@ class Service:
         routes = {"/submit": self._submit, "/observe": self._observe}
         if self.reset_budget:
             routes["/reset"] = self._reset
+        if self.hide:
+            routes["/finish"] = self._finish
         if method != "POST" or path not in routes:
             return self._reply_json(404, {"error": "no such endpoint"})
         if (len(body) if content_length is None else content_length) > MAX_BODY:
@@ -636,6 +681,8 @@ class Service:
             return self._reply_json(500, {"error": "simulator error", "detail": repr(exc)[:200]})
         finally:
             self.log("call_end", path=path)
+        if blobs is None:                            # (hide) /finish: a JSON answer
+            return self._reply_json(200, out)
         return self._reply_rcb1(out, blobs)
 
     @staticmethod
@@ -697,8 +744,12 @@ class Service:
             return Refused(409, {"error": "trial finished: your time is up", "reason": self.reason})
         body = {"error": "episode finished", "reason": self.reason}
         if self.reset_budget:
-            body["resets_left"] = 0 if self.success else self.reset_budget - self.resets
+            body["resets_left"] = 0 if self.success or self.reason == "finished" else self.reset_budget - self.resets
         return Refused(409, body)
+
+    def _finished(self) -> bool:
+        """(hide) The agent ended the episode with POST /finish: every call after it is refused."""
+        return self.hide and self.done and self.reason == "finished"
 
     def _step(self, typ: str, row: np.ndarray) -> dict:
         """One control step: execute, journal, and end the episode if it is over."""
@@ -707,6 +758,17 @@ class Service:
         self._unwritten.append(sim_row)
         self.journal_rows += 1
         self.episode.append(sim_row)
+        if self.hide:
+            # The success is the state's (the last step's), never latched and never shown: logged, and judged at the end
+            self.now_success = bool(success)
+            if success and self.seen_step is None:
+                self.seen_step, self.trial_seen = len(self.episode), True
+                self.log("hidden_success", control_steps=len(self.episode), episode=self.resets + 1)
+            if done and not success:
+                self._end("failed")
+            elif len(self.episode) >= self.sim.max_control_steps:
+                self._end("step_limit")
+            return {k: v for k, v in info.items() if k not in self.hidden_keys}
         if success:
             self._end("success")
         elif done or len(self.episode) >= self.sim.max_control_steps:
@@ -784,6 +846,8 @@ class Service:
         return out, rec.parts()
 
     def _observe(self, meta: dict, parts: dict) -> tuple[dict, list]:
+        if self._finished():
+            raise self._conflict()
         with bad_request():
             try:
                 seconds = float(meta.get("seconds") or 0.0)
@@ -815,6 +879,8 @@ class Service:
 
     def _reset_view(self, meta: dict) -> tuple[list[str], int, str, bool]:
         """A reset's checks, all of them, before anything changes: Refused (409, 400) or the view it returns."""
+        if self._finished():
+            raise self._conflict()
         if self.success or self.stopping:
             raise Refused(409, {"error": "trial finished: " + ("an episode succeeded" if self.success else "your time is up"),
                                 "reason": self.reason})
@@ -843,6 +909,7 @@ class Service:
                 self._write_final()
             raise
         self.resets += 1
+        self.now_success, self.seen_step = False, None     # (hide) the new episode's own
         self.ep_start, self.episode = self.journal_rows, []
         self.done, self.reason, self.success, self.t_end = False, None, False, None
         self.error_infra = False
@@ -866,6 +933,15 @@ class Service:
         self._checkpoint("reset", cameras=cams, start_ok=self.ep_start_ok)
         self._save_call(out, None)
         return out, rec.parts()
+
+    def _finish(self, meta: dict, parts: dict) -> tuple[dict, None]:
+        """(hide) POST /finish: the agent ends the episode; the state it leaves is graded (_finalize)."""
+        if self.done or self.stopping:
+            raise self._conflict()
+        self.calls += 1
+        self.finish_t = time.time()
+        self._end("finished")
+        return {**self.meta(), "ok": True}, None
 
     # ------------------------------------------------------------------ the end of the trial
     def on_sigusr1(self, *_) -> None:
@@ -905,6 +981,15 @@ class Service:
         trajectory, which can no longer change or void the verdict: while it renders final.json says
         "video_pending": true (the collect hook waits for it as long as its time allows)."""
         rows = first_rows = None
+        if self.hide:
+            # The end state is judged: the last control step's success, at an end that leaves the state as the agent's
+            # (POST /finish, the agent's end, the step cap); the adapter's live_verdict() (a settle window) then runs
+            # from that state as always. An end by the task's own failure rule, an error or an abandoned episode: none.
+            # An adapter whose success is an event (latched_success = True: a referee's call, a staged check, a return
+            # reached) keeps the graded episode's first success at the end and at a later failure: the event is its state.
+            self.success = self.reason in END_STATE_REASONS and bool(self.now_success) or (
+                bool(getattr(self.sim, "latched_success", False)) and self.seen_step is not None
+                and self.reason in END_STATE_REASONS + ("failed",))
         try:
             rows = np.asarray(self.episode, dtype=np.float64).reshape(-1, self.sim.raw_dim)
             try:

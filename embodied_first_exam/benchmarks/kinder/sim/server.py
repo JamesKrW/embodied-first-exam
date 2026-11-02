@@ -39,6 +39,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from rcb_kinder import CAMERA_HW, GL_BACKEND, Session  # noqa: E402
 from rcb_service import InstanceMismatch, main  # noqa: E402
 
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1; off by default): KinDER's goal check is a predicate on the current
+# state and the episode has no failure rule, so done is never set from here (the success never ends the episode; the
+# service's step cap does) and the success is the state's
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
+
 CAMERAS = ("robot_base", "robot_wrist")       # the robot's own cameras
 DEPTH = ("robot_wrist",)                     # the one that is RGB-D on the real robot
 ROOM = "task_view"                           # upstream's camera framing the task, served as `room_camera`
@@ -267,7 +272,7 @@ class TidyBot(_Robot):
     def step(self, row: np.ndarray) -> tuple[bool, bool, dict]:
         _, success, done = self.s.step(row)
         self._grip = float(row[10])
-        return done, success, {"blocked": False}
+        return done and not HIDE_SUCCESS, success, {"blocked": False}
 
     def reset(self) -> None:
         super().reset()
@@ -313,7 +318,7 @@ class Kinova(_Robot):
                                                            arm.joint_upper_limits[:7])])
         _, success, done = self.s.step(row)
         asked, moved = np.abs(target - q0) > self.STILL, np.abs(self._pose() - q0) > self.STILL
-        return done, success, {"blocked": bool(asked.any() and not moved.any())}
+        return done and not HIDE_SUCCESS, success, {"blocked": bool(asked.any() and not moved.any())}
 
     def hold(self) -> tuple[str, np.ndarray]:
         return "delta", np.zeros(self.dim)      # gripper 0: leave it as it is

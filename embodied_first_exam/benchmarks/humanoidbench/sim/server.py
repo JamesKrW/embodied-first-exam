@@ -31,7 +31,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # rcb_hb first: it picks MuJoCo's GL backend, which `import mujoco` binds once per process. Imported after it, the
 # depth renderer's context ended up inside the viewer's and head-camera images came back as another camera's.
-from rcb_hb import GL_BACKEND, Session  # noqa: E402
+from rcb_hb import GL_BACKEND, HIDE_SUCCESS, Session  # noqa: E402
 import mujoco  # noqa: E402
 from rcb_rewards import restore  # noqa: E402
 
@@ -52,6 +52,7 @@ IMU = ("imu_gyro_x", "imu_gyro_y", "imu_gyro_z", "imu_gravity_x", "imu_gravity_y
 class HumanoidBench:
     """One frozen HumanoidBench instance behind the rcb_service.Sim contract. The agent never gets the root pose,
     object or goal state, or the reward -- the reward is live here only so the service can judge."""
+    latched_success = True   # (hide) the success is an event (rcb_service.py Service._finalize): a later failure keeps it
 
     def __init__(self, task: str | None, instance: str, *, proprio: bool = True, imu: bool = False,
                  room_camera: bool = False, room_pose: tuple | None = None, depth: bool = False, task_text: str = "",
@@ -76,6 +77,8 @@ class HumanoidBench:
         self.joints = [m.joint(j).name for j in range(m.njnt) if 7 <= m.jnt_qposadr[j] < self.robot.dof]
         self.nu = self.raw_dim = int(self.s.nu)
         self.control_dt, self.max_control_steps = float(self.s.low.dt), int(self.s.max_steps)
+        if HIDE_SUCCESS:
+            self._cap = self.max_control_steps   # (hide) restored by reset() after a task-completion end
         self.lo, self.hi = (np.asarray(v, dtype=np.float64) for v in m.actuator_ctrlrange[:self.nu].T)
         self.proprio_on, self.imu = proprio, imu
         self.proprio_layout = ([f"{j}_pos" for j in self.joints] + [f"{j}_vel" for j in self.joints] if proprio else []) \
@@ -267,11 +270,24 @@ class HumanoidBench:
     def step(self, row: np.ndarray) -> tuple[bool, bool, dict]:
         done = self.s.step(row)[2]
         self.cmd = np.asarray(row, dtype=np.float64)
+        if HIDE_SUCCESS:
+            # (hide) success = the return reached the pass mark (it only grows: the latched value is the state), and
+            # it never ends the episode. done = the task's own failure end (a fall, a dropped object), which takes the
+            # success away; the time limit is the service's step cap. Bookshelf's one end that is not a failure (all
+            # five objects placed: upstream ends there and cannot step on) ends as the step cap, judged on the state.
+            term, task = self.s.last_terminated, self.s.low.task
+            succ = bool(self.s.status()["success"])
+            if term and type(task).__name__.startswith("Bookshelf") and self.s._last_info.get("terminated_reason") == 1:
+                self.max_control_steps = 0
+                return False, succ, {}
+            return term, succ and not term, {}
         return done, bool(self.s.status()["success"]), {}
 
     def reset(self) -> None:
         self.s.reset()
         self.cmd = self._command_now()
+        if HIDE_SUCCESS:
+            self.max_control_steps = self._cap
 
     def state_sha(self) -> str:
         return self.s.state_sha()

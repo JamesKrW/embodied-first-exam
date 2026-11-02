@@ -78,6 +78,8 @@ def ctrl_steps() -> int:
 # (rcb_topogym.SIMULATOR_INSTABILITY: a cloth particle faster than PARTICLE_SPEED_LIMIT_M_S, before the task's own failure
 # predicates). A simulator error the agent's call raised (reason "error") is the agent's 0 (PROTOCOL §4).
 INFRA_REASONS = ("simulator_instability",)
+if L.HIDE_SUCCESS:      # (hide) the task ended on its own success although rcb_topogym turned its goal off: never graded
+    INFRA_REASONS += ("hide_switch_failed",)
 
 
 def instability_fields() -> dict:
@@ -96,7 +98,7 @@ def write_final() -> None:
         "success": bool(E["success"]), "infra_error": int(E["reason"] in INFRA_REASONS), **instability_fields(), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": S.physics_steps, "sim_time_s": S.sim_time_s,
         "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "done": E["done"], "task": TASK,
         "protocol": PROTOCOL, "finalized": False, "n_actions": E.get("n_actions"), "live_rows": E.get("live_rows"),
-        "live_sha": E.get("live_sha"), **EP.final_fields()})
+        "live_sha": E.get("live_sha"), **EP.final_fields(), **L.hide_fields(E)})
 
 
 def dump() -> None:
@@ -116,17 +118,55 @@ def dump() -> None:
     L._write_json(os.path.join(DATA, "episode.json"), {
         "success": bool(E["success"]), "infra_error": int(E["reason"] in INFRA_REASONS), **instability_fields(), "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": S.physics_steps, "sim_time_s": S.sim_time_s,
         "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": TASK, "protocol": PROTOCOL,
-        "n_actions": E.get("n_actions"), "live_rows": E.get("live_rows"), "live_sha": E.get("live_sha"), **EP.final_fields()})
+        "n_actions": E.get("n_actions"), "live_rows": E.get("live_rows"), "live_sha": E.get("live_sha"), **EP.final_fields(),
+        **L.hide_fields(E)})
     write_final()
+
+
+def end_state_success() -> bool:
+    """(hide) The end state judged (an END_STATE_REASONS end): the task's success with its own confirmation. The window
+    already complete is the success; else the last command is held with the task's goal switch on (Session.enable_goal) for
+    at most one stability window (Session.hold_window, the time already held counted), journaled and recorded as live
+    rows, until the task's own end: its success, or a failure predicate / breakdown (then the end's reason). A failure that
+    ended the episode, or the runaway guard (no step left), leaves no window to hold."""
+    if S.episode_end is not None:
+        return False
+    if S.goal_now() and not S.settle_only_when_reached:   # a settling family's window had no settling: held anew
+        return True
+    if S.episode_done:
+        return False
+    S.enable_goal()
+    for _ in range(S.hold_window()):
+        S.step(np.asarray(S.hold_action(), dtype=np.float32))
+        EP.journal(S.hold_action(), physics_steps=S.last_step_ticks)
+        if S.episode_end is not None or S.episode_done:
+            break
+    if S.episode_end not in (None, "success"):
+        E["reason"] = S.episode_end     # a failure rule or a breakdown during the window: that end (infra for an instability)
+    return S.episode_end == "success"
+
+
+def finish_hidden(reason: str) -> None:
+    """(hide) finish(): only an end-state end is judged; a failure, an error or the switch's failure is 0."""
+    E["done"] = True; E["reason"] = "hide_switch_failed" if reason == "success" else reason; E["t_end"] = time.time()
+    E["success"] = False
+    if E["reason"] in L.END_STATE_REASONS:
+        try: E["success"] = bool(end_state_success())
+        except Exception: traceback.print_exc()
+    E["episode_control_steps"] = ctrl_steps()
+    E.setdefault("end_row", len(S._recording) if S._recording is not None else None)   # after the window: its rows are live
 
 
 def finish(reason: str) -> None:
     if E["done"]: return
-    E["done"] = True; E["reason"] = reason; E["t_end"] = time.time(); E["episode_control_steps"] = ctrl_steps()
-    E.setdefault("end_row", len(S._recording) if S._recording is not None else None)   # timeout / error / guard ends
-    if not E["success"]:
-        try: E["success"] = check_success()
-        except Exception: pass
+    if L.HIDE_SUCCESS:
+        finish_hidden(reason)
+    else:
+        E["done"] = True; E["reason"] = reason; E["t_end"] = time.time(); E["episode_control_steps"] = ctrl_steps()
+        E.setdefault("end_row", len(S._recording) if S._recording is not None else None)   # timeout / error / guard ends
+        if not E["success"]:
+            try: E["success"] = check_success()
+            except Exception: pass
     log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "elapsed_s": round(E["t_end"] - E["t0"], 1), "success": bool(E["success"])})
     dump()
 
@@ -322,6 +362,13 @@ SPEC = {
               "source": f"{S.engine_name()} geometric depth at the same camera rig and pixels as the Nyx RGB (the distance along the optical axis); "
                         "it may differ from the RGB at transparent surfaces"},
 }
+if L.HIDE_SUCCESS:                      # (hide) a success ends nothing (success_signal); the cap's reason is step_limit
+    for _a, _b in (("ends at the first success (the task predicate is evaluated after every /submit and every /observe that "
+                    "watches), ", "ends when you POST /finish (success_signal: the state then is graded, with the task's own "
+                    "stability window held from it), "), ("reason step_guard, graded as it stands", "reason step_limit, graded "
+                    "as it stands")):
+        assert _a in SPEC["episode"], _a
+        SPEC["episode"] = SPEC["episode"].replace(_a, _b)
 L.check_spec(SPEC)                      # refuse to start with an incomplete spec or a forbidden field
 
 
@@ -461,10 +508,12 @@ def ctrl_step(a: np.ndarray, rec: L.Recorder, *, row_start=False, notes: list | 
                 notes.append({"row": ri, "index": int(ARM[arm][1]), "reason": text})
     stop = EP.journal(S.hold_action(), physics_steps=S.last_step_ticks) if S.n_steps != before else EP.poll_stop()
     rec.tick()
+    if L.HIDE_SUCCESS and S.n_steps != before:    # (hide) the state's success, never shown (rcb_topogym.HIDE_SUCCESS)
+        L.hidden_success(E, S.goal_now(), log, ctrl_steps())
     if S.episode_end is not None and "end_row" not in E and S._recording is not None:
         E["end_row"] = len(S._recording)      # the row at which the live episode ended (success or a failure predicate)
     if S.episode_end is not None: finish(S.episode_end)
-    elif guard: finish("step_guard")
+    elif guard: finish("step_limit" if L.HIDE_SUCCESS else "step_guard")
     return E["done"] or stop
 
 
@@ -585,7 +634,8 @@ def do_submit(meta: dict, A: np.ndarray) -> tuple[dict, list]:
     if typ == "joint_position": run_joint_position(A, dt, interp, rec, clipped)
     else: run_ee_pose(A, rec, plan, clipped)
     rec.tick(force=True, last=True)
-    succ = check_success(); E["success"] = E["success"] or succ
+    succ = False if L.HIDE_SUCCESS else check_success()     # (hide) no check here: ctrl_step keeps the state's success
+    if not L.HIDE_SUCCESS: E["success"] = E["success"] or succ
     out = {**meta_common(cams), "chunk_id": E["calls"], "type": typ, "executed_rows": E["step"] - step0, "control_steps_chunk": ctrl_steps() - before,
            "physics_steps_chunk": S.physics_steps - before_ticks, "clipped": clipped[:200], "n_clipped": len(clipped), "plan": plan, "rejected": None, "ok": True,
            **({"frames_skipped": rec.skipped} if rec.skipped else {})}
@@ -611,8 +661,9 @@ def do_observe(meta: dict) -> tuple[dict, list]:
         for _ in range(int(round(seconds * CTRL_HZ))):
             if ctrl_step(hold, rec): break
         rec.tick(force=True, last=True)
-        succ = check_success(); E["success"] = E["success"] or succ
-        if succ: finish("success")
+        if not L.HIDE_SUCCESS:          # (hide) no latch and no end: ctrl_step keeps the state's success
+            succ = check_success(); E["success"] = E["success"] or succ
+            if succ: finish("success")
     E["calls"] += 1
     out = {**meta_common(cams), "obs_id": E["calls"], "seconds": seconds, "control_steps_watch": ctrl_steps() - before,
            "physics_steps_watch": S.physics_steps - before_ticks, "ok": True, **({"frames_skipped": rec.skipped} if rec.skipped else {})}
@@ -723,7 +774,8 @@ print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", f
 threading.Thread(target=L.serve, daemon=True, args=(L.Service(
     spec=SPEC, lock=LOCK, state=E, submit=lambda meta, A: on_main(do_submit, meta, A), observe=lambda meta: on_main(do_observe, meta),
     kinematics=lambda req: on_main(do_kinematics, req), status=status, on_submit_error=lambda exc: on_main(finish, "error"), log=log,
-    episode=EP, state_sha=lambda: on_main(S.state_sha), proprio=lambda: on_main(proprio_row)),)).start()
+    episode=EP, state_sha=lambda: on_main(S.state_sha), proprio=lambda: on_main(proprio_row),
+    **({"finish": lambda: on_main(finish, "finished")} if L.HIDE_SUCCESS else {})),)).start()
 while True:                                 # the main thread: simulator jobs in order; signals are handled between them
     if deadline_reached():
         finish("timeout")

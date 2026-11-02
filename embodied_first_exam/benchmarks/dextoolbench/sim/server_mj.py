@@ -31,7 +31,15 @@ that ends the episode. `time_s` / `time_left_s` count from the agent's first req
 Optional reset capability (PROTOCOL §4.5; RCB_RESET_BUDGET = N > 0, default 0; DexToolBench's standard twins set 20):
 POST /reset abandons the running episode and starts a new one from the frozen start state (Session.reset()), N times
 in all. Only the last episode is graded (trajectory.npz holds its rows, replayable from the frozen start); a
-success ends the trial (no reset after it), as does the agent's time (SIGUSR1). Without a budget /reset is a 404."""
+success ends the trial (no reset after it), as does the agent's time (SIGUSR1). Without a budget /reset is a 404.
+
+The no-success-signal ablation (RCB_HIDE_SUCCESS=1; off by default, and then nothing below applies; docs/protocol/
+standard_mode.md "No success signal"): a success never ends the episode and nothing the agent can see changes with it
+(done, reason, 409s, resets_left, executed rows; DexToolBench's task view shows the last goal as current once every goal
+is reached, as before it is reached); it is logged as "hidden_success" only. POST /finish ends the episode ("finished";
+then every call but GET /spec and /status is a 409, /reset included); the agent's end (SIGUSR1, "timeout"), the step
+cap ("step_limit") and /finish are judged on the state they leave (DexToolBench: every goal reached; Playground: the
+tooling's check() of that state); an end by the task's own rule (a goal timeout) or an error is no success."""
 from __future__ import annotations
 import errno, importlib, json, math, os, signal, sys, threading, time, traceback
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -52,6 +60,12 @@ MAX_CONTROL_STEPS = int(os.environ.get("RCB_MAX_CONTROL_STEPS", "0"))
 MAX_VIDEO_FPS = 30; MAX_FRAMES_PER_CALL = 3000   # frames x cameras per response: bounds the service's memory
 WALL_CLOCK_S = float(os.environ.get("RCB_WALL_CLOCK_S", "3600"))
 RESET_BUDGET = max(0, int(os.environ.get("RCB_RESET_BUDGET", "0") or 0))   # PROTOCOL §4.5: 0 = one episode, no /reset
+# the no-success-signal ablation (module docstring): RCB_HIDE_SUCCESS=1, off by default
+HIDE = os.environ.get("RCB_HIDE_SUCCESS") == "1"
+END_STATE_REASONS = ("finished", "timeout", "step_limit")   # (hide) the ends judged on the state they leave
+SUCCESS_SIGNAL_NOTE = ("hidden: the service never tells you whether you have succeeded and a success does not end the "
+                       "episode; POST /finish (JSON {}) ends it and the state at that moment is graded (if you never "
+                       "call it, the state when your session ends); after /finish every call is refused (409)")
 MAX_BODY = 64 * 1024 * 1024; MAX_RESP = 256 * 1024 * 1024
 LOCK = threading.Lock()
 E = {"ready": False, "calls": 0, "rows": 0, "done": False, "reason": None, "t0": time.time(), "finalized": False,
@@ -59,6 +73,8 @@ E = {"ready": False, "calls": 0, "rows": 0, "done": False, "reason": None, "t0":
 # t_first: the agent's first request (its clock starts there). resets: POST /reset calls that started a new episode;
 # journal_rows: control steps executed over the whole trial (record.f64's length); ep_start: where the current episode
 # begins in it. stopping: the agent's time is up (SIGUSR1): no reset any more.
+if HIDE:   # (hide) the last control step's success (the state's), the graded episode's first successful step, any episode's, /finish's time
+    E.update(now_success=False, seen_step=None, trial_seen=False, finish_t=None)
 
 # SIGUSR1 (the collect hook's "episode over") may arrive before the service is ready, e.g. during a resume replay; its
 # default action would kill the process. Until the real handler is installed, only remember it.
@@ -308,6 +324,16 @@ def task_info() -> dict:
     return info
 
 
+def task_view() -> dict:
+    """task_info() as the agent sees it. (hide) DexToolBench: once every goal is reached the last goal stays the current
+    one, as it was until it was reached (index, pose, goals_reached): the end of the goal sequence is never shown."""
+    info = task_info()
+    if HIDE and KIND == "dtb" and info["goal"] is None:
+        n = info["n_goals"]
+        info.update(goal_index=n - 1, goal=list(S.goals[n - 1]), goals_reached=n - 1)
+    return info
+
+
 PROPRIO_LAYOUT = [f"{n}_pos" for n in NAMES] + [f"{n}_vel" for n in NAMES] + [f"{n}_target" for n in NAMES]
 SPEC = {"protocol": PROTOCOL, "simulator": "mujoco", "task_text": S.inst.get("text", ""), "control_dt": CTRL_DT,
         "max_chunk_s": MAX_CHUNK_S, "max_watch_s": MAX_WATCH_S, "max_control_steps": MAX_CONTROL_STEPS or None,
@@ -343,6 +369,16 @@ if RESET_BUDGET:
                      "budget.reset times in all; only the last episode is graded, and a success ends the trial. The clock "
                      "(time_left_s) keeps running. meta and /status add episode, resets_left and control_steps_total")
     SPEC["episode"] += "; with resets, only the last episode is scored"
+if HIDE:
+    if KIND == "dtb":
+        SPEC["episode"] = ("ends when you POST /finish" + (f", when a goal is not reached within {TOOL.GOAL_TIMEOUT_STEPS * CTRL_DT:g} s" if TOOL.GOAL_TIMEOUT_STEPS else "")
+                           + (f", after {MAX_CONTROL_STEPS} control steps" if MAX_CONTROL_STEPS else "") + ", or when your time is up; the state it ends in is scored"
+                           + ("; with resets, only the last episode is scored" if RESET_BUDGET else ""))
+    if RESET_BUDGET:
+        SPEC["reset"] = ("POST /reset abandons the running episode and starts a new one from the same starting state, "
+                         "budget.reset times in all; only the last episode is graded. The clock "
+                         "(time_left_s) keeps running. meta and /status add episode, resets_left and control_steps_total")
+    SPEC["success_signal"] = SUCCESS_SIGNAL_NOTE
 
 
 def _success() -> bool:
@@ -350,10 +386,15 @@ def _success() -> bool:
     return E["done"] and E["reason"] == "all goals reached"
 
 
+def _finished() -> bool:
+    """(hide) The agent ended the episode with POST /finish: every call after it is refused (GET /spec, /status aside)."""
+    return HIDE and E["done"] and E["reason"] == "finished"
+
+
 def _reset_counters() -> dict:
     if not RESET_BUDGET: return {}
     return {"episode": E["resets"] + 1, "control_steps_total": E["journal_rows"],
-            "resets_left": 0 if _success() or E["stopping"] else RESET_BUDGET - E["resets"]}
+            "resets_left": 0 if _success() or E["stopping"] or _finished() else RESET_BUDGET - E["resets"]}
 
 
 def _agent_time() -> float:
@@ -371,7 +412,7 @@ def _touch() -> None:
 def meta_common() -> dict:
     return {"calls": E["calls"], "rows": E["rows"], "control_steps": len(RECORD), "sim_time_s": round(len(RECORD) * CTRL_DT, 3),
             "time_s": round(_agent_time(), 2), "time_left_s": max(0.0, round(WALL_CLOCK_S - _agent_time(), 1)),
-            "proprio": {"layout": PROPRIO_LAYOUT, "now": proprio().tolist()}, "task": task_info(), "cameras": calib(),
+            "proprio": {"layout": PROPRIO_LAYOUT, "now": proprio().tolist()}, "task": task_view(), "cameras": calib(),
             "done": E["done"], "reason": E["reason"], **_reset_counters()}
 
 
@@ -381,6 +422,10 @@ def write_final(extra: dict | None = None) -> None:
          "video_done": E["video_done"], "reset_budget": RESET_BUDGET, "resets": E["resets"], "episodes": E["resets"] + 1,
          "control_steps_total": E["journal_rows"]}
     d.update(E.get("verdict") or {}); d.update(extra or {})
+    if HIDE:
+        d.update(success_signal="hidden", ended_by=E["reason"], hidden_success_seen=E["seen_step"] is not None,
+                 hidden_success_first_step=E["seen_step"], trial_hidden_success_seen=E["trial_seen"],
+                 finish_time_s=round(E["finish_t"] - E["t_first"], 1) if E["finish_t"] and E["t_first"] else None)
     _write_json(os.path.join(DATA, "final.json"), d)
 
 
@@ -437,12 +482,37 @@ class Recorder:
 
 def _ctrl_step(tg, rec) -> bool:
     """One control step with targets `tg`; returns True if the episode ended (DexToolBench goal rule)."""
+    if HIDE: return _ctrl_step_hidden(tg, rec)
     S.step(tg); row = np.asarray(S.targets, float).copy(); RECORD.append(row); RECF.write(row.tobytes()); E["journal_rows"] += 1; rec.tick()
     if KIND == "dtb":
         p = S.progress()
         if p["done"]: finish("all goals reached"); return True
         if p["failed"]: finish("goal timeout"); return True
     if MAX_CONTROL_STEPS and len(RECORD) >= MAX_CONTROL_STEPS: finish("step limit"); return True
+    return False
+
+
+def _hidden_success(ok: bool) -> None:
+    """(hide) Record the state's success after a control step: logged once per episode, never shown, never an end."""
+    E["now_success"] = bool(ok)
+    if ok and E["seen_step"] is None:
+        E["seen_step"] = len(RECORD); E["trial_seen"] = True
+        log({"ev": "hidden_success", "control_steps": len(RECORD), "episode": E["resets"] + 1, **_journal_pos()})
+
+
+def _ctrl_step_hidden(tg, rec) -> bool:
+    """(hide) _ctrl_step without the success end: the task's own failure rule (a goal timeout) still ends the episode and
+    the step cap ends it as "step_limit" (judged on its state). The tooling's step() returns the tracker's progress
+    (DexToolBench) or check() (Playground) of the state it leaves, which is the success recorded: no extra work."""
+    info = S.step(tg); row = np.asarray(S.targets, float).copy(); RECORD.append(row); RECF.write(row.tobytes()); E["journal_rows"] += 1; rec.tick()
+    if KIND == "dtb":
+        if info["done"]:   # the tracker stops once every goal is reached: the same goal-distance work as before it, so no timing tell
+            S.goal_distance(); S.goal_distance()
+        _hidden_success(info["done"])
+        if info["failed"]: finish("goal timeout"); return True
+    else:
+        _hidden_success(info.get("success"))
+    if MAX_CONTROL_STEPS and len(RECORD) >= MAX_CONTROL_STEPS: finish("step_limit"); return True
     return False
 
 
@@ -577,6 +647,8 @@ class Refused(Exception):
 
 def check_reset() -> None:
     """409 when no new episode may start: the trial is over (a success, or the agent's time is up), or the budget is spent."""
+    if _finished():
+        raise Refused({"error": "episode finished", "reason": E["reason"], "resets_left": 0})
     if _success() or E["stopping"] or E.get("finalizing"):
         raise Refused({"error": "trial finished: " + ("an episode succeeded" if _success() else "your time is up"), "reason": E["reason"], "resets_left": 0})
     if E["resets"] >= RESET_BUDGET:
@@ -594,6 +666,7 @@ def do_reset(q: dict):
         raise
     E["resets"] += 1; E["ep_start"] = E["journal_rows"]; RECORD.clear()
     E["done"] = False; E["reason"] = None; E["t_end"] = None
+    if HIDE: E["now_success"] = False; E["seen_step"] = None      # (hide) the new episode's own
     rec = Recorder(q["cams"], q["fps"], q["depth"]); rec.tick(force=True)
     E["calls"] += 1; RECF.flush()
     log({"ev": "reset", "call": E["calls"], "cameras": q["cams"], "control_steps": 0, "rows_total": E["rows"], **_journal_pos(),
@@ -622,8 +695,13 @@ def finalize() -> None:
                 v.update(success=False, live_success=False)
             elif KIND == "dtb":
                 ok = bool(live["done"])
+                if HIDE: ok = ok and E["reason"] in END_STATE_REASONS   # (hide) the state it ended in; a failure rule's end is none
                 v.update(success=ok, live_success=ok, progress=round(float(live["progress"]), 4), goals_reached=int(live["reached"]),
                          n_goals=int(live["n_goals"]), failed_on_timeout=bool(live["failed"]), live_goals_reached=int(live["reached"]))
+            elif HIDE:   # (hide) Playground: the tooling's check() of the state the episode ended in, at an end that leaves it
+                ok = bool(live["success"]) and E["reason"] in END_STATE_REASONS
+                v.update(success=ok, live_success=ok,
+                         **{k: val for k, val in live.items() if k not in ("success", "state_sha", "steps") and isinstance(val, (int, float, bool))})
             else:
                 v.update(success=bool(live["success"]), live_success=bool(live["success"]),
                          **{k: val for k, val in live.items() if k not in ("success", "state_sha", "steps") and isinstance(val, (int, float, bool))})
@@ -688,7 +766,7 @@ class Hd(BaseHTTPRequestHandler):
         return self._json(404, {"error": "no such endpoint"})
     def do_POST(self):
         _touch()
-        if self.path not in ("/submit", "/observe") + (("/reset",) if RESET_BUDGET else ()): return self._json(404, {"error": "no such endpoint"})
+        if self.path not in ("/submit", "/observe") + (("/reset",) if RESET_BUDGET else ()) + (("/finish",) if HIDE else ()): return self._json(404, {"error": "no such endpoint"})
         try: self._req = self._body()
         except Exception as exc: return self._json(413 if str(exc) == "request too large" else 400, {"error": str(exc)[:200]})
         with LOCK:
@@ -700,6 +778,8 @@ class Hd(BaseHTTPRequestHandler):
 
     def _serve(self):
         meta, parts = self._req
+        if HIDE and (self.path == "/finish" or (self.path == "/observe" and _finished())):
+            return self._finish_or_refuse()
         if self.path == "/submit" and E["done"]:
             return self._json(409, {"error": "episode finished", "reason": E["reason"], **({"resets_left": _reset_counters()["resets_left"]} if RESET_BUDGET else {})})
         if self.path == "/reset":
@@ -716,6 +796,16 @@ class Hd(BaseHTTPRequestHandler):
             traceback.print_exc(); log({"ev": "error", "error": repr(exc)}); finish("error")   # PROTOCOL §4.6: a 500 ends the episode
             return self._json(500, {"error": "simulator error", "detail": repr(exc)[:200]})
         return self._rcb1(out, blobs)
+
+    def _finish_or_refuse(self):
+        """(hide) POST /finish: the agent ends the episode, the state it leaves is graded (finalize); after the episode's
+        end (any) it is a 409, as /observe is after /finish."""
+        if E["done"] or E["stopping"] or E.get("finalizing") or self.path != "/finish":
+            return self._json(409, {"error": "episode finished", "reason": E["reason"], **({"resets_left": _reset_counters()["resets_left"]} if RESET_BUDGET else {})})
+        E["calls"] += 1; E["finish_t"] = time.time()
+        log({"ev": "finish", "call": E["calls"], "finish_t": E["finish_t"], **_journal_pos()})
+        finish("finished")
+        return self._json(200, {**meta_common(), "ok": True})
 
 
 def _end_from_signal():
@@ -761,8 +851,9 @@ def _resume_or_start() -> None:
     except OSError: R = np.zeros(0)
     if R.size < n * N: _give_up("resume_failed: journal shorter than the log", infra=True)
     R = R[: n * N].reshape(n, N)
+    info = None
     for row in R[ep0:]:                                  # the current episode, from the frozen start
-        S.step(row); RECORD.append(row.copy())
+        info = S.step(row); RECORD.append(row.copy())
     if S.state_sha() != last["state_sha"]: _give_up("resume_failed: replayed state differs from the logged one", infra=True)
     R.tofile(REC_PATH)                                   # drop the steps of the call that was in flight
     E["calls"] = int(last.get("call", 0)); E["rows"] = int(last.get("rows_total", 0)); E["t0"] = float(starts[0]["ts"])
@@ -774,6 +865,15 @@ def _resume_or_start() -> None:
              and int(e.get("journal_rows", e.get("control_steps")) or 0) <= n]
     if ended: E["done"] = True; E["reason"] = ended[-1].get("reason"); E["t_end"] = float(ended[-1]["ts"])
     E["stopping"] = any(e.get("ev") == "end" and e.get("reason") == "timeout" for e in ev)   # the agent's time was up already
+    if HIDE:   # (hide) the hidden fields: the replayed state's success, the logged first successes, /finish's time
+        E["now_success"] = bool(info is not None and (info["done"] if KIND == "dtb" else info.get("success")))
+        hs = [e for e in ev if e.get("ev") == "hidden_success"
+              and (int(e.get("resets", 0)) < resets or int(e.get("journal_rows", 0)) <= n)]
+        cur = [e for e in hs if int(e.get("resets", 0)) == resets and int(e.get("ep_start", 0)) == ep0]
+        E["seen_step"] = int(cur[0]["control_steps"]) if cur else None; E["trial_seen"] = bool(hs)
+        fin_ev = [e for e in ev if e.get("ev") == "finish" and int(e.get("resets", 0)) == resets and int(e.get("journal_rows", 0)) <= n]
+        if fin_ev and E["done"] and E["reason"] == "finished":
+            E["finish_t"] = float(fin_ev[-1]["finish_t"]); E["calls"] = max(E["calls"], int(fin_ev[-1]["call"]))
     log({"ev": "resumed", "control_steps": len(RECORD), "journal_rows": n, "resets": resets, "calls": E["calls"], "state_sha": S.state_sha(), "crashed_in_call": in_call,
          "downtime_s": round(time.time() - float(ev[-1]["ts"]), 1)})
     write_final()

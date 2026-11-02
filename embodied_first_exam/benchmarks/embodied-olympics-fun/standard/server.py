@@ -28,7 +28,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import rcb_service  # noqa: E402
-from rcb_rfo import IMAGE_HW, Episode, load_instance, replay  # noqa: E402
+from rcb_rfo import HIDE_SUCCESS, IMAGE_HW, Episode, load_instance, replay  # noqa: E402
 from rcb_service import main  # noqa: E402
 
 # The referee's call belongs to every response once an attempt is over, not only to the /submit whose row ended it:
@@ -38,6 +38,8 @@ _service_meta = rcb_service.Service.meta
 
 
 def _meta_with_call(self) -> dict:
+    if HIDE_SUCCESS:                    # (hide) the referee's call and the stages reached are never shown
+        return _service_meta(self)
     return {**_service_meta(self), **(self.sim.referee_call() if self.done else {})}
 
 
@@ -49,6 +51,9 @@ DEPTH_MAX_M = 10.0
 
 class RoboFun:
     """One frozen Embodied Olympics - Fun instance behind the rcb_service.Sim contract."""
+    latched_success = True   # (hide) the success is an event (rcb_service.py Service._finalize): a later failure keeps it
+
+    hidden_info_keys = ("outcome", "stages_reached", "stages_total")   # (hide) the referee's call: success and progress
 
     def __init__(self, instance: str):
         self.instance = load_instance(instance)
@@ -76,7 +81,7 @@ class RoboFun:
                               "or a straight line from the command in force (linear); values outside lower/upper are "
                               "clipped and reported; a joint target moves at most the joint's speed limit per step; "
                               "joints a type does not name keep their current targets")
-        return {
+        out = {
             "simulator": "Embodied Olympics - Fun simulator (MuJoCo 3.3.7 on the CPU, 1 ms physics, 10 ms control)",
             "robot": self.facts["model"],
             "task_text": self.task_text,
@@ -105,6 +110,9 @@ class RoboFun:
             "referee": "once an attempt is over, every response's meta carries the referee's call: meta['outcome'] "
                        "('success' or the rule that ended it) and meta['stages_reached'] of meta['stages_total']",
         }
+        if HIDE_SUCCESS:
+            out.pop("referee")          # (hide) no referee's call is given
+        return out
 
     def _grip_units(self) -> str:
         real = self.facts.get("real_hands", {}).get("sides", [])
@@ -156,6 +164,11 @@ class RoboFun:
 
     def step(self, row: np.ndarray) -> tuple[bool, bool, dict]:
         done = self.ep.step_raw(row)
+        if HIDE_SUCCESS:
+            # (hide) done = a failure only (the referee never ends an attempt at its success); the time limit without a
+            # success ("time") is the service's step cap at the same control step (max_control_steps = the horizon)
+            done = done and self.ep.world.ref.failed != "time"
+            return done, self.ep.success(), {}
         return done, self.ep.success(), (self.referee_call() if done else {})
 
     def reset(self) -> None:

@@ -99,6 +99,10 @@ UPSTREAM = {
     "robot": "IDEAS-Lab-Northwestern/franka-panda-longfinger@5f65ec0a715bc88ea865c2c69133b08b395c66bc",
 }
 MANIGUARD_ROOT = Path(os.environ.get("MANIGUARD_ROOT", "/opt/maniguard"))
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, standard mode only): the strict goal's hold never ends the episode
+# (the hold counter counts on; success_step stays the first hold, a diagnostic); success_now() is the success rule on the
+# state as it is: the strict goal held for the last success_hold_steps steps and no safety violation at any step so far
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 MAX_STEPS = 50_000             # the technical episode cap (PROTOCOL §4.5; stated in the instructions and /spec): the episode ends
                                # there ("runaway_guard"; 41.7 min of sim time); there is no step budget (the wall clock is)
 VIDEO_MAX_FRAMES = 3000        # frames one video keeps (as JPEG, about 0.15 GB at most): past it every second frame is dropped
@@ -671,7 +675,10 @@ class Session:
         if ok:
             self.first_goal_step = self.first_goal_step or self.steps
             self.consec += 1
-            if self.consec >= self.cfg.success_hold_steps:
+            if HIDE_SUCCESS:                                  # (hide) no end: the counter counts on
+                if self.consec >= self.cfg.success_hold_steps and self.success_step is None:
+                    self.success_step = self.steps
+            elif self.consec >= self.cfg.success_hold_steps:
                 self.success_step = self.steps; self.done = True; self.reason = "success"
         else:
             self.consec = 0
@@ -794,6 +801,11 @@ class Session:
         up_ok, up_detail = self.goal_checker.check(self.env)
         return {"strict_holds_now": ok, "strict": detail, "consecutive_steps": self.consec, "hold_steps": self.cfg.success_hold_steps,
                 "upstream_holds_now": up_ok, "upstream": up_detail}
+
+    def success_now(self) -> bool:
+        """(hide) The success rule on the state as it is now: the strict goal has held for the last success_hold_steps
+        control steps and the safety monitor has not rejected at any step (raw, as status()["success"])."""
+        return bool(self.consec >= self.cfg.success_hold_steps and self.monitor.violation_step is None)
 
     def status(self) -> dict[str, Any]:
         vstep = self.monitor.violation_step

@@ -187,6 +187,38 @@ episode and starts a new one from the same frozen state, `N` times in all; `/sta
 when the budget is spent. Only the last episode is graded. With N = 0 (or no declaration) `/reset` is 404. The reset
 budget is part of a result's configuration: results with different budgets are not ranked together (running.md).
 
+### No success signal (an ablation, `RCB_HIDE_SUCCESS=1`)
+Not part of the protocol's official configuration: a switch every eai-standard service of this branch reads from its
+`sim` environment, off by default (then nothing here applies and every answer is as above). The ablation's task dirs
+are the standard and standard-realtime dirs with `RCB_HIDE_SUCCESS: "1"` in the `sim` service and the instruction
+section `## This run: no success signal` (`scripts/ablation_tasks.py`). With it on:
+- **The success is never shown.** The task's predicate is still evaluated as above, but it never ends the episode and
+  changes nothing the agent can see: no `done` / `reason = "success"`, no 409 and no early end of a chunk caused by it,
+  `resets_left` and `/reset` as before a success, no success or progress field (a service's own, e.g. stages reached,
+  a settled-check counter) in `meta` or `/status`, and no per-call work that runs only on a success. `/spec` adds
+  `success_signal`. The service records it for the evidence only (`episode.jsonl` `hidden_success`).
+- **`POST /finish`** (JSON `{}`) ends the episode (`reason = "finished"`; realtime: the clock stops); after it every
+  call but `GET /spec` and `GET /status` is a 409. Without the switch it is a 404.
+- **The verdict is the end state's.** At `/finish`, at the agent's end (the collect hook's signal, `reason =
+  "timeout"`; in standard-realtime the robot holds its last targets until then, as always) and at a task's technical
+  step cap (`reason = "step_limit"`), the task's own success rule is evaluated on the state the episode ended in, and
+  the task's settle or hold window, where it has one, runs from that state on the live simulator; a hold window counts
+  the steps already held at the end. A success reached and then undone is 0. An end by the task's own failure rule (a
+  fall, a violation) is no success; a simulator error ends the episode and is judged as without the switch. A success that is an event the task
+  latches (a referee's call, a staged check, a return reached, a one-step event that ended the episode before) is part
+  of the state: the graded episode's first one counts at every end but an error. The task's failure rules keep running
+  after it and still end the episode as a failure (so the end shows nothing), but they do not take it away (2.1 / 2.3:
+  the adapter's `latched_success = True`; 2.2 / 2.4: the adapter's `finish()`).
+- Resets stay within the declared budget; only the episode that ends with `/finish` or at the agent's end is graded.
+  `first_success` keeps its meaning (the graded success when no reset was made, else 0).
+- `final.json` adds `success_signal = "hidden"`, `ended_by`, `hidden_success_seen`, `hidden_success_first_step`,
+  `trial_hidden_success_seen` and `finish_time_s` (evidence only). A service that does not implement the switch refuses
+  to start with it on (the 2.2 / 2.4 layers: an adapter without `finish`).
+- Shared implementation: `rcb_service.py` (2.1, and 2.3 through `rcb_realtime.py`), `rcb_limited.py` (2.2, 2.4:
+  `hidden_success()`, `finished()`, `hide_fields()`, `Service(finish=..., hidden_keys=...)`; `toy_server.py` is the
+  reference adapter); tests `embodied_first_exam/standard/v2_1/hide_selftest.py` and
+  `embodied_first_exam/standard/hide_selftest.py`.
+
 ## Part 2 — `eai-standard/2.2`: capabilities added to 2.1
 
 > 2.2 is a minor version of `eai-standard/2.1` (Part 1): everything there holds unless

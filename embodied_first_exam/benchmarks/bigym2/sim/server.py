@@ -27,7 +27,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from rcb_bigym2 import CAMERAS, Episode, load_instance, replay  # noqa: E402
+from rcb_bigym2 import CAMERAS, HIDE_SUCCESS, Episode, load_instance, replay  # noqa: E402
 from rcb_service import InstanceMismatch, main  # noqa: E402
 
 ACTION = "whole_body"
@@ -35,6 +35,9 @@ ACTION = "whole_body"
 
 class BiGym2:
     """One frozen BiGym 2.0 instance behind the rcb_service.Sim contract."""
+
+    # (hide) upstream's label of the end says "success" once its success latch is set, even at a later failure end
+    hidden_info_keys = ("outcome",)
 
     def __init__(self, instance: str, task_text: str = "", episode: str = "", image_hw: int = 84):
         self.instance = load_instance(instance)
@@ -54,6 +57,8 @@ class BiGym2:
         self.mounts = self.instance["t0"]["cameras"]
         self.facts = self.instance["t0"]["robot"]  # the robot's description: joint axes, camera mounts
         self.cmd = self.ep.hold_row()
+        if HIDE_SUCCESS:
+            self.live_verdict = self._hide_live_verdict
 
     # ------------------------------------------------------------------ the rcb_service.Sim contract
     def spec(self) -> dict:
@@ -125,7 +130,25 @@ class BiGym2:
     def step(self, row: np.ndarray) -> tuple[bool, bool, dict]:
         done = self.ep.step(row)
         self.cmd = np.asarray(row, dtype=np.float64)
+        if HIDE_SUCCESS:
+            # (hide) done = upstream's failure end only (its held success and its time limit no longer end it: the
+            # service's step cap does); success = the predicate in this state, the hold window is judged at the end
+            failed = self.ep.failed
+            return failed, self.ep.success_now(), ({"outcome": self.ep.outcome()} if failed else {})
         return done, self.ep.success(), ({"outcome": self.ep.outcome()} if done else {})
+
+    def _hide_live_verdict(self, rows: np.ndarray, success: bool) -> dict:
+        """(hide) The end state's hold window: the last command held (zero walking and turning) until the predicate
+        has held hold_steps control steps in a row, counting the steps it already held before the end; success when
+        it does, with no fall and no failure end on the way."""
+        ep, ran = self.ep, 0
+        held0 = ep.held
+        if success:
+            while ran < ep.hold_steps and ep.held < ep.hold_steps and ep.success_now():
+                ep.step(ep.hold_row())
+                ran += 1
+        return {"success": bool(success) and ep.held_success(), "end_hold_steps": ran, "end_held_before": held0,
+                "hold_steps": ep.hold_steps}
 
     def reset(self) -> None:
         self.ep.reset()

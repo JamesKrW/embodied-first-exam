@@ -313,7 +313,7 @@ def summary() -> dict:
             "fell_at": chk.get("fell_at"), "worst_lin_err": chk.get("worst_lin_err"), "worst_yaw_err": chk.get("worst_yaw_err"),
             "tilt_deg": chk.get("tilt_deg"), "imu_height": chk.get("imu_height"), "pose_angle_deg": chk.get("pose_angle_deg"),
             "episodes": E["resets"] + 1, "resets": E["resets"], "reset_budget": RESET_BUDGET, "control_steps_total": EP.rows,
-            "instance_ok": bool(S.instance_ok), **EP.final_fields()}
+            "instance_ok": bool(S.instance_ok), **EP.final_fields(), **L.hide_fields(E)}
 
 
 def finish(reason: str) -> None:
@@ -323,12 +323,16 @@ def finish(reason: str) -> None:
     E["done"] = True
     E["reason"] = reason
     E["t_end"] = time.time()
+    if L.HIDE_SUCCESS and reason in L.END_STATE_REASONS:
+        end_hold()   # (hide) the task's hold window, run from the end state (getup / stand_on_two)
     E["episode_control_steps"] = ctrl_steps()
     try:
         chk = S.check()
         E["check"] = {k: v for k, v in chk.items() if k != "segments"}
         # a simulator error ends the episode: the state after it is never judged a success (PROTOCOL §4.6)
         E["success"] = bool(chk["success"]) and reason != "error"
+        if L.HIDE_SUCCESS:   # (hide) the end state decides: only the ends judged on their state can succeed
+            E["success"] = E["success"] and reason in L.END_STATE_REASONS
     except Exception:  # noqa: BLE001
         traceback.print_exc()
     EP.log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "success": bool(E["success"]),
@@ -347,7 +351,64 @@ def dump() -> None:
     write_final()
 
 
-def after_step() -> None:
+def held_steps() -> int:
+    """(hide) The control steps in a row, up to now, in which the getup / stand_on_two hold condition is met (the
+    per-step condition of Q.Session.check)."""
+    n = 0
+    if S.kind == "stand_on_two":
+        if S.fell_at is not None:
+            return 0
+        for (ang, air_down), row in zip(reversed(S.pose_log), reversed(S.log)):
+            if ang <= S.spec["fwd_tol_deg"] and row[3] >= S.spec["min_imu_height"] and not air_down:
+                n += 1
+            else:
+                break
+    elif S.kind == "getup":
+        for row in reversed(S.log):
+            if row[2] <= Q.TILT_MAX_DEG and row[3] >= S.spec["min_imu_height"]:
+                n += 1
+            else:
+                break
+    return n
+
+
+def end_hold() -> None:
+    """(hide) At an end judged on its state (L.END_STATE_REASONS): the getup / stand_on_two goal must hold for
+    HOLD_STEPS / POSE_HOLD_STEPS control steps in a row. The last command is held and stepped (journaled: the trajectory
+    holds these steps) for up to one hold window, the steps already held before the end counted; it stops when the
+    check holds, at the horizon or at the termination rule (a fall: the check then fails)."""
+    if S.kind not in ("getup", "stand_on_two"):
+        return
+    window = (Q.POSE_HOLD_STEPS if S.kind == "stand_on_two" else Q.HOLD_STEPS) - held_steps()
+    hold, k = S.targets.copy(), 0
+    try:
+        while k < window and not S.done and S.fell_at is None and not S.check()["success"]:
+            S.step(hold)
+            ROWS.append(np.asarray(hold, dtype=np.float64))
+            EP.journal(hold)
+            k += 1
+    except Exception as exc:  # noqa: BLE001 -- a simulator error during the hold: recorded; the check is judged as it stands
+        traceback.print_exc()
+        E["hold_error"] = repr(exc)[:300]
+        EP.log({"ev": "hold_error", "error": E["hold_error"]})
+    E["hold_steps"] = k
+    EP.log({"ev": "end_hold", "steps": k, "window": window})
+
+
+def after_step_hidden(chk: dict) -> None:
+    """(hide) after_step without the success end: the check only records the state's success (L.hidden_success); the
+    fall still ends the episode (a failure), the horizon is the technical cap (step_limit, judged on its state)."""
+    if S.kind in ("joystick", "stand_on_two") and S.fell_at is not None:
+        finish("fell")
+        return
+    L.hidden_success(E, bool(chk.get("success")), EP.log, ctrl_steps())
+    if S.done:
+        finish("step_limit")
+
+
+def after_step(chk: dict | None = None) -> None:
+    if L.HIDE_SUCCESS:
+        return after_step_hidden(chk if chk is not None else S.check())
     if S.kind in ("joystick", "stand_on_two") and S.fell_at is not None:
         finish("fell")
     elif S.kind in ("getup", "stand_on_two") and S.check()["success"]:
@@ -358,11 +419,11 @@ def after_step() -> None:
 
 def ctrl_step(a, rec) -> bool:
     """One executed control step, journaled. True when the call must stop here."""
-    S.step(a)
+    chk = S.step(a)   # Session.step returns its check of the steps so far
     ROWS.append(np.asarray(a, dtype=np.float64))
     stop = EP.journal(a)
     rec.tick()
-    after_step()
+    after_step(chk)
     return E["done"] or stop
 
 
@@ -451,7 +512,7 @@ def do_submit(meta: dict, A: np.ndarray):
         rec = recorder(cameras_of(meta), 5, meta)
         rec.tick(force=True, last=True)  # every response carries the last frames
         E["calls"] += 1
-        finish("done")
+        finish("finished" if L.HIDE_SUCCESS else "done")   # (hide) `done` is the agent's end, as POST /finish
         return {**meta_common(cameras_of(meta)), "chunk_id": E["calls"], "type": typ, "executed_rows": 0, "ok": True}, rec.parts("none", 5)
     if typ != "joint_position":
         raise ValueError(f"type must be joint_position or done (not yet: {SPEC['action_types']['not_yet']})")
@@ -533,7 +594,10 @@ def do_observe(meta: dict):
 def reset_counters() -> dict:
     if not RESET_BUDGET:
         return {}
-    left = 0 if (E["success"] or E.get("exiting")) else RESET_BUDGET - E["resets"]
+    if L.HIDE_SUCCESS:   # (hide) never from the success: only the end of the trial (time up, POST /finish)
+        left = 0 if (E.get("exiting") or L.finished(E)) else RESET_BUDGET - E["resets"]
+    else:
+        left = 0 if (E["success"] or E.get("exiting")) else RESET_BUDGET - E["resets"]
     return {"episode": E["resets"] + 1, "resets_left": left, "control_steps_total": EP.rows}
 
 
@@ -556,7 +620,9 @@ def do_reset(meta: dict):
     meta = _request(meta)
     cams, fps = cameras_of(meta), video_fps(meta)
     L.depth_mode(meta)  # a bad depth value is a 400 before anything changes
-    if E["success"]:
+    if L.finished(E):   # (hide) after POST /finish
+        raise Refused({"error": "episode finished", "reason": E["reason"], "resets_left": 0})
+    if E["success"] and not L.HIDE_SUCCESS:
         raise Refused({"error": "trial finished: an episode succeeded", "reason": E["reason"], "resets_left": 0})
     if E["resets"] >= RESET_BUDGET:
         raise Refused({"error": "reset budget exhausted", "reason": "reset budget exhausted", "budget": RESET_BUDGET,
@@ -570,6 +636,8 @@ def do_reset(meta: dict):
     E["resets"] += 1
     E["reset_at"] = list(E["reset_at"]) + [EP.rows]
     E.update(done=False, reason=None, success=False, t_end=None, episode_control_steps=None, dumped=False, check=None)
+    if L.HIDE_SUCCESS:   # (hide) the new episode's hidden success starts afresh (trial_seen stays)
+        E.update(now_success=False, seen_step=None, hold_steps=None, hold_error=None)
     EP._ck = None  # the state changed without a journal row: the checkpoint after this call must hash it anew
     E["calls"] += 1
     EP.log({"ev": "reset", "call": E["calls"], "episode": E["resets"] + 1, "journal_rows": EP.rows,
@@ -652,6 +720,8 @@ def make_handler(svc: L.Service):
                 meta, _ = self._body()
             except Exception as exc:  # noqa: BLE001
                 return self._json(413 if "too large" in str(exc) else 400, {"error": str(exc)[:200]})
+            if L.finished(E):   # (hide) after POST /finish every call but GET /spec and /status is a 409
+                return self._json(409, {"error": "episode finished", "reason": E.get("reason"), "resets_left": 0})
             with LOCK:
                 if E.get("exiting"):
                     return self._json(409, {"error": "trial finished: your time is up", "reason": E.get("reason"),
@@ -692,10 +762,15 @@ def serve(svc: L.Service, port: int) -> None:
     service restarts is waited for, not a crash)."""
     svc.spec.setdefault("on_service_error", L.ON_SERVICE_ERROR)
     svc.spec.setdefault("max_call_wall_s", EP.max_call_wall_s)
+    if L.HIDE_SUCCESS:   # as L.serve: fail closed without finish(), and the spec says the success is hidden
+        if svc.finish is None:
+            raise RuntimeError("RCB_HIDE_SUCCESS=1, but this service has no finish()")
+        svc.spec["success_signal"] = L.SUCCESS_SIGNAL_NOTE
     L.check_spec(svc.spec)
     L.bind(port, make_handler(svc)).serve_forever()
 
 
 serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                 on_submit_error=lambda exc: finish("error"), log=EP.log, episode=EP, state_sha=S.state_sha,
-                proprio=proprio_row), port=int(os.environ.get("RCB_PORT", "8000")))
+                proprio=proprio_row, **({"finish": lambda: finish("finished")} if L.HIDE_SUCCESS else {})),
+      port=int(os.environ.get("RCB_PORT", "8000")))

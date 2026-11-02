@@ -56,6 +56,10 @@ CAMERAS = ("head", "left_wrist", "right_wrist")  # the robot's own cameras, in t
 INSTANCE_TOL = 5e-4  # m / rad: upstream's tests/test_substrate_golden.py TOLERANCE ("a stand-in for CPU kernel differences")
 VELOCITIES = ("vx", "vy", "wz")
 SESSION_LOG = os.environ.get("RCB_SESSION_LOG", "/app/output/rcb_session_log.jsonl")
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, sim/server.py; off by default and then nothing changes): the held
+# success no longer ends the episode (upstream keeps stepping its env after it), only the task's failure or a physics
+# error does; the success is the state's (the hold condition now, the hold window judged at the end).
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 
 
 def load_instance(path) -> dict:
@@ -102,6 +106,8 @@ class Episode:
     def reset(self) -> None:
         self.ts = self.tools.reset(self.seed)
         self.last_row = None  # the last command executed (clipped), for hold_row()
+        if HIDE_SUCCESS:
+            self.failed = False   # (hide) upstream ended the episode by the task's failure or a physics error
         self.t0_sha = self.state_sha()
         self.t0_scene_sha = self.scene_sha()
         self.t0_qpos = np.asarray(self.data.qpos, dtype=np.float64).copy()
@@ -134,7 +140,7 @@ class Episode:
     def step(self, row) -> bool:
         """One control step of a physical action row (clipped into the bounds, as upstream does); True when upstream
         ended the episode."""
-        if self.done:
+        if self.done and not (HIDE_SUCCESS and not self.failed):
             raise RuntimeError("the episode is over")
         row = np.asarray(row, dtype=np.float64)
         if row.shape != (self.action_dim,) or not np.all(np.isfinite(row)):
@@ -142,7 +148,32 @@ class Episode:
         row = self.clip(row).astype(np.float32)
         self.ts = self.tools.step(row)
         self.last_row = row.astype(np.float64)
+        if HIDE_SUCCESS:
+            # upstream's own failure end, read every step (the same work with or without a success: upstream's
+            # terminate skips the fail predicate once the success is held, so it is evaluated here unconditionally)
+            self.failed = self.failed or bool(self.tools.inner.fail) or \
+                self.tools.outer.last_truncation_reason() == "physics_error"
         return self.done
+
+    # ------------------------------------------------------------------ (hide) the state's success
+    @property
+    def hold_steps(self) -> int:
+        """The task's hold window in control steps (0: an instantaneous success)."""
+        return int(self.tools.inner.success_hold_steps)
+
+    @property
+    def held(self) -> int:
+        """Consecutive control steps the task's success predicate has held up to now (upstream's own counter)."""
+        return int(self.tools.inner._success_hold_counter)
+
+    def success_now(self) -> bool:
+        """(hide) The task's success predicate in the current state (not yet the hold), no fall, no failure end."""
+        pred = self.held > 0 if self.hold_steps > 0 else bool(self.tools.inner.success)
+        return bool(pred) and not self.fell() and not self.failed
+
+    def held_success(self) -> bool:
+        """(hide) upstream's success in the current state: the predicate held for the window, no fall, no failure."""
+        return bool(self.tools.inner.success) and not self.fell() and not self.failed
 
     def success(self) -> bool:
         from bigym.loco.eval import is_success
@@ -292,7 +323,7 @@ def replay(instance: dict, rows, video: str | None = None) -> dict:
     n = 0
     try:
         for row in rows:
-            if ep.done:
+            if ep.done and not (HIDE_SUCCESS and not ep.failed):   # (hide) the episode runs on after a success
                 break
             ep.step(row)
             n += 1

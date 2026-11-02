@@ -42,6 +42,9 @@ DUMMY = [0.0] * 6 + [-1.0]  # LIBERO's no-op (gripper open), used for the warm-u
 SUITE_MAX_STEPS = {"libero_spatial": 220, "libero_object": 280, "libero_goal": 300, "libero_10": 520}
 CAMERAS = {"agentview": "agentview", "wrist": "robot0_eye_in_hand"}
 HORIZON = 1_000_000
+# The no-success-signal ablation of the standard sidecar (RCB_HIDE_SUCCESS=1, sim/server.py; off by default): LIBERO's
+# success check (a predicate on the current state) no longer ends the episode; `success` is this step's check
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
 OBS_RES = 128  # resolution of LIBERO's own camera observations (only used by LIBERO-MAX's internal render checks)
 _BUILT = {"n": 0}
 # The replay video (`--replay ... <video>`): evidence for humans, never part of a verdict. What it may add to a replay
@@ -207,7 +210,9 @@ class Session:
         self.targets = a
         if self.wrapped.events and self.trigger_step is None:
             self.trigger_step = len(self.actions)
-        if done:
+        if HIDE_SUCCESS:
+            self.success = bool(done)       # the state's, never latched; the episode runs on
+        elif done:
             self.done = self.success = True
         return self.report()
 

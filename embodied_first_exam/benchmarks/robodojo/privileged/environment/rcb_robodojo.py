@@ -66,6 +66,43 @@ CONFIG_NAME = "arx_x5"                 # RoboDojo's simulation embodiment: two A
 CONTROL_HZ = 25
 ACTION_DIM = 14
 MAX_ACTIONS = 15000                    # no step budget (PROTOCOL D1; the wall clock is): this only stops a runaway episode (10 min of simulated time)
+# The no-success-signal ablation (RCB_HIDE_SUCCESS=1, the standard-mode service only; off: nothing below changes): the
+# checks never end the episode. RoboDojo's evaluator ends it at the action whose reward reaches 1 (every staged check
+# passed: RoboDojo pops each stage once it passes, so the stages are latched); with the switch on, _hidden_episode_end
+# replaces EvalEnv.is_episode_end for the Session's env: the same reward call, its value kept as the state's success
+# (Session.success), and only the failure (a check that marks the env failed, e.g. a query over its count) or the
+# runaway guard end the episode, as RoboDojo's own rule does. The reward is a latch (check lists only shrink, query
+# counts only grow; only a failure takes a reached 1 back): env._rcb_latch keeps "the reward reached 1", which a later
+# failure does not take back (Session.latched: the verdict at a failure end too).
+HIDE_SUCCESS = os.environ.get("RCB_HIDE_SUCCESS") == "1"
+
+
+def _hidden_episode_end(env) -> bool:
+    """(hide) EvalEnv.is_episode_end (RoboDojo @ cb2a37d, src/eval_client/eval_env.py) without the success end: the
+    reward is computed exactly as there (final checks only at the step limit or after a failure) and kept in
+    env._rcb_goal; the episode ends at a failure, or at the step limit (then judged: success iff the reward is 1)."""
+    pre_end_flag = deepcopy(env.end_flag)
+    final_check = False
+    for env_idx in range(env.num_envs):
+        if env.take_action_cnt[env_idx] >= env.step_lim or (not env.success[env_idx] and not env.end_flag[env_idx]):
+            final_check = True
+            break
+    reward_list = env.reward_manager.get_reward(final_check=final_check)
+    for env_idx in range(env.num_envs):
+        if env.end_flag[env_idx]:
+            continue
+        goal = reward_list[env_idx] > 1 - 1e-3
+        env._rcb_goal[env_idx] = bool(goal)
+        env._rcb_latch[env_idx] = bool(env._rcb_latch[env_idx] or goal)
+        if env.take_action_cnt[env_idx] >= env.step_lim:
+            env.end_flag[env_idx] = True
+            env.success[env_idx] = bool(goal)
+        elif not env.success[env_idx]:
+            env.end_flag[env_idx] = True
+    changed = [env_idx for env_idx in range(env.num_envs) if env.end_flag[env_idx] != pre_end_flag[env_idx]]
+    if changed:
+        env.get_obs_batch(env_idx_list=changed, last_frame=True)
+    return all(env.end_flag)
 ARMS = ("left", "right")
 ARM_SLICE = {"left": slice(0, 6), "right": slice(7, 13)}
 GRIP_INDEX = {"left": 6, "right": 13}
@@ -345,6 +382,11 @@ class Session:
         self.robodojo_step_lim = int(env.step_lim)
         env.step_lim = MAX_ACTIONS
         self.step_lim = MAX_ACTIONS
+        if HIDE_SUCCESS:     # (hide) the episode's end without the success end (see _hidden_episode_end)
+            import types
+            env._rcb_goal = [False] * int(env.num_envs)
+            env._rcb_latch = [False] * int(env.num_envs)
+            env.is_episode_end = types.MethodType(_hidden_episode_end, env)
         return env
 
     # ---- episode
@@ -359,6 +401,8 @@ class Session:
             return
         env = self.env
         env.success, env.end_flag, env.take_action_cnt = [True], [False], [0]
+        if HIDE_SUCCESS:
+            env._rcb_goal, env._rcb_latch = [False], [False]
         env.episode_nums, env.unstable_nums = 1, 0
         env.reset(seed=[self._layout_id])
         # the start of RoboDojo's episode (EvalEnv.run_eval): register the task's checks, its process score, and for the
@@ -410,11 +454,19 @@ class Session:
         return bool(self.env.end_flag[0])
 
     def success(self) -> bool:
+        if HIDE_SUCCESS:     # (hide) the state's success: the reward reached 1 (latched stages) and the env not failed
+            return bool(self.env._rcb_goal[0]) and bool(self.env.success[0])
         return bool(self.env.end_flag[0]) and bool(self.env.success[0])
+
+    def latched(self) -> bool:
+        """(hide) RoboDojo's reward reached 1 at some action of this episode (a later failure does not take it back)."""
+        return bool(self.env._rcb_latch[0])
 
     def end_reason(self) -> str | None:
         if not self.done:
             return None
+        if HIDE_SUCCESS:     # (hide) an end is the runaway guard or a failed check, never the success
+            return "step_guard" if self.env.take_action_cnt[0] >= self.step_lim else "failed_check"
         if self.success():
             return "success"
         return "step_guard" if self.env.take_action_cnt[0] >= self.step_lim else "failed_check"

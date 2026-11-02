@@ -6,7 +6,12 @@ Env: RCB_DATA (record dir), RCB_TOY_RESUME (exact | approx), RCB_TOY_MODE (inpro
 RoboWits | dump: dump the episode and exit on SIGUSR1, as RoboLab / BEHAVIOR / RoboPaint), test knobs RCB_TOY_STEP_S (wall
 time per control step), RCB_TOY_PERTURB (added to the joints at every step after a restart: a nondeterministic simulator),
 RCB_TOY_HANG_S (the scene build hangs that long on the first start), RCB_TOY_REFUSE (a reason: the service refuses the
-episode at its start, as DexJoCo does with too few CPUs), RCB_TOY_PORT."""
+episode at its start, as DexJoCo does with too few CPUs), RCB_TOY_PORT.
+
+RCB_HIDE_SUCCESS=1 (the no-success-signal ablation, rcb_limited.HIDE_SUCCESS) is the reference for an adapter: the
+success check records the state's success (L.hidden_success) instead of ending the episode, finish() judges the end
+state for the ends in L.END_STATE_REASONS (the task's settle or hold window, where it has one, runs from there),
+final.json adds L.hide_fields(E), and L.Service(finish=...) gives POST /finish."""
 from __future__ import annotations
 import hashlib, os, sys, threading, time
 import numpy as np
@@ -98,7 +103,7 @@ def write_final() -> None:
     fin.update({"success": bool(E["success"]), "steps": E["step"], "calls": E["calls"], "control_steps": ctrl_steps(), "done": E["done"],
                 "reason": E["reason"], "protocol": L.PROTOCOL, "finalized": bool(E.get("finalized")), "live_success": bool(E["success"]),
                 **({"graded_by": "live", "replays": 0} if E.get("finalized") else {}),
-                **EP.final_fields()})
+                **EP.final_fields(), **L.hide_fields(E)})
     L._write_json(os.path.join(DATA, "final.json"), fin)
 
 
@@ -106,13 +111,17 @@ def finish(reason: str) -> None:
     if E["done"]:
         return
     E["done"] = True; E["reason"] = reason; E["t_end"] = time.time()
+    if L.HIDE_SUCCESS:                                      # the end state is judged (no settle window in this toy)
+        E["success"] = reason in L.END_STATE_REASONS and S.success()
     EP.log({"ev": "end", "reason": reason, "step": E["step"], "control_steps": ctrl_steps(), "success": bool(E["success"])})
     write_final()
 
 
 def ctrl_step(a, rec) -> bool:
     S.step(a); stop = EP.journal(a); rec.tick()
-    if S.success() and not E["success"]:
+    if L.HIDE_SUCCESS:
+        L.hidden_success(E, S.success(), EP.log, ctrl_steps())
+    elif S.success() and not E["success"]:
         E["success"] = True; finish("success")
     return E["done"] or stop
 
@@ -187,4 +196,4 @@ open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{L.PROTOCOL} toy sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=lambda req: {"ok": True, "op": req["op"]},
                   status=status, on_submit_error=lambda exc: finish("error"), log=EP.log, episode=EP, state_sha=S.state_sha,
-                  proprio=proprio_row), port=int(os.environ.get("RCB_TOY_PORT", "8000")))
+                  proprio=proprio_row, finish=lambda: finish("finished")), port=int(os.environ.get("RCB_TOY_PORT", "8000")))
