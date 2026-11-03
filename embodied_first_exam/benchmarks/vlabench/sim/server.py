@@ -21,9 +21,8 @@ initial_state_sha256) is checked by rcb_service when an episode begins.
 Ablations (off unless the task sets them; nothing here runs without them):
   rcb_service.STATE_QUERY   state_table(): the privileged state in the world frame of /spec "frames" (quaternions
                             w x y z): the Panda's base pose and arm and finger joints, its tcp (proprio ee pose); the
-                            task's entities (Session.state()["entities"] names, neutralised by entity_names()): free
-                            ones as objects (pose, velocity, size, bbox), those with joints as articulations, the others
-                            as scene features. A query reads
+                            task's entities (Session.state()["entities"] names): free ones as objects (pose, velocity,
+                            size, bbox), those with joints as articulations, the others as scene features. A query reads
                             a scratch copy of the live MuJoCo state (MjRead); it takes no control step. Never an
                             entity's grasp keypoints, place point or the task's conditions.
   rcb_service.STATE_OPS     save_state() / load_state(): every array of MuJoCo's data (derived quantities included), the
@@ -37,7 +36,6 @@ Ablations (off unless the task sets them; nothing here runs without them):
 from __future__ import annotations
 
 import os
-import re
 import sys
 
 import numpy as np
@@ -107,43 +105,6 @@ def _logic_objects(env) -> dict:
 
 PANDA_LIMITS = [[-2.8973, 2.8973], [-1.7628, 1.7628], [-2.8973, 2.8973], [-3.0718, -0.0698], [-2.8973, 2.8973],
                 [-0.0175, 3.7525], [-2.8973, 2.8973]]  # fmt: skip
-
-
-# rcb_service.STATE_QUERY: the state table's entity names. VLABench's own names can state a role ("target_container",
-# "cooked_food"), the asset split ("microwave_seen") or a card's face ("10_of_spades"). entity_names() keeps a name
-# unless it does: a playing card is card_<k> and a card holder card_holder_<k> (VLABench's holder numbers follow its
-# card order); an entity whose name states a role, and every entity of its class, is
-# <class>_<k> (the class in snake case); k counts within the group in the order of the start positions (x, then y,
-# then z); a "_seen" / "_unseen" suffix is dropped.
-ROLE_WORDS = re.compile(r"target|distract|cooked|goal")
-CLASS_NAMES = {"Poker": "card", "CardHolder": "card_holder", "PlaceMat": "placemat"}
-
-
-def entity_names(ents: dict) -> dict:
-    """{VLABench name: table name} for {VLABench name: (class name, start position [3])}."""
-    snake = lambda c: CLASS_NAMES.get(c) or re.sub(r"(?<!^)(?=[A-Z])", "_", c).lower()  # noqa: E731
-    group = {c for c, _ in ents.values() if c in ("Poker", "CardHolder")} | \
-        {c for n, (c, _) in ents.items() if ROLE_WORDS.search(n)}
-    out = {}
-    for c in sorted(group):
-        base = snake(c)
-        members = sorted((n for n, (k, _) in ents.items() if k == c),
-                         key=lambda n: tuple(round(float(v), 3) for v in ents[n][1]))
-        for i, n in enumerate(members, 1):
-            out[n] = f"{base}_{i}"
-    used = set(out.values())
-    for n in ents:
-        if n not in out:
-            new = re.sub(r"_(seen|unseen)$", "", n)
-            if new in used or (new != n and new in ents):
-                new = n
-            k = 1
-            while new in used:
-                k += 1
-                new = f"{n}_{k}"
-            out[n] = new
-            used.add(new)
-    return out
 
 
 # rcb_service.STATE_QUERY: the state table (VLABench.state_table), read by MjRead.
@@ -465,26 +426,20 @@ class VLABench:
         t.add("tcp", "robot_link", {"pos": ("m", lambda: np.asarray(self.s.env.get_ee_pos(), float)),
                                     "quat": ("1 (w x y z)", lambda: np.asarray(self.s.env.get_ee_quat(), float))},
               note="VLABench's end effector (env.get_ee_pos / get_ee_quat): proprio ee pose")
-        ents = {n: (e, root_of(e)) for n, e in env.task.entities.items()}
-        ents = {n: (e, b) for n, (e, b) in ents.items() if b not in sub and b > 0}
-        names = entity_names({n: (type(e).__name__, R.d.xpos[b]) for n, (e, b) in ents.items()})
-        def joint_fields(ids):                    # joint names "<entity>/<joint>" with the entity's table name
-            out = mj_joint_fields(R, ids, ranges=True)
-            path = lambda k: "/".join(names.get(c, c) for c in k.split("/"))  # noqa: E731
-            return {f: (u, lambda get=get: {path(k): v for k, v in get().items()}) for f, (u, get) in out.items()}
-
-        for n, (e, b) in sorted(ents.items(), key=lambda kv: names[kv[0]]):
-            n = names[n]
+        for n, e in env.task.entities.items():
+            b = root_of(e)
+            if b in sub or b <= 0:
+                continue
             js = [j for j in range(m.njnt) if int(m.jnt_bodyid[j]) in R.subtree(b)]
             free = any(int(m.jnt_type[j]) == 0 for j in js if int(m.jnt_bodyid[j]) == b)
             moving = [j for j in js if int(m.jnt_type[j]) in (2, 3)]
             cat = type(e).__name__
             if free:
-                t.add(n, "object", {**mj_body_fields(R, b, size=True, bbox=True), **joint_fields(moving)},
+                t.add(n, "object", {**mj_body_fields(R, b, size=True, bbox=True), **mj_joint_fields(R, moving, ranges=True)},
                       note=f"VLABench {cat}, free")
             elif moving:
                 t.add(n, "articulation", {**mj_body_fields(R, b, vel=False, size=True, bbox=True),
-                                          **joint_fields(moving)}, note=f"VLABench {cat}")
+                                          **mj_joint_fields(R, moving, ranges=True)}, note=f"VLABench {cat}")
             else:
                 t.add(n, "scene_feature", mj_body_fields(R, b, vel=False, size=True, bbox=True), note=f"VLABench {cat}, fixed")
         return t

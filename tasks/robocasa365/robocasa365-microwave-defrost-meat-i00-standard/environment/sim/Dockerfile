@@ -3,7 +3,7 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:robocasa365-0.1.0
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:robocasa365-files-0.5.0-stateq-pose@sha256:39aa9789d7d34dcec7c2706e39bcabfc2d1efb3fe9079cd0e9e2b5c1084499ef \
+COPY --from=ghcr.io/mll-lab-nu/efe:robocasa365-files-0.5.0-stateq-leakfix@sha256:074c9c9fa3e4e13cdb7eb95d2016bcacb12a92819cd6a13e08f2c6f4630727b4 \
      /privileged/environment/casa_tool.py \
      /sim/finalize.sh \
      /sim/server_casa.py \

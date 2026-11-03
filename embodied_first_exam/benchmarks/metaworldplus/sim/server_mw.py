@@ -666,10 +666,6 @@ def _top(m, b: int) -> int:
     return b
 
 
-# fixed bodies whose name states a role in the task, under a neutral name in the state table
-NEUTRAL = {"basket_goal": "basket"}
-
-
 def state_table():
     """The state-query ablation's table (RCB_STATE_QUERY=1), built once after the scene, in the world frame of /spec
     "frames": the Sawyer (`robot`: its fixed base's pose, velocity and height above the floor, every arm and finger
@@ -721,7 +717,7 @@ def state_table():
     for b in range(1, m.nbody):
         if (int(m.body_parentid[b]) == 0 and b not in robot and b not in jointed and int(m.body_mocapid[b]) < 0
                 and R.body_geoms(b) and name(b) and name(b) not in have):
-            t.add(NEUTRAL.get(name(b), name(b)), "scene_feature", mj_body_fields(R, b, vel=False, size=True, bbox=True),
+            t.add(name(b), "scene_feature", mj_body_fields(R, b, vel=False, size=True, bbox=True),
                   note="a fixed body of the scene, with every body fixed below it")
     return t
 

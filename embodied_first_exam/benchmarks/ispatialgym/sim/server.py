@@ -25,8 +25,8 @@ As BEHAVIOR-1K's service (the same robot on the same simulator), except:
   bounds (RCB_RESUME_MAX_DEV_M), and its verdict is the episode it then runs.
 
 Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table (state_table(): the R1Pro, its key
-links and every object of the scene but the room shell, named by category and index, in the odometry frame, read between
-calls on the request thread) and RCB_STATE_OPS=1 reset / save / load (ops_*)."""
+links and the instance's physical objects, in the odometry frame, read between calls on the request thread) and
+RCB_STATE_OPS=1 reset / save / load (ops_*)."""
 from __future__ import annotations
 import json, math, os, sys, threading, time, traceback
 import numpy as np
@@ -398,7 +398,7 @@ REPLAY = {"skipped": 0}
 
 
 # ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
-# RCB_STATE_QUERY=1: state_table() below (the robot, its key links, the scene's objects but the room shell; odometry frame).
+# RCB_STATE_QUERY=1: state_table() below (the robot, its key links, the instance's physical objects; odometry frame).
 # RCB_STATE_OPS=1: reset = Session.reset() (upstream's reset and re-restores; approximate in-process); save / load =
 # og.sim.dump_state(serialized=True) / load_state (approximate: PhysX's solver and contact caches are not in it) plus the
 # session's episode (control steps n, the success latch, the recorded rows, the last command), upstream's task-side
@@ -425,24 +425,15 @@ def _f64(x) -> np.ndarray:
     return M._np(x).astype(np.float64).reshape(-1)
 
 
-SHELL = ("walls", "floors", "ceilings")   # the room shell: not in the state table
-
-
 def state_table() -> _ReadOnce:
     """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: the R1Pro (base pose, velocities,
     the base's height above the floor, every joint), its key links (base footprint, torso, head camera link, both
-    end-effector frames, both fingertip centres, the finger links) and every object of the scene (env.scene.objects) but
-    the robot, the room shell (SHELL: walls, floors, ceilings) and visual-only markers, furniture included. An object is
-    named by its category and an index, `<category>_<k>`, k counting the objects of that category ordered by their start
-    position (odometry x, then y, then z, to the cm; then by the scene's own name), so the names and their order do not
-    tell the task's objects from the rest. An articulated one is an articulation with its joint state and ranges, a fixed
-    body without joints a scene feature, every other one an object. A body with a fixed base cannot move: its pose (and
-    zero velocity) is read once, at the start; free bodies and every joint state are read at each query (once per entity
-    per query), and a failed read answers the last values read, so no value is null. Built at the start state, before a
-    resume replays its journal, so the entities, their names and their fields are the start's. Every pose and velocity
-    is in the odometry frame of every other pose of this service (S.odom: the world frame moved to the robot's base_link
-    at the start of the episode); nothing of goal.json. Read with OmniGibson's getters of the live PhysX state on the
-    thread that serves the requests (the one that steps Isaac), between calls: nothing steps or renders."""
+    end-effector frames, both fingertip centres, the finger links) and the instance's physical objects (loader.physical,
+    the names of instance.json and facts.json, the robot and the floor left out): an articulated one as an articulation
+    with its joint state and ranges, a fixed body without joints as a scene feature, every other one as an object. Every
+    pose and velocity is in the odometry frame of every other pose of this service (S.odom: the world frame moved to the
+    robot's base_link at the start of the episode); nothing of goal.json. Read with OmniGibson's getters of the live PhysX
+    state on the thread that serves the requests (the one that steps Isaac), between calls: nothing steps or renders."""
     r = S.robot
     O = np.asarray(S.odom, np.float64)
     Ro = O[:3, :3]
@@ -450,8 +441,7 @@ def state_table() -> _ReadOnce:
                         "metres; the frame of the proprio poses and the camera extrinsics. The service gives no other frame",
                   quaternion_order="xyzw",
                   note="an object's pos / quat are its base link's; size = its native bounding box times its scale, along its "
-                       "own axes; velocities are expressed along the odometry axes; objects are named <category>_<k>, k "
-                       f"ordered by start position; a query takes at most {L.MAX_QUERY_NAMES} names")
+                       "own axes; velocities are expressed along the odometry axes")
     try:
         floor_z = float(S.env.scene.get_floor_height())
     except Exception:  # noqa: BLE001
@@ -514,76 +504,38 @@ def state_table() -> _ReadOnce:
             if fl in r.links:
                 add_link(f"{a}_finger_{k}", fl)
 
-    def kept(key, fn, start=None):
-        """fn() -> {field: value}, read once per query; a failed read (or a missing value) answers the last values read.
-        Seeded with `start` (the start's values) or, without it, by a read here, at the episode's start."""
-        last = dict(start or {})
-
-        def read():
-            try:
-                v = fn()
-            except Exception:  # noqa: BLE001
-                v = None
-            if v is not None and all(x is not None for x in v.values()):
-                last.clear(); last.update(v)
-                return v
-            return dict(last)
-        if start is None:
-            read()
-        return lambda: t.memo(key, read)
-
     def field(get, k):
-        return lambda: get()[k]
+        return lambda: (get() or {}).get(k)
 
-    # every object of the scene but the robot, the room shell and visual-only markers, named by visible category and
-    # index: ordered by category, then by start position (odometry x, y, z, cm), then by the scene's own name
-    try:
-        objs = list(S.env.scene.objects)
-    except Exception:  # noqa: BLE001
-        objs = list(S.loader.physical.values())
-    rows = []
-    for o in objs:
-        cat = str(getattr(o, "category", None) or "object")
-        if o is r or cat in SHELL or bool(getattr(o, "visual_only", False)) or not hasattr(o, "get_position_orientation"):
+    for name in sorted(k for k in S.loader.physical if not k.startswith(("agent.", "floor."))):
+        o = S.loader.physical[name]
+        if o is r:
             continue
-        try:
-            st = odom_read(o)
-        except Exception:  # noqa: BLE001
-            log({"ev": "state_table_skip", "object": str(getattr(o, "name", "?")), "why": "no pose at the start"})
-            continue
-        rows.append((cat, tuple(round(float(x), 2) for x in st["pos"]), str(getattr(o, "name", "")), o, st))
-    rows.sort(key=lambda x: x[:3])
-    count: dict = {}
-    for cat, _, _, o, st in rows:
-        k = count.get(cat, 0); count[cat] = k + 1
-        name = f"{cat}_{k}"
-        while name in t._ents:
-            name += "_"
+
+        def oread(o=o):
+            try:
+                return odom_read(o)
+            except Exception:  # noqa: BLE001
+                return None
+        g = (lambda name=name, oread=oread: t.memo(f"obj.{name}", oread))
         try:
             size = _f64(o.native_bbox) * _f64(o.scale)
         except Exception:  # noqa: BLE001
             size = None
+        fields = {"pos": ("m", field(g, "pos")), "quat": ("1", field(g, "quat")), **({"size": ("m", lambda size=size: size)} if size is not None else {})}
         try:
             n_dof, fixed = int(getattr(o, "n_dof", 0) or 0), bool(getattr(o, "fixed_base", False))
         except Exception:  # noqa: BLE001
             n_dof, fixed = 0, False
-        st = {k_: v for k_, v in st.items() if k_ in ("pos", "quat", "lin_vel", "ang_vel")}
-        if fixed:                          # fixed to the world: its base never moves, read once at the start
-            st = {k_: (np.zeros(3) if k_ in ("lin_vel", "ang_vel") else v) for k_, v in st.items()}
-            g = (lambda st=st: st)
-        else:
-            g = kept(f"obj.{name}", lambda o=o: odom_read(o), start={k_: (np.zeros(3) if v is None else v) for k_, v in st.items()})
-        fields = {"pos": ("m", field(g, "pos")), "quat": ("1", field(g, "quat")),
-                  **({"size": ("m", lambda size=size: size)} if size is not None else {})}
         if n_dof > 0:
             jnames = list(o.joints)
             rng = {j: [float(jp.lower_limit), float(jp.upper_limit)] for j, jp in o.joints.items()}
-            jg = kept(f"joints.{name}", lambda o=o, jnames=jnames: {
-                "joint_pos": dict(zip(jnames, _f64(o.get_joint_positions()))),
-                "joint_vel": dict(zip(jnames, _f64(o.get_joint_velocities())))})
+
+            def jread(o=o, name=name):
+                return t.memo(f"joints.{name}", lambda: (_f64(o.get_joint_positions()), _f64(o.get_joint_velocities())))
             fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel")),
-                           "joint_pos": ("rad or m", field(jg, "joint_pos")),
-                           "joint_vel": ("rad/s or m/s", field(jg, "joint_vel")),
+                           "joint_pos": ("rad or m", lambda jnames=jnames, jread=jread: dict(zip(jnames, jread()[0]))),
+                           "joint_vel": ("rad/s or m/s", lambda jnames=jnames, jread=jread: dict(zip(jnames, jread()[1]))),
                            "joint_range": ("rad or m", lambda rng=rng: rng)})
             kind = "articulation"
         elif fixed:
@@ -591,7 +543,7 @@ def state_table() -> _ReadOnce:
         else:
             fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel"))})
             kind = "object"
-        t.add(name, kind, fields, note=f"category {cat}")
+        t.add(name, kind, fields, note=f"category {getattr(o, 'category', '?')}")
     return t
 
 
@@ -696,7 +648,6 @@ def replay_row(row) -> None:
 
 L.check_spec(SPEC)                      # before the episode starts: a bad /spec must not cost a resume
 EP.scene_built()
-TABLE = state_table() if L.STATE_QUERY else None   # at the start state, before a resume's journal replay
 resumed = EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC,
                    start_event={"subtask": S.up["subtask"], "start_sha": S.start_sha, "cameras": CAMS}, on_end=_end_from_signal,
                    **({"ops": OPS} if OPS is not None else {}))
@@ -722,4 +673,4 @@ print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', r
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
                   **({"state_ops": OPS} if OPS is not None else {}),
-                  state_table=TABLE))
+                  state_table=state_table() if L.STATE_QUERY else None))

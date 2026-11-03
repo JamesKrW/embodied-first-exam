@@ -410,7 +410,7 @@ def state_table() -> L.StateTable:
         except Exception:  # noqa: BLE001
             joints = {}
         t.add(n, "articulation" if joints else "object", {**fields, **joints},
-              note="bbox = its axis-aligned box [[min], [max]] in the world frame")
+              note=("fixed in place; " if o.get("fixed") else "") + "bbox = its axis-aligned box [[min], [max]] in the world frame")
     table = S.env.get_entity("table")
     if table is not None:
         t.add("table", "scene_feature", {"pos": ("m", lambda: _one(table.get_pos())), "quat": ("wxyz", lambda: _one(table.get_quat())),
