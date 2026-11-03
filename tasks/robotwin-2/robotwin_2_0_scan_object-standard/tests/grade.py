@@ -43,6 +43,8 @@ def main():
             out.update(resets=int(d.get("resets") or 0), reset_budget=int(d.get("reset_budget") or 0), saves=int(d.get("saves") or 0),
                        loads=int(d.get("loads") or 0), first_success=int(ok and int(d.get("resets") or 0) + int(d.get("loads") or 0) == 0))
             if ok: out.update({k: int(d[k]) for k in ("resets_at_success", "loads_at_success") if k in d})
+        if "state_queries" in d:   # the state-query ablation (RCB_STATE_QUERY=1): /state/query calls answered; never the verdict
+            out["state_queries"] = int(d.get("state_queries") or 0)
     except Exception:  # noqa: BLE001 — an unreadable final.json is not the agent's failure
         traceback.print_exc()
         write(False, {**FAIL, "infra_error": 1, "grader_error": 1, "sim_startups": _startups()}); return

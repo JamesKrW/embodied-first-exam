@@ -28,7 +28,7 @@ services:
     environment:
       RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
       RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
-      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_TASK: svallet
       RCB_DATA: /data
       RCB_WALL_CLOCK_S: "10800"   # the agent's wall clock, from its first request (= [agent] timeout_sec), server.py

@@ -40,7 +40,11 @@ Differences from the RoboTwin service, all from the simulator:
 - the video is recorded live (/out/live.mp4, fragmented MP4: a crash leaves a playable prefix): the robot cameras'
   frames, which every control step renders anyway for the agent (224 px), tiled, every third control step (10 fps),
   copied in the control loop and encoded by a thread (LiveVideo); a resume records it anew while it replays the
-  journal. When it is missing or does not play, finalize.sh renders one in a video-only pass after the verdict."""
+  journal. When it is missing or does not play, finalize.sh renders one in a video-only pass after the verdict.
+
+Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table (state_table(): the R1Pro, its key
+links and the task's BDDL scope objects, world frame, read between calls on the request thread) and RCB_STATE_OPS=1 reset /
+save / load (ops_*)."""
 from __future__ import annotations
 import json, math, os, sys, threading, time, traceback
 import numpy as np
@@ -661,23 +665,12 @@ REPLAY = {"skipped": 0}
 
 
 # ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
-# RCB_EXPOSE_OBJECT_POSES=1: the task's BDDL scope objects (Session.objects(), the privileged twin's names: the robot and
-# the substances excluded), world frame, position + quaternion xyzw (spec.world). An object a transition rule creates
-# appears once it exists; one it removes disappears.
+# RCB_STATE_QUERY=1: state_table() below (the robot, its key links, the task's BDDL scope objects).
 # RCB_STATE_OPS=1: reset = Session.reset() (ev.reset + og.sim.load_state of the frozen start; approximate in-process);
 # save / load = og.sim.dump_state(serialized=True) / load_state (approximate: PhysX's solver and contact caches are not
 # in it) plus the session's per-episode state (the success and fall windows, the latches, the last action, the recorded
 # rows, OmniGibson's episode step counter). A task whose transition rules create or remove objects changes the scene's
 # object registry, which a serialized state does not carry: the op is logged with "object_set_changed" when it differs.
-POSE_NAMES = sorted(S.objects()) if L.OBJECT_POSES else []
-POSE_SPEC = {"frame": "OmniGibson world frame (spec.world; the ee_pose action's and the proprio poses' frame), each object's "
-                      "base link", "quaternion_order": "xyzw", "objects": POSE_NAMES}
-
-
-def object_poses() -> dict:
-    return {n: L.pose_entry(o["position"], o["orientation_xyzw"]) for n, o in S.objects().items()}
-
-
 def _step_owner():
     """The OmniGibson Environment that holds the episode's step counter (episode_steps), under the evaluator's wrappers."""
     e = S.env
@@ -762,6 +755,200 @@ def ops_load(snap) -> None:
     _render()
 
 
+class _ReadOnce(L.StateTable):
+    """L.StateTable whose getters share one read per entity per query (memo), so pos / quat / velocities of a body
+    come from one simulator read."""
+
+    def query(self, plan: dict) -> dict:
+        self._memo = {}
+        return super().query(plan)
+
+    def memo(self, key, fn):
+        if key not in self._memo:
+            self._memo[key] = fn()
+        return self._memo[key]
+
+
+def _f64(x) -> np.ndarray:
+    return M._np(x).astype(np.float64).reshape(-1)
+
+
+def state_table() -> _ReadOnce:
+    """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: the R1Pro (base pose, world
+    velocities, height of its base above the floor, every joint), its key links (base footprint, torso, head camera
+    link, both end-effector frames, both fingertip centres and the four finger links) and every BDDL scope object of
+    the task by its BDDL name (Session.objects(), the privileged twin's names): an articulated one (a cabinet, a fridge,
+    an oven) as an articulation with its joint state and ranges, a fixed body without joints (a floor, a fixed table)
+    as a scene feature, every other one as an object; a substance (a particle system) as an object with its particles'
+    centroid and bounding box. An object a transition rule creates or removes reads null while it does not exist. Every
+    read is OmniGibson's getters of the live PhysX state, on the thread that serves the requests (the one that steps
+    Isaac), between calls: nothing steps or renders."""
+    r = S.robot
+    t = _ReadOnce(frame="OmniGibson's world frame of the scene (spec.world): right-handed, z up, the floor is the plane z = 0, "
+                        "x and y horizontal; the frame of the ee_pose action and of the proprio poses",
+                  quaternion_order="xyzw",
+                  note="positions in m; an object's pos / quat are its base link's; bbox = the world-axis-aligned box of its "
+                       "collision meshes [[min], [max]]; size = its native bounding box times its scale, along its own axes")
+    try:
+        floor_z = float(S.env.scene.get_floor_height())
+    except Exception:  # noqa: BLE001
+        floor_z = 0.0
+    jn = list(r.joints)
+
+    def body(key, prim):
+        """pos, quat, lin_vel, ang_vel of an entity or link prim, read once per query."""
+        def read():
+            p, q = prim.get_position_orientation()
+            return {"pos": _f64(p), "quat": _f64(q), "lin_vel": _f64(prim.get_linear_velocity()),
+                    "ang_vel": _f64(prim.get_angular_velocity())}
+        return lambda: t.memo(key, read)
+
+    def robot_joints():
+        return t.memo("robot.joints", lambda: (_f64(r.get_joint_positions()), _f64(r.get_joint_velocities())))
+
+    rb = body("robot", r)
+    t.add("robot", "robot", {
+        "pos": ("m", lambda: rb()["pos"]), "quat": ("1", lambda: rb()["quat"]),
+        "lin_vel": ("m/s", lambda: rb()["lin_vel"]), "ang_vel": ("rad/s", lambda: rb()["ang_vel"]),
+        "height_above_ground": ("m", lambda: float(rb()["pos"][2]) - floor_z),
+        "joint_pos": ("rad or m", lambda: dict(zip(jn, robot_joints()[0]))),
+        "joint_vel": ("rad/s or m/s", lambda: dict(zip(jn, robot_joints()[1]))),
+        "joint_range": ("rad or m", lambda: {n: [float(r.joints[n].lower_limit), float(r.joints[n].upper_limit)] for n in jn})},
+        note=f"the R1Pro's base ({r.base_footprint_link_name}: x forward, y left, z up); height_above_ground = its z above the "
+             "floor; the 6 virtual base joints are relative to the robot's start frame")
+
+    def add_link(name, link, note=None):
+        lb = body(f"link.{link}", r.links[link])
+        t.add(name, "robot_link", {"pos": ("m", lambda: lb()["pos"]), "quat": ("1", lambda: lb()["quat"]),
+                                   "lin_vel": ("m/s", lambda: lb()["lin_vel"]), "ang_vel": ("rad/s", lambda: lb()["ang_vel"])},
+              note=note or f"link {link}")
+        return lb
+
+    add_link("base_link", r.base_footprint_link_name)
+    if r.trunk_link_names:
+        add_link("torso", r.trunk_link_names[-1], f"link {r.trunk_link_names[-1]}: the top of the trunk")
+    if "zed_link" in r.links:
+        add_link("head", "zed_link", "link zed_link: the head camera's link")
+    S._kin()                              # the fingertip-centre offsets (S._tcp)
+    for a in ("left", "right"):
+        eef = r.eef_link_names[a]
+        lb = add_link(f"{a}_eef", eef, f"link {eef}: the {a} end-effector frame (the ee_pose action's and proprio {a}_eef_*)")
+        off = S._tcp[S.TCP_FRAMES[a]][1]
+
+        def tcp(lb=lb, off=off):
+            e = lb()
+            return np.asarray(M._pose7(M._T_of(e["pos"], e["quat"]) @ off), dtype=np.float64)
+        t.add(f"{a}_tcp", "robot_link", {"pos": ("m", lambda tcp=tcp: tcp()[:3]), "quat": ("1", lambda tcp=tcp: tcp()[3:])},
+              note=f"the {a} fingertip centre (proprio {a}_tcp_*): {eef} moved {off[2, 3]:.4f} m along its +z")
+        for k, fl in enumerate(r.gripper_link_names[a]):
+            if fl in r.links:
+                add_link(f"{a}_finger_{k}", fl)
+
+    scope = S._scope()
+
+    def live(name):
+        ent = scope.get(name)
+        return getattr(ent, "wrapped_obj", ent) if ent is not None else None
+
+    def obj_read(name):
+        def read():
+            o = live(name)
+            if o is None or not hasattr(o, "get_position_orientation"):
+                return None
+            try:
+                p, q = o.get_position_orientation()
+                out = {"pos": _f64(p), "quat": _f64(q)}
+            except Exception:  # noqa: BLE001 -- removed by a transition rule
+                return None
+            for k, fn in (("lin_vel", "get_linear_velocity"), ("ang_vel", "get_angular_velocity")):
+                try:
+                    out[k] = _f64(getattr(o, fn)())
+                except Exception:  # noqa: BLE001
+                    out[k] = None
+            try:
+                lo, hi = o.aabb
+                out["bbox"] = [_f64(lo), _f64(hi)]
+            except Exception:  # noqa: BLE001
+                out["bbox"] = None
+            return out
+        return lambda: t.memo(f"obj.{name}", read)
+
+    def size_of(name):
+        def read():
+            o = live(name)
+            try:
+                return _f64(o.native_bbox) * _f64(o.scale)
+            except Exception:  # noqa: BLE001
+                return None
+        return lambda: t.memo(f"size.{name}", read)
+
+    def field(get, k):
+        return lambda: (get() or {}).get(k)
+
+    def joints_of(name):
+        def read():
+            o = live(name)
+            try:
+                return list(o.joints), _f64(o.get_joint_positions()), _f64(o.get_joint_velocities())
+            except Exception:  # noqa: BLE001
+                return None
+        return lambda: t.memo(f"joints.{name}", read)
+
+    def particles(name):
+        def read():
+            sysm = live(name)
+            if sysm is None or not hasattr(sysm, "get_particles_position_orientation"):
+                return None
+            try:
+                p = M._np(sysm.get_particles_position_orientation()[0]).astype(np.float64).reshape(-1, 3)
+            except Exception:  # noqa: BLE001 -- the system holds no particles (or does not exist yet)
+                return None
+            if not len(p):
+                return None
+            return {"pos": p.mean(0), "bbox": [p.min(0), p.max(0)]}
+        return lambda: t.memo(f"particles.{name}", read)
+
+    for name in sorted(scope):
+        if name.startswith("agent"):
+            continue
+        o = live(name)
+        if o is r:
+            continue
+        if bool(getattr(scope.get(name), "is_system", False)) or (
+                o is not None and not hasattr(o, "get_position_orientation") and hasattr(o, "get_particles_position_orientation")):
+            g = particles(name)
+            t.add(name, "object", {"pos": ("m", field(g, "pos")), "bbox": ("m", field(g, "bbox"))},
+                  note="a substance (particle system): the centroid and the axis-aligned box of its particles; null when it holds none")
+            continue
+        g = obj_read(name)
+        cat = getattr(o, "category", None) if o is not None else None
+        fields = {"pos": ("m", field(g, "pos")), "quat": ("1", field(g, "quat")), "bbox": ("m", field(g, "bbox")),
+                  "size": ("m", size_of(name))}
+        try:
+            n_dof = int(getattr(o, "n_dof", 0) or 0) if o is not None else 0
+            fixed = bool(getattr(o, "fixed_base", False)) if o is not None else False
+        except Exception:  # noqa: BLE001
+            n_dof, fixed = 0, False
+        if n_dof > 0:
+            jg = joints_of(name)
+            try:
+                rng = {j: [float(jp.lower_limit), float(jp.upper_limit)] for j, jp in o.joints.items()}
+            except Exception:  # noqa: BLE001
+                rng = {}
+            fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel")),
+                           "joint_pos": ("rad or m", lambda jg=jg: dict(zip(jg()[0], jg()[1])) if jg() else None),
+                           "joint_vel": ("rad/s or m/s", lambda jg=jg: dict(zip(jg()[0], jg()[2])) if jg() else None),
+                           "joint_range": ("rad or m", lambda rng=rng: rng)})
+            kind = "articulation"
+        elif fixed:
+            kind = "scene_feature"
+        else:
+            fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel"))})
+            kind = "object"
+        t.add(name, kind, fields, note=f"category {cat}" if cat else "not in the scene at the start (a transition rule may create it)")
+    return t
+
+
 OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset, save=ops_save,
                  load=ops_load) if L.STATE_OPS else None
 
@@ -809,7 +996,7 @@ HTTPD["serving"] = True
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
                   **({"state_ops": OPS} if OPS is not None else {}),
-                  **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})))
+                  state_table=state_table() if L.STATE_QUERY else None))
 # the end signal stopped the loop (_end_from_signal): the agent's phase is over
 with LOCK:
     try:

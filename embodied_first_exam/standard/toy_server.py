@@ -93,11 +93,16 @@ def grab(cams, want_depth):
     return {c: img for c in cams}, ({c: np.ones((8, 8), np.float32) for c in cams} if want_depth else {})
 
 
-# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches): the block's pose for
-# RCB_EXPOSE_OBJECT_POSES=1, and reset / save / load for RCB_STATE_OPS=1. A snapshot holds the simulator's whole state AND
-# the adapter's per-episode state (the graded rows from the frozen start), so the graded episode stays a replayable path.
-def object_poses() -> dict:
-    return {"block": L.pose_entry(S.block, [1.0, 0.0, 0.0, 0.0])}
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches): the state table for
+# RCB_STATE_QUERY=1 (the arm's tip and joints, the block), and reset / save / load for RCB_STATE_OPS=1. A snapshot holds
+# the simulator's whole state AND the adapter's per-episode state (the graded rows from the frozen start), so the graded
+# episode stays a replayable path.
+def state_table() -> L.StateTable:
+    t = L.StateTable(frame="toy: x along the arm's reach, z up, origin at its base", quaternion_order="wxyz")
+    t.add("arm", "robot", {"joint_pos": ("rad", lambda: {f"j{i}": S.q[i] for i in range(N)}),
+                           "tip_pos": ("m", lambda: S.q)})            # the toy tip sits at q
+    t.add("block", "object", {"pos": ("m", lambda: S.block), "quat": ("1", lambda: [1.0, 0.0, 0.0, 0.0])})
+    return t
 
 
 def ops_reset() -> None:
@@ -216,7 +221,5 @@ open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{L.PROTOCOL} toy sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=lambda req: {"ok": True, "op": req["op"]},
                   status=status, on_submit_error=lambda exc: finish("error"), log=EP.log, episode=EP, state_sha=S.state_sha,
-                  proprio=proprio_row, state_ops=OPS,
-                  **({"object_poses": object_poses, "object_pose_spec": {"frame": "toy", "quaternion_order": "wxyz", "objects": ["block"]}}
-                     if L.OBJECT_POSES else {})),
+                  proprio=proprio_row, state_ops=OPS, state_table=state_table() if L.STATE_QUERY else None),
         port=int(os.environ.get("RCB_TOY_PORT", "8000")))

@@ -90,6 +90,18 @@ class Toy:
     def state_sha(self):
         return hashlib.sha256(np.array([self.x, self.n]).tobytes()).hexdigest()[:12]
 
+    def state_table(self):                     # RCB_STATE_QUERY: any object with entities() and query(plan)
+        toy = self
+
+        class Table:
+            def entities(self):
+                return {"frame": "toy line", "quaternion_order": "wxyz",
+                        "entities": {"x": {"kind": "robot", "fields": {"pos": "m", "steps": "1"}}}}
+
+            def query(self, plan):
+                return {n: {f: ([toy.x] if f == "pos" else toy.n) for f in fs} for n, fs in plan.items()}
+        return Table()
+
     def save_trajectory(self, rows, path, meta):
         np.savez(path, actions=rows, **{k: str(v) for k, v in meta.items()})
 
@@ -221,6 +233,47 @@ def test_state_ops(path: Path) -> None:
         shutil.rmtree(d)
 
 
+def test_state_query(path: Path) -> None:
+    """RCB_STATE_QUERY=1: GET /state/entities, POST /state/query read without a step, 400 / 409, the count in
+    final.json and across a crash resume; off, both routes are 404 and final.json has no state_queries."""
+    tag = path.relative_to(ROOT)
+    fin, _ = run(load(path), [[[0.5, 0], [0.6, 0]]])
+    check("state_queries" not in fin, f"{tag}: switch off wrote state_queries")
+    os.environ["RCB_STATE_QUERY"] = "1"
+    try:
+        S = load(path, "_query")
+    finally:
+        del os.environ["RCB_STATE_QUERY"]
+    check("state_queries" in S.RESERVED, f"{tag}: state_queries not RESERVED")
+    d = tempfile.mkdtemp()
+    try:
+        svc = S.Service(Toy(), data=d, reset_budget=0)
+        svc.start()
+        js = lambda r: (r[0], json.loads(r[2]))  # noqa: E731
+        q = lambda body: js(svc.handle("POST", "/state/query", json.dumps(body).encode()))  # noqa: E731
+        code, ents = js(svc.handle("GET", "/state/entities"))
+        check(code == 200 and ents["entities"]["x"]["fields"]["pos"] == "m" and "state_query" in svc.spec,
+              f"{tag}: entities {code} {ents}")
+        svc._step("joints", np.array([0.3, 0.0])); svc._checkpoint("submit")
+        code, out = q({"names": ["x"], "fields": ["pos"]})
+        check(code == 200 and out["state"] == {"x": {"pos": [0.3]}} and out["control_steps"] == 1
+              and out["state_queries"] == 1 and len(svc.episode) == 1, f"{tag}: query {code} {out}")
+        check(q({"names": ["y"]})[0] == 400 and q({"names": ["x"], "fields": ["vel"]})[0] == 400 and q({})[0] == 400,
+              f"{tag}: unknown name / field / no names")
+        svc2 = S.Service(Toy(), data=d, reset_budget=0)    # a crash: the count comes back from the log
+        svc2.start()
+        check(svc2.state_queries == 1 and svc2.status()["state_queries"] == 1, f"{tag}: resumed count {svc2.state_queries}")
+        svc2._step("joints", np.array([0.8, 0.0])); svc2._checkpoint("submit")
+        code, out = js(svc2.handle("POST", "/state/query", b'{"names": ["x"]}'))
+        check(svc2.done and code == 409, f"{tag}: after the end {code}")
+        svc2.stopping = True
+        svc2.poll()
+        fin = json.load(open(os.path.join(d, "final.json")))
+        check(fin["success"] and fin["state_queries"] == 1, f"{tag}: final {fin.get('state_queries')}")
+    finally:
+        shutil.rmtree(d)
+
+
 def load(path: Path, suffix: str = ""):
     spec = importlib.util.spec_from_file_location(f"rcb_service_{hashlib.sha1(str(path).encode()).hexdigest()[:8]}{suffix}", path)
     S = importlib.util.module_from_spec(spec)
@@ -241,6 +294,8 @@ def main() -> None:
         test(paths[0])
         if "RCB_STATE_OPS" in paths[0].read_text():
             test_state_ops(paths[0])
+        if "RCB_STATE_QUERY" in paths[0].read_text():
+            test_state_query(paths[0])
         tested += len(paths)
     check(tested > 0, "no rcb_service.py copy with the first-attempt record")
     if fails:

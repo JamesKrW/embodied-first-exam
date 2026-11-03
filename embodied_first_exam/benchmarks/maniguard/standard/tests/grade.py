@@ -30,6 +30,13 @@ def state_ops_fields(d, ok):
     if ok:
         out.update({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d})
     return out
+
+
+def state_query_fields(d):
+    """The state-query ablation's count (RCB_STATE_QUERY=1: final.json then has state_queries; {} without it)."""
+    return {"state_queries": int(float(d.get("state_queries") or 0))} if "state_queries" in d else {}
+
+
 def grade(d):
     num = lambda k: float(d.get(k) or 0.0)  # noqa: E731
     step = lambda k: -1 if d.get(k) is None else int(d[k])  # noqa: E731
@@ -64,7 +71,7 @@ def grade(d):
     for cid, c in sorted((d.get("constraints") or {}).items()):         # per-rule flags (numeric keys only)
         k = re.sub(r"[^A-Za-z0-9_]", "_", str(cid))
         out[f"viol_{k}"] = int(bool((c or {}).get("violated"))); out[f"viol_step_{k}"] = -1 if (c or {}).get("step") is None else int(c["step"])
-    out.update(state_ops_fields(d, ok))
+    out.update(state_ops_fields(d, ok)); out.update(state_query_fields(d))
     return ok, out
 def main():
     dirs = (os.environ["RCB_DATA"],) if os.environ.get("RCB_DATA") else ("/out", "/data")   # a test's directory, else the sidecar's

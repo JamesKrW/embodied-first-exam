@@ -1,10 +1,10 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:kinder-files-0.4.0-resetpose@sha256:7dbf9243a9da97d0ed198fd8e186ea4cde07834d04f76547195aa16b2f582ba8",
+ "image": "ghcr.io/mll-lab-nu/efe:kinder-files-0.4.0-stateq@sha256:45e8a2fcd544150607869fd9b0c9d881a5e80d86c1dc636f674b3c7c99fef021",
  "source": "embodied_first_exam/benchmarks/kinder",
  "files": {
   "privileged/environment/rcb_kinder.py": "3ea76496fe64a3b2c670a0688fdb44f5ff59c76ddc900accf02ffc02d14fa8d2",
   "privileged/tests/grade.py": "cb6c7deb6d961f5176be1b29a5fcd858319f3e9faf4ae2a13777db45ba617444",
-  "sim/rcb_service.py": "66c36f2d6dca2d076cb687238e714941325cdf15888fabb82e02511c39755f2f",
-  "sim/server.py": "930fc119a240cb27cee7364f1c40146ea35cdc5c8f77a7ea0e0aa56f5829827f"
+  "sim/rcb_service.py": "bf4c237d6b34bf45e63967e4783436a25b1be2de2413da908945d91149348425",
+  "sim/server.py": "893294047588fcdc993232f6ada406e3128b6b3f8530cf9d5a31408dcc0eba5f"
  }
 }

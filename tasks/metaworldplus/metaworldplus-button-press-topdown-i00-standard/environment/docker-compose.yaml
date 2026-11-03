@@ -22,7 +22,7 @@ services:
     environment:
       RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
       RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
-      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_TOOL: mw_tool
       RCB_INSTANCE: /srv/instance.npz
       RCB_INSTANCE_SHA: "a0200e0c09cc6619fd71cc62ada5e585fd09ae99da19184cb53d710772ef26e4"

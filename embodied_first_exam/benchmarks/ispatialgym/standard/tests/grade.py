@@ -29,6 +29,11 @@ def state_ops_fields(d: dict, ok: bool) -> dict:
             **({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d} if ok else {})}
 
 
+def state_query_fields(d):
+    """The state-query ablation's count (RCB_STATE_QUERY=1: final.json then has state_queries; {} without it)."""
+    return {"state_queries": int(float(d.get("state_queries") or 0))} if "state_queries" in d else {}
+
+
 def grade(d: dict) -> tuple[bool, dict]:
     """(success, reward.json) of a final.json."""
     if not isinstance(d, dict): raise ValueError(f"final.json is not an object: {type(d).__name__}")
@@ -38,7 +43,7 @@ def grade(d: dict) -> tuple[bool, dict]:
     infra = bool(d.get("infra_error")) or not finalized
     live = bool(d.get("live_success", d.get("success")))
     ok = live and bool(d.get("success")) and not d.get("gave_up") and not infra and reason != "error"   # PROTOCOL §4: a simulator error is the agent's 0
-    return ok, {**state_ops_fields(d, ok),
+    return ok, {**state_ops_fields(d, ok), **state_query_fields(d),
         "success": int(ok), "live_success": int(live), "graded_by_live": 1, "replays": 0,
         "finalized": int(finalized), "missing_log": 0, "n_actions": int(d.get("n_actions") or 0), "sim_steps": int(d.get("control_steps") or 0),
         "max_steps": int(d.get("max_steps") or 0), "steps": int(d.get("steps") or 0), "elapsed_s": num("elapsed_s"),

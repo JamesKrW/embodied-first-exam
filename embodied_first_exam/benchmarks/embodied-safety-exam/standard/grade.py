@@ -171,7 +171,9 @@ def main() -> None:
                "calls": int(d.get("calls") or 0), "rows": int(d.get("rows") or 0),
                "sim_startups": int(d.get("sim_startups") or 0), "elapsed_s": num(d.get("elapsed_s")),
                "requests_refused": int(num(d.get("requests_refused"))),
-               "video_rendered": int(bool(d.get("video"))), **verdict_fields(v)}
+               "video_rendered": int(bool(d.get("video"))), **verdict_fields(v),
+               # the state-query ablation's count (RCB_STATE_QUERY=1); nothing without the switch
+               **({"state_queries": int(num(d["state_queries"]))} if "state_queries" in d else {})}
     except Exception:  # noqa: BLE001 -- an unreadable final.json or verdict.json is the grader's failure, not the agent's
         traceback.print_exc()
         write(False, {"success": 0, "live_success": 0, "graded_by_live": 0, "replays": 0, "finalized": 0,

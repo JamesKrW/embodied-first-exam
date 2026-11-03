@@ -76,8 +76,8 @@ def first_attempt(d: dict, ok: bool, infra: bool) -> dict:
 def reset_log_fields(d: dict, ok: bool) -> dict:
     """The unlimited-reset ablation's record (the service writes it with RCB_STATE_OPS=1): saves and loads, and for a
     success resets_at_success / loads_at_success, the /reset and /load_state calls made before the graded episode
-    began. Numbers only; {} without the switch."""
-    out = {k: int(num(d[k])) for k in ("saves", "loads") if k in d}
+    began; and the state-query ablation's state_queries (RCB_STATE_QUERY=1). Numbers only; {} without the switches."""
+    out = {k: int(num(d[k])) for k in ("saves", "loads", "state_queries") if k in d}
     if ok:
         out.update({k: int(num(d[k])) for k in ("resets_at_success", "loads_at_success") if k in d})
     return out

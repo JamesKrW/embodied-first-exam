@@ -99,26 +99,133 @@ ON_SERVICE_ERROR = ("if a call fails with a connection error or a 5xx, the servi
 # success), saves, loads and episodes_log; a crash resume replays every reset, save and load at its journal row.
 STATE_OPS = os.environ.get("RCB_STATE_OPS") == "1"
 MAX_HANDLES = int(os.environ.get("RCB_MAX_STATE_HANDLES", "32"))
-# The object-pose ablation (off unless the task sets RCB_EXPOSE_OBJECT_POSES=1; nothing changes when off): every meta
-# (/submit, /observe, /reset) adds "objects", the adapter's object_poses() at the state the answer ends in, and /spec adds
-# "object_poses" (the adapter's object_pose_spec(): frame, quaternion order, names). An adapter without them refuses to
-# start with the switch on.
-OBJECT_POSES = os.environ.get("RCB_EXPOSE_OBJECT_POSES") == "1"
+# The state-query ablation (off unless the task sets RCB_STATE_QUERY=1; nothing changes when off): GET /state/entities
+# lists what the agent may ask about (the adapter's StateTable: every entity's kind and fields, with units), and POST
+# /state/query {"names": [...], "fields": [...]} answers their current values in the world frame. A query only reads:
+# no control step, the clock neither advances nor pauses (on a realtime clock it answers at the current simulation
+# time), served only while the episode runs (409 after its end). episode.jsonl logs each answered query, final.json
+# adds state_queries (their count). A service without a state table refuses to start with the switch on.
+STATE_QUERY = os.environ.get("RCB_STATE_QUERY") == "1"
+STATE_KINDS = ("robot", "robot_link", "object", "articulation", "scene_feature")
+MAX_QUERY_NAMES = 512
+STATE_QUERY_NOTE = (
+    "privileged state (an ablation of this run): GET /state/entities lists every entity you may query, {\"frame\", "
+    "\"quaternion_order\", \"entities\": {name: {\"kind\", \"fields\": {field: unit}}}}; kinds are robot, robot_link, "
+    "object, articulation and scene_feature. POST /state/query {\"names\": [names], \"fields\": [fields] (optional; "
+    "default: every field of each name)} answers JSON {\"state\": {name: {field: value}}, \"control_steps\", "
+    "\"sim_time_s\", \"state_queries\"}: the current values in the world frame `frame`, in the units listed; a "
+    "requested field that an entity does not have is left out of its entry. An unknown name or field is a 400 that "
+    "lists the valid ones. A query only reads the simulator: it takes no control step and does not advance or pause "
+    "the clock (on a realtime clock it answers at the current simulation time). It is served while the episode runs "
+    "(409 after it ended). Every query is counted (state_queries)")
 
 
-def pose_entry(pos, quat=None, size=None, digits: int = 5) -> dict:
-    """One object of meta["objects"]: {"pos": [x, y, z], "quat": [4] or absent, "size": [...] or absent}, plain floats."""
-    out = {"pos": [round(float(v), digits) for v in np.asarray(pos, dtype=np.float64).reshape(-1)]}
-    if quat is not None:
-        out["quat"] = [round(float(v), digits) for v in np.asarray(quat, dtype=np.float64).reshape(-1)]
-    if size is not None:
-        out["size"] = [round(float(v), digits) for v in np.asarray(size, dtype=np.float64).reshape(-1)]
-    return out
+def state_value(v, digits: int = 6):
+    """A queried value as JSON holds it: numbers rounded (NaN / inf as null), arrays as (nested) lists, dicts, lists and
+    tuples taken apart, strings, bools and None as they are."""
+    if isinstance(v, dict):
+        return {str(k): state_value(x, digits) for k, x in v.items()}
+    if v is None or isinstance(v, str):
+        return v
+    if isinstance(v, (bool, np.bool_)):
+        return bool(v)
+    if isinstance(v, (int, np.integer)):
+        return int(v)
+    if isinstance(v, (float, np.floating)):
+        f = float(v)
+        return round(f, digits) if np.isfinite(f) else None
+    if isinstance(v, np.ndarray):
+        return state_value(v.tolist(), digits)
+    if isinstance(v, (list, tuple)):
+        return [state_value(x, digits) for x in v]
+    raise TypeError(f"a state value must be numbers, arrays, strings or dicts of them, not {type(v).__name__}")
 
 
-POSE_NOTE = ("object_poses (an ablation of this run): every /submit, /observe and /reset answer's meta carries "
-             "\"objects\" = {name: {\"pos\": [x, y, z] (m), \"quat\": [4] (quaternion_order), \"size\": [...] where "
-             "given}}, each object's pose in `frame` at the state the answer ends in")
+class StateTable:
+    """The state-query ablation's entities (RCB_STATE_QUERY=1), built by an adapter once its scene is built:
+        add(name, kind, {field: (unit, getter)}, note=None)
+    for each entity, kind one of STATE_KINDS; getter() reads the field's current value from the live simulator, in the
+    world frame (an array, a number, a bool, a string or a dict of them). The usual fields: pos [x, y, z] m, quat [4]
+    (quaternion_order), lin_vel [3] m/s, ang_vel [3] rad/s, height_above_ground m, joint_pos / joint_vel {joint: rad or
+    m (/s)}, size [3] m (full extents along the body axes), bbox [[x, y, z] min, [x, y, z] max] m; a benchmark adds its
+    own (a coverage fraction, a line's endpoints). The entities and their fields are fixed for the episode. Never a
+    task predicate, a success flag, a progress or a grader value."""
+
+    def __init__(self, frame: str, quaternion_order: str = "wxyz", note: str | None = None):
+        if quaternion_order not in ("wxyz", "xyzw"):
+            raise ValueError("quaternion_order is wxyz or xyzw")
+        self.frame, self.quaternion_order, self.note = str(frame), quaternion_order, note
+        self._ents: dict = {}
+
+    def add(self, name: str, kind: str, fields: dict, note: str | None = None) -> "StateTable":
+        if kind not in STATE_KINDS:
+            raise ValueError(f"kind {kind!r} is not one of {STATE_KINDS}")
+        if not isinstance(name, str) or not name or name in self._ents:
+            raise ValueError(f"entity name {name!r} empty or added twice")
+        if not fields:
+            raise ValueError(f"entity {name!r} has no fields")
+        for f, spec in fields.items():
+            if not (isinstance(f, str) and isinstance(spec, tuple) and len(spec) == 2 and isinstance(spec[0], str)
+                    and callable(spec[1])):
+                raise ValueError(f"{name}.{f}: a field is (unit text, getter)")
+        self._ents[name] = {"kind": kind, "fields": dict(fields), "note": note}
+        return self
+
+    def entities(self) -> dict:
+        ents = {n: {"kind": e["kind"], "fields": {f: u for f, (u, _) in e["fields"].items()},
+                    **({"note": e["note"]} if e["note"] else {})} for n, e in self._ents.items()}
+        return {"frame": self.frame, "quaternion_order": self.quaternion_order, **({"note": self.note} if self.note else {}),
+                "entities": ents}
+
+    def query(self, plan: dict) -> dict:
+        """plan = {name: [fields]}, already checked (plan_state_query) -> {name: {field: value}}."""
+        return {n: {f: state_value(self._ents[n]["fields"][f][1]()) for f in fs} for n, fs in plan.items()}
+
+
+def check_state_table(table) -> dict:
+    """The table's entities() as GET /state/entities serves it, checked (a malformed table refuses to start)."""
+    if not (callable(getattr(table, "entities", None)) and callable(getattr(table, "query", None))):
+        raise TypeError("RCB_STATE_QUERY=1: the state table must have entities() and query(plan)")
+    ents = table.entities()
+    if not isinstance(ents, dict) or not isinstance(ents.get("entities"), dict) or not ents["entities"] \
+            or not isinstance(ents.get("frame"), str) or ents.get("quaternion_order") not in ("wxyz", "xyzw"):
+        raise TypeError("RCB_STATE_QUERY=1: entities() must give frame, quaternion_order and a non-empty entities dict")
+    for n, e in ents["entities"].items():
+        if e.get("kind") not in STATE_KINDS or not isinstance(e.get("fields"), dict) or not e["fields"] \
+                or not all(isinstance(u, str) for u in e["fields"].values()):
+            raise TypeError(f"RCB_STATE_QUERY=1: entity {n!r} needs a kind in {STATE_KINDS} and fields {{field: unit}}")
+    json.dumps(ents, allow_nan=False)
+    return ents
+
+
+def plan_state_query(ents: dict, body: dict) -> tuple[dict | None, dict | None]:
+    """A /state/query body -> ({name: [fields]}, None), or (None, the 400's JSON body)."""
+    table = ents["entities"]
+    extra = sorted(set(body) - {"names", "fields"})
+    if extra:
+        return None, {"error": f"unknown keys {extra}: the body is {{\"names\": [...], \"fields\": [...]}}"}
+    names = body.get("names")
+    if not isinstance(names, list) or not names or not all(isinstance(n, str) for n in names):
+        return None, {"error": "names must be a non-empty list of entity names (GET /state/entities)",
+                      "names": list(table)}
+    names = list(dict.fromkeys(names))
+    if len(names) > MAX_QUERY_NAMES:
+        return None, {"error": f"at most {MAX_QUERY_NAMES} names per query"}
+    unknown = [n for n in names if n not in table]
+    if unknown:
+        return None, {"error": "unknown names", "unknown": unknown, "names": list(table)}
+    fields = body.get("fields")
+    if fields is None:
+        return {n: list(table[n]["fields"]) for n in names}, None
+    if not isinstance(fields, list) or not fields or not all(isinstance(f, str) for f in fields):
+        return None, {"error": "fields must be a non-empty list of field names, or left out for all of them"}
+    fields = list(dict.fromkeys(fields))
+    have = {f for n in names for f in table[n]["fields"]}
+    bad = [f for f in fields if f not in have]
+    if bad:
+        return None, {"error": "unknown fields for these names", "unknown": bad,
+                      "fields": {n: list(table[n]["fields"]) for n in names}}
+    return {n: [f for f in fields if f in table[n]["fields"]] for n in names}, None
 
 
 class Sim:
@@ -157,8 +264,8 @@ class Sim:
     # optional: replay_free = True   the adapter has a verify() but knows nothing calls it (else refused at build)
     # optional (RCB_STATE_OPS=1): save_state() -> obj, the simulator's whole state AND the adapter's per-episode state (its
     #           referee, latches, counters), in memory; load_state(obj) restores it. Without them: reset only.
-    # optional (required with RCB_EXPOSE_OBJECT_POSES=1): object_poses() -> {name: pose_entry(...)} and
-    #           object_pose_spec() -> {"frame": text, "quaternion_order": "wxyz" | "xyzw", "objects": [names], ...}
+    # optional (required with RCB_STATE_QUERY=1): state_table() -> StateTable (or any object with entities() and
+    #           query(plan)), called once after the scene is built: what GET /state/entities lists and /state/query reads
     # build() may raise InstanceMismatch: the adapter's own loader found the frozen instance does not build (infra)
     def save_trajectory(self, rows: np.ndarray, path: str, meta: dict) -> None: ...
     def render_video(self, rows: np.ndarray, path: str) -> None: ...   # path and path.last.png: the episode's video, after
@@ -180,7 +287,7 @@ RESERVED = frozenset({"protocol", "success", "live_success", "done", "reason", "
                       "video_source", "live_rule", "live_verdict_error", "finalize_error", "infra_error",
                       "instance_mismatch", "ev", "ts", "deterministic", "replay_success", "live_sha", "first_success",
                       "first_reason", "first_n_actions", "first_video", "resets_at_success", "loads_at_success",
-                      "saves", "loads", "episodes_log"})
+                      "saves", "loads", "episodes_log", "state_queries"})
 
 
 def episodes_log(ev: list[dict], t0: float | None) -> list[dict]:
@@ -427,9 +534,13 @@ class Service:
             # so (replay_free = True).
             raise TypeError(f"{type(sim).__name__} defines verify(), which this service never calls: move its rule "
                             "to step() or live_verdict(), or set replay_free = True")
-        if OBJECT_POSES and not (callable(getattr(sim, "object_poses", None))
-                                 and callable(getattr(sim, "object_pose_spec", None))):
-            raise TypeError(f"RCB_EXPOSE_OBJECT_POSES=1 but {type(sim).__name__} has no object_poses()/object_pose_spec()")
+        self.state_table = self.state_ents = None    # RCB_STATE_QUERY: the adapter's entities, fixed for the episode
+        if STATE_QUERY:
+            if not callable(getattr(sim, "state_table", None)):
+                raise TypeError(f"RCB_STATE_QUERY=1 but {type(sim).__name__} has no state_table()")
+            self.state_table = sim.state_table()
+            self.state_ents = check_state_table(self.state_table)
+        self.state_queries = 0                        # RCB_STATE_QUERY: /state/query calls answered
         self.sim, self.data = sim, data
         self.reset_budget, self.wall_clock_s = int(reset_budget), float(wall_clock_s)
         self.saves = self.loads = 0                   # RCB_STATE_OPS: /save_state and /load_state calls that took effect
@@ -471,8 +582,8 @@ class Service:
         cams = {c: {"rgb": True, "depth": c in self.sim.depth_cameras, **own["cameras"].get(c, {})}
                 for c in self.sim.cameras}
         spec = {**core, **own, "cameras": cams}
-        if OBJECT_POSES:
-            spec["object_poses"] = {"units": "m", **self.sim.object_pose_spec(), "note": POSE_NOTE}
+        if STATE_QUERY:
+            spec["state_query"] = STATE_QUERY_NOTE
         if self.reset_budget:
             spec["reset"] = ("POST /reset abandons the running episode and starts a new one from the same starting "
                              "state, budget.reset times in all; only the last episode is graded, and a success ends "
@@ -499,6 +610,8 @@ class Service:
                        resets_left=0 if self.success or self.stopping else self.reset_budget - self.resets)
         if self.can_save:
             out.update(saves=self.saves, loads=self.loads)
+        if STATE_QUERY:
+            out["state_queries"] = self.state_queries
         return out
 
     def status(self) -> dict:
@@ -510,8 +623,6 @@ class Service:
                "time_s": round(t, 2), "time_left_s": max(0.0, round(self.wall_clock_s - t, 1)),
                "proprio": {"layout": list(self.sim.proprio_layout),
                            "now": np.asarray(self.sim.proprio(), np.float32).tolist()}}
-        if OBJECT_POSES:
-            out["objects"] = self.sim.object_poses()
         return out
 
     # ------------------------------------------------------------------ evidence
@@ -557,6 +668,8 @@ class Service:
         first = self.resets == 0 and self.loads == 0
         d["first_success"] = bool(d["success"]) if first else False
         d.setdefault("first_reason", self.reason if first else None)
+        if STATE_QUERY:
+            d["state_queries"] = self.state_queries
         if STATE_OPS:
             d.update(saves=self.saves, loads=self.loads, episodes=self.resets + self.loads + 1)
             if d["success"]:                           # a success ends the trial: the graded episode is the last one
@@ -647,6 +760,7 @@ class Service:
             self.episode = [r.copy() for r in rows[self.ep_start:]]
         if STATE_OPS:
             self.saves, self.loads = int(cp.get("saves", self.saves)), int(cp.get("loads", self.loads))
+        self.state_queries = sum(1 for e in ev if e["ev"] == "state_query")   # each is logged before it is answered
         self.done, self.reason, self.success = bool(cp["done"]), cp["reason"], bool(cp["success"])
         self.judged_before = any(e["ev"] == "live_verdict_begin" for e in ev)   # a process died in live_verdict()
         self.error_infra = bool(cp.get("error_infra", self.error_infra))
@@ -703,6 +817,8 @@ class Service:
         path = urlparse(path).path
         if method == "GET" and path in ("/spec", "/status"):
             return self._reply_json(200, self.spec if path == "/spec" else self.status())
+        if STATE_QUERY and path in ("/state/entities", "/state/query"):
+            return self._state_query_http(method, path, body, content_length)
         routes = {"/submit": self._submit, "/observe": self._observe}
         if self.reset_budget:
             routes["/reset"] = self._reset
@@ -731,6 +847,55 @@ class Service:
         if blobs is None:                            # a JSON answer (/save_state)
             return self._reply_json(200, out)
         return self._reply_rcb1(out, blobs)
+
+    def _state_query_http(self, method: str, path: str, body: bytes, content_length: int | None):
+        """RCB_STATE_QUERY: GET /state/entities, POST /state/query."""
+        if path == "/state/entities":
+            if method != "GET":
+                return self._reply_json(404, {"error": "no such endpoint: GET /state/entities"})
+            return self._reply_json(200, self.state_ents)
+        if method != "POST":
+            return self._reply_json(404, {"error": "no such endpoint: POST /state/query"})
+        if (len(body) if content_length is None else content_length) > MAX_BODY:
+            return self._reply_json(413, {"error": f"request body over {MAX_BODY} bytes"})
+        try:
+            meta, _ = self._decode(body)
+        except Exception as exc:  # noqa: BLE001 -- any malformed body is the caller's error
+            return self._reply_json(400, {"error": f"malformed body: {exc}"[:300]})
+        try:
+            if refused := self._state_query_refusal():
+                raise refused
+            plan, err = plan_state_query(self.state_ents, meta)
+            if err:
+                raise Refused(400, err)
+            return self._reply_json(200, self._state_answer(plan))
+        except Refused as exc:
+            return self._reply_json(exc.code, exc.body)
+
+    def _state_query_refusal(self) -> Refused | None:
+        """RCB_STATE_QUERY: a query is served only while the episode runs."""
+        if self.done or self.stopping or self.finalized:
+            return Refused(409, {"error": "the episode has ended: state queries are served only while it runs"})
+        return None
+
+    def _state_answer(self, plan: dict) -> dict:
+        """RCB_STATE_QUERY: read the planned fields now; nothing steps, nothing on the clock changes. An adapter error
+        here is a 500 that ends nothing (the query only reads)."""
+        if refused := self._state_query_refusal():
+            raise refused
+        try:
+            state = self.state_table.query(plan)
+            json.dumps(state, allow_nan=False)
+        except Exception as exc:  # noqa: BLE001
+            traceback.print_exc()
+            self.log("state_query_error", error=repr(exc)[:300])
+            raise Refused(500, {"error": "state query failed", "detail": repr(exc)[:200]}) from None
+        self.state_queries += 1
+        steps = len(self.episode)
+        self.log("state_query", n=self.state_queries, names=list(plan),
+                 fields=sorted({f for fs in plan.values() for f in fs}), control_steps=steps)
+        return {"state": state, "control_steps": steps, "sim_time_s": round(steps * self.sim.control_dt, 4),
+                "state_queries": self.state_queries}
 
     @staticmethod
     def _decode(body: bytes) -> tuple[dict, dict]:

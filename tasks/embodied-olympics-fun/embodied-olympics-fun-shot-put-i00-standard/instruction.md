@@ -161,6 +161,32 @@ sensor; angular velocity `gx, gy, gz`, rad/s; acceleration `ax, ay, az`, m/s², 
 4 joints / lowcmd; the G1 also 5 walk_falcon, 6 walk_agile), the velocity command in force (`cmd_vx`, `cmd_vy`, `cmd_wz`) and `time_s`, the attempt's time. A
 real H1-2 has no sensor for its position in the venue, and neither do you: that is what the cameras are for.
 
+## This run: privileged state queries
+
+This run lets you query the simulator's state. This section overrides anything above, and anything in `/spec`, that
+says object poses or the scene's state are never given.
+
+- `GET /state/entities` (on the same base URL as your other calls) lists what you can query:
+  `{"frame": ..., "quaternion_order": ..., "entities": {name: {"kind": ..., "fields": {field: unit}}}}`. The
+  kinds are `robot` (the robot's base or root), `robot_link` (a hand, a foot, an end effector), `object`,
+  `articulation` (a door, a drawer, a faucet: its joints) and `scene_feature` (a zone, a line, a hazard, a canvas
+  region). The list is fixed for the run.
+- `POST /state/query` with `{"names": ["robot", ...], "fields": ["pos", "quat"]}` answers JSON
+  `{"state": {name: {field: value}}, "control_steps": ..., "sim_time_s": ..., "state_queries": ...}` with the
+  current values. `fields` is optional: without it you get every field of each name. In Python:
+  `requests.post(base + "/state/query", json={"names": ["robot"]}).json()["state"]`.
+  - The usual fields: `pos` [x, y, z] m, `quat` (in `quaternion_order`), `lin_vel` m/s, `ang_vel` rad/s,
+    `height_above_ground` m, `joint_pos` / `joint_vel` {joint: value}, `size` [3] m (full extents), and `bbox`
+    [[min x, y, z], [max x, y, z]] m. A task may add its own; each field's unit is in the list.
+  - All values are in the world frame that `frame` describes.
+  - A field that an entity does not have is left out of its entry.
+  - An unknown name or field is a 400 that lists the valid ones.
+- A query only reads. It takes no control step, and it does not advance or pause the clock. In standard-realtime it
+  answers at the current simulation time while the robot keeps moving. It is served while the episode runs (409 after
+  the episode ended). Queries are counted and recorded; they do not change the grading.
+- Nothing else changes: the goal, the success rule and its thresholds are not given, and no answer says whether the
+  task is done.
+
 ## This run: unlimited resets, save and load
 
 This run changes the reset budget and adds two calls. This section overrides anything above, and anything in `/spec`,
@@ -185,19 +211,6 @@ that says there is no reset, one episode only, or fewer resets.
 - Only the last episode is graded: from the starting state, or for a loaded episode the path that led to the saved
   state followed by what you did after the load. The success rule is checked again from your next command on. A
   success still ends the run: no reset, save or load after it.
-
-## This run: object poses
-
-This run gives you the objects' poses. This section overrides anything above, and anything in `/spec`, that says
-object poses are never given.
-
-- Every answer of `/submit`, `/observe` and `/reset` (and `/load_state` where it exists) has
-  `meta["objects"]`: `{name: {"pos": [x, y, z], "quat": [4 numbers], "size": [...]}}`, each object's pose at the
-  state the answer ends in. `quat` is absent for objects with no orientation (a cloth or a fluid gives its centroid),
-  `size` only where the task gives one.
-- `spec()["object_poses"]` names the objects, the frame the poses are in (the frame of the robot poses this service
-  already gives you) and the quaternion order. The units are metres.
-- Nothing else changes: the goal, the success rule and its thresholds are not given.
 
 ## External material
 The network is open. You may install packages (pip, apt), and you may search for, download and use public tools, robot models and pretrained controllers (for example a published Unitree G1 walking, jumping or whole-body policy): finding existing work and adapting it to this robot is encouraged. Say in your notes what you used. You may read anything installed in your container, this benchmark's own source code included. The one thing not to look up is a ready-made solution to this exact task, such as this benchmark's reference solutions. This is an honour rule; trials are reviewed.

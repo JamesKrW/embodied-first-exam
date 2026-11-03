@@ -3,7 +3,7 @@
 # declared artifacts (/app/output/).
 FROM ghcr.io/mll-lab-nu/efe:kinder-0.1.6
 COPY instance.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:kinder-files-0.4.0-resetpose@sha256:7dbf9243a9da97d0ed198fd8e186ea4cde07834d04f76547195aa16b2f582ba8 /privileged/environment/rcb_kinder.py /privileged/tests/grade.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:kinder-files-0.4.0-stateq@sha256:45e8a2fcd544150607869fd9b0c9d881a5e80d86c1dc636f674b3c7c99fef021 /privileged/environment/rcb_kinder.py /privileged/tests/grade.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 WORKDIR /tests
 # resources (PROTOCOL §6) # rcb-monitor

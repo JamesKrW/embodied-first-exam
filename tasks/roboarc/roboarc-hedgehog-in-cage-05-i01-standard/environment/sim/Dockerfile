@@ -3,7 +3,7 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:roboarc-0.2.0
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0-resetpose@sha256:aa56bd86521758e12051e4993efd37c709a7bc2a9cb99161182cbed68e634209 \
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0-stateq@sha256:20b83eb467f5b4f58504c96abeff4fa7c12dd9c5b0ca0c5d80a32d2c87480f5e \
      /standard/sim/finalize.sh \
      /nyx_direct.py \
      /rcb_topogym.py \
@@ -12,7 +12,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0-resetpose@sha256:aa56bd86
      /sim/run.sh \
      /standard/sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-resetpose@sha256:90a9bd8fd47f66371cba9378ccc5954544457eab8dc60efe8d25dfb58ac329aa \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 \
      /rcb1.py \
      /v2_4/rcb_limited.py \
      /srv/

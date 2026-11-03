@@ -73,13 +73,13 @@ ENV OMNI_KIT_ACCEPT_EULA=YES HDF5_USE_FILE_LOCKING=FALSE HF_HUB_OFFLINE=1 \
 # their paths under /srv the files it shares with other tasks, from pinned files-only images (images/<name>/
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:ispatialgym-files-0.4.0-resetpose@sha256:2bd3fb79e3c298ede47065f0f9baceb1e37ca34b17fa30720556334968388f22 \
+COPY --from=ghcr.io/mll-lab-nu/efe:ispatialgym-files-0.4.0-stateq@sha256:870ac902797a90b89fddbd23ef9e3d9f1197c48e7edec308e7cc2f1c665ce7e1 \
      /sim/finalize.sh \
      /privileged/environment/rcb_ispatialgym.py \
      /sim/server.py \
      /sim/task_text.txt \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-resetpose@sha256:90a9bd8fd47f66371cba9378ccc5954544457eab8dc60efe8d25dfb58ac329aa \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 \
      /rcb1.py \
      /rcb_limited.py \
      /run.sh \

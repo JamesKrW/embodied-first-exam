@@ -3,14 +3,14 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-resetpose@sha256:9d1f54a40c8ea34df8a02efd57fd333ff7b7e96fee2bf691c83fa44551804a1f \
+COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-stateq@sha256:21852e2ab6751b6f200608173cc10f64296b1b49be905d3eb7158f26fa2a4149 \
      /sim/finalize.py \
      /sim/finalize.sh \
      /privileged/environment/hands.py \
      /sim/rcb_dexhand.py \
      /sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-resetpose@sha256:90a9bd8fd47f66371cba9378ccc5954544457eab8dc60efe8d25dfb58ac329aa \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 \
      /rcb1.py \
      /rcb_limited.py \
      /run.sh \

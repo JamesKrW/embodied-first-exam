@@ -1,7 +1,7 @@
 FROM ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350
 COPY . /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-resetpose@sha256:9d1f54a40c8ea34df8a02efd57fd333ff7b7e96fee2bf691c83fa44551804a1f /privileged/environment/hands.py /privileged/tests/grade.py /privileged/environment/arm_rig.py /privileged/environment/variants/85d44635c5/catalog.json /privileged/environment/variants/cf1c141a55/checker.py /privileged/environment/variants/4c79bfe5f4/replay.py /privileged/environment/variants/969b07e0b2/runtime.py /privileged/environment/variants/95e2695c2d/scene.py /privileged/environment/variants/cf26dc5048/task.json /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-resetpose@sha256:9d1f54a40c8ea34df8a02efd57fd333ff7b7e96fee2bf691c83fa44551804a1f /privileged/environment/assets/water-lilies.png /tests/assets/water-lilies.png
+COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-stateq@sha256:21852e2ab6751b6f200608173cc10f64296b1b49be905d3eb7158f26fa2a4149 /privileged/environment/hands.py /privileged/tests/grade.py /privileged/environment/arm_rig.py /privileged/environment/variants/85d44635c5/catalog.json /privileged/environment/variants/cf1c141a55/checker.py /privileged/environment/variants/4c79bfe5f4/replay.py /privileged/environment/variants/969b07e0b2/runtime.py /privileged/environment/variants/95e2695c2d/scene.py /privileged/environment/variants/cf26dc5048/task.json /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-stateq@sha256:21852e2ab6751b6f200608173cc10f64296b1b49be905d3eb7158f26fa2a4149 /privileged/environment/assets/water-lilies.png /tests/assets/water-lilies.png
 ENV PYTHONPATH=/tests
 RUN chmod +x /tests/test.sh
 WORKDIR /tests

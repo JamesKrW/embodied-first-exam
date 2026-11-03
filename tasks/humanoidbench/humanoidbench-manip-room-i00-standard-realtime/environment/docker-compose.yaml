@@ -23,7 +23,7 @@ services:
     restart: on-failure:6                               # a crash resumes the same episode, paused, never a reset
     environment:
       RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
-      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_TASK: room
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "Six loose objects — a chair, a trophy, a pair of headphones, two packages and a snow globe — are scattered around the room (the table and the bookshelf are fixed). Tidy up: gather them together, so they end up close to one another rather than spread out."

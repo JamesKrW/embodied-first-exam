@@ -3,11 +3,11 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:bigym2-0.1.1
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-resetpose@sha256:90a9bd8fd47f66371cba9378ccc5954544457eab8dc60efe8d25dfb58ac329aa \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 \
      /rcb1.py \
      /realtime/rcb_realtime.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:bigym2-files-0.4.0-resetpose@sha256:8d0eea72238bd77018ad9fac08512cdfc305e16201b095bdca311d58d66a75d9 \
+COPY --from=ghcr.io/mll-lab-nu/efe:bigym2-files-0.4.0-stateq@sha256:1bb199cf988acabd348d3686f0682d549fcd76748deafdedf7c892b4b307286c \
      /privileged/environment/rcb_bigym2.py \
      /sim/rcb_service.py \
      /sim/server.py \

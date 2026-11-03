@@ -22,7 +22,7 @@ services:
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
       RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
-      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_INSTANCE: /srv/instance.json
       RCB_TASK_TEXT: "Use the spatula to move the sandwich from the frying pan onto the chopping board."
       RCB_EPISODE: "one episode, no reset: it succeeds when this has held for 1 s (50 control steps): the sandwich lies flat (either face up, within 10 degrees of level) touching the chopping board; a finger of either gripper touching the sandwich ends the episode as a failure: move it with the spatula; a fall (pelvis tilted beyond ~53 degrees or below 0.30 m) fails it without ending it; it ends at the success, a failure, the pelvis 10 m from the scene's origin, a simulator error, or after 3150 control steps"

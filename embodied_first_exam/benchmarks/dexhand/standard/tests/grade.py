@@ -33,6 +33,12 @@ def state_ops_fields(data: dict, success: bool) -> dict:
     return out
 
 
+def state_query_fields(data: dict) -> dict:
+    """The state-query ablation's count (the service writes it with RCB_STATE_QUERY=1): state_queries, the /state/query
+    calls answered; {} without the switch. Never part of the verdict."""
+    return {"state_queries": int(data.get("state_queries") or 0)} if "state_queries" in data else {}
+
+
 def verdict(data: dict) -> dict:
     live = data.get("graded_by") == "live"
     gave_up = bool(data.get("gave_up"))
@@ -66,6 +72,7 @@ def verdict(data: dict) -> dict:
         "resets": int(data.get("resets") or 0),
         "reset_budget": int(data.get("reset_budget") or 0),
         **state_ops_fields(data, success),
+        **state_query_fields(data),
     }
 
 

@@ -23,7 +23,7 @@ services:
     restart: on-failure:6                               # a crash resumes the same episode, paused, never a reset
     environment:
       RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
-      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_TASK: window
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "Grasp the wiping tool — it starts in the air just in front of the hands and falls within the first second unless it is held — and wipe the window with it, moving steadily up and down."

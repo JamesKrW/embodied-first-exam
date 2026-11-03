@@ -33,7 +33,7 @@ services:
     environment:
       RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
       RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
-      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       OMP_NUM_THREADS: "8"
       MKL_NUM_THREADS: "8"
       RCB_TASK: jar_transport/task_0013

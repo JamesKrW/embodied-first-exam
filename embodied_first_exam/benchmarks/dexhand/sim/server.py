@@ -5,6 +5,13 @@ MyoSuite 2.2 service adds it (the shared layer has none): with RCB_RESET_BUDGET 
 POST /reset abandons the running episode, or follows one that has ended, and starts a new one from the frozen start
 (Session.reset(): the same state hash as a fresh process); only the last episode is graded. A crash resume replays the
 journal and resets where the committed resets did (their journal rows are checkpointed, `persist`).
+
+Ablations (rcb_limited; off unless the task sets the switch): with RCB_STATE_QUERY=1 the state table holds the robot
+(its root body's pose, velocity and height above the floor, the actuated joints), its tcp frames, palms and fingertips,
+every free body that is no part of the robot (an object: pose, velocity, extents), every jointed part of one
+(an articulation: pose, velocity, its hinge / slide joints with their ranges) and every fixed body with collision geometry
+(a scene feature: pose, extents), all in the MuJoCo world frame (that of /kinematics and proprio tcp_pose), quaternions
+wxyz. A query copies the live joint state into a private MjData and runs MuJoCo's kinematics there.
 """
 
 from __future__ import annotations
@@ -493,25 +500,123 @@ def do_reset(meta):
 
 
 # The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
-# RCB_EXPOSE_OBJECT_POSES=1: the task objects' world poses (wxyz), as the cameras see them (no physics, no mj_forward).
-# The essential families name them as Session.state()["objects"] does; the other families' objects are the moving bodies
-# that are no part of the robot (a free body, or an articulated part: its body pose, never its joint angle).
+# RCB_STATE_QUERY=1: the state table (module docstring, "Ablations").
 ROBOT_ROOTS = {int(MD.body_rootid[int(MD.jnt_bodyid[joint])]) for joint in JIDS}
+_JOINT_KIND = {int(mujoco.mjtJoint.mjJNT_HINGE): "hinge", int(mujoco.mjtJoint.mjJNT_SLIDE): "slide"}
 
 
-def object_names() -> list:
-    if hasattr(S, "_moving_bodies"):
-        return sorted(S._moving_bodies)
-    return [MD.body(index).name for index in range(1, MD.nbody)
-            if int(MD.body_rootid[index]) not in ROBOT_ROOTS and int(MD.body_jntnum[index]) > 0
-            and MD.body_mocapid[index] < 0 and MD.body(index).name]
+def _body_extent(index: int) -> list:
+    """Full extents (m) of a body's collision geoms (all its geoms if none collide) along the body's axes, from MuJoCo's
+    geom bounding boxes."""
+    geoms = [g for g in range(MD.ngeom) if int(MD.geom_bodyid[g]) == index and int(MD.geom_type[g]) != int(mujoco.mjtGeom.mjGEOM_PLANE)]
+    colliding = [g for g in geoms if MD.geom_contype[g] or MD.geom_conaffinity[g]]
+    corners = []
+    for g in colliding or geoms:
+        rot = np.zeros(9)
+        mujoco.mju_quat2Mat(rot, MD.geom_quat[g])
+        centre, half = MD.geom_aabb[g][:3], MD.geom_aabb[g][3:]
+        for signs in np.array(np.meshgrid([-1, 1], [-1, 1], [-1, 1])).T.reshape(-1, 3):
+            corners.append(MD.geom_pos[g] + rot.reshape(3, 3) @ (centre + signs * half))
+    if not corners:
+        return [0.0, 0.0, 0.0]
+    corners = np.asarray(corners)
+    return (corners.max(axis=0) - corners.min(axis=0)).tolist()
 
 
-OBJECTS = {name: MD.body(name).id for name in object_names()} if L.OBJECT_POSES else {}
+class MjStateTable:
+    """The state table over a private MjData: each query copies the live qpos / qvel / mocap poses into it and runs
+    mj_kinematics, mj_comPos and mj_comVel there, so every value is the current state and the live MjData is never
+    touched (no step, no forward on it)."""
+
+    def __init__(self, frame: str, note: str | None = None):
+        self.table = L.StateTable(frame=frame, quaternion_order="wxyz", note=note)
+        self.data = mujoco.MjData(MD)
+        self.add = self.table.add
+
+    def entities(self) -> dict:
+        return self.table.entities()
+
+    def query(self, plan: dict) -> dict:
+        d = self.data
+        d.qpos[:], d.qvel[:] = D.qpos, D.qvel
+        d.mocap_pos[:], d.mocap_quat[:] = D.mocap_pos, D.mocap_quat
+        mujoco.mj_kinematics(MD, d)
+        mujoco.mj_comPos(MD, d)
+        mujoco.mj_comVel(MD, d)
+        return self.table.query(plan)
+
+    def velocity(self, index: int) -> np.ndarray:
+        out = np.zeros(6)
+        mujoco.mj_objectVelocity(MD, self.data, mujoco.mjtObj.mjOBJ_BODY, index, out, 0)
+        return out                                   # [angular, linear], world axes, at the body's origin
+
+    def body(self, index: int, velocity: bool = True) -> dict:
+        d = self.data
+        fields = {"pos": ("m", lambda: d.xpos[index].copy()), "quat": ("wxyz", lambda: d.xquat[index].copy())}
+        if velocity:
+            fields["lin_vel"] = ("m/s", lambda: self.velocity(index)[3:])
+            fields["ang_vel"] = ("rad/s", lambda: self.velocity(index)[:3])
+        return fields
+
+    def joints(self, ids: list) -> dict:
+        d = self.data
+        names = [MD.joint(j).name or f"joint{j}" for j in ids]
+        qadr = [int(MD.jnt_qposadr[j]) for j in ids]
+        vadr = [int(MD.jnt_dofadr[j]) for j in ids]
+        unit = "rad or m (hinge / slide)" if len({int(MD.jnt_type[j]) for j in ids}) > 1 else \
+            ("m" if int(MD.jnt_type[ids[0]]) == int(mujoco.mjtJoint.mjJNT_SLIDE) else "rad")
+        fields = {"joint_pos": (unit, lambda: dict(zip(names, d.qpos[qadr].tolist()))),
+                  "joint_vel": (("rad/s or m/s (hinge / slide)" if "or" in unit else unit + "/s"), lambda: dict(zip(names, d.qvel[vadr].tolist())))}
+        ranges = {n: MD.jnt_range[j].tolist() for n, j in zip(names, ids) if MD.jnt_limited[j]}
+        if ranges:
+            fields["joint_range"] = (unit, lambda: ranges)
+        return fields
 
 
-def object_poses() -> dict:
-    return {name: L.pose_entry(D.xpos[index], D.xquat[index]) for name, index in OBJECTS.items()}
+def _floor_z() -> float | None:
+    planes = [float(MD.geom_pos[g][2]) for g in range(MD.ngeom)
+              if int(MD.geom_type[g]) == int(mujoco.mjtGeom.mjGEOM_PLANE) and int(MD.geom_bodyid[g]) == 0]
+    return max(planes) if planes else None
+
+
+def state_table() -> MjStateTable:
+    floor = _floor_z()
+    frame = ("MuJoCo world frame: z up, metres; the frame of /kinematics, proprio tcp_pose and the camera extrinsics. "
+             + (f"The floor is the plane z = {floor:g}." if floor is not None else
+                "The scene has no floor: height_above_ground is the height above z = 0."))
+    t = MjStateTable(frame)
+    ground = floor if floor is not None else 0.0
+    root = min(ROBOT_ROOTS)
+    t.add("robot", "robot", {**t.body(root), "height_above_ground": ("m", lambda: float(t.data.xpos[root][2]) - ground),
+                             **t.joints([int(j) for j in JIDS])},
+          note=f"{ROBOT} with the {HAND} hand: the root body {MD.body(root).name!r}; joint_pos / joint_vel = the "
+               "actuated joints (proprio joint_pos)")
+    children = {}
+    for index in LINK_IDS.values():
+        children.setdefault(int(MD.body_parentid[index]), []).append(index)
+    links = list(TCP_IDS)
+    links += [index for index in LINK_IDS.values() if len(children.get(index, [])) >= 3 and index not in links]  # palms
+    links += [index for index in LINK_IDS.values() if not children.get(index) and index not in links]           # fingertips
+    for index in links:
+        t.add(MD.body(index).name, "robot_link", t.body(index),
+              note="tcp frame" if index in TCP_IDS else ("palm" if children.get(index) else "fingertip (distal link)"))
+    for index in range(1, MD.nbody):
+        name = MD.body(index).name
+        if not name or int(MD.body_rootid[index]) in ROBOT_ROOTS or MD.body_mocapid[index] >= 0:
+            continue
+        own = list(range(int(MD.body_jntadr[index]), int(MD.body_jntadr[index]) + int(MD.body_jntnum[index])))
+        if any(int(MD.jnt_type[j]) == int(mujoco.mjtJoint.mjJNT_FREE) for j in own):
+            t.add(name, "object", {**t.body(index), "size": ("m", lambda e=_body_extent(index): e)})
+        elif own:
+            hinged = [j for j in own if int(MD.jnt_type[j]) in _JOINT_KIND]
+            t.add(name, "articulation", {**t.body(index), **(t.joints(hinged) if hinged else {}),
+                                         "size": ("m", lambda e=_body_extent(index): e)},
+                  note=f"a jointed part of {MD.body(int(MD.body_rootid[index])).name!r}")
+        elif int(MD.body_weldid[index]) == 0 and any(int(MD.geom_bodyid[g]) == index and (MD.geom_contype[g] or MD.geom_conaffinity[g])
+                                                     for g in range(MD.ngeom)):
+            t.add(name, "scene_feature", {**t.body(index, velocity=False), "size": ("m", lambda e=_body_extent(index): e)},
+                  note="fixed in the world")
+    return t
 
 
 # RCB_STATE_OPS=1: reset = Session.reset() (the frozen start, the same state hash as a fresh process) and the graded rows
@@ -777,9 +882,7 @@ serve(
         state_sha=S.state_sha,
         proprio=proprio_row,
         state_ops=OPS,
-        **({"object_poses": object_poses,
-            "object_pose_spec": {"frame": "world (the frame of /kinematics and proprio tcp_pose)",
-                                 "quaternion_order": "wxyz", "objects": list(OBJECTS)}} if L.OBJECT_POSES else {}),
+        state_table=state_table() if L.STATE_QUERY else None,
     ),
     port=int(os.environ.get("RCB_PORT", "8000")),
 )

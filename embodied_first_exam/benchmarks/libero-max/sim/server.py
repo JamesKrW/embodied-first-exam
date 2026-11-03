@@ -22,10 +22,12 @@ Settings come from environment/docker-compose.yaml:
   RCB_IMAGE_HW            the side of every camera's image in pixels (256)
   RCB_RESET_BUDGET, RCB_WALL_CLOCK_S, RCB_DATA   the service's own (rcb_service.main)
 
-Ablation (off unless the task sets it; nothing here runs without it): with rcb_service.OBJECT_POSES, object_poses() gives
-the privileged twin's objects (Session.state()["objects"]: the scene's movable objects, its names; no fixture), position and
-orientation only (Session.entity_pose), in the world frame of /spec "frames"; quaternions w x y z. No save_state(): one
-episode per process, so no reset either.
+Ablation (off unless the task sets it; nothing here runs without it): with rcb_service.STATE_QUERY, state_table() gives
+the privileged state in the world frame of /spec "frames" (quaternions w x y z): the Panda's base pose and every arm and
+finger joint, its eef site (proprio eef) and hand; the scene's movable objects (Session.state()["objects"] names: pose,
+velocity, size, bbox) and fixtures (an articulation with its hinge and slide joints, else a scene feature), the arena's
+table. A query reads a scratch copy of the live MuJoCo state (MjRead); it takes no control step. Never the goal, the
+success check or the event's record. No save_state(): one episode per process, so no reset either.
 """
 
 from __future__ import annotations
@@ -57,6 +59,170 @@ def _result(line: str) -> dict | None:
     except ValueError:
         return None
     return r if isinstance(r, dict) and "state_sha" in r and "success" in r else None
+
+
+# rcb_service.STATE_QUERY: the state table (LiberoMax.state_table), read by MjRead.
+class MjRead:
+    """The state-query ablation's read of a live MuJoCo simulation, read-only: refresh() copies the live qpos, qvel and
+    mocap poses into a scratch MjData of the same model and runs the position and velocity stages there (mj_kinematics,
+    mj_comPos, mj_comVel), so each pose and velocity is the current state's and the live MjData is never written. The
+    model and the live data may be given as callables (a simulator that rebuilds them on reset)."""
+
+    def __init__(self, mj, model, data):
+        self.mj, self._model, self._live = mj, model, data
+        self.m = self.d = None
+
+    def refresh(self) -> "MjRead":
+        m = self._model() if callable(self._model) else self._model
+        live = self._live() if callable(self._live) else self._live
+        if m is not self.m:
+            self.m, self.d = m, self.mj.MjData(m)
+        d = self.d
+        d.qpos[:] = live.qpos
+        d.qvel[:] = live.qvel
+        if m.nmocap:
+            d.mocap_pos[:] = live.mocap_pos
+            d.mocap_quat[:] = live.mocap_quat
+        d.time = live.time
+        self.mj.mj_kinematics(m, d)
+        self.mj.mj_comPos(m, d)
+        self.mj.mj_comVel(m, d)
+        return self
+
+    def vel(self, objtype: str, i: int):
+        """(linear m/s, angular rad/s) of a body or site, world frame, at its frame origin."""
+        r = np.zeros(6)
+        self.mj.mj_objectVelocity(self.m, self.d, getattr(self.mj.mjtObj, f"mjOBJ_{objtype.upper()}"), int(i), r, 0)
+        return r[3:].copy(), r[:3].copy()
+
+    def site_quat(self, i: int):
+        q = np.zeros(4)
+        self.mj.mju_mat2Quat(q, self.d.site_xmat[i])
+        return q
+
+    def body_geoms(self, b: int) -> list:
+        """The geoms of body b and of every body fixed to it (reached without crossing a joint)."""
+        m, out, todo = self.m, [], [int(b)]
+        while todo:
+            c = todo.pop()
+            out += range(int(m.body_geomadr[c]), int(m.body_geomadr[c]) + int(m.body_geomnum[c])) if m.body_geomnum[c] else []
+            todo += [k for k in range(c + 1, m.nbody) if int(m.body_parentid[k]) == c and not m.body_jntnum[k]]
+        return out
+
+    def _corners(self, g: int):
+        """The 8 corners of geom g's own bounding box (model.geom_aabb), world frame, in the current state."""
+        c, h = self.m.geom_aabb[g][:3], self.m.geom_aabb[g][3:]
+        s = np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)], float)
+        return (c + s * h) @ self.d.geom_xmat[g].reshape(3, 3).T + self.d.geom_xpos[g]
+
+    def size(self, b: int):
+        """Full extents [3] (m) of body_geoms(b) along the body's own axes, or None (no geom)."""
+        gs = self.body_geoms(b)
+        if not gs:
+            return None
+        p = (np.concatenate([self._corners(g) for g in gs]) - self.d.xpos[b]) @ self.d.xmat[b].reshape(3, 3)
+        return p.max(0) - p.min(0)
+
+    def bbox(self, b: int):
+        """[[x, y, z] min, [x, y, z] max] (m) of body_geoms(b), world axes, in the current state, or None."""
+        gs = self.body_geoms(b)
+        if not gs:
+            return None
+        p = np.concatenate([self._corners(g) for g in gs])
+        return [p.min(0), p.max(0)]
+
+    def height_above_ground(self, b: int, exclude: set):
+        """The body's height above the first colliding geom straight below its frame origin that belongs to none of the
+        bodies in `exclude` (the robot itself), by ray casts on the scratch data; None when nothing is below."""
+        m, d = self.m, self.d
+        p0 = d.xpos[b].copy()
+        p = p0.copy()
+        gid = np.zeros(1, np.int32)
+        for _ in range(16):
+            dist = self.mj.mj_ray(m, d, p, np.array([0.0, 0.0, -1.0]), None, 1, -1, gid)
+            if dist < 0 or gid[0] < 0:
+                return None
+            g = int(gid[0])
+            if int(m.geom_bodyid[g]) in exclude or not (m.geom_contype[g] or m.geom_conaffinity[g]):
+                p = p - np.array([0.0, 0.0, dist + 1e-4])
+                continue
+            return float(p0[2] - (p[2] - dist))
+        return None
+
+    def subtree(self, root: int) -> set:
+        """Body ids of root and every body below it."""
+        out, m = {int(root)}, self.m
+        for b in range(int(root) + 1, m.nbody):
+            if int(m.body_parentid[b]) in out:
+                out.add(b)
+        return out
+
+    def joints(self, ids) -> dict:
+        """{name: qpos address, dof address, range or None} of hinge and slide joints."""
+        m, out = self.m, {}
+        for j in ids:
+            j = int(j)
+            if int(m.jnt_type[j]) in (2, 3):              # mjJNT_SLIDE, mjJNT_HINGE
+                rng = [float(m.jnt_range[j][0]), float(m.jnt_range[j][1])] if m.jnt_limited[j] else None
+                out[m.joint(j).name or f"joint{j}"] = (int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j]), rng)
+        return out
+
+
+def mj_body_fields(R: MjRead, b: int, *, vel: bool = True, size: bool = False, bbox: bool = False,
+                   ground_exclude: set | None = None) -> dict:
+    """StateTable fields of one MuJoCo body: pos, quat (w x y z), lin_vel / ang_vel (world frame), size, bbox,
+    height_above_ground."""
+    f = {"pos": ("m", lambda: R.d.xpos[b].copy()), "quat": ("1 (w x y z)", lambda: R.d.xquat[b].copy())}
+    if vel:
+        f["lin_vel"] = ("m/s", lambda: R.vel("body", b)[0])
+        f["ang_vel"] = ("rad/s", lambda: R.vel("body", b)[1])
+    if size and R.body_geoms(b):
+        ext = R.size(b)
+        f["size"] = ("m (full extents of its geoms and those fixed to it, along the body's axes)", lambda: ext)
+    if bbox and R.body_geoms(b):
+        f["bbox"] = ("m ([min xyz, max xyz] of its geoms and those fixed to it, world axes)", lambda: R.bbox(b))
+    if ground_exclude is not None:
+        f["height_above_ground"] = ("m", lambda: R.height_above_ground(b, ground_exclude))
+    return f
+
+
+def mj_site_fields(R: MjRead, s: int, *, vel: bool = True) -> dict:
+    f = {"pos": ("m", lambda: R.d.site_xpos[s].copy()), "quat": ("1 (w x y z)", lambda: R.site_quat(s))}
+    if vel:
+        f["lin_vel"] = ("m/s", lambda: R.vel("site", s)[0])
+        f["ang_vel"] = ("rad/s", lambda: R.vel("site", s)[1])
+    return f
+
+
+def mj_joint_fields(R: MjRead, joint_ids, *, ranges: bool = False) -> dict:
+    """joint_pos / joint_vel {joint: rad or m (/s)} (and joint_range {joint: [lo, hi]}) of hinge and slide joints."""
+    J = R.joints(joint_ids)
+    if not J:
+        return {}
+    f = {"joint_pos": ("rad or m", lambda: {n: float(R.d.qpos[a]) for n, (a, _, _) in J.items()}),
+         "joint_vel": ("rad/s or m/s", lambda: {n: float(R.d.qvel[v]) for n, (_, v, _) in J.items()})}
+    rng = {n: r for n, (_, _, r) in J.items() if r is not None}
+    if ranges and rng:
+        f["joint_range"] = ("rad or m ([lo, hi])", lambda: rng)
+    return f
+
+
+class MjStateTable:
+    """A StateTable whose query() refreshes the MjRead once, then reads every planned field from it."""
+
+    def __init__(self, table, reader: MjRead):
+        self.table, self.reader = table, reader
+
+    def add(self, *a, **k):
+        self.table.add(*a, **k)
+        return self
+
+    def entities(self) -> dict:
+        return self.table.entities()
+
+    def query(self, plan: dict) -> dict:
+        self.reader.refresh()
+        return self.table.query(plan)
 
 
 class LiberoMax:
@@ -175,19 +341,66 @@ class LiberoMax:
     def state_sha(self) -> str:
         return self.s.state_sha()
 
-    # ---------------------------------------------------------------- ablation (rcb_service.OBJECT_POSES)
-    def object_pose_spec(self) -> dict:
-        base = self.s.robot_base()["pos"]
-        return {"frame": f"world frame: metres; the robot's base is at ({', '.join(f'{v:g}' for v in base)}) facing +x: x "
-                         "forward, y to the robot's left, z up", "quaternion_order": "wxyz",
-                "objects": list(self.s.env.objects_dict)}
+    # ---------------------------------------------------------------- ablation (rcb_service.STATE_QUERY)
+    def state_table(self):
+        """The state-query ablation's table, world frame of /spec "frames". Robot: the Panda's root body (fixed mount)
+        with every robot0_ / gripper0_ joint (prefix dropped); links: the eef site (proprio eef pose) and the hand;
+        objects: Session.state()["objects"], each its root body; fixtures: articulations when they hold hinge or slide
+        joints, else scene features; the arena's table. Read by MjRead (a scratch copy of the live state)."""
+        import mujoco
 
-    def object_poses(self) -> dict:
-        out = {}
+        sim = self.s.sim
+        R = MjRead(mujoco, lambda: sim.model._model, lambda: sim.data._data).refresh()
+        m = R.m
+        robot = self.s.env.robots[0]
+        root = m.body(robot.robot_model.root_body).id
+        sub = R.subtree(root)
+        base = self.s.robot_base()["pos"]
+        t = MjStateTable(rcb_service.StateTable(
+            frame=f"the world frame of /spec frames: metres, the robot's base at ({', '.join(f'{v:g}' for v in base)}) "
+                  "facing +x: x forward (across the table), y to the robot's left, z up; the frame of the proprio eef "
+                  "pose and the cameras' cam2world_gl", quaternion_order="wxyz",
+            note="a pose is a body's or site's frame origin (MuJoCo xpos / xquat); velocities are world-frame, at that "
+                 "origin"), R)
+        js = [j for j in range(m.njnt) if int(m.jnt_bodyid[j]) in sub]
+        jf = mj_joint_fields(R, js, ranges=True)
+        strip = lambda n: n.split("_", 1)[1] if n.startswith(("robot0_", "gripper0_")) else n  # noqa: E731
+        for k in list(jf):
+            unit, get = jf[k]
+            jf[k] = (unit, lambda get=get: {strip(n): v for n, v in get().items()})
+        t.add("robot", "robot", {**mj_body_fields(R, root), **jf},
+              note=f"Franka Panda, root body {m.body(root).name!r} (fixed mount); joints by name without the robot0_ / "
+                   "gripper0_ prefix (joint1..7: proprio joint*_pos; finger_joint1 / 2: proprio finger_left / right)")
+        site = int(getattr(robot, "eef_site_id", -1))
+        if site < 0:
+            site = m.site("gripper0_grip_site").id
+        t.add("eef", "robot_link", mj_site_fields(R, site), note=f"site {m.site(site).name!r}: proprio eef_x .. eef_qz")
+        for b in sorted(sub):
+            if m.body(b).name.endswith("right_hand"):
+                t.add("hand", "robot_link", mj_body_fields(R, b), note=f"body {m.body(b).name!r}")
+        backend = self.s.wrapped.backend
+
+        def root_of(n):
+            entity, _ = backend._entity(n)
+            return m.body(entity.root_body).id
+
         for n in self.s.env.objects_dict:
-            e = self.s.entity_pose(n)
-            out[n] = rcb_service.pose_entry(e["pos"], e["quat_wxyz"])
-        return out
+            t.add(n, "object", mj_body_fields(R, root_of(n), size=True, bbox=True), note="a movable object of the scene")
+        for n in self.s.env.fixtures_dict:
+            b = root_of(n)
+            inner = [j for j in range(m.njnt) if int(m.jnt_bodyid[j]) in R.subtree(b) and int(m.jnt_type[j]) in (2, 3)]
+            if inner:
+                t.add(n, "articulation", {**mj_body_fields(R, b, vel=False, size=True, bbox=True),
+                                          **mj_joint_fields(R, inner, ranges=True)},
+                      note="a fixture with moving parts: its root body and its hinge / slide joints")
+            else:
+                t.add(n, "scene_feature", mj_body_fields(R, b, vel=False, size=True, bbox=True), note="a fixture")
+        have = set(t.entities()["entities"])
+        for b in range(1, m.nbody):   # the arena's table (LIBERO's main_table, ...): not a fixture of the task
+            n = m.body(b).name
+            if int(m.body_parentid[b]) == 0 and "table" in n and n not in have and R.body_geoms(b):
+                t.add(n, "scene_feature", mj_body_fields(R, b, vel=False, size=True, bbox=True), note="the arena's table")
+        return t
 
     # ---------------------------------------------------------------- the verdict's record and the video
     def live_verdict(self, rows: np.ndarray, success: bool) -> dict:

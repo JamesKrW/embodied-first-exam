@@ -27,9 +27,12 @@ Settings (environment/docker-compose.yaml): RCB_INSTANCE (the frozen instance), 
 RCB_DATA, RCB_RESET_BUDGET, RCB_WALL_CLOCK_S, RCB_SLOWDOWN (rcb_realtime / rcb_service).
 
 Ablations (off unless the task sets them; nothing here runs without them):
-  rcb_service.OBJECT_POSES  object_poses(): the privileged twin's objects (Session.objects(), its names), position and
-                            orientation only, in the scene's world frame (the frame of the TCP and tool poses);
-                            quaternions w x y z.
+  rcb_service.STATE_QUERY   state_table(): the privileged state in the scene's world frame (the frame of the TCP and
+                            tool poses; quaternions w x y z): each arm's base pose and joints, its TCP and tool poses;
+                            the task's objects (Session.objects(), its names: pose and velocity); its fixtures (base
+                            pose, the joint's position and velocity); the static parts of the scene (pose, bbox). Read
+                            off the live scene between calls (no step, nothing written); never the task's phase, goals,
+                            events or debug target markers.
   rcb_service.STATE_OPS     save_state() / load_state(): Session.snapshot() / restore() (the environment's own exact
                             snapshot; restoring one that is not the current state re-runs its rows from a seeded reset)
                             and the command in force.
@@ -179,13 +182,70 @@ class PandaDyn:
     def state_sha(self) -> str:
         return self.s.state_sha()
 
-    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, OBJECT_POSES)
-    def object_pose_spec(self) -> dict:
-        return {"frame": "the scene's world frame (z up, the table top is the plane z = 0; the frame of the TCP and tool "
-                         "poses)", "quaternion_order": "wxyz", "objects": list(self.s.u.objects)}
+    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, STATE_QUERY)
+    def state_table(self):
+        """The state-query ablation's table, in the scene's world frame. Robots: each arm by its id (base pose, joint1..7
+        and the two fingers, the joint limits of robot_spec); links: <arm>_tcp and <arm>_tool (the proprio poses);
+        objects: Session.objects(); articulations: Session.fixtures() (pose of the fixture's base); scene features: the
+        static actors (table, pedestals, rails, lanes, ...: pose and collision bbox), never a debug target marker."""
+        s = self.s
+        t = rcb_service.StateTable(
+            frame="the scene's world frame (metres, z up, the table top is the plane z = 0): the frame of the proprio "
+                  "TCP and tool poses, /kinematics and the cameras' extrinsics", quaternion_order="wxyz",
+            note="an object's pose is its rigid body's frame (SAPIEN entity pose); velocities are world-frame")
+        qn = JOINTS + ["finger_left", "finger_right"]
+        L = M._limits()
+        rng = {j: [float(lo), float(hi)] for j, lo, hi in zip(JOINTS, L.LOWER, L.UPPER)}
+        for uid in self.arms:
+            arm = s.u.arms[uid]
+            q = lambda arm=arm: np.asarray(M._np(arm.robot.qpos), dtype=np.float64)[:9]   # noqa: E731
+            v = lambda arm=arm: np.asarray(M._np(arm.robot.qvel), dtype=np.float64)[:9]   # noqa: E731
+            t.add(uid, "robot", {
+                "pos": ("m", lambda uid=uid: s.base_pose(uid)[:3]), "quat": ("1 (w x y z)", lambda uid=uid: s.base_pose(uid)[3:]),
+                "joint_pos": ("rad (joint1..7), m (fingers)", lambda q=q: dict(zip(qn, q().tolist()))),
+                "joint_vel": ("rad/s, m/s", lambda v=v: dict(zip(qn, v().tolist()))),
+                "joint_range": ("rad ([lo, hi])", lambda: rng)},
+                note=f"Franka Panda {uid!r} ({arm.role}), fixed base; joints as proprio joint_pos names them")
+            t.add(f"{uid}_tcp", "robot_link", {"pos": ("m", lambda uid=uid: s.tcp_pose(uid)[:3]),
+                                               "quat": ("1 (w x y z)", lambda uid=uid: s.tcp_pose(uid)[3:])},
+                  note="the hand TCP (proprio tcp pose)")
+            if arm.tool is not None:
+                t.add(f"{uid}_tool", "robot_link", {"pos": ("m", lambda uid=uid: s.tool_pose(uid)[:3]),
+                                                    "quat": ("1 (w x y z)", lambda uid=uid: s.tool_pose(uid)[3:])},
+                      note=f"the tool ({arm.setup.tool}) mounted on the hand (proprio tool pose)")
+        from panda_dynamics.props.primitives import body
 
-    def object_poses(self) -> dict:
-        return {n: rcb_service.pose_entry(o["position"], o["orientation_wxyz"]) for n, o in self.s.objects().items()}
+        def obj(n, k):   # one value of one object, as Session.objects() reads it (the scene's current props: a reset rebuilds them)
+            rb = body(s.u.objects[n])
+            return M._np({"position": rb.entity_pose.p, "orientation_wxyz": rb.entity_pose.q, "velocity": rb.linear_velocity,
+                          "angular_velocity": rb.angular_velocity}[k]).reshape(-1).tolist()
+
+        for n in s.u.objects:
+            t.add(n, "object", {"pos": ("m", lambda n=n: obj(n, "position")),
+                                "quat": ("1 (w x y z)", lambda n=n: obj(n, "orientation_wxyz")),
+                                "lin_vel": ("m/s", lambda n=n: obj(n, "velocity")),
+                                "ang_vel": ("rad/s", lambda n=n: obj(n, "angular_velocity"))}, note="a prop of the task")
+        for n in s.u.fixtures:
+            art = lambda n=n: s.u.scene.articulations.get(f"{n}_fixture")   # noqa: E731
+            f = {"joint_pos": ("rad or m", lambda n=n: {n: float(s.u.fixtures[n].q)}),
+                 "joint_vel": ("rad/s or m/s", lambda n=n: {n: float(s.u.fixtures[n].v)})}
+            if art() is not None:
+                f = {"pos": ("m", lambda art=art: M._np(art().pose.p).reshape(-1).tolist()),
+                     "quat": ("1 (w x y z)", lambda art=art: M._np(art().pose.q).reshape(-1).tolist()), **f}
+            t.add(n, "articulation", f, note="a fixture of the task: its base pose and its one joint's position and velocity")
+        skip = set(s.u.objects) | {"floor"}
+        for n, a in s.u.scene.actors.items():   # the scene's static parts (table, pedestals, rails, lanes, ...)
+            if n in skip or getattr(a, "px_body_type", "") != "static" or any(k in n for k in ("debug", "marker", "target")):
+                continue
+            f = {"pos": ("m", lambda p=M._np(a.pose.p).reshape(-1).tolist(): p),
+                 "quat": ("1 (w x y z)", lambda q=M._np(a.pose.q).reshape(-1).tolist(): q)}
+            try:
+                lo, hi = np.asarray(a.get_first_collision_mesh(to_world_frame=True).bounds, dtype=np.float64)
+                f["bbox"] = ("m ([min xyz, max xyz] of its collision shape, world axes)", lambda b=[lo.tolist(), hi.tolist()]: b)
+            except Exception:   # an actor without a collision mesh: its pose only
+                pass
+            t.add(n, "scene_feature", f, note="the table: its top is the plane z = 0" if n == "table" else "a static part of the scene")
+        return t
 
     def save_state(self) -> dict:
         return {"session": self.s.snapshot(), "cmd": self.cmd.copy()}

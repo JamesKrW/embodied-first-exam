@@ -31,7 +31,11 @@ RoboDojo specifics:
   camera on demand (cached per action), so a frame of cam_head is kept only at an action whose observation a call already
   rendered (the agent's frames at its video_fps, 5 per simulated second by default; the call's proprioception at its
   end), at most one per 5 actions; no extra render is made for the video during the episode (one, of the end state, at
-  its end). The collect hook encodes live.mp4 after the verdict."""
+  its end). The collect hook encodes live.mp4 after the verdict.
+
+Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table (state_table(): the arms, their links,
+the table and every item of the layout, the scene frame, read on the main thread between calls) and RCB_STATE_OPS=1 the
+reset (ops_reset)."""
 from __future__ import annotations
 import json, math, os, sys, threading, time, traceback
 from typing import Callable
@@ -212,20 +216,173 @@ SPEC = {
               "frames_encoding": "uint16 mm, zlib", "noise": L.DEPTH_NOISE},
 }
 # The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
-# RCB_EXPOSE_OBJECT_POSES=1: the layout's labelled items, as Session.objects() names them: position and orientation
-# (wxyz) from RoboDojo's layout manager, in the scene frame of /spec world (that of the arms' links and /kinematics).
-OBJECTS = S.labels() if L.OBJECT_POSES else []
+# RCB_STATE_QUERY=1: state_table() below (the arms, their links, the table, every item of the layout).
+_ITEM_TYPES = ("Rigid", "Dynamic", "Geometry", "Articulation", "Garment", "Fluid")
 
 
-def object_poses() -> dict:
-    lm, out = S.env.scene_manager.layout_manager, {}
-    for label in OBJECTS:
-        try:
-            pos, rot = lm.get_instance_pose(0, label=label)
-        except Exception:  # noqa: BLE001 -- an item the layout manager cannot place is left out of this answer
-            continue
-        out[label] = L.pose_entry(M._np(pos).reshape(-1)[:3], M._np(rot).reshape(-1)[:4])
-    return out
+class _ReadOnce(L.StateTable):
+    """L.StateTable whose getters share one read per body per query (memo)."""
+
+    def query(self, plan: dict) -> dict:
+        self._memo = {}
+        return super().query(plan)
+
+    def memo(self, key, fn):
+        if key not in self._memo:
+            self._memo[key] = fn()
+        return self._memo[key]
+
+
+def state_table() -> _ReadOnce:
+    """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: both ARX X5 arms (root pose and
+    velocities, the base's height above the ground, every joint with its soft range) and their links, a support arm a task
+    has, the table, and every item of the layout (RoboDojo's layout manager: a labelled item by its label, as
+    Session.objects() names it, one without a label by its instance name): a rigid or dynamic item as an object, an
+    articulated one (a toaster, a laptop, a button) as an articulation with its joint state and ranges, a static geometry
+    item (a stand, a holder, a mat) as a scene feature, a garment or a fluid as an object with its points' centroid and
+    box. Poses come from the layout manager (get_instance_pose, the scene frame of /spec world), velocities and joints
+    from the items' Isaac Sim prims, the arms from their Isaac Lab data buffers; read on the main thread, the one that
+    steps Isaac Sim, between calls: nothing steps or renders."""
+    lm = S.env.scene_manager.layout_manager
+    rm = S.env.robot_manager
+    origin = M._np(S.env.scene_manager.env_origins[0]).astype(np.float64).reshape(-1)[:3]
+    t = _ReadOnce(frame="RoboDojo's scene frame (/spec world): x to the right as seen from behind the arms, y forward from the arm "
+                        "bases towards the far side of the table, z up; Isaac Sim's world frame moved to the environment's "
+                        "origin; the frame of the arm links, proprio tcp_pose, ee_pose and /kinematics",
+                  quaternion_order="wxyz",
+                  note="size = the extent of an item's oriented box (its asset's metadata), along its own axes")
+
+    def v(x):
+        return M._np(x).astype(np.float64).reshape(-1)
+
+    gi = (getattr(lm, "ground_info", None) or {}).get(0) or {}
+    ground_z = float(gi["pos"][2]) if gi.get("pos") is not None else None
+    for idx, robot in enumerate(rm.robot_list):
+        key = rm.robot_key[idx]
+        side = next((a for a in ARMS if str(robot.arm_name).startswith(a)), None)
+        name = f"{side}_arm" if robot.type == "target" and side else f"{robot.type}_{robot.arm_name}"
+        jn = list(key.joint_names)
+        lim = M._np(key.data.soft_joint_pos_limits)[0]
+        rng = {n: [float(lim[i, 0]), float(lim[i, 1])] for i, n in enumerate(jn)}
+
+        def rd(key=key, name=name):
+            def read():
+                d = key.data
+                return {"pos": v(d.root_pos_w[0]) - origin, "quat": v(d.root_quat_w[0]), "lin_vel": v(d.root_lin_vel_w[0]),
+                        "ang_vel": v(d.root_ang_vel_w[0]), "q": v(d.joint_pos[0]), "qd": v(d.joint_vel[0])}
+            return t.memo(("arm", name), read)
+        t.add(name, "robot", {
+            "pos": ("m", lambda rd=rd: rd()["pos"]), "quat": ("1", lambda rd=rd: rd()["quat"]),
+            "lin_vel": ("m/s", lambda rd=rd: rd()["lin_vel"]), "ang_vel": ("rad/s", lambda rd=rd: rd()["ang_vel"]),
+            "height_above_ground": ("m", lambda rd=rd: None if ground_z is None else float(rd()["pos"][2]) - ground_z),
+            "joint_pos": ("rad or m", lambda rd=rd, jn=jn: dict(zip(jn, rd()["q"]))),
+            "joint_vel": ("rad/s or m/s", lambda rd=rd, jn=jn: dict(zip(jn, rd()["qd"]))),
+            "joint_range": ("rad or m", lambda rng=rng: rng)},
+            note=f"an ARX X5 arm ({robot.arm_name}, fixed base): pos / quat = its root; height_above_ground = the base above "
+                 "the ground plane")
+        bn = list(key.body_names)
+
+        def bodies(key=key, name=name):
+            def read():
+                d = key.data
+                return (M._np(d.body_pos_w)[0].astype(np.float64) - origin, M._np(d.body_quat_w)[0].astype(np.float64),
+                        M._np(d.body_lin_vel_w)[0].astype(np.float64), M._np(d.body_ang_vel_w)[0].astype(np.float64))
+            return t.memo(("bodies", name), read)
+        pfx = side if robot.type == "target" and side else f"{robot.type}_{robot.arm_name}"
+        for i, b in enumerate(bn):
+            bname = b if b.startswith(f"{pfx}_") else f"{pfx}_{b}"
+            if bname in t._ents:
+                continue
+            t.add(bname, "robot_link", {
+                "pos": ("m", lambda i=i, bd=bodies: bd()[0][i]), "quat": ("1", lambda i=i, bd=bodies: bd()[1][i]),
+                "lin_vel": ("m/s", lambda i=i, bd=bodies: bd()[2][i]), "ang_vel": ("rad/s", lambda i=i, bd=bodies: bd()[3][i])},
+                note=f"link {b} of {robot.arm_name}" + (" (the end-effector frame: ee_pose, proprio tcp_pose)" if b.endswith("link6") else ""))
+    ti = (getattr(lm, "table_info", None) or {}).get(0) or {}
+    if ti.get("pos") is not None and ti.get("size") is not None:
+        x0, y0, x1, y1 = (float(c) for c in ti["size"])
+        px, py, pz = (float(c) for c in ti["pos"])
+        top = float(ti.get("height", pz))
+        t.add("table", "scene_feature", {"pos": ("m", lambda: [px, py, top]), "quat": ("1", lambda: [1.0, 0.0, 0.0, 0.0]),
+                                         "size": ("m", lambda: [x1 - x0, y1 - y0])},
+              note="the table: pos = the centre of its top surface; size = its top's extent along x and y")
+    for typ in _ITEM_TYPES:
+        recs = lm.object_records_by_type[typ].layout_records_by_env[0] if typ in lm.object_records_by_type else []
+        for rec in recs:
+            inst = rec.get("inst_name")
+            if not inst:
+                continue
+            name = str(rec.get("label") or inst)
+            if name in t._ents:
+                name = inst
+            obj = lm.get_scene_object(0, inst)
+            kind = lm.instance_type_by_env[0].get(inst, typ.lower())
+            try:
+                verts = lm.get_instance_bbox_vertices(inst, 0)
+                verts = np.asarray(verts if not isinstance(verts, tuple) else verts[2], np.float64)
+                size = (verts.reshape(-1, 3).max(0) - verts.reshape(-1, 3).min(0)) if verts.size % 3 == 0 and verts.size >= 6 else None
+            except Exception:  # noqa: BLE001
+                size = None
+
+            def pose(inst=inst):
+                def read():
+                    try:
+                        p, q = lm.get_instance_pose(0, inst_name=inst)
+                    except Exception:  # noqa: BLE001
+                        return None
+                    return None if p is None else (v(p)[:3], v(q)[:4])
+                return t.memo(("pose", inst), read)
+
+            def vel(obj=obj, inst=inst):
+                def read():
+                    try:
+                        return v(obj.get_linear_velocity())[:3], v(obj.get_angular_velocity())[:3]
+                    except Exception:  # noqa: BLE001
+                        return None, None
+                return t.memo(("vel", inst), read)
+            fields = {"pos": ("m", lambda pose=pose: (pose() or (None, None))[0]),
+                      "quat": ("1", lambda pose=pose: (pose() or (None, None))[1])}
+            if size is not None:
+                fields["size"] = ("m", lambda size=size: size)
+            if kind in ("garment", "fluid"):
+                def pts(obj=obj, inst=inst, kind=kind):
+                    def read():
+                        try:
+                            p = obj.sample_mesh_vertices()[0] if kind == "garment" else obj.get_particle_positions()[0]
+                            p = np.asarray(p, np.float64).reshape(-1, 3)
+                        except Exception:  # noqa: BLE001
+                            return None
+                        return (p - origin) if len(p) else None
+                    return t.memo(("pts", inst), read)
+                fields = {"pos": ("m", lambda pts=pts: None if pts() is None else pts().mean(0)),
+                          "bbox": ("m", lambda pts=pts: None if pts() is None else [pts().min(0), pts().max(0)])}
+                t.add(name, "object", fields, note=f"a {kind}: the centroid and the axis-aligned box of its points")
+                continue
+            if kind == "geometry":
+                t.add(name, "scene_feature", fields, note="a static geometry item of the layout")
+                continue
+            fields.update({"lin_vel": ("m/s", lambda vel=vel: vel()[0]), "ang_vel": ("rad/s", lambda vel=vel: vel()[1])})
+            if kind == "articulation":
+                try:
+                    dn = list(obj.dof_names)
+                    lo, hi = np.asarray(obj.lower_joint_positions, np.float64), np.asarray(obj.upper_joint_positions, np.float64)
+                    jr = {n: [float(lo[i]), float(hi[i])] for i, n in enumerate(dn)}
+                except Exception:  # noqa: BLE001
+                    dn, jr = [], {}
+
+                def joints(obj=obj, inst=inst):
+                    def read():
+                        try:
+                            return v(obj.get_joint_positions()), v(obj.get_joint_velocities())
+                        except Exception:  # noqa: BLE001
+                            return None
+                    return t.memo(("joints", inst), read)
+                fields.update({"joint_pos": ("rad or m", lambda j=joints, dn=dn: None if j() is None else dict(zip(dn, j()[0]))),
+                               "joint_vel": ("rad/s or m/s", lambda j=joints, dn=dn: None if j() is None else dict(zip(dn, j()[1]))),
+                               "joint_range": ("rad or m", lambda jr=jr: jr)})
+                t.add(name, "articulation", fields)
+                continue
+            t.add(name, "object", fields, note=None if rec.get("label") else "an item of the layout without a label: named by its instance")
+    return t
 
 
 # RCB_STATE_OPS=1, reset only: Session.reset() (RoboDojo's own episode start on the frozen layout, env.reset(seed=layout):
@@ -596,8 +753,4 @@ open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
-                  state_ops=OPS,
-                  **({"object_poses": object_poses,
-                      "object_pose_spec": {"frame": "RoboDojo's scene frame (/spec world: that of the arm links, proprio tcp_pose "
-                                                    "and /kinematics)", "quaternion_order": "wxyz", "objects": OBJECTS}}
-                     if L.OBJECT_POSES else {})))
+                  state_ops=OPS, state_table=state_table() if L.STATE_QUERY else None))

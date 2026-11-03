@@ -8,7 +8,16 @@ goes to final.json first ("finalized": true, "graded_by": "live"); then the reco
 deliverable, is rendered once for people: the six-view /data/replay.mp4 and /data/live.mp4 (rcb_live.py: call-stamped
 frames only while physics ran, skipped while nothing moved) in one pass ("video_pending": true while it runs; it never
 changes the verdict). It also saves each call's actions under /data/calls/ and appends the trajectory to
-/data/trajectory_live.f64 after every call (crash-safe). Nothing about objects ever leaves this process."""
+/data/trajectory_live.f64 after every call (crash-safe). Outside the state-query ablation (below) nothing about objects
+ever leaves this process.
+
+Ablations (off unless the task sets them; nothing changes without them): RCB_STATE_OPS (reset / save / load, below) and
+RCB_STATE_QUERY: GET /state/entities and POST /state/query (STATE_QUERY_NOTE) answer from the state table: the robot (its
+fixed base's pose, every active joint with its range), both arms' end-effector frames and gripper centres, the task's
+actors by the instruction's names (TASK_ACTORS: pose and velocity, an articulated one also its joints), every other
+dynamic actor and articulation of the scene by its entity name, and the table, all in the world frame of ee_pose and
+camera_calibration, quaternions w x y z. A query reads SAPIEN's poses and velocities (no physics step).
+final.json and /status add state_queries."""
 from __future__ import annotations
 import errno, io, json, math, os, shutil, signal, sys, threading, time, traceback
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -38,13 +47,137 @@ STATE_OPS = os.environ.get("RCB_STATE_OPS") == "1"
 MAX_HANDLES = int(os.environ.get("RCB_MAX_STATE_HANDLES", "32"))
 RESET_BUDGET = max(0, int(os.environ.get("RCB_RESET_BUDGET", "0") or 0)) if STATE_OPS else 0
 CAN_SAVE = STATE_OPS and bool(RESET_BUDGET)
-# The object-pose ablation (off unless the task sets RCB_EXPOSE_OBJECT_POSES=1; nothing changes when off): every meta
-# (/submit, /observe, /reset, /load_state) adds "objects", the task actors' poses at the state the answer ends in, and
-# /spec adds "object_poses" (frame, quaternion order, names).
-OBJECT_POSES = os.environ.get("RCB_EXPOSE_OBJECT_POSES") == "1"
+# The state-query ablation (off unless the task sets RCB_STATE_QUERY=1; nothing changes when off): GET /state/entities
+# lists what the agent may ask about (the adapter's StateTable: every entity's kind and fields, with units), and POST
+# /state/query {"names": [...], "fields": [...]} answers their current values in the world frame. A query only reads:
+# no control step, the clock neither advances nor pauses (on a realtime clock it answers at the current simulation
+# time), served only while the episode runs (409 after its end). episode.jsonl logs each answered query, final.json
+# adds state_queries (their count). A service without a state table refuses to start with the switch on.
+STATE_QUERY = os.environ.get("RCB_STATE_QUERY") == "1"
+STATE_KINDS = ("robot", "robot_link", "object", "articulation", "scene_feature")
+MAX_QUERY_NAMES = 512
+STATE_QUERY_NOTE = (
+    "privileged state (an ablation of this run): GET /state/entities lists every entity you may query, {\"frame\", "
+    "\"quaternion_order\", \"entities\": {name: {\"kind\", \"fields\": {field: unit}}}}; kinds are robot, robot_link, "
+    "object, articulation and scene_feature. POST /state/query {\"names\": [names], \"fields\": [fields] (optional; "
+    "default: every field of each name)} answers JSON {\"state\": {name: {field: value}}, \"control_steps\", "
+    "\"sim_time_s\", \"state_queries\"}: the current values in the world frame `frame`, in the units listed; a "
+    "requested field that an entity does not have is left out of its entry. An unknown name or field is a 400 that "
+    "lists the valid ones. A query only reads the simulator: it takes no control step and does not advance or pause "
+    "the clock (on a realtime clock it answers at the current simulation time). It is served while the episode runs "
+    "(409 after it ended). Every query is counted (state_queries)")
+
+
+def state_value(v, digits: int = 6):
+    """A queried value as JSON holds it: numbers rounded (NaN / inf as null), arrays as (nested) lists, dicts, lists and
+    tuples taken apart, strings, bools and None as they are."""
+    if isinstance(v, dict):
+        return {str(k): state_value(x, digits) for k, x in v.items()}
+    if v is None or isinstance(v, str):
+        return v
+    if isinstance(v, (bool, np.bool_)):
+        return bool(v)
+    if isinstance(v, (int, np.integer)):
+        return int(v)
+    if isinstance(v, (float, np.floating)):
+        f = float(v)
+        return round(f, digits) if np.isfinite(f) else None
+    if isinstance(v, np.ndarray):
+        return state_value(v.tolist(), digits)
+    if isinstance(v, (list, tuple)):
+        return [state_value(x, digits) for x in v]
+    raise TypeError(f"a state value must be numbers, arrays, strings or dicts of them, not {type(v).__name__}")
+
+
+class StateTable:
+    """The state-query ablation's entities (RCB_STATE_QUERY=1), built by an adapter once its scene is built:
+        add(name, kind, {field: (unit, getter)}, note=None)
+    for each entity, kind one of STATE_KINDS; getter() reads the field's current value from the live simulator, in the
+    world frame (an array, a number, a bool, a string or a dict of them). The usual fields: pos [x, y, z] m, quat [4]
+    (quaternion_order), lin_vel [3] m/s, ang_vel [3] rad/s, height_above_ground m, joint_pos / joint_vel {joint: rad or
+    m (/s)}, size [3] m (full extents along the body axes), bbox [[x, y, z] min, [x, y, z] max] m; a benchmark adds its
+    own (a coverage fraction, a line's endpoints). The entities and their fields are fixed for the episode. Never a
+    task predicate, a success flag, a progress or a grader value."""
+
+    def __init__(self, frame: str, quaternion_order: str = "wxyz", note: str | None = None):
+        if quaternion_order not in ("wxyz", "xyzw"):
+            raise ValueError("quaternion_order is wxyz or xyzw")
+        self.frame, self.quaternion_order, self.note = str(frame), quaternion_order, note
+        self._ents: dict = {}
+
+    def add(self, name: str, kind: str, fields: dict, note: str | None = None) -> "StateTable":
+        if kind not in STATE_KINDS:
+            raise ValueError(f"kind {kind!r} is not one of {STATE_KINDS}")
+        if not isinstance(name, str) or not name or name in self._ents:
+            raise ValueError(f"entity name {name!r} empty or added twice")
+        if not fields:
+            raise ValueError(f"entity {name!r} has no fields")
+        for f, spec in fields.items():
+            if not (isinstance(f, str) and isinstance(spec, tuple) and len(spec) == 2 and isinstance(spec[0], str)
+                    and callable(spec[1])):
+                raise ValueError(f"{name}.{f}: a field is (unit text, getter)")
+        self._ents[name] = {"kind": kind, "fields": dict(fields), "note": note}
+        return self
+
+    def entities(self) -> dict:
+        ents = {n: {"kind": e["kind"], "fields": {f: u for f, (u, _) in e["fields"].items()},
+                    **({"note": e["note"]} if e["note"] else {})} for n, e in self._ents.items()}
+        return {"frame": self.frame, "quaternion_order": self.quaternion_order, **({"note": self.note} if self.note else {}),
+                "entities": ents}
+
+    def query(self, plan: dict) -> dict:
+        """plan = {name: [fields]}, already checked (plan_state_query) -> {name: {field: value}}."""
+        return {n: {f: state_value(self._ents[n]["fields"][f][1]()) for f in fs} for n, fs in plan.items()}
+
+
+def check_state_table(table) -> dict:
+    """The table's entities() as GET /state/entities serves it, checked (a malformed table refuses to start)."""
+    if not (callable(getattr(table, "entities", None)) and callable(getattr(table, "query", None))):
+        raise TypeError("RCB_STATE_QUERY=1: the state table must have entities() and query(plan)")
+    ents = table.entities()
+    if not isinstance(ents, dict) or not isinstance(ents.get("entities"), dict) or not ents["entities"] \
+            or not isinstance(ents.get("frame"), str) or ents.get("quaternion_order") not in ("wxyz", "xyzw"):
+        raise TypeError("RCB_STATE_QUERY=1: entities() must give frame, quaternion_order and a non-empty entities dict")
+    for n, e in ents["entities"].items():
+        if e.get("kind") not in STATE_KINDS or not isinstance(e.get("fields"), dict) or not e["fields"] \
+                or not all(isinstance(u, str) for u in e["fields"].values()):
+            raise TypeError(f"RCB_STATE_QUERY=1: entity {n!r} needs a kind in {STATE_KINDS} and fields {{field: unit}}")
+    json.dumps(ents, allow_nan=False)
+    return ents
+
+
+def plan_state_query(ents: dict, body: dict) -> tuple[dict | None, dict | None]:
+    """A /state/query body -> ({name: [fields]}, None), or (None, the 400's JSON body)."""
+    table = ents["entities"]
+    extra = sorted(set(body) - {"names", "fields"})
+    if extra:
+        return None, {"error": f"unknown keys {extra}: the body is {{\"names\": [...], \"fields\": [...]}}"}
+    names = body.get("names")
+    if not isinstance(names, list) or not names or not all(isinstance(n, str) for n in names):
+        return None, {"error": "names must be a non-empty list of entity names (GET /state/entities)",
+                      "names": list(table)}
+    names = list(dict.fromkeys(names))
+    if len(names) > MAX_QUERY_NAMES:
+        return None, {"error": f"at most {MAX_QUERY_NAMES} names per query"}
+    unknown = [n for n in names if n not in table]
+    if unknown:
+        return None, {"error": "unknown names", "unknown": unknown, "names": list(table)}
+    fields = body.get("fields")
+    if fields is None:
+        return {n: list(table[n]["fields"]) for n in names}, None
+    if not isinstance(fields, list) or not fields or not all(isinstance(f, str) for f in fields):
+        return None, {"error": "fields must be a non-empty list of field names, or left out for all of them"}
+    fields = list(dict.fromkeys(fields))
+    have = {f for n in names for f in table[n]["fields"]}
+    bad = [f for f in fields if f not in have]
+    if bad:
+        return None, {"error": "unknown fields for these names", "unknown": bad,
+                      "fields": {n: list(table[n]["fields"]) for n in names}}
+    return {n: [f for f in fields if f in table[n]["fields"]] for n in names}, None
 LOCK = threading.Lock()
 E = {"ready": False, "step": 0, "calls": 0, "done": False, "reason": None, "success": False, "t0": time.time(), "frames": [], "error": None}
 if STATE_OPS: E.update(resets=0, saves=0, loads=0, ep_start=0, journal_rows=0, stopping=False)
+if STATE_QUERY: E["state_queries"] = 0   # /state/query calls answered (each is logged before it is answered; a resume counts them)
 HANDLES: dict = {}                       # RCB_STATE_OPS: handle -> snapshot, LRU order
 OPS_DIR = os.path.join(DATA, "state_ops")  # RCB_STATE_OPS: each saved handle's live.mp4 segments, earlier episodes' segments
 
@@ -142,6 +275,7 @@ def write_final() -> None:
             if "episodes_log" in E: d["episodes_log"] = E["episodes_log"]
         if E["success"]:                                # a success ends the trial: the graded episode is the last one
             d.update(resets_at_success=E["resets"], loads_at_success=E["loads"])
+    if STATE_QUERY: d["state_queries"] = E["state_queries"]
     _dump_final(d)
 
 
@@ -293,46 +427,127 @@ if CAN_SAVE:
                          "count against budget.reset; a success ends the trial (409 after it)")
 
 
-def pose_entry(pos, quat=None, size=None, digits: int = 5) -> dict:
-    """One object of meta["objects"]: {"pos": [x, y, z], "quat": [4] or absent, "size": [...] or absent}, plain floats."""
-    out = {"pos": [round(float(v), digits) for v in np.asarray(pos, dtype=np.float64).reshape(-1)]}
-    if quat is not None:
-        out["quat"] = [round(float(v), digits) for v in np.asarray(quat, dtype=np.float64).reshape(-1)]
-    if size is not None:
-        out["size"] = [round(float(v), digits) for v in np.asarray(size, dtype=np.float64).reshape(-1)]
-    return out
-
-
-POSE_NOTE = ("object_poses (an ablation of this run): every /submit, /observe and /reset answer's meta carries "
-             "\"objects\" = {name: {\"pos\": [x, y, z] (m), \"quat\": [4] (quaternion_order), \"size\": [...] where "
-             "given}}, each object's pose in `frame` at the state the answer ends in")
-# The task actors per task (RoboTwin's own attributes of the task env, as its load_actors() creates them): name -> (attribute,
-# index into a list attribute or None). Looked up on every call: a reset rebuilds them.
-POSE_ACTORS = {"hanging_mug": {"mug": ("mug", None), "rack": ("rack", None)},
+# RCB_STATE_QUERY: the state table (module docstring, "Ablations"). The task actors per task, by the names the
+# instruction uses (RoboTwin's own attributes of the task env, as its load_actors() creates them): name -> (attribute,
+# index into a list attribute or None); every other dynamic actor and articulation of the scene by its entity name.
+# Everything is looked up again at each query: a reset rebuilds the scene.
+TASK_ACTORS = {"hanging_mug": {"mug": ("mug", None), "rack": ("rack", None)},
                "place_bread_skillet": {"bread": ("bread", None), "skillet": ("skillet", None)},
                "put_bottles_dustbin": {**{f"bottle_{i}": ("bottles", i) for i in range(3)}, "dustbin": ("dustbin", None)}}
 
 
 def _actor(attr: str, i):
     a = getattr(ENV, attr)
-    return a if i is None else a[i]
+    a = a if i is None else a[i]
+    return getattr(a, "actor", a)                 # RoboTwin's Actor / ArticulationActor wrap the sapien object
 
 
-def object_poses() -> dict:
-    """Each task actor's pose in the world frame: its sapien Pose, p and q (w x y z)."""
-    out = {}
-    for name, (attr, i) in POSE_ACTORS[TASK].items():
-        p = _actor(attr, i).get_pose(); out[name] = pose_entry(p.p, p.q)
-    return out
+def _rigid(ent):
+    """The physx rigid-body component of a sapien entity (velocities), or None."""
+    import sapien
+    for typ in ("PhysxRigidDynamicComponent", "PhysxRigidBodyComponent"):
+        c = getattr(sapien.physx, typ, None)
+        comp = ent.find_component_by_type(c) if c is not None and hasattr(ent, "find_component_by_type") else None
+        if comp is not None:
+            return comp
+    return None
 
 
-if OBJECT_POSES:
-    if TASK not in POSE_ACTORS:
-        raise TypeError(f"RCB_EXPOSE_OBJECT_POSES=1 but the task {TASK} has no task actors listed (POSE_ACTORS)")
-    object_poses()   # fail at startup, not in the first response, if an actor is missing
-    SPEC["object_poses"] = {"units": "m", "frame": ("world (metres), the frame of ee_pose and camera_calibration: origin at the "
-                                                    "table centre on the floor plane, +z up, robot base at y = -0.65 facing +y"),
-                            "quaternion_order": "wxyz", "objects": list(POSE_ACTORS[TASK]), "note": POSE_NOTE}
+def _pose_fields(get) -> dict:
+    """pos / quat (+ velocities when it has a dynamic body) of what get() returns: a sapien entity or articulation."""
+    def vel(kind):
+        o = get()
+        if hasattr(o, "get_root_linear_velocity"):
+            return o.get_root_linear_velocity() if kind == "lin" else o.get_root_angular_velocity()
+        c = _rigid(o)
+        if c is None:
+            return [0.0, 0.0, 0.0]
+        return c.get_linear_velocity() if kind == "lin" else c.get_angular_velocity()
+    pose = lambda: (get().get_root_pose() if hasattr(get(), "get_root_pose") else get().get_pose())  # noqa: E731
+    return {"pos": ("m", lambda: np.asarray(pose().p, dtype=np.float64)), "quat": ("wxyz", lambda: np.asarray(pose().q, dtype=np.float64)),
+            "lin_vel": ("m/s", lambda: np.asarray(vel("lin"), dtype=np.float64)),
+            "ang_vel": ("rad/s", lambda: np.asarray(vel("ang"), dtype=np.float64))}
+
+
+def _joint_fields(get, unit: str = "rad or m (revolute / prismatic)") -> dict:
+    art = get()
+    names = [j.get_name() for j in art.get_active_joints()]
+    rng = {}
+    for j in art.get_active_joints():
+        lo, hi = [float(x) for x in np.asarray(j.get_limits()).reshape(-1)[:2]]
+        rng[j.get_name()] = [lo, hi] if math.isfinite(lo) and math.isfinite(hi) else None
+    vunit = "rad/s or m/s" if " or " in unit else unit + "/s"
+    return {"joint_pos": (unit, lambda: dict(zip(names, np.asarray(get().get_qpos(), dtype=np.float64).tolist()))),
+            "joint_vel": (vunit, lambda: dict(zip(names, np.asarray(get().get_qvel(), dtype=np.float64).tolist()))),
+            "joint_range": (unit, lambda: rng)}
+
+
+def _scene_item(kind: str, name: str, k: int):
+    """The k-th actor (kind "actor") or articulation of the current scene named `name`."""
+    items = S._raw_scene.get_all_actors() if kind == "actor" else S._raw_scene.get_all_articulations()
+    return [x for x in items if x.get_name() == name][k]
+
+
+def state_table() -> StateTable:
+    t = StateTable(frame="world (metres), the frame of ee_pose and camera_calibration: origin at the table centre on the "
+                         "floor plane (the floor is z = 0), +z up, robot base at y = -0.65 facing +y, table top at z ~= "
+                         "0.74; quaternions w x y z, velocities in world axes", quaternion_order="wxyz")
+    arms = {"left": lambda: ROBOT.left_entity, "right": lambda: ROBOT.right_entity}
+    same = ROBOT.left_entity is ROBOT.right_entity
+    for side in (("left",) if same else ("left", "right")):
+        get = arms[side]
+        t.add("robot" if same else f"robot_{side}", "robot",
+              {**_pose_fields(get), "height_above_ground": ("m", lambda get=get: float(get().get_root_pose().p[2])),
+               **_joint_fields(get)},
+              note=f"{SPEC['robot']}" + ("" if same else f", the {side} arm's articulation") + ": pos / quat = its root "
+                   "(the fixed base); joint_pos / joint_vel = every active joint (arms and gripper fingers)")
+    for side in ("left", "right"):
+        t.add(f"{side}_ee", "robot_link", {"pos": ("m", lambda side=side: np.asarray(ENV.get_arm_pose(side)[:3], dtype=np.float64)),
+                                           "quat": ("wxyz", lambda side=side: np.asarray(ENV.get_arm_pose(side)[3:7], dtype=np.float64))},
+              note="RoboTwin's end-effector frame (proprio ee_pose, the ee_pose action's frame)")
+        tcp = (lambda: ROBOT.get_left_tcp_pose()) if side == "left" else (lambda: ROBOT.get_right_tcp_pose())
+        t.add(f"{side}_tcp", "robot_link", {"pos": ("m", lambda tcp=tcp: np.asarray(tcp()[:3], dtype=np.float64)),
+                                            "quat": ("wxyz", lambda tcp=tcp: np.asarray(tcp()[3:7], dtype=np.float64))},
+              note="the gripper centre (proprio tcp_pose)")
+    named = set()
+    for name, (attr, i) in TASK_ACTORS.get(TASK, {}).items():
+        get = lambda attr=attr, i=i: _actor(attr, i)  # noqa: E731
+        o = get()
+        named.add(id(o))
+        if hasattr(o, "get_qpos"):
+            t.add(name, "articulation", {**_pose_fields(get), **_joint_fields(get)}, note="a task object")
+        else:
+            t.add(name, "object", _pose_fields(get), note="a task object")
+    robot_arts = {id(ROBOT.left_entity), id(ROBOT.right_entity)}
+    seen = {}
+    for a in S._raw_scene.get_all_actors():
+        n = a.get_name() or "actor"
+        k = seen.get(n, 0); seen[n] = k + 1
+        c = _rigid(a)
+        if id(a) in named or c is None or getattr(c, "kinematic", False) or type(c).__name__ != "PhysxRigidDynamicComponent":
+            continue
+        t.add(n if k == 0 else f"{n}_{k}", "object", _pose_fields(lambda n=n, k=k: _scene_item("actor", n, k)),
+              note="a free body of the scene")
+    seen = {}
+    for a in S._raw_scene.get_all_articulations():
+        n = a.get_name() or "articulation"
+        k = seen.get(n, 0); seen[n] = k + 1
+        if id(a) in robot_arts or id(a) in named:
+            continue
+        get = lambda n=n, k=k: _scene_item("articulation", n, k)  # noqa: E731
+        t.add(n if k == 0 else f"{n}_{k}", "articulation", {**_pose_fields(get), **_joint_fields(get)},
+              note="an articulated object of the scene")
+    table = getattr(ENV, "table", None)
+    if table is not None and "table" not in t.entities()["entities"]:
+        t.add("table", "scene_feature", {k: v for k, v in _pose_fields(lambda: _actor("table", None)).items() if k in ("pos", "quat")},
+              note="the table (its top at z ~= 0.74)")
+    return t
+
+
+STATE_TABLE = state_table() if STATE_QUERY else None
+STATE_ENTS = check_state_table(STATE_TABLE) if STATE_QUERY else None
+if STATE_QUERY:
+    SPEC["state_query"] = STATE_QUERY_NOTE
 
 
 # ---- proprioception (what a real arm reports: encoders, gripper position, forward kinematics, motor effort)
@@ -492,7 +707,6 @@ def meta_common() -> dict:
            "time_s": round(t, 2), "time_left_s": max(0.0, round(SPEC["budget"]["wall_clock_s"] - t, 1)),
            "proprio": {"layout": SPEC["proprio_layout"], "now": proprio_row().tolist()}, "done": E["done"], "reason": E["reason"],
            **({"cameras": calib()} if OBS_CALIBRATION else {}), **_reset_counters()}   # the calibration of the state this response ends in
-    if OBJECT_POSES: out["objects"] = object_poses()
     return out
 
 
@@ -940,9 +1154,12 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path in ("/spec", "/status"): touch_clock()
         if self.path == "/spec": return self._json(200, SPEC)
-        if self.path == "/status": return self._json(200, {"step": E["step"], "calls": E["calls"], "physics_steps": int(S._sim_steps), "done": E["done"], "reason": E["reason"], "elapsed_s": round(time.time() - E["t0"], 1), **_reset_counters()})
+        if self.path == "/status": return self._json(200, {"step": E["step"], "calls": E["calls"], "physics_steps": int(S._sim_steps), "done": E["done"], "reason": E["reason"], "elapsed_s": round(time.time() - E["t0"], 1), **_reset_counters(),
+                                                           **({"state_queries": E["state_queries"]} if STATE_QUERY else {})})
+        if STATE_QUERY and self.path == "/state/entities": return self._json(200, STATE_ENTS)   # fixed for the episode
         return self._json(404, {"error": "no such endpoint"})
     def do_POST(self):
+        if STATE_QUERY and self.path == "/state/query": return self._state_query()
         if self.path not in ("/submit", "/observe") + (("/reset",) if RESET_BUDGET else ()) + (("/save_state", "/load_state") if CAN_SAVE else ()): return self._json(404, {"error": "no such endpoint"})
         try: meta, parts = self._body()
         except Exception as exc: return self._json(413 if str(exc) == "request too large" else 400, {"error": str(exc)[:200]})
@@ -951,6 +1168,29 @@ class H(BaseHTTPRequestHandler):
             log({"ev": "call_begin", "path": self.path, "call": E["calls"] + 1})
             try: return self._serve(meta, parts)
             finally: log({"ev": "call_end", "path": self.path})
+
+    def _state_query(self):
+        """RCB_STATE_QUERY: POST /state/query reads the simulator between calls (no physics step, no clock); served only
+        while the episode runs (409 after it ended)."""
+        try: meta, _ = self._body()
+        except Exception as exc: return self._json(413 if str(exc) == "request too large" else 400, {"error": str(exc)[:200]})
+        with LOCK:
+            touch_clock()
+            if E["done"] or E.get("finalized") or E.get("stopping"):
+                return self._json(409, {"error": "the episode has ended: state queries are served only while it runs", "reason": E["reason"]})
+            plan, err = plan_state_query(STATE_ENTS, meta)
+            if err: return self._json(400, err)
+            try:
+                state = STATE_TABLE.query(plan); json.dumps(state, allow_nan=False)
+            except Exception as exc:  # noqa: BLE001 -- the query only reads: nothing ends
+                traceback.print_exc(); log({"ev": "state_query_error", "error": repr(exc)[:300]})
+                return self._json(500, {"error": "state query failed", "detail": repr(exc)[:200]})
+            E["state_queries"] += 1
+            steps = int(S._sim_steps)
+            log({"ev": "state_query", "n": E["state_queries"], "names": list(plan), "fields": sorted({f for fs in plan.values() for f in fs}),
+                 "physics_steps": steps})
+            return self._json(200, {"state": state, "control_steps": steps, "sim_time_s": round(steps / PHYS_HZ, 4),
+                                    "state_queries": E["state_queries"]})
 
     def _serve(self, meta, parts):
         if self.path in ("/reset", "/save_state", "/load_state"):
@@ -1035,6 +1275,7 @@ def _resume_or_start() -> None:
     E["calls"] = int(last.get("call", 0)); E["step"] = int(last.get("step", 0)); E["success"] = bool(last.get("success")); E["t0"] = float(starts[0]["ts"])
     _first = [e for e in ev if e.get("ev") == "first_request"]
     if _first: E["t_agent0"] = float(_first[0]["ts"])
+    if STATE_QUERY: E["state_queries"] = sum(1 for e in ev if e.get("ev") == "state_query")
     # the episode's end, if it is within the last checkpoint: an end past it was logged by a call lost with the crash (an
     # end before 2026-10-14 carries no rows and is kept, as before)
     ended = [e for e in ev if e.get("ev") == "end" and int(e.get("rows") or 0) <= n]
@@ -1074,6 +1315,7 @@ def _resume_ops(ev: list, starts: list, in_call: bool) -> None:
     E["calls"] = int(last.get("call", 0)); E["step"] = int(last.get("step", 0)); E["success"] = bool(last.get("success")); E["t0"] = float(starts[0]["ts"])
     _first = [e for e in ev if e.get("ev") == "first_request"]
     if _first: E["t_agent0"] = float(_first[0]["ts"])
+    if STATE_QUERY: E["state_queries"] = sum(1 for e in ev if e.get("ev") == "state_query")
     # the current episode's end: after the reset or load that began it, within the last checkpoint, never a lost reset's or load's
     k0 = max((i for i, e in enumerate(ev) if e is last), default=-1)
     b = max((i for i, e in enumerate(ev[:k0 + 1]) if e.get("ev") in ("reset", "load") and "state_sha" in e), default=-1)

@@ -711,41 +711,200 @@ def replay_row(row) -> None:
 
 
 # ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
-# RCB_EXPOSE_OBJECT_POSES=1: the task's own entities of Session.objects() (the privileged twin's names: the robot, the
-# table and the lab scene props left out), without goal / target markers (a name with "target", "goal" or "marker"), in
-# the robot frame every other pose of this service is in (to_robot), quaternion wxyz; size = the privileged twin's
-# axis-aligned bounds' extent (the frame's axes are the simulator world's). A deformable (cloth, rope, FEM mesh) gives
-# its particles' / vertices' centroid and their bounds' extent, no orientation, as the privileged twin does.
+# RCB_STATE_QUERY=1: the state table (rcb_limited.StateTable) in the robot frame every other pose of this service is in
+# (spec world.frame, to_robot; velocities in its axes), quaternions wxyz. The robot: its root link, its height above the
+# table top it is mounted on, every robot joint (the privileged twin's articulation state) and the arm joints' ranges;
+# links: each arm's TCP (proprio tcp_pose), hand and finger links. Objects: the task's own entities of Session.objects()
+# (the privileged twin's names: the robot, the table and the lab scene props left out), without visual-only markers (an
+# entity with no collision geometry, or whose morph turns collision off): a free body as an object (pose, velocities, its axis-aligned box), an entity
+# with revolute / prismatic joints as an articulation (base pose, joint positions / velocities), a fixed one as a scene
+# feature, a deformable (cloth, rope, FEM mesh) as its particles' / vertices' centroid, mean velocity and box; an entity
+# of several links adds each link's position. The table: the centre of its top face and its x / y extents (the floor,
+# and so the table's height, is never given). Each query is one main-thread job reading the world's state once
+# (World.read_state, the entities' AABBs): a read, no physics step.
 # RCB_STATE_OPS=1, reset only: Session.reset() (env.privileged.rewind_to(S0), the frozen first checkpoint; its rewind
 # event re-applies the torque caps and resets the safety monitor; approximate on Genesis' GPU solvers), the recording
 # restarted (the graded rows from the frozen start) and this service's episode keys cleared. No save / load: the
 # simulator keeps a complete checkpoint of the first tick only (rcb_topogym TASKS history_storage "segment"), so an
 # arbitrary state cannot be restored.
-POSE_SKIP = ("target", "goal", "marker")
-POSE_NAMES = sorted(n for n in S._entities() if not any(k in n.lower() for k in POSE_SKIP)) if L.OBJECT_POSES else []
-POSE_SPEC = {"frame": "the world frame of spec world.frame (origin at the robot's root link); rigid objects: their body "
-                      "frame; deformables: the centroid of their particles or vertices, no orientation",
-             "quaternion_order": "wxyz", "objects": POSE_NAMES}
+_ROT = T_RW[:3, :3]
 
 
-def _object_poses() -> dict:
-    out = {}
-    for n, o in S.objects().items():
-        if n not in POSE_NAMES:
+def _rpos(p) -> np.ndarray:
+    return _ROT @ np.asarray(p, dtype=np.float64).reshape(3) + T_RW[:3, 3]
+
+
+def _rvec(v) -> np.ndarray:
+    return _ROT @ np.asarray(v, dtype=np.float64).reshape(3)
+
+
+def _rquat(q) -> np.ndarray:
+    return _qmul(Q_RW, np.asarray(q, dtype=np.float64).reshape(4))
+
+
+def _rbox(b) -> list:
+    """An axis-aligned world box [[min], [max]] in the robot frame (its axes are the world's up to the base's rotation)."""
+    c = np.array([[x, y, z] for x in (b[0][0], b[1][0]) for y in (b[0][1], b[1][1]) for z in (b[0][2], b[1][2])])
+    c = (_ROT @ c.T).T + T_RW[:3, 3]
+    return [c.min(axis=0).tolist(), c.max(axis=0).tolist()]
+
+
+def _visual_only(entity) -> bool:
+    """A marker drawn for the cameras only: its morph turns collision off, or none of its links has a collision geom."""
+    if getattr(getattr(entity, "morph", None), "collision", True) is False:
+        return True
+    try:
+        return not any(len(getattr(link, "geoms", ()) or ()) for link in entity.links)
+    except Exception:  # noqa: BLE001 — an entity view without links: kept
+        return False
+
+
+class ArcStateTable:
+    """entities() / query(plan): each query is one main-thread job; the world's state is read once per query."""
+
+    def __init__(self, frame: str):
+        self.table = L.StateTable(frame=frame, quaternion_order="wxyz")
+        self.add = self.table.add
+        self.snap = None
+
+    def entities(self) -> dict:
+        return self.table.entities()
+
+    def _query(self, plan: dict) -> dict:
+        self.snap = {}
+        try:
+            return self.table.query(plan)
+        finally:
+            self.snap = None
+
+    def query(self, plan: dict) -> dict:
+        return on_main(self._query, plan)
+
+    def get(self, key: str, read):
+        if key not in self.snap:
+            self.snap[key] = read()
+        return self.snap[key]
+
+    def ws(self) -> dict:
+        return self.get("ws", S.env._world.read_state)
+
+    def objects(self) -> dict:
+        return self.get("objects", S.objects)
+
+    def bounds(self, name: str) -> list:
+        return self.get("bounds:" + name, lambda: _rbox(S.object_bounds(name)))
+
+    def tcp(self, arm: str):
+        return self.get("tcp:" + arm, lambda: to_robot(*S.ee_pose(arm)))
+
+    def rigid(self, name: str, velocity: bool = True) -> dict:
+        b = lambda: self.ws()["bodies"][name]
+        out = {"pos": ("m", lambda: _rpos(b()["position_m"])), "quat": ("wxyz", lambda: _rquat(b()["quaternion_wxyz"]))}
+        if velocity:
+            out["lin_vel"] = ("m/s", lambda: _rvec(b()["linear_velocity_m_s"]))
+            out["ang_vel"] = ("rad/s", lambda: _rvec(b()["angular_velocity_rad_s"]))
+        return out
+
+    def link(self, entity: str, link: str) -> dict:
+        k = lambda: self.ws()["articulations"][entity]["links"][link]
+        return {"pos": ("m", lambda: _rpos(k()["position_m"])), "quat": ("wxyz", lambda: _rquat(k()["quaternion_wxyz"])),
+                "lin_vel": ("m/s", lambda: _rvec(k()["linear_velocity_m_s"])),
+                "ang_vel": ("rad/s", lambda: _rvec(k()["angular_velocity_rad_s"]))}
+
+    def joints(self, entity: str, names: list, unit: str) -> dict:
+        j = lambda: self.ws()["articulations"][entity]["joints"]
+        return {"joint_pos": (unit, lambda: {n: float(np.asarray(j()[n]["position"]).reshape(-1)[0]) for n in names}),
+                "joint_vel": (unit.replace("rad", "rad/s").replace(" m", " m/s") if " or " in unit else unit + "/s",
+                              lambda: {n: float(np.asarray(j()[n]["velocity"]).reshape(-1)[0]) for n in names})}
+
+    def link_positions(self, entity: str, links: list) -> dict:
+        k = lambda: self.ws()["articulations"][entity]["links"]
+        return {"link_pos": ("m", lambda: {n: _rpos(k()[n]["position_m"]) for n in links})}
+
+
+def _hinged(entity) -> tuple[list, str, dict]:
+    """(the names of an entity's revolute / prismatic joints, their unit, {name: [lo, hi]} where the joint has limits)."""
+    names, kinds, ranges = [], set(), {}
+    for j in getattr(entity, "joints", []) or []:
+        kind = str(getattr(j, "type", "")).lower()
+        if "revolute" in kind or "prismatic" in kind:
+            names.append(j.name); kinds.add("prismatic" in kind)
+            try:
+                lim = np.asarray(j.dofs_limit, dtype=np.float64).reshape(-1)[:2]
+                if np.isfinite(lim).all():
+                    ranges[j.name] = lim.tolist()
+            except Exception:  # noqa: BLE001 — a joint view without limits
+                pass
+    unit = "rad or m (revolute / prismatic)" if len(kinds) > 1 else ("m" if kinds == {True} else "rad")
+    return names, unit, ranges
+
+
+def state_table() -> ArcStateTable:
+    t = ArcStateTable(WORLD_FRAME + "; velocities in its axes, metres; the simulator's own world frame (origin on the "
+                      "floor) is not given")
+    ws = S.env._world.read_state()
+    arts, bodies = ws.get("articulations", {}), ws.get("bodies", {})
+    table_z = S.table_z()
+    rjoints = list(arts.get("robot", {}).get("joints", {}))
+    ranges = {n: LIMITS[n] for n in rjoints if n in LIMITS}
+    t.add("robot", "robot", {**t.rigid("robot"),
+                             **({"height_above_ground": ("m", lambda: float(t.ws()["bodies"]["robot"]["position_m"][2]) - table_z)}
+                                if table_z is not None else {}),
+                             **t.joints("robot", rjoints, "rad or m (revolute / prismatic)"),
+                             **({"joint_range": ("rad", lambda: ranges)} if ranges else {})},
+          note=f"{R_SPEC.get('name', 'the robot')}: pos / quat = its root link {BASE_LINK} (the frame's origin, fixed); "
+               "height_above_ground = its height above the table top it is mounted on; joint_pos / joint_vel = every robot "
+               "joint (the gripper's driven and passive joints included); joint_range = the arm joints' limits")
+    for a in ARMS:
+        t.add(f"{a}_tcp", "robot_link", {"pos": ("m", lambda a=a: t.tcp(a)[0]), "quat": ("wxyz", lambda a=a: t.tcp(a)[1])},
+              note=f"the {a} arm's tool frame (proprio tcp_pose)")
+    for n in arts.get("robot", {}).get("links", {}):
+        low = n.lower()
+        if low == "hand" or low.endswith("_hand") or "finger" in low:
+            t.add(n if n not in ("robot", "table") else f"robot_{n}", "robot_link", t.link("robot", n),
+                  note="a finger link" if "finger" in low else "the hand link")
+    objs = S.objects()
+    for n in sorted(objs):
+        o, ent = objs[n], S.env._world.entities[n]
+        if _visual_only(ent) or n in t.table._ents:
             continue
-        lo, hi = (np.asarray(o["bounds"][0], dtype=np.float64), np.asarray(o["bounds"][1], dtype=np.float64)) \
-            if o.get("bounds") else (None, None)
-        size = None if lo is None else hi - lo
-        if "orientation_wxyz" in o:
-            p, q = to_robot(o["position"], o["orientation_wxyz"])
-            out[n] = L.pose_entry(p, q, size)
+        if o.get("material") in ("particle", "fem"):
+            t.add(n, "object", {"pos": ("m", lambda n=n: _rpos(t.objects()[n]["position"])),
+                                "lin_vel": ("m/s", lambda n=n: _rvec(t.objects()[n]["velocity"])),
+                                "bbox": ("m", lambda n=n: _rbox(t.objects()[n]["bounds"]))},
+                  note=f"a deformable ({'cloth / rope particles' if o['material'] == 'particle' else 'FEM mesh'}): pos = the "
+                       "centroid of its points, lin_vel = their mean velocity, bbox = their axis-aligned box [[min], [max]]")
+            continue
+        if n not in bodies:
+            continue
+        box = {"bbox": ("m", lambda n=n: t.bounds(n))}
+        links = list(arts.get(n, {}).get("links", {}))
+        multi = t.link_positions(n, links) if len(links) > 1 else {}
+        names, unit, rng = _hinged(ent)
+        if names and n in arts:
+            t.add(n, "articulation", {**t.rigid(n), **t.joints(n, names, unit),
+                                      **({"joint_range": (unit, lambda rng=rng: rng)} if rng else {}), **box, **multi},
+                  note=("its base is fixed; " if o.get("fixed") else "") + "pos / quat = its base link; bbox = its "
+                       "axis-aligned box [[min], [max]]" + ("; link_pos = each link's position" if multi else ""))
+        elif o.get("fixed"):
+            t.add(n, "scene_feature", {**t.rigid(n, velocity=False), **box, **multi},
+                  note="fixed in place; bbox = its axis-aligned box [[min], [max]]")
         else:
-            out[n] = L.pose_entry(T_RW[:3, :3] @ np.asarray(o["position"], dtype=np.float64) + T_RW[:3, 3], None, size)
-    return out
+            t.add(n, "object", {**t.rigid(n), **box, **multi},
+                  note="bbox = its axis-aligned box [[min], [max]]" + ("; link_pos = each link's position" if multi else ""))
+    table = S.env._world.entities.get("table")
+    if table is not None and table_z is not None:
+        try:
+            lo, hi = np.asarray(_rbox(M._np(table.get_AABB()).reshape(-1, 2, 3)[0]))
+        except Exception:  # noqa: BLE001 — a table without collision geometry: its visual box
+            lo, hi = np.asarray(_rbox(M._np(table.get_vAABB()).reshape(-1, 2, 3)[0]))
+        top = [float((lo[0] + hi[0]) / 2), float((lo[1] + hi[1]) / 2), float(_rpos([0.0, 0.0, table_z])[2])]
+        t.add("table", "scene_feature", {"top_pos": ("m", lambda: top), "size_xy": ("m", lambda: [float(hi[0] - lo[0]), float(hi[1] - lo[1])])},
+              note="the table the task is set on: the centre of its top face and its x / y extents")
+    return t
 
 
-def object_poses() -> dict:
-    return on_main(_object_poses)
+STATE_TABLE = state_table() if L.STATE_QUERY else None
 
 
 def _ops_reset() -> None:
@@ -781,7 +940,7 @@ threading.Thread(target=L.serve, daemon=True, args=(L.Service(
     kinematics=lambda req: on_main(do_kinematics, req), status=status, on_submit_error=lambda exc: on_main(finish, "error"), log=log,
     episode=EP, state_sha=lambda: on_main(S.state_sha), proprio=lambda: on_main(proprio_row),
     **({"state_ops": OPS} if OPS is not None else {}),
-    **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})),)).start()
+    state_table=STATE_TABLE),)).start()
 while True:                                 # the main thread: simulator jobs in order; signals are handled between them
     if deadline_reached():
         finish("timeout")

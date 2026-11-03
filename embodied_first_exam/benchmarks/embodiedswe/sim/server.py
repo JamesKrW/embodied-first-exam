@@ -23,7 +23,11 @@ journal holds the native action rows).
 
 Per call, images are bounded by spec.max_frames_per_call (PROTOCOL §3 "Images per call": the frames really captured,
 at the recorder's stride, per-frame depth counted again), checked before anything runs; the shared Recorder holds one
-copy of the frames and the shared layer builds the body once."""
+copy of the frames and the shared layer builds the body once.
+
+Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table (state_table(): the robot, its key
+links, the scene's other rigid objects, articulations and deformables, world frame, read on the main thread between calls);
+RCB_STATE_OPS=1 is refused (no in-process reset of this scene)."""
 from __future__ import annotations
 import json, math, os, sys, threading, time, traceback
 from typing import Callable
@@ -590,26 +594,159 @@ def replay_row(row) -> None:
     native_step(np.asarray(row, dtype=np.float64)); RIG.after_replay(row)
 
 
-# ---------------------------------------------------------------- the object-pose ablation (rcb_limited "ablations"; off
-# unless the task sets RCB_EXPOSE_OBJECT_POSES=1): every rigid object and articulation of Isaac Lab's scene (its
-# get_state(is_relative=False) keys) but the robot, its root pose in the world frame (spec.world), quaternion wxyz.
-# The unlimited-reset ablation is not offered here (no in-process reset of this scene repeats its GPU PhysX start), so
-# RCB_STATE_OPS=1 makes the layer refuse to start this service.
-POSE_KINDS = ("rigid_object", "articulation")
+# ---------------------------------------------------------------- the ablations (rcb_limited "ablations"; off unless the task
+# sets them). RCB_STATE_QUERY=1: state_table() below. The unlimited-reset ablation is not offered here (no in-process reset
+# of this scene repeats its GPU PhysX start), so RCB_STATE_OPS=1 makes the layer refuse to start this service.
+STATE_KINDS = ("rigid_object", "articulation", "deformable_object")
 
 
-def _root_poses() -> dict:
-    st = env.iscene.get_state(is_relative=False)
-    return {n: v["root_pose"][0].detach().to("cpu").double().numpy() for k in POSE_KINDS for n, v in (st.get(k) or {}).items()
-            if n != "robot" and isinstance(v, dict) and "root_pose" in v}
+class _ReadOnce(L.StateTable):
+    """L.StateTable whose getters share one read of the scene's state per query (memo)."""
+
+    def query(self, plan: dict) -> dict:
+        self._memo = {}
+        return super().query(plan)
+
+    def memo(self, key, fn):
+        if key not in self._memo:
+            self._memo[key] = fn()
+        return self._memo[key]
 
 
-POSE_SPEC = {"frame": "world (spec.world: the simulator's world frame, the ee_pose action's frame), each object's root",
-             "quaternion_order": "wxyz", "objects": sorted(_root_poses()) if L.OBJECT_POSES else []}
+def _ground_z() -> float | None:
+    """The world z of the scene's ground plane (a prim named like one), None without one."""
+    try:
+        import omni.usd
+        from pxr import Usd, UsdGeom
+        cache = UsdGeom.XformCache(Usd.TimeCode.Default())
+        for prim in omni.usd.get_context().get_stage().Traverse():
+            n = prim.GetName().lower()
+            if ("groundplane" in n or n in ("ground", "ground_plane", "defaultgroundplane")) and prim.IsA(UsdGeom.Xformable):
+                return float(cache.GetLocalToWorldTransform(prim).ExtractTranslation()[2])
+    except Exception:  # noqa: BLE001
+        pass
+    return None
 
 
-def object_poses() -> dict:
-    return {n: L.pose_entry(p[:3], p[3:7]) for n, p in sorted(_root_poses().items())}
+def state_table() -> _ReadOnce:
+    """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: the robot (root pose and velocities,
+    the root's height above the ground plane, every joint with its range), its key links (Franka: panda_link0..7,
+    panda_hand, the fingertip centre, the fingers; G1: pelvis, torso, head, the wrists, every hand link), and every other
+    rigid object, articulation (joint state and ranges) and deformable object (its nodes' centroid and box) of Isaac Lab's
+    scene, by its get_state names. No grader value, progress or tool-only record is in it. World frame (/spec world).
+    Read from Isaac Lab's data buffers (scene.get_state, as the call checkpoints' state hash reads it, and the robot's
+    body / joint buffers, as proprio reads them) on the main thread, between calls: nothing steps or renders."""
+    t = _ReadOnce(frame="the simulator's world frame (/spec world: one environment, its origin at the world origin), z up; the "
+                        "frame of every pose, camera extrinsic and ee_pose target of this service",
+                  quaternion_order="wxyz",
+                  note="size = the object's local bounding box (its own axes, scale applied), from the USD stage at the start")
+
+    def arr(x):
+        return x.detach().to("cpu").double().numpy() if hasattr(x, "detach") else np.asarray(x, np.float64)
+
+    def scene_state():
+        return t.memo("scene", lambda: env.iscene.get_state(is_relative=False))
+
+    def entry(kind, name):
+        return lambda: (scene_state().get(kind) or {}).get(name) or {}
+
+    gz = _ground_z()
+    arts = [(a.p.rstrip("_") or "robot", a.art) for a in RIG.arms] if RIG.kind == "franka" else [("robot", RIG.art)]
+    for rname, art in arts:
+        jn = list(art.joint_names)
+        lim = arr(art.data.soft_joint_pos_limits[0])
+        rng = {n: [float(lim[i, 0]), float(lim[i, 1])] for i, n in enumerate(jn)}
+
+        def rdata(art=art, key=rname):
+            def read():
+                d = art.data
+                return {"pos": arr(d.root_pos_w[0]), "quat": arr(d.root_quat_w[0]), "lin_vel": arr(d.root_lin_vel_w[0]),
+                        "ang_vel": arr(d.root_ang_vel_w[0]), "q": arr(d.joint_pos[0]), "qd": arr(d.joint_vel[0])}
+            return t.memo(("root", key), read)
+        t.add(rname, "robot", {
+            "pos": ("m", lambda r=rdata: r()["pos"]), "quat": ("1", lambda r=rdata: r()["quat"]),
+            "lin_vel": ("m/s", lambda r=rdata: r()["lin_vel"]), "ang_vel": ("rad/s", lambda r=rdata: r()["ang_vel"]),
+            "height_above_ground": ("m", lambda r=rdata: None if gz is None else float(r()["pos"][2]) - gz),
+            "joint_pos": ("rad or m", lambda r=rdata, jn=jn: dict(zip(jn, r()["q"]))),
+            "joint_vel": ("rad/s or m/s", lambda r=rdata, jn=jn: dict(zip(jn, r()["qd"]))),
+            "joint_range": ("rad or m", lambda rng=rng: rng)},
+            note=("the Franka arm: pos / quat = its root (panda_link0)" if RIG.kind == "franka" else
+                  "the Unitree G1 with Dex3 hands: pos / quat = its root (the pelvis" + (")" if RIG.loco else ", welded to the world)"))
+                 + "; height_above_ground = the root above the scene's ground plane (null when the scene has none)")
+        bn = list(art.body_names)
+
+        def bodies(art=art, key=rname):
+            def read():
+                d = art.data
+                return arr(d.body_pos_w[0]), arr(d.body_quat_w[0]), arr(d.body_lin_vel_w[0]), arr(d.body_ang_vel_w[0])
+            return t.memo(("bodies", key), read)
+        if RIG.kind == "franka":
+            keep = [b for b in bn if b.startswith("panda_")]
+        else:
+            keep = [b for b in bn if b in ("pelvis", "torso_link", "head_link", "waist_yaw_link", "left_wrist_yaw_link",
+                                           "right_wrist_yaw_link") or "_hand_" in b or b.endswith("palm_link")
+                    or b.endswith(("ankle_roll_link",))]
+        pfx = "" if rname == "robot" else rname + "_"
+        for b in keep:
+            i = bn.index(b)
+            t.add(pfx + b, "robot_link", {
+                "pos": ("m", lambda i=i, bd=bodies: bd()[0][i]), "quat": ("1", lambda i=i, bd=bodies: bd()[1][i]),
+                "lin_vel": ("m/s", lambda i=i, bd=bodies: bd()[2][i]), "ang_vel": ("rad/s", lambda i=i, bd=bodies: bd()[3][i])},
+                note=f"link {b}")
+        if RIG.kind == "franka" and "panda_hand" in bn:
+            h = bn.index("panda_hand")
+
+            def tcp(h=h, bd=bodies):
+                T = X.T_of(bd()[0][h], bd()[1][h]); return T[:3, 3] + T[:3, 2] * X.FRANKA_TCP_Z
+            t.add(pfx + "tcp", "robot_link", {"pos": ("m", tcp), "quat": ("1", lambda h=h, bd=bodies: bd()[1][h])},
+                  note=f"the fingertip centre (proprio tcp_pose): panda_hand moved {X.FRANKA_TCP_Z} m along its approach axis")
+    robot_arts = {id(a) for _, a in arts}
+    st0 = env.iscene.get_state(is_relative=False)
+    sizes = {}
+    try:
+        import omni.usd, re
+        from pxr import Usd, UsdGeom
+        stage = omni.usd.get_context().get_stage()
+        bc = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render])
+        for kind in STATE_KINDS:
+            for n, obj in (getattr(env.iscene, kind + "s", None) or {}).items():
+                try:
+                    path = re.sub(r"env_\.\*", "env_0", str(obj.cfg.prim_path).replace("{ENV_REGEX_NS}", "/World/envs/env_0"))
+                    prim = stage.GetPrimAtPath(path)
+                    if prim and prim.IsValid():
+                        r = bc.ComputeLocalBound(prim).ComputeAlignedRange()
+                        sizes[n] = np.asarray(r.GetMax() - r.GetMin(), np.float64)
+                except Exception:  # noqa: BLE001
+                    continue
+    except Exception:  # noqa: BLE001
+        pass
+    for kind in STATE_KINDS:
+        for n in sorted(st0.get(kind) or {}):
+            if n == "robot" or (kind == "articulation" and id((env.iscene.articulations or {}).get(n)) in robot_arts):
+                continue
+            e = entry(kind, n)
+            if kind == "deformable_object":
+                def nodes(e=e):
+                    v = e().get("nodal_position")
+                    return None if v is None else arr(v[0]).reshape(-1, 3)
+                t.add(n, "object", {"pos": ("m", lambda nodes=nodes: None if nodes() is None else nodes().mean(0)),
+                                    "bbox": ("m", lambda nodes=nodes: None if nodes() is None else [nodes().min(0), nodes().max(0)])},
+                      note="a deformable body: the centroid and the axis-aligned box of its simulation nodes")
+                continue
+            fields = {"pos": ("m", lambda e=e: arr(e()["root_pose"][0])[:3]), "quat": ("1", lambda e=e: arr(e()["root_pose"][0])[3:7]),
+                      "lin_vel": ("m/s", lambda e=e: arr(e()["root_velocity"][0])[:3]),
+                      "ang_vel": ("rad/s", lambda e=e: arr(e()["root_velocity"][0])[3:6])}
+            if n in sizes:
+                fields["size"] = ("m", lambda sz=sizes[n]: sz)
+            if kind == "articulation":
+                art = env.iscene.articulations[n]
+                jn = list(art.joint_names)
+                lim = arr(art.data.soft_joint_pos_limits[0])
+                fields.update({"joint_pos": ("rad or m", lambda e=e, jn=jn: dict(zip(jn, arr(e()["joint_position"][0])))),
+                               "joint_vel": ("rad/s or m/s", lambda e=e, jn=jn: dict(zip(jn, arr(e()["joint_velocity"][0])))),
+                               "joint_range": ("rad or m", lambda r={j: [float(lim[i, 0]), float(lim[i, 1])] for i, j in enumerate(jn)}: r)})
+            t.add(n, "articulation" if kind == "articulation" else "object", fields)
+    return t
 
 
 E["tgt"] = [float(v) for v in RIG.hold()]
@@ -625,4 +762,4 @@ open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready: {PRESET} (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("infra_error" if isinstance(exc, InfraError) else "error"), log=log, episode=EP, state_sha=lambda: R.state_sha(env), proprio=proprio_row,
-                  **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})))
+                  state_table=state_table() if L.STATE_QUERY else None))

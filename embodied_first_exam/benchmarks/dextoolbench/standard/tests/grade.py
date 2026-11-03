@@ -55,4 +55,6 @@ if "saves" in d:   # the unlimited-reset ablation (RCB_STATE_OPS=1): a load begi
     for k in ("resets_at_success", "loads_at_success"):   # only for a success
         if ok and k in d: out[k] = int(d[k])
         else: out.pop(k, None)
+if "state_queries" in d:   # the state-query ablation (RCB_STATE_QUERY=1): its /state/query calls; never the verdict
+    out["state_queries"] = int(d.get("state_queries") or 0)
 write(reward, out)

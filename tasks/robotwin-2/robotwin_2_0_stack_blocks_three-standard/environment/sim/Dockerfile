@@ -3,8 +3,8 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:robotwin-0.1.2
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-resetpose@sha256:90a9bd8fd47f66371cba9378ccc5954544457eab8dc60efe8d25dfb58ac329aa /rcb1.py /srv/rcb1.py
-COPY --from=ghcr.io/mll-lab-nu/efe:robotwin-2-files-0.3.0-resetpose@sha256:05bcac93abacc52a8a201420896a0aa93cc2588612391061aa5f7199b45a39be \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 /rcb1.py /srv/rcb1.py
+COPY --from=ghcr.io/mll-lab-nu/efe:robotwin-2-files-0.3.0-stateq@sha256:5989a990e683d2310ebe7f3020dbc68108386d4e8969688200b6373062d25b2d \
      /sim/rcb_live.py \
      /sim/server.py \
      /srv/

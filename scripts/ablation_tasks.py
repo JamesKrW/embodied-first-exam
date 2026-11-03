@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""The task dirs of the reset + save/load and object-pose ablations (docs/protocol/standard_mode.md, Part 1).
+"""The task dirs of the reset + save/load and state-query ablations (docs/protocol/standard_mode.md, Part 1).
 
-    python3 scripts/ablation_tasks.py apply reset|pose|both <task dir> ...
-    python3 scripts/ablation_tasks.py check reset|pose|both <task dir> ...
+    python3 scripts/ablation_tasks.py apply reset|query|both <task dir> ...
+    python3 scripts/ablation_tasks.py check reset|query|both <task dir> ...
 
 reset: compose `sim` environment: RCB_RESET_BUDGET default -> 1000 (added when absent), RCB_STATE_OPS "1";
        instruction: every stated "<N> resets" -> 1000, and the section RESET_HEAD before `## External material`.
-pose:  compose `sim` environment: RCB_EXPOSE_OBJECT_POSES "1"; instruction: the section POSE_HEAD.
-both:  both, the reset section first. Idempotent.
+query: compose `sim` environment: RCB_STATE_QUERY "1"; instruction: the section QUERY_HEAD.
+both:  both. Idempotent; a section or switch of an earlier form (OLD_HEADS,
+       RCB_EXPOSE_OBJECT_POSES) is replaced.
 """
 from __future__ import annotations
 
@@ -43,19 +44,33 @@ that says there is no reset, one episode only, or fewer resets.
   success still ends the run: no reset, save or load after it.
 
 """
-POSE_HEAD = "## This run: object poses"
-POSE_TEXT = f"""{POSE_HEAD}
+QUERY_HEAD = "## This run: privileged state queries"
+OLD_HEADS = ("## This run: object poses",)            # sections an earlier form of this tool wrote: replaced
+QUERY_TEXT = f"""{QUERY_HEAD}
 
-This run gives you the objects' poses. This section overrides anything above, and anything in `/spec`, that says
-object poses are never given.
+This run lets you query the simulator's state. This section overrides anything above, and anything in `/spec`, that
+says object poses or the scene's state are never given.
 
-- Every answer of `/submit`, `/observe` and `/reset` (and `/load_state` where it exists) has
-  `meta["objects"]`: `{{name: {{"pos": [x, y, z], "quat": [4 numbers], "size": [...]}}}}`, each object's pose at the
-  state the answer ends in. `quat` is absent for objects with no orientation (a cloth or a fluid gives its centroid),
-  `size` only where the task gives one.
-- `spec()["object_poses"]` names the objects, the frame the poses are in (the frame of the robot poses this service
-  already gives you) and the quaternion order. The units are metres.
-- Nothing else changes: the goal, the success rule and its thresholds are not given.
+- `GET /state/entities` (on the same base URL as your other calls) lists what you can query:
+  `{{"frame": ..., "quaternion_order": ..., "entities": {{name: {{"kind": ..., "fields": {{field: unit}}}}}}}}`. The
+  kinds are `robot` (the robot's base or root), `robot_link` (a hand, a foot, an end effector), `object`,
+  `articulation` (a door, a drawer, a faucet: its joints) and `scene_feature` (a zone, a line, a hazard, a canvas
+  region). The list is fixed for the run.
+- `POST /state/query` with `{{"names": ["robot", ...], "fields": ["pos", "quat"]}}` answers JSON
+  `{{"state": {{name: {{field: value}}}}, "control_steps": ..., "sim_time_s": ..., "state_queries": ...}}` with the
+  current values. `fields` is optional: without it you get every field of each name. In Python:
+  `requests.post(base + "/state/query", json={{"names": ["robot"]}}).json()["state"]`.
+  - The usual fields: `pos` [x, y, z] m, `quat` (in `quaternion_order`), `lin_vel` m/s, `ang_vel` rad/s,
+    `height_above_ground` m, `joint_pos` / `joint_vel` {{joint: value}}, `size` [3] m (full extents), and `bbox`
+    [[min x, y, z], [max x, y, z]] m. A task may add its own; each field's unit is in the list.
+  - All values are in the world frame that `frame` describes.
+  - A field that an entity does not have is left out of its entry.
+  - An unknown name or field is a 400 that lists the valid ones.
+- A query only reads. It takes no control step, and it does not advance or pause the clock. In standard-realtime it
+  answers at the current simulation time while the robot keeps moving. It is served while the episode runs (409 after
+  the episode ended). Queries are counted and recorded; they do not change the grading.
+- Nothing else changes: the goal, the success rule and its thresholds are not given, and no answer says whether the
+  task is done.
 
 """
 
@@ -85,8 +100,11 @@ def compose(text: str, kind: str) -> str:
             add.append(new)
         if "RCB_STATE_OPS" not in text:
             add.append(f'{indent}RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record')
-    if kind in ("pose", "both") and "RCB_EXPOSE_OBJECT_POSES" not in text:
-        add.append(f'{indent}RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])')
+    if kind in ("query", "both"):
+        lines = [ln for ln in lines if not re.match(r"^\s*RCB_EXPOSE_OBJECT_POSES:", ln)]
+        env, indent = _sim_env(lines)
+        if "RCB_STATE_QUERY" not in text:
+            add.append(f'{indent}RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)')
     lines[env + 1:env + 1] = add
     return "\n".join(lines)
 
@@ -100,8 +118,14 @@ def instruction(text: str, kind: str) -> str:
         text = STATED.sub(lambda m: f"{BUDGET}{m.group(2)}" if m.group(1) != str(BUDGET) else m.group(0), text)
         if RESET_HEAD not in text:
             secs.append(RESET_TEXT)
-    if kind in ("pose", "both") and POSE_HEAD not in text:
-        secs.append(POSE_TEXT)
+    if kind in ("query", "both"):
+        for head in OLD_HEADS:                       # an earlier section: up to the next "## " heading
+            if head in text:
+                i = text.index(head)
+                j = text.index("\n## ", i + len(head)) + 1
+                text = text[:i] + text[j:]
+        if QUERY_HEAD not in text:
+            secs.append(QUERY_TEXT)
     if secs:
         k = text.index("\n## External material")
         text = text[:k + 1] + "".join(secs) + text[k + 1:]
@@ -121,7 +145,7 @@ def apply(d: pathlib.Path, kind: str) -> bool:
 
 
 def main() -> int:
-    if len(sys.argv) < 3 or sys.argv[1] not in ("apply", "check") or sys.argv[2] not in ("reset", "pose", "both"):
+    if len(sys.argv) < 3 or sys.argv[1] not in ("apply", "check") or sys.argv[2] not in ("reset", "query", "both"):
         print(__doc__)
         return 2
     kind, dirs = sys.argv[2], [pathlib.Path(a) for a in sys.argv[3:]]

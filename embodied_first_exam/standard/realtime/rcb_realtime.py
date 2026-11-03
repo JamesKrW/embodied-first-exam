@@ -490,8 +490,11 @@ class RealtimeService(Service):
             return ("reply", *self._spec_reply)
         if method == "GET" and path == "/status":
             return ("/status", None)
+        if rcb_service.STATE_QUERY and method == "GET" and path == "/state/entities":   # fixed for the episode
+            return ("reply", *self._reply_json(200, self.state_ents))
         if method != "POST" or path not in ("/submit", "/observe") + (("/reset",) if self.reset_budget else ()) \
-                + (("/save_state", "/load_state") if self.can_save else ()):
+                + (("/save_state", "/load_state") if self.can_save else ()) \
+                + (("/state/query",) if rcb_service.STATE_QUERY else ()):
             return self._refusal(Refused(404, {"error": "no such endpoint"}))
         if n < 0:
             return self._refusal(Refused(400, {"error": "bad Content-Length"}))
@@ -528,6 +531,8 @@ class RealtimeService(Service):
                 self._reset_view({})
             except Refused as exc:
                 return exc
+        if path == "/state/query":
+            return self._state_query_refusal()
         if path in ("/save_state", "/load_state") and (self.success or self.stopping or self.finalized):
             try:
                 self._ops_view({}, "save")
@@ -548,6 +553,11 @@ class RealtimeService(Service):
             return self._check_observe(meta)
         if path == "/save_state":                    # nothing to check before the simulator thread
             return meta
+        if path == "/state/query":                   # RCB_STATE_QUERY: checked against the fixed entities here
+            plan, err = rcb_service.plan_state_query(self.state_ents, meta)
+            if err:
+                raise Refused(400, err)
+            return plan
         with bad_request():                          # /reset, /load_state: their view; the budget / handle is the
             self._view(meta, "frames")               # simulator thread's to check
         return meta
@@ -693,7 +703,8 @@ class RealtimeService(Service):
                 return job.finish("raw", *self._reply_json(200, self.status()))
             try:
                 {"/submit": self._rt_submit, "/observe": self._rt_observe, "/reset": self._rt_reset,
-                 "/save_state": self._rt_save, "/load_state": self._rt_load}[route](job.req[1], job)
+                 "/save_state": self._rt_save, "/load_state": self._rt_load,
+                 "/state/query": self._rt_state_query}[route](job.req[1], job)
             except Refused as exc:                   # 409, or a 400 only the episode's state decides: nothing changed
                 self._count(refused=1)
                 job.finish("raw", *self._reply_json(exc.code, exc.body))
@@ -886,6 +897,11 @@ class RealtimeService(Service):
         """RCB_STATE_OPS: the state at this control step boundary; the clock runs on."""
         out, _ = self._save_state(meta, {})
         job.finish("raw", *self._reply_json(200, {**out, **self._realtime_counters()}))
+
+    def _rt_state_query(self, plan: dict, job: _Job) -> None:
+        """RCB_STATE_QUERY: the state at the current simulation time, read between two control steps; the clock runs
+        on (a refusal or an adapter error is answered without ending anything)."""
+        job.finish("raw", *self._reply_json(200, {**self._state_answer(plan), **self._realtime_counters()}))
 
     def _rt_load(self, meta: dict, job: _Job) -> None:
         """RCB_STATE_OPS: as a reset, to a saved state: the watches are answered, the new episode starts paused."""

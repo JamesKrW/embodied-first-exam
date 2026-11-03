@@ -1,12 +1,12 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:ispatialgym-files-0.4.0-resetpose@sha256:2bd3fb79e3c298ede47065f0f9baceb1e37ca34b17fa30720556334968388f22",
+ "image": "ghcr.io/mll-lab-nu/efe:ispatialgym-files-0.4.0-stateq@sha256:870ac902797a90b89fddbd23ef9e3d9f1197c48e7edec308e7cc2f1c665ce7e1",
  "source": "embodied_first_exam/benchmarks/ispatialgym",
  "files": {
   "privileged/environment/rcb_ispatialgym.py": "c0e239bebf689f12df76704f447e339ef0041178a4f356753b20e43a2d38ca4b",
   "privileged/tests/grade.py": "9458e1664f21378794488c9e67bb818bf4bcfa32ec750fd99f2fc2505e627e63",
   "sim/finalize.sh": "67242510294227dcc286f859cd62b16c4c89392c056c7e113d82e2762a0543a2",
-  "sim/server.py": "d4a9e36a3d774430fac9675fb8a46c5947a56d9dcf2411bb33e90aa4fe358109",
+  "sim/server.py": "26283ff4eae453f2d32a7b24ac0099c7618c5c13a7525a4f84749f4172d6fcd1",
   "sim/task_text.txt": "eb15bd10ca5fc78b43babbc3d949ae947acb09e3d4e88af520a18bb3950c8d59",
-  "standard/tests/grade.py": "b111504091e289f9521d94d7a81b477722a92ed789a4cc484071394ddd32db6b"
+  "standard/tests/grade.py": "9993ee3d050cd3ebcf43ed2a6b13b3e40bac7e5d8c9896a16aba84a75116aa37"
  }
 }
