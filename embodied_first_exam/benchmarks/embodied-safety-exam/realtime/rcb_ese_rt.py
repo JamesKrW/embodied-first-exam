@@ -248,6 +248,8 @@ def build_service():
             """Live (a tick) and in a resume replay: the same journal row, the same call to the episode."""
             typ = self.s.codec.decode(row)[0]
             out = self.s.step_raw(row)
+            if server.STATE_OPS:
+                self._path.append(np.array(row, dtype=np.float64))
             ok = bool(out.get("ok"))
             res = out.get("result") if ok else None
             if isinstance(res, dict):
@@ -265,6 +267,13 @@ def build_service():
                 self.answer = res["answer"]
             done = self.s.ended
             return done, bool(done and self.live_pass()), {}
+
+        def on_new_session(self) -> None:
+            """A reset or a load (server.STATE_OPS): the agent calls not yet registered, the results and the answer
+            belong to the abandoned episode; steps count from the new episode's path."""
+            self.src, self.pending = -1, [0, 0]
+            self.results, self.dropped_results, self.answer = [], 0, None
+            self.step_no = len(self._path)
 
         def verdict_extra(self) -> dict:
             """verdict.json: was the episode driven through Embodied Safety Exam's external-clock hooks?"""
@@ -315,7 +324,7 @@ def build_service():
     class RtService(rcb_realtime.RealtimeService):
         def __init__(self, sim, **kw):
             self._owed, self.pictures, self.picture_steps, self.picture_wall_s = 0, 0, 0, 0.0
-            self._keep: tuple | None = None          # inside _rt_submit: (index of `at` in the plan, [(index, row)] kept)
+            self._kept_plan: tuple | None = None     # inside _rt_submit: (index of `at` in the plan, [(index, row)] kept)
             self._kept_meta: list = []                # the rows the last /submit kept, for its response
             self.kept_rows = 0
             self.per_picture = picture_steps(sim.control_dt)        # a camera with no cost of its own (the default)
@@ -492,9 +501,9 @@ def build_service():
         def _start_clock(self) -> None:
             # Inside _rt_submit the layer calls this right after it has replaced the plan from `at` on (and before it
             # answers): the rows of other types it took out go back in, each at the step it was planned for.
-            if self._keep is not None:
-                i, kept = self._keep
-                self._keep = None
+            if self._kept_plan is not None:
+                i, kept = self._kept_plan
+                self._kept_plan = None
                 if kept:
                     # each kept row back at the step it was planned for (its index from the next step); the new
                     # chunk's rows fill the other steps in order, so those from a kept row's step on move one step
@@ -522,7 +531,7 @@ def build_service():
                 nxt = len(self.episode)
                 at = nxt if req["at"] is None else req["at"]
                 i = max(at - nxt, 0)
-                self._keep = (i, [(k, e) for k, e in enumerate(self.plan)
+                self._kept_plan = (i, [(k, e) for k, e in enumerate(self.plan)
                                   if k >= i and e[0] is not None and e[0] not in MOTION_TYPES])
                 if req["type"] == "ee_pose" and req["k"] > 1 and req["interpolate"] == "linear":
                     held = self._in_force(at - 1, nxt, "ee_pose")
@@ -531,12 +540,20 @@ def build_service():
             try:
                 super()._rt_submit(req, job)
             finally:
-                self._keep = None
+                self._kept_plan = None
                 self.sim.align_from = None
 
             if req["note"]:
                 self.sim.call_notes[self.calls] = req["note"]
             self.sim.agent_called(bool(req["view"][0]))
+
+        def _rt_reset(self, meta: dict, job) -> None:
+            super()._rt_reset(meta, job)
+            self._owed = 0                           # picture steps owed by the abandoned episode's clock
+
+        def _rt_load(self, meta: dict, job) -> None:
+            super()._rt_load(meta, job)
+            self._owed = 0
 
         def _rt_observe(self, req: dict, job) -> None:
             super()._rt_observe(req, job)
