@@ -211,6 +211,7 @@ section `## This run: no success signal` (`scripts/ablation_tasks.py`). With it 
   the adapter's `latched_success = True`; 2.2 / 2.4: the adapter's `finish()`).
 - Resets stay within the declared budget; only the episode that ends with `/finish` or at the agent's end is graded.
   `first_success` keeps its meaning (the graded success when no reset was made, else 0).
+- **roboEngineer** (its own `eai-policy` runtime, no success shown during adaptation anyway): `POST /finish` with an optional `round_id` selects the graded round; tasks/roboengineer/README.md "Ablations".
 - `final.json` adds `success_signal = "hidden"`, `ended_by`, `hidden_success_seen`, `hidden_success_first_step`,
   `trial_hidden_success_seen` and `finish_time_s` (evidence only). A service that does not implement the switch refuses
   to start with it on (the 2.2 / 2.4 layers: an adapter without `finish`).

@@ -22,6 +22,18 @@ This task uses `eai-policy/1.0`. Work in `/app`, preserve your code, policies, e
 
 Seal a completed round to select it. If you finish or time out without sealing, the evaluator selects the latest round completed before the cutoff. In-flight or late rounds cannot be selected. With no eligible round the score is zero. Harbor stops the agent at its time limit; the service also closes after the same duration from the first policy API request. Calibration and health checks do not consume deployment rounds. Binary benchmark success requires all six held-out cases to land safely; the continuous 0–100 score is reported separately as `final_reward` (`progress` is that score divided by 100).
 
+## This run: no success signal
+
+This run adds an explicit end to adaptation. This section overrides anything above that says only sealing ends it.
+
+- No response tells you whether a policy succeeds or how it scores: a deployment returns its noisy telemetry and frames
+  only, as described above, and `/spec` says `"success_signal": "hidden"`.
+- You decide when you are done: send `POST /finish` with `{"round_id": <a completed round>, "summary": "..."}` (both
+  optional) on the same base URL as your other calls (in Python: `from scripts.quadrotor_landing.public.client import call; call("finish", {"round_id": "round-2", "summary": "..."}, url="http://127.0.0.1:8000")`). That round, or without one the latest
+  completed round, is the graded policy, evaluated on the held-out cases as described above. After `/finish` every call
+  is refused (409). Sealing a round ends adaptation the same way.
+- If you do neither, the latest round completed before your time is up is graded, as described above.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

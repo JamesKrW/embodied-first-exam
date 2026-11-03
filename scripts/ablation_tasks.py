@@ -3,7 +3,8 @@
 standard-realtime task dir as the ablation runs it. Two changes, both idempotent:
 
   - environment/docker-compose.yaml: `RCB_HIDE_SUCCESS: "1"` first in the `sim` service's environment;
-  - instruction.md: the section ADDENDUM before `## External material` (the closing sections stay last).
+  - instruction.md: the section ADDENDUM before `## External material` (the closing sections stay last); a
+    roboEngineer task dir (its policy-submission interface) gets its own text, from scripts/ablation_roboengineer.py.
 
     python3 scripts/ablation_tasks.py apply <task dir> ...     change them (then normalize them: their DIGEST)
     python3 scripts/ablation_tasks.py check <task dir> ...     exit 1 if any is not in the ablation's form
@@ -21,9 +22,10 @@ import tomllib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import task_conventions as tc  # noqa: E402
+import ablation_roboengineer as roboengineer  # noqa: E402  (its policy-submission interface: its own section text)
 
 # a benchmark's own runtime (not an eai-standard service): out of the ablation's scope
-EXCLUDED = ("embodied-olympics-match", "roboengineer")
+EXCLUDED = ("embodied-olympics-match",)
 ENV_LINE = 'RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)'
 HEADING = "## This run: no success signal"
 ADDENDUM = f"""{HEADING}
@@ -48,6 +50,11 @@ success ends the episode, that `meta["reason"]` can be `"success"`, or that a su
 """
 
 
+def addendum(d: pathlib.Path) -> str:
+    """The section for this task dir: roboEngineer's own text for its policy interface, else ADDENDUM."""
+    return roboengineer.nosignal(d) if roboengineer.applies(d) else ADDENDUM
+
+
 def apply(d: pathlib.Path) -> bool:
     """Bring one task dir into the ablation's form; True if anything changed."""
     changed = False
@@ -70,7 +77,7 @@ def apply(d: pathlib.Path) -> bool:
     text = ins.read_text()
     if HEADING not in text:
         k = text.index("\n## External material")
-        ins.write_text(text[:k + 1] + ADDENDUM + text[k + 1:])
+        ins.write_text(text[:k + 1] + addendum(d) + text[k + 1:])
         changed = True
     return changed
 
@@ -78,7 +85,7 @@ def apply(d: pathlib.Path) -> bool:
 def in_form(d: pathlib.Path) -> bool:
     comp = (d / "environment" / "docker-compose.yaml").read_text()
     ins = (d / "instruction.md").read_text()
-    return 'RCB_HIDE_SUCCESS: "1"' in comp and ADDENDUM.strip() in ins
+    return 'RCB_HIDE_SUCCESS: "1"' in comp and addendum(d).strip() in ins
 
 
 def core() -> list[pathlib.Path]:

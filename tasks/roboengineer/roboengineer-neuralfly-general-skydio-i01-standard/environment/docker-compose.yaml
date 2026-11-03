@@ -18,6 +18,7 @@ services:
     working_dir: /srv
     command: python -m scripts.control_transfer.trusted.service
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       PYTHONPATH: /srv
       MUJOCO_GL: osmesa
       CUDA_VISIBLE_DEVICES: ""
