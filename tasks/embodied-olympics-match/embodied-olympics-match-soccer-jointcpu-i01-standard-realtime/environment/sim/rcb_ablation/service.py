@@ -20,21 +20,34 @@ match the agent lost (or forfeited by the rules: a missed review, the chess cloc
 finalized, so the agent may reset or load; a win ends the run as before. The graded record (episode.jsonl) is the last
 episode's: from the frozen start, or for a loaded one the rows up to the save followed by the rows after the load, so
 the spectator replay draws the graded match. Earlier episodes' logs are kept as episode.<n>.jsonl.
+
+A core from 0.5 on (table tennis G1): the platform opponent's program runs in a process of its own
+(core/platform_seat.py); a save also keeps its whole state, read there after every observation already sent, its
+replies received first (rcb_ablation/platform_ops.py, rcb_ablation/worker.py), and the commands it sent that are not
+yet in effect; a load restores both and checks them (the reply's `verified`: the match's state digest and the program's
+canonical state hash equal to the save's); a reset builds a new program. The seats' frame streams start empty, and the frozen world
+after a reset or load runs on when its window (the review window) is over. GET /over stays false while a loss is held.
 """
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import threading
 import time
 from collections import OrderedDict
 
+import core
+
 from . import BUDGET, HIDE, MAX_HANDLES, OPS, QUERY
+from . import platform_ops
 from . import snapcopy
 from . import sports
 
 RULE_ENDS = ("match_over", "ready_timeout", "clock")        # a match decided by its rules: held when lost (OPS)
+NEW = not str(getattr(core, "VERSION", "")).startswith("0.2.")   # a core from 0.5 on (platform seats, frame streams)
+STREAM_DRAIN_S = 30.0                                      # a frame being drawn at a reset or load: waited for
 
 
 class _Abl:
@@ -57,6 +70,8 @@ class _Abl:
         self.players: dict = {}             # built-in seat -> its locked player
         self.restore_players: dict = {}     # built-in seat -> the player to restore at its next start
         self.loop_alive = False
+        self.reporter = False
+        self.verified: dict = {}            # the last load's checks (a core from 0.5 on)
         self.table = None
 
 
@@ -138,6 +153,12 @@ def make(Base):
                 self.abl.collected = True
                 if OPS and self.abl.held and not self.finalizing:      # a held loss: finalize it now
                     self.finalizing = True
+                    if NEW:
+                        self.session_end(a[0] if a else kw.get("events"))
+                        self.on_end()
+                        self.settle_seats(self.reason, self.forfeiting)
+                        self.ended_at = time.monotonic()
+                        self.devgate("over")
                     self.abl_close_episode(self.reason or "over")
                     threading.Thread(target=self.finalize, daemon=True).start()
                     return
@@ -163,14 +184,26 @@ def make(Base):
                 if won:
                     self.abl_close_episode(reason)
                     return super().end(reason, None)          # the forfeit (if any) is already recorded
-                self.on_end()
+                self.abl_stop_world()
                 self.phase, self.reason, self.abl.held = "over", reason, True
+                if NEW:
+                    self.devgate("review")              # frozen, as in a review: a reset or load may follow
                 self.ep.write("end", k=self.m.k, reason=reason)
                 self.bc.frame(force=True)
                 self.bc.event("end", reason=reason)
                 self.abl_close_episode(reason)
                 self.write_final()
                 self.cond.notify_all()
+
+        def abl_stop_world(self):
+            """A held loss: the world stops as at the end (its pending acts dropped), but stays usable for a reset or
+            a load (a core from 0.5 on: its frame streams stay open)."""
+            if not NEW:
+                return self.on_end()
+            if self.segment_start is not None:
+                self.run_wall += time.monotonic() - self.segment_start
+                self.segment_start = None
+            self.drop_all("match_over")
 
         def abl_agent_won(self) -> bool:
             seat = self.abl_seat()
@@ -193,13 +226,38 @@ def make(Base):
             return out
 
         def loop(self):
-            with self.cond:
-                self.abl.loop_alive = True
-            try:
-                return super().loop()
-            finally:
+            while True:
                 with self.cond:
-                    self.abl.loop_alive = False
+                    self.abl.loop_alive = True
+                again = False
+                try:
+                    super().loop()
+                finally:
+                    with self.cond:
+                        # a reset or load while this loop was returning (it saw "over"): it runs the new episode
+                        again = OPS and self.phase != "over" and not self.finalizing
+                        self.abl.loop_alive = again
+                if not again:
+                    return
+
+        def reporter(self):
+            """The mid-match final.json writer (a core from 0.4 on): one per service, though the world loop that
+            starts it runs again after a held loss."""
+            with self.cond:
+                if self.abl.reporter:
+                    return
+                self.abl.reporter = True
+            return super().reporter()
+
+        def timeout(self):
+            """After a reset or a load (a core from 0.5 on: the match has started, the phase is prepare): the window
+            ran out, the world runs on after the lead time (nobody loses). Otherwise the core's rule."""
+            if NEW and OPS and self.phase == "prepare" and self.match_t0 is not None:
+                self.ready_deadline = None
+                self.resume_at = time.monotonic() + float(self.ts.timing["barrier_lead_s"])
+                self.diag("restart_window_over", k=self.m.k)
+                return
+            return super().timeout()
 
         # ------------------------------------------------------------------ state queries
         def abl_table(self):
@@ -252,6 +310,8 @@ def make(Base):
 
         # ------------------------------------------------------------------ reset, save, load
         def abl_window(self) -> float:
+            if NEW:
+                return float(self.review_window())
             return float(os.environ.get("READY_TIMEOUT_S", "60"))
 
         def abl_can_restart(self):
@@ -274,6 +334,11 @@ def make(Base):
                 if self.abl.resets >= BUDGET:
                     return 409, {"error": "no resets left", "resets_left": 0}
                 m = self.sport.build(self.cfg)
+                if hasattr(self.m, "camera_model"):          # the service tells its match the camera model
+                    try:
+                        m.camera_model = self.m.camera_model
+                    except AttributeError:
+                        pass
                 self.abl.resets += 1
                 self.abl_restart(m, None, "reset")
                 return 200, self.abl_reply(seat)
@@ -286,9 +351,16 @@ def make(Base):
                 if self.phase == "over":
                     return 409, {"error": "the match is over: nothing to save"}
                 t = time.monotonic()
+                ps = getattr(self, "pseats", None)
+                programs = platform_ops.save(ps) if ps else {}     # the platform opponent's program, in its process
                 m, shared = snapcopy.snap(self.m)
+                sched = getattr(self, "sched", None) if NEW else None
                 snap = {"m": m, "k": self.m.k, "digest": self.m.state_digest(), "rows": copy.deepcopy(self.ep.commands),
                         "scheduled": copy.deepcopy(getattr(self, "scheduled", [])), "players": self.abl_save_players(),
+                        "programs": programs,
+                        "sched": {"platform_pending": copy.deepcopy(sched.platform_pending),
+                                  "platform_seq": sched.platform_seq,
+                                  "scheduled": copy.deepcopy(sched.scheduled)} if sched is not None else None,
                         "clocks": {s: (st.used, st.clock_s) for s, st in self.seats.items()} if turn else None,
                         "on_turn": getattr(self, "on_turn", None), "review_due": getattr(self, "review_due", None)}
                 self.abl.next_handle += 1
@@ -298,7 +370,8 @@ def make(Base):
                     self.abl.handles.popitem(last=False)
                 self.abl.saves += 1
                 self.ep.write("save_state", handle=h, k=self.m.k, digest=snap["digest"],
-                              copy_s=round(time.monotonic() - t, 3), shared=shared)
+                              copy_s=round(time.monotonic() - t, 3), shared=shared,
+                              **({"program_state_sha": {s: p["state_sha"] for s, p in programs.items()}} if programs else {}))
                 return 200, {"handle": h, "step": self.m.k, "saves": self.abl.saves,
                              "handles_kept": len(self.abl.handles)}
 
@@ -316,7 +389,10 @@ def make(Base):
                 m, _ = snapcopy.snap(snap["m"])
                 self.abl.loads += 1
                 self.abl_restart(m, snap, "load", handle=h)
-                return 200, self.abl_reply(seat)
+                out = self.abl_reply(seat)
+                if NEW:
+                    out["verified"] = self.abl.verified
+                return 200, out
 
         def abl_save_players(self) -> dict:
             out = {}
@@ -343,22 +419,36 @@ def make(Base):
             self.abl_close_episode(self.reason if self.phase == "over" else why)
             # the old episode's acts and built-in players stop here
             a.gen += 1
-            if not turn:
+            if not turn and NEW:
+                # the acts not yet in effect are dropped; the platform opponent's commands received and not yet in
+                # effect are the saved ones (none after a reset)
+                self.drop_all(why)
+                self.flight = {s: {} for s in self.cfg.seats}
+                sc = (snap or {}).get("sched")
+                self.sched.platform_pending = copy.deepcopy(sc["platform_pending"]) if sc else []
+                self.sched.platform_seq = sc["platform_seq"] if sc else 0
+                self.sched.scheduled = copy.deepcopy(sc["scheduled"]) if sc else []
+            elif not turn:
                 for (s, _e), item in list(self.pending.items()):
                     if hasattr(self, "dropped"):
                         self.dropped(item, s, why)
                 self.pending.clear()
                 self.scheduled = copy.deepcopy(snap["scheduled"]) if snap else []
+            if not turn:
                 if self.segment_start is not None:
                     self.run_wall += time.monotonic() - self.segment_start
                 self.segment_start = self.anchor = self.resume_at = None
                 self.seen = {}
             self.m = m
             self.bc.m = m
+            if NEW:
+                self.abl_restart_new(m, snap)
             if hasattr(self.layer, "_units"):                # the skill in the loop: reload at the next contact
                 self.layer._units.clear()
             self.phase, self.reason, self.forfeiting, a.held = "prepare", None, None, False
             self.retired = []
+            if hasattr(self, "exits"):
+                self.exits = []
             for st in self.seats.values():
                 st.ready = False
                 st.retired = False
@@ -375,16 +465,60 @@ def make(Base):
                 self.start_deadline = None
                 self.begin()                    # a turn match plays on at once (the chess clock runs on your turn)
             else:
-                self.ready_deadline = time.monotonic() + self.abl_window()
+                if not NEW or self.match_t0 is not None:     # (before the match start: the start window stands)
+                    self.ready_deadline = time.monotonic() + self.abl_window()
+                if NEW and self.match_t0 is not None:
+                    self.devgate("review")
                 if not a.loop_alive:
+                    a.loop_alive = True
                     threading.Thread(target=self.loop, daemon=True).start()
             self.abl_restart_players(snap)
             self.write_final()
             self.cond.notify_all()
 
+        def abl_restart_new(self, m, snap):
+            """A core from 0.5 on, under the lock: the platform opponent's program is the saved one (a load: checked
+            to pickle to the saved bytes) or a new one (a reset); every seat's frame stream starts empty."""
+            ps = getattr(self, "pseats", None)
+            got = platform_ops.restore(ps, snap.get("programs") if snap else None) if ps else {}
+            v = {"state_digest_equal": m.state_digest() == snap["digest"]} if snap else {}
+            if snap and got:
+                v["opponent_program_equal"] = {s: r.get("state_sha") == snap["programs"][s]["state_sha"]
+                                               and r.get("program_digest") == snap["programs"][s].get("program_digest")
+                                               for s, r in got.items()}
+                diff = {s: sorted(k for k, h in (r.get("parts") or {}).items()
+                                  if (snap["programs"][s].get("parts") or {}).get(k) != h)
+                        for s, r in got.items() if not v["opponent_program_equal"][s]}
+                if diff:
+                    v["opponent_program_diff"] = diff
+            self.abl.verified = v
+            for fs in (getattr(self, "streams", None) or {}).values():
+                end = time.monotonic() + STREAM_DRAIN_S
+                with fs.cond:
+                    for item in fs.pending:
+                        fs.queued.discard(item[0])
+                    fs.pending.clear()
+                    while fs.queued and time.monotonic() < end:      # a frame being drawn: its drawing ends
+                        fs.cond.wait(0.05)
+                    fs.ready.clear()
+                    fs.metas.clear()
+                    fs.dropped.clear()
+                    fs.queued.clear()
+                    fs.unit_first.clear()
+
         def abl_rotate_log(self, snap, why, handle):
             ep = self.ep
+            if hasattr(ep, "flush"):
+                ep.flush(timeout=60)                         # a background writer: every row in the file first
             with ep.lock:
+                cv = getattr(ep, "_cv", None)
+                if cv is not None:
+                    with cv:
+                        while ep._done < ep._queued:
+                            cv.wait(1.0)
+                        if ep._f is not None and not ep._f.closed:
+                            ep._f.close()
+                        ep._f = None
                 if self.abl.header is None:
                     with ep.path.open() as f:
                         self.abl.header = f.readline()
@@ -399,8 +533,16 @@ def make(Base):
                     for r in rows:
                         f.write(json.dumps(r, default=float) + "\n")
                 ep.commands = rows
+                if hasattr(ep, "_sha"):                       # the running digest of the command rows
+                    h = hashlib.sha256(b"[")
+                    for i, r in enumerate(rows):
+                        if i:
+                            h.update(b",")
+                        h.update(json.dumps(r, sort_keys=True, separators=(",", ":"), default=float).encode())
+                    ep._sha = h
             self.ep.write(why if why != "load" else "load_state", episode=self.abl.episode + 1, k=self.m.k,
                           **({"handle": handle, "digest": snap["digest"]} if snap else {}),
+                          **({"verified": self.abl.verified} if NEW else {}),
                           resets=self.abl.resets, saves=self.abl.saves, loads=self.abl.loads,
                           previous_log=f"episode.{self.abl.episode}.jsonl")
 
