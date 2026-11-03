@@ -24,6 +24,8 @@ services:
     command: python -m scripts.quadrotor_landing.native.service
     restart: on-failure:3
     environment:
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
       PYTHONPATH: /srv
       RCB_INSTANCE: /srv/instance.json
       RCB_WALL_CLOCK_S: "3600"

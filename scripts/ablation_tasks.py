@@ -8,12 +8,17 @@ reset: compose `sim` environment: RCB_RESET_BUDGET default -> 1000 (added when a
        instruction: every stated "<N> resets" -> 1000, and the section RESET_HEAD before `## External material`.
 pose:  compose `sim` environment: RCB_EXPOSE_OBJECT_POSES "1"; instruction: the section POSE_HEAD.
 both:  both, the reset section first. Idempotent.
+A roboEngineer task dir (its policy-submission interface) gets the same switches and heading with its own reset
+section, from scripts/ablation_roboengineer.py.
 """
 from __future__ import annotations
 
 import pathlib
 import re
 import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import ablation_roboengineer as roboengineer  # noqa: E402  (its policy-submission interface: its own section text)
 
 BUDGET = 1000
 RESET_HEAD = "## This run: unlimited resets, save and load"
@@ -94,12 +99,12 @@ def compose(text: str, kind: str) -> str:
 STATED = re.compile(r"\b(\d+)(\*{0,2}\s+resets?)\b", re.I)
 
 
-def instruction(text: str, kind: str) -> str:
+def instruction(text: str, kind: str, d: pathlib.Path | None = None) -> str:
     secs = []
     if kind in ("reset", "both"):
         text = STATED.sub(lambda m: f"{BUDGET}{m.group(2)}" if m.group(1) != str(BUDGET) else m.group(0), text)
         if RESET_HEAD not in text:
-            secs.append(RESET_TEXT)
+            secs.append(roboengineer.reset(d) if roboengineer.applies(d) else RESET_TEXT)
     if kind in ("pose", "both") and POSE_HEAD not in text:
         secs.append(POSE_TEXT)
     if secs:
@@ -113,7 +118,7 @@ def apply(d: pathlib.Path, kind: str) -> bool:
     for name, fn in (("environment/docker-compose.yaml", compose), ("instruction.md", instruction)):
         p = d / name
         old = p.read_text()
-        new = fn(old, kind)
+        new = fn(old, kind, d) if fn is instruction else fn(old, kind)
         if new != old:
             p.write_text(new)
             changed = True
@@ -128,8 +133,9 @@ def main() -> int:
     if sys.argv[1] == "apply":
         print(f"changed {sum(apply(d, kind) for d in dirs)} of {len(dirs)} task dirs")
         return 0
-    bad = [d for d in dirs if any(fn((d / n).read_text(), kind) != (d / n).read_text()
-                                  for n, fn in (("environment/docker-compose.yaml", compose), ("instruction.md", instruction)))]
+    bad = [d for d in dirs if compose((d / "environment/docker-compose.yaml").read_text(), kind)
+           != (d / "environment/docker-compose.yaml").read_text()
+           or instruction((d / "instruction.md").read_text(), kind, d) != (d / "instruction.md").read_text()]
     for d in bad:
         print(f"not in the ablation's form: {d}")
     return 1 if bad else 0

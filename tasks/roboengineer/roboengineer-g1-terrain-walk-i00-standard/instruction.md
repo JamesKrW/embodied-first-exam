@@ -16,6 +16,26 @@ The selected policy is tested on 12 disjoint cases in two fresh processes. Binar
 ## Modeling limitations
 Simulation transfer only, not hardware. Fixed 98→512→256→128→29 ELU actor and public PD wrapper. Coding-agent feedback is noisy joint angles, public commands and images.
 
+## This run: unlimited resets, save and load
+
+This run raises the deployment budget and adds two calls. This section overrides anything above, and anything in
+`/describe`, that says there are three rounds, or that no reset exists.
+
+- You have 1003 deployment rounds (`max_rounds` in `/describe`): in practice as many as your time allows. Every
+  deployment starts each development case afresh from its starting state (that is the reset); the cases and the hidden
+  dynamics stay the same.
+- `POST /save_state` with `{"round_id": 0, "case": 0, "t": 4.0}` names the state of that completed development
+  episode at its telemetry time at or before `t` seconds and answers `{"handle": "s1", "t": ...}`. The handle is all
+  you get, never the state's contents. At most 32 handles are kept (the least recently used one is dropped).
+- `POST /load_state` with `{"handle": "s1"}` makes your next deployment run only that case, starting from that saved
+  state, with the policy you deploy taking over there. The controller's run-time state (its phase, timers,
+  integrators, last action) carries over; its parameters are the new policy's. The loaded deployment's feedback covers
+  the whole episode, the saved path included, and its answer has `start` and `load_verified`. `{"handle": null}`
+  cancels a pending load. Saves and loads cost no round. In Python: `c.save_state(round_id, case, t)`, `c.load_state(handle)`, then `c.deploy(policy, diagnosis)`.
+- Grading is unchanged: the selected round's policy (sealed, or else the latest completed round) runs every held-out
+  case from its start, as described above; a policy deployed after a load is evaluated like any other.
+- Your time keeps running across deployments, saves and loads.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 
