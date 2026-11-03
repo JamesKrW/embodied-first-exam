@@ -4,7 +4,7 @@
 # Generated from scripts/humanoidbench/templates/tests.Dockerfile -- edit the template, not this copy.
 FROM ghcr.io/mll-lab-nu/efe:humanoidbench-0.2.0
 COPY instance.npz rewards.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.4.0-stateq@sha256:891cdc5edcf01f945332d55ef988f5c419e45a1c7c91b526dd9cc28cd12d7aae /privileged/environment/rcb_hb.py /privileged/tests/grade.py /privileged/tests/rcb_rewards.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.4.0-stateq-pose@sha256:513bfc79a98bcf72ce05dfe625280e1be77776568b1ce81c133b7c220f0bc30e /privileged/environment/rcb_hb.py /privileged/tests/grade.py /privileged/tests/rcb_rewards.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 WORKDIR /tests
 # resources (PROTOCOL §6) # rcb-monitor

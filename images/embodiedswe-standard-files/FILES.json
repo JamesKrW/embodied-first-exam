@@ -1,10 +1,10 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:embodiedswe-standard-files-0.2.0-stateq-resetinf@sha256:dc7a4684d285fcebe5778577fc708978bb42906a8c2805d10b21aa572c959194",
+ "image": "ghcr.io/mll-lab-nu/efe:embodiedswe-standard-files-0.2.0-stateq-resetinf-pose@sha256:132d6f9e940bdf72aa650c82d5c9fca6cb444fe19a9ea715e6e07438d4eb6b3f",
  "source": "embodied_first_exam/benchmarks/embodiedswe",
  "files": {
   "sim/esw_std.py": "3670cecfa792274ff4a99af17bf0739dacb6b55544710843a2512e691883742d",
   "sim/finalize.sh": "827f76ce84fd8c47e5fa8e2e894a4d3d82a7117ca7814a492c353f0c57b06e69",
   "sim/live_video.py": "70ecc92d43fcf2bc6e2ac9d37ca88cb17db17c11678f939bc33540746f8d115b",
-  "sim/server.py": "191afcdecdafd83e18354101a3fdb7df2e4fb6bf4c8045ba22b5ef71e13ab360"
+  "sim/server.py": "a2cfe19ad4cd85916b61163720229c8d6a932f30fc91c641dab09bf046eeb88f"
  }
 }

@@ -115,11 +115,11 @@ its start, in two fresh processes) is the plain one.
   records `ended_by` (`finish`: a finish or a seal; else `timeout`) and `finish_time_s`. Telemetry that stops at a crash or a fall stays (it
   is the robot's own observation); the evaluator's per-case metrics in `round-N/` stay private.
 - **Privileged state queries**: `GET /state/entities` and `POST /state/query` (`names`, `fields`, `round_id`, `case`,
-  `t`) read the true simulator state (no sensor noise or bias) of a completed round's development episodes at their
-  telemetry times: the robot (base pose, world-frame velocities, height above the ground, joints), its links (Go2 and
-  G1 feet, G1 torso and hands), the scene (weave poles, the parking slot, parked cars and curb, the G1 terrain, the
-  landing pad), rotor thrusts (drones). Never: scores, success, grader latches, the hidden plant parameters, the wind,
-  anything about the held-out bank. `state_queries` is counted.
+  `t`) read the simulator state of a completed round's development episodes at their telemetry times: the robot (base
+  pose, world-frame velocities, height above the ground, size / bbox, and its joints as its encoders read them, the
+  same readings as the telemetry), the scene (weave poles, the parking slot, parked cars and curb, the landing pad:
+  pose, size, bbox). Never: scores, success, grader latches, the hidden plant parameters (the encoder bias, the motor
+  lag), rotor thrusts, the terrain, the wind, anything about the held-out bank. `state_queries` is counted.
 - **Unlimited resets + save/load**: a deployment is already a reset of every development case; the budget becomes
   3 + `RCB_RESET_BUDGET` rounds (`resets` = rounds beyond 3). `POST /save_state` (`round_id`, `case`, `t`) names a
   completed episode's state at a telemetry time; `POST /load_state` makes the next deployment run that case from there

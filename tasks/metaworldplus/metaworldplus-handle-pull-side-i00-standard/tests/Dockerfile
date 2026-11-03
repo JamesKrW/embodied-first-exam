@@ -1,7 +1,7 @@
 # Separate verifier sandbox: grades the sim service's own artifacts; the client base image, nothing else.
 FROM docker.io/library/python:3.12.14-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
 COPY test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:metaworldplus-files-0.4.0-stateq@sha256:ca892ed7843f6eb86dcc4596fbb3cf97969b790e038c299cce2aca923d47d2b0 /standard/tests/grade.py /tests/grade.py
+COPY --from=ghcr.io/mll-lab-nu/efe:metaworldplus-files-0.4.0-stateq-pose@sha256:41b4c9e3d7807ad3cc72b6d0cbd5b101caad883a7dd6148b7f47dd1b6a1011a8 /standard/tests/grade.py /tests/grade.py
 RUN chmod +x /tests/test.sh
 # resources (PROTOCOL §6) # rcb-monitor
 COPY --from=ghcr.io/mll-lab-nu/efe:monitor-0.5.0@sha256:ecc5f24f1516ca11711d7c2d3ac07c89f79cd9220812c1244498ec71e352402a /opt/rcb_monitor/rcb_limits.py /tests/rcb_limits.py

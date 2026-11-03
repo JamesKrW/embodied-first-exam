@@ -1,11 +1,11 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.4.0-stateq@sha256:891cdc5edcf01f945332d55ef988f5c419e45a1c7c91b526dd9cc28cd12d7aae",
+ "image": "ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.4.0-stateq-pose@sha256:513bfc79a98bcf72ce05dfe625280e1be77776568b1ce81c133b7c220f0bc30e",
  "source": "embodied_first_exam/benchmarks/humanoidbench",
  "files": {
   "privileged/environment/rcb_hb.py": "52d982c6ff29d8d1f8bc80739c98283ffebec6963dae8549fae36048a4c91405",
   "privileged/tests/grade.py": "21dc032feae394fb820140ded295c2f5ac869da7d1975f7336db0a8b679d2873",
   "privileged/tests/rcb_rewards.py": "a90e12a68d2ca9865139313de36a39dc7d99d5dfc681cc1072cb31f5a13c78b5",
   "sim/rcb_service.py": "bf4c237d6b34bf45e63967e4783436a25b1be2de2413da908945d91149348425",
-  "sim/server.py": "be8ff126835fa0d65e599f45ddec452e71261f265b541744d246e9abd3dea934"
+  "sim/server.py": "c72f164211a202bac9f48e306864635aae5e55570c03ba01f89bee30d69e3593"
  }
 }

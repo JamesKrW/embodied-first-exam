@@ -4,15 +4,15 @@
 # Harbor uploads only /app/output/.
 FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1
 COPY instance.json rfo_task.py test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e /grade.py /tests/grade.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e /rcb_rfo.py /tests/rcb_rfo.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e /rfo/__init__.py /tests/rfo/__init__.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e /rfo/scene.py /tests/rfo/scene.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e /rfo/looks.py /tests/rfo/looks.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e /rfo/world.py /tests/rfo/world.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e /rfo/referee.py /tests/rfo/referee.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e /rfo/task.py /tests/rfo/task.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e /rfo/realhand.py /tests/rfo/realhand.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df /grade.py /tests/grade.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df /rcb_rfo.py /tests/rcb_rfo.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df /rfo/__init__.py /tests/rfo/__init__.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df /rfo/scene.py /tests/rfo/scene.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df /rfo/looks.py /tests/rfo/looks.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df /rfo/world.py /tests/rfo/world.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df /rfo/referee.py /tests/rfo/referee.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df /rfo/task.py /tests/rfo/task.py
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df /rfo/realhand.py /tests/rfo/realhand.py
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests

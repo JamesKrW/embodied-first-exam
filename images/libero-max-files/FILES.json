@@ -1,12 +1,12 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:libero-max-files-0.4.0-stateq-resetese@sha256:47cc6a6c31455b5adf19d62dc4a8b858cf5da9600b6809766e7c5d852860b98a",
+ "image": "ghcr.io/mll-lab-nu/efe:libero-max-files-0.4.0-stateq-resetese-pose@sha256:7435a5a4d53332d8998672023137c139c186875550a78ccaf94040c3f49af818",
  "source": "embodied_first_exam/benchmarks/libero-max",
  "files": {
   "privileged/environment/lmx_tool.py": "4209d8c52596622e9220fa09c0d3b0317574b9e60823e479b14340e35dff5f7b",
   "privileged/tests/grade.py": "9a416bac57252c82f7cd95f8c1b9f72aa15db00ccb646f0bb6ddb0cea0262c13",
   "sim/finalize.sh": "6be0b0f5ccc70af14d52a2c45a6efbb44bf8813838f68f3524ac710d47312a4f",
   "sim/rcb_service.py": "bf4c237d6b34bf45e63967e4783436a25b1be2de2413da908945d91149348425",
-  "sim/server.py": "ae244a33ec15e1144bfd75c1dd7d952b7ee973df9c11c5fcce45bc766b70f857",
+  "sim/server.py": "09749d613b28b88af348ed4357d65bd25666ab6c59d5cf998206f3904b7220dd",
   "standard/tests/grade.py": "180d5da83c90fef95ab74e17628cd9cc14800f8cc97e9a2e00e0245f9ead078c"
  }
 }

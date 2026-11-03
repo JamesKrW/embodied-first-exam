@@ -30,30 +30,36 @@ Snapshots are exact unless marked approximate.
 
 ## Privileged state queries: coverage
 
-Every task of the set (the robot itself is always an entity). Per benchmark, what `GET /state/entities` lists:
+Every task of the set (the robot itself is always an entity). An entity's fields are only `pos`, `quat`, `size`,
+`bbox`, `lin_vel`, `ang_vel`, `joint_pos`, `joint_vel`, `joint_range` (the robot's and articulated objects' joints) and
+`height_above_ground`; RoboPaint adds its sheets' paint `coverage` and its wells' `rgb`. Names and notes are neutral
+(no target / goal / distractor or hazard roles, no hidden facts); goal markers and goal zones are not listed; particle
+systems and objects that do not exist at the episode's start are not listed, and a body the simulator removes keeps
+its last pose. Per benchmark, what `GET /state/entities` lists:
 
 Every table has the robot (`robot`: base or root pose, velocities, height above the ground, joints) and its key links
 (`robot_link`: end effectors / TCPs, hands, fingertips, feet, pelvis, torso, head where the robot has them). Then:
 
 | Benchmark | Frame | Objects, articulations, scene features |
 |---|---|---|
-| BEHAVIOR-1K | OmniGibson world, xyzw | every BDDL scope object (particle systems: centroid and bbox); jointed ones as articulations, fixed ones as scene features |
-| iSpatialGym | odometry (the base at the episode's start), xyzw | the physical objects, without `agent.*` and `floor.*` |
-| ManiGuard, RoboLab, RoboDojo, EmbodiedSWE | world (RoboLab, RoboDojo: the environment's own origin), wxyz / xyzw | the scene's objects (deformables and fluids: centroid and bbox), articulations with their joints, the table |
-| RoboPaint | world, wxyz | brush (holder, tip), board, plate, paint wells, the sheets and their 8 x 8 regions with paint coverage |
+| BEHAVIOR-1K | OmniGibson world, xyzw | the BDDL scope objects present at the start (no particle systems); jointed ones as articulations, fixed ones as scene features |
+| iSpatialGym | odometry (the base at the episode's start), xyzw | every object of the scene except the room shell, as `<category>_<k>` |
+| ManiGuard | world, xyzw | every scene object except the goal marker, as `<category>_<k>` (no particle systems) |
+| RoboLab, RoboDojo, EmbodiedSWE | world (RoboLab, RoboDojo: the environment's own origin) | the scene's objects (deformables and fluids: centroid and bbox), articulations with their joints, the table |
+| RoboPaint | world, wxyz | brush (holder), brush tip, board, plate, paint wells (pose, size, colour), the sheets and their 8 x 8 regions with paint coverage |
 | DexHand, DexJoCo, MolmoSpaces, BiGym2, MetaWorld+, DexToolBench, MuJoCo Playground, LIBERO-Max | MuJoCo world | free bodies (pose, velocities, size / bbox), jointed bodies as articulations, static colliding bodies as scene features (MuJoCo Playground Go1 / Spot / Barkour: trunk, IMU, feet, floor) |
 | KinDER | odometry (the base at the episode's start) | movable objects with KinDER's bounding boxes, drawers as articulations, fixtures |
 | VLABench, PandaDyn, RoboTwin 2.0, RoboWits, YAMLab, AM-Bench | the simulator's world (AM-Bench: the environment origin) | the task's actors / objects, articulations, the table and other static actors |
-| RoboCasa, RoboCasa-GR1, RoboCasa365 | MuJoCo world | the episode's objects; jointed fixtures (faucets, microwave and cabinet doors) as articulations; the other fixtures |
-| RoboARC, RoboARC IKEA | the robot frame (the table's height is never given: heights are above the table top) | the scene's colliding bodies (deformables: centroid and bbox; multi-link: link positions), lock discs and hinged parts as articulations, the table / bench / pedestals as top centre and size |
-| EO Fun | the venue (floor z = 0) | free bodies (props, balls; a chain of alike bodies as one rope), jointed fixtures (springboard, ball machines, bag), the field's geometry (track, lanes, beam, bar, water, sand, gates) |
-| HumanoidBench | MuJoCo world | props, the door's hinges, the hurdles, barriers and targets |
-| MyoSuite | MyoSuite world | the objects and balls, the opponent and goalkeeper, the markers the instruction describes (target, start, goal), terrain heights |
-| Embodied Safety Exam | the bench or room frame | every scene object (contents, device states), zones, the hazards with their member objects |
-| roboEngineer | MuJoCo world, wxyz | of a completed round's development episodes at their telemetry times: the robot, its feet / torso / hands, the weave poles, the parking slot, parked cars and curb, the G1 terrain, the landing pad, rotor thrusts (tasks/roboengineer/README.md "Ablations") |
+| RoboCasa, RoboCasa-GR1, RoboCasa365 | MuJoCo world | the episode's objects as `<category>_<k>`; jointed fixtures (faucets, microwave and cabinet doors) as articulations; the other fixtures |
+| RoboARC, RoboARC IKEA | the robot frame (the table's height above the floor is never given: heights are above the table top) | the scene's colliding bodies (deformables: centroid and bbox; multi-link: the root link), lock discs and hinged parts as articulations, the table / bench / pedestals as their top faces |
+| EO Fun | the venue (floor z = 0) | free bodies (props, balls; a chain of alike bodies as one rope), jointed fixtures (springboard, bag, bed), the field's geometry (track, lanes, beam, bar, water, sand, gates); ball machines and other launchers as pose and box only |
+| HumanoidBench | MuJoCo world | props, the door's hinges, the hurdles and barriers |
+| MyoSuite | MyoSuite world | the objects and balls, the opponent and goalkeeper (pose and box), bimanual's pillars, the terrain |
+| Embodied Safety Exam | the bench or room frame | every scene object as `<category>_<i>` (pose, size, bbox, velocities), the table, floor and walls |
+| roboEngineer | MuJoCo world, wxyz | of a completed round's development episodes at their telemetry times: the robot (joints as its encoders read them), the weave poles, the parking slot, parked cars and curb, the landing pad (tasks/roboengineer/README.md "Ablations") |
 
 Never in a table: task predicates, success flags, progress, rewards, distances to a goal, thresholds, referee or hold
-counters, visual-only goal markers.
+counters, goal markers or zones, contents or device states, hazard labels.
 
 ## Recorded per trial
 
