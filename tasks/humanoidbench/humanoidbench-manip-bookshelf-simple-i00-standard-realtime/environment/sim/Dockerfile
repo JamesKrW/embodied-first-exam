@@ -7,7 +7,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22e
      /rcb1.py \
      /realtime/rcb_realtime.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.4.0-stateq-pose@sha256:513bfc79a98bcf72ce05dfe625280e1be77776568b1ce81c133b7c220f0bc30e \
+COPY --from=ghcr.io/mll-lab-nu/efe:humanoidbench-files-0.4.0-stateq-leakfix@sha256:cb7ca74f44da387d94cfd0f780b37d4926e3c17ee66028cb7052646f5b7a67a2 \
      /privileged/environment/rcb_hb.py \
      /privileged/tests/rcb_rewards.py \
      /sim/rcb_service.py \

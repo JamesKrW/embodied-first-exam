@@ -62,10 +62,6 @@ MOUNT = {"overview": "static, looking at the whole workspace from the front righ
          "closeup": "static, closer to the task's working area"}
 
 
-# scene parts whose name states a role in the task, under a neutral name in the state table
-NEUTRAL = {"goal_backstop": "backstop"}
-
-
 class PandaDyn:
     """One frozen Panda Dynamic Scenes instance behind the rcb_service.Sim contract (see the module docstring)."""
 
@@ -250,8 +246,7 @@ class PandaDyn:
                 f["bbox"] = ("m ([min xyz, max xyz] of its collision shape, world axes)", lambda b=[lo.tolist(), hi.tolist()]: b)
             except Exception:   # an actor without a collision mesh: its pose only
                 pass
-            t.add(NEUTRAL.get(n, n), "scene_feature", f,
-                  note="the table: its top is the plane z = 0" if n == "table" else "a static part of the scene")
+            t.add(n, "scene_feature", f, note="the table: its top is the plane z = 0" if n == "table" else "a static part of the scene")
         return t
 
     def save_state(self) -> dict:

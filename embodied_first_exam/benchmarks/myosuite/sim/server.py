@@ -851,17 +851,17 @@ def end_from_signal() -> None:
 
 # The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
 # RCB_STATE_QUERY=1: the state table, MyoSuite's world frame (z up; the frame of root_pose). The robot: its root body
-# (the pelvis of a free-standing body, the fixed base of an arm or a hand), its height above the ground, its own
-# joints; its key links (pelvis, torso, head, feet; wrist, fingertips; the prosthesis's palm and fingertips). The
-# task's objects: the bodies the task's observation dict reads (obs_dict obj_* / curr_obj_*, object1 / object2, ball),
-# every body moved by a joint that is not the body's own; the opponent and the goalkeeper (mocap bodies: pose and box
-# only). Scene features: bimanual's two pillars (pillar_1, pillar_2 along x), the world's named geoms (floor, terrain, the soccer goal's frame,
-# the arena's fence), each with pose and box (a geom: and extents). Goal markers (target poses) are not
-# listed.
+# (the pelvis of a free-standing body, the fixed base of an arm or a hand), its height above the ground, its centre of
+# mass, its own joints; its key links (pelvis, torso, head, feet; wrist, fingertips; the prosthesis's palm and
+# fingertips). The task's objects: the bodies the task's observation dict reads (obs_dict obj_* / curr_obj_*, object1 /
+# object2, ball), every body moved by a joint that is not the body's own; the opponent and the goalkeeper (mocap
+# bodies: pose only). Scene features: the markers the instruction describes (the start and goal pillars), the world's
+# named geoms (floor, terrain with its heights, goal, arena). Goal markers (the baoding targets, the translucent target
+# object) are not listed.
 # Read off a private copy of the live state (forward kinematics there): the live simulator is never written.
 OBJECT_LABELS = {"baoding": ("object1", "object2"), "soccer": ("ball",)}
-GOAL_BODIES = ("target",)          # goal markers (the reorient tasks' target pose): not listed
-STILL_BODIES = ("start", "goal")   # bimanual's two pillars, mocap bodies the scene places once: scene features
+MARKER_BODIES = ("start", "goal")                  # the markers the instructions describe (bimanual's pillars)
+GOAL_BODIES = ("target",)                          # goal markers (the reorient tasks' target pose): not listed
 
 
 def _object_bodies() -> dict:
@@ -876,6 +876,8 @@ def _object_bodies() -> dict:
 # forward kinematics and the com velocities there, so a query never writes the live data and never changes the state
 # hash or the next step.
 _DOWN = np.array([0.0, 0.0, -1.0])
+_GEOM_SHAPES = {0: "plane", 1: "hfield", 2: "sphere", 3: "capsule", 4: "ellipsoid", 5: "cylinder", 6: "box", 7: "mesh",
+                8: "sdf"}
 U_POS, U_QUAT, U_LIN, U_ANG = "m", "1 (unit quaternion, w x y z)", "m/s", "rad/s"
 U_JPOS, U_JVEL = "rad (hinge), m (slide), unit quaternion w x y z (ball)", "rad/s, m/s; ball: rad/s about the child's axes"
 U_BOX = "m: [[x, y, z] min, [x, y, z] max]"
@@ -974,6 +976,23 @@ class _Mirror:
             lo, hi = np.minimum(lo, c - h), np.maximum(hi, c + h)
         return (hi - lo).tolist() if np.isfinite(lo).all() else None
 
+    def part(self, what: str, i: int, geoms) -> dict:
+        """One part of a scene-feature group: a geom's pose and extents, or a body's pose and box."""
+        if what == "geom":
+            return {"pos": self.d.geom_xpos[i], "quat": self.geom_quat(i), "size": 2 * self.aabb[i][3:]}
+        return {"pos": self.d.xpos[i], "quat": self.d.xquat[i], "bbox": self.box(geoms)}
+
+    def heights(self, g: int) -> dict:
+        """A height field geom's surface: world x, y of the samples (the geom unrotated) and their world z."""
+        m, h = self.m, int(self.m.geom_dataid[g])
+        nr, nc, (sx, sy, sz, _) = int(m.hfield_nrow[h]), int(m.hfield_ncol[h]), m.hfield_size[h]
+        a = int(m.hfield_adr[h])
+        z = np.asarray(m.hfield_data[a:a + nr * nc]).reshape(nr, nc)
+        kr, kc = max(1, -(-nr // 64)), max(1, -(-nc // 64))
+        c = self.d.geom_xpos[g]
+        return {"x": c[0] + np.linspace(-sx, sx, nc)[::kc], "y": c[1] + np.linspace(-sy, sy, nr)[::kr],
+                "z": c[2] + sz * z[::kr, ::kc]}
+
     def tangible(self, g: int) -> bool:
         """A geom that collides, or that a camera shows (alpha above 0 and in a group drawn by default); an invisible
         helper that does neither is no part of the scene."""
@@ -1044,6 +1063,7 @@ def _mj_robot(t: _MirrorTable, name: str, root: int, mask: np.ndarray, skip: np.
         "pos": (U_POS, lambda: M.d.xpos[root]), "quat": (U_QUAT, lambda: M.d.xquat[root]),
         "lin_vel": (U_LIN, lambda: M.vel(root)[3:]), "ang_vel": (U_ANG, lambda: M.vel(root)[:3]),
         "height_above_ground": ("m (null: nothing below)", lambda: M.drop(M.d.xpos[root], skip)),
+        "com": (U_POS, lambda: M.d.subtree_com[root]),
         **({"joint_pos": (U_JPOS, lambda: {k: M.joint(j) for k, j in joints.items()}),
             "joint_vel": (U_JVEL, lambda: {k: M.joint(j, True) for k, j in joints.items()})} if joints else {}),
         **(extra or {})}, note)
@@ -1064,8 +1084,8 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
     for its children instead) and the world body's named geoms:
       a body under a free joint or a mocap body: an object (bodies that differ only in their numbers, at least
       chain_min of them, are one chain: a rope);
-      a body whose subtree has joints: an articulation (at least group_min alike: one entity with all their joints);
-      any other body with geoms, and the world body's named geoms: scene features (alike names: one entity, its box).
+      a body whose subtree has joints: an articulation (at least group_min alike: one entity with its parts);
+      any other body with geoms, and the world body's named geoms: scene features (alike names: one entity with parts).
     Names for which skip_name() is true are left out (decoration), and so are geoms that neither collide nor show.
     Gives the bool mask over bodies of what moves freely (objects), for height_above_ground."""
     M, m = t.mirror, t.mirror.m
@@ -1112,8 +1132,10 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
             bs = [objs[n][0] for n in members]
             geoms = [g for n in members for g in objs[n][1]]
             t.put(gname, "object", {
-                "pos": ("m (the mean of its bodies' positions)", lambda bs=bs: M.d.xpos[bs].mean(0)),
-                "bbox": (U_BOX, lambda g=geoms: M.box(g))}, f"a chain of {len(bs)} bodies")
+                "pos": ("m (the mean of its parts' positions)", lambda bs=bs: M.d.xpos[bs].mean(0)),
+                "bbox": (U_BOX, lambda g=geoms: M.box(g)),
+                "points": ("m: [[x, y, z]] each part's position, in the order of the note",
+                           lambda bs=bs: M.d.xpos[bs])}, f"a chain of {len(bs)} bodies: {', '.join(members)}")
     for gname, members in _groups(list(arts), group_min):
         joints = [j for n in members for j in arts[n][2]]
         geoms = [g for n in members for g in arts[n][1]]
@@ -1127,7 +1149,10 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
             t.put(members[0], "articulation", {"pos": (U_POS, lambda b=b: M.d.xpos[b]),
                                                "quat": (U_QUAT, lambda b=b: M.d.xquat[b]), **f})
         else:
-            t.put(gname, "articulation", f, f"{len(members)} alike bodies")
+            bs = {n: arts[n][0] for n in members}
+            f["parts"] = ("{part: {pos m, quat w x y z}}",
+                          lambda bs=bs: {n: {"pos": M.d.xpos[b], "quat": M.d.xquat[b]} for n, b in bs.items()})
+            t.put(gname, "articulation", f, f"{len(bs)} alike bodies")
     feats = {n: ("body", b, geoms) for n, (b, geoms) in stat.items()}
     for g in range(m.ngeom):
         n = m.geom(g).name
@@ -1137,17 +1162,23 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
         if gname is None:
             what, i, geoms = feats[members[0]]
             if what == "geom":
-                f = {"pos": (U_POS, lambda i=i: M.d.geom_xpos[i]), "quat": (U_QUAT, lambda i=i: M.geom_quat(i)),
+                f = {"shape": ("geom type", lambda i=i: _GEOM_SHAPES.get(int(m.geom_type[i]), "other")),
+                     "pos": (U_POS, lambda i=i: M.d.geom_xpos[i]), "quat": (U_QUAT, lambda i=i: M.geom_quat(i)),
                      "size": ("m (full extents along its own axes; 0: unbounded)", lambda i=i: 2 * M.aabb[i][3:])}
+                if m.geom_type[i] == 1:
+                    f["heights"] = ("m: {x [ncol], y [nrow], z [nrow][ncol]} world heights of the surface on a grid "
+                                    "(every k-th sample, at most 64 a side)", lambda i=i: M.heights(i))
             else:
                 f = {"pos": (U_POS, lambda i=i: M.d.xpos[i]), "quat": (U_QUAT, lambda i=i: M.d.xquat[i])}
             f["bbox"] = (U_BOX, lambda g=geoms: M.box(g))
             t.put(members[0], "scene_feature", f)
         else:
+            parts = {n: feats[n] for n in members}
             geoms = [g for n in members for g in feats[n][2]]
             t.put(gname, "scene_feature", {
-                "pos": ("m (the centre of its bbox)", lambda g=geoms: np.mean(M.box(g), 0)),
-                "bbox": (U_BOX, lambda g=geoms: M.box(g))}, f"{len(members)} alike parts")
+                "bbox": (U_BOX, lambda g=geoms: M.box(g)),
+                "parts": ("{part: {pos m, quat w x y z, size m (full extents)} or {pos m, quat, bbox m}}",
+                          lambda ps=parts: {n: M.part(*p) for n, p in ps.items()})}, f"{len(parts)} alike parts")
     return free_mask
 
 
@@ -1196,11 +1227,6 @@ def state_table() -> _MirrorTable:
         if (size := M.local_size(b)) is not None:
             f["size"] = ("m (full extents along the body's axes)", lambda s=size: s)
         t.put(name, "object", f, None if name == m.body(b).name else f"MuJoCo body {m.body(b).name!r}")
-    # the pillars under neutral names, numbered along x (then y) by where they stand when the table is built (read
-    # off the live data, which is not written)
-    still = sorted((b for b in range(1, m.nbody) if m.body(b).name in STILL_BODIES),
-                   key=lambda b: (round(float(S.data.xpos[b][0]), 3), round(float(S.data.xpos[b][1]), 3)))
-    pillar = {m.body(b).name: f"pillar_{i}" for i, b in enumerate(still, 1)}
     for b in range(1, m.nbody):
         if m.body_parentid[b] != 0 or robot[b] or skip[b]:
             continue
@@ -1209,8 +1235,8 @@ def state_table() -> _MirrorTable:
              "bbox": (U_BOX, lambda g=geoms: M.box(g))}
         if m.body(b).name in GOAL_BODIES:
             continue
-        if m.body(b).name in STILL_BODIES:
-            t.put(pillar[m.body(b).name], "scene_feature", f, "a pillar")
+        if m.body(b).name in MARKER_BODIES:
+            t.put(m.body(b).name, "scene_feature", f, "a marker the instruction describes")
         elif m.body_mocapid[b] >= 0:
             skip |= rootid == b
             t.put(m.body(b).name, "object", f, "moved by the scene (a mocap body)")
