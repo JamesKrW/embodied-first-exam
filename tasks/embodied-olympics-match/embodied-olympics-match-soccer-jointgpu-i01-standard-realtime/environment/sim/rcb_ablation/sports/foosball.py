@@ -7,9 +7,8 @@ from __future__ import annotations
 
 from . import _mj
 
-BALL = {"pos": "m", "quat": "wxyz", "lin_vel": "m/s", "ang_vel": "rad/s"}
-ROD = {"pos": "m (the rod body's origin)", "slide": "m", "angle": "rad", "slide_velocity": "m/s",
-       "angular_velocity": "rad/s"}
+BALL = {"pos": "m", "quat": "wxyz", "lin_vel": "m/s", "ang_vel": "rad/s", **_mj.BOX}
+ROD = {**_mj.POSE, **_mj.JOINTS, **_mj.BOX}           # joints: slide (along the bar, m), spin (about it, rad)
 
 
 def _foos():
@@ -23,24 +22,26 @@ def _sides(seat):
 
 def entities(m, seat):
     F = _foos()
-    ents = {"ball": {"kind": "ball", "fields": dict(BALL)}}
+    ents = {"ball": {"kind": "object", "fields": dict(BALL)}}
     for r in F.RODS:
-        ents[f"rod_{r}"] = {"kind": "robot_link", "fields": dict(ROD), "what": f"your {r} rod"}
+        ents[f"rod_{r}"] = {"kind": "robot_link", "fields": dict(ROD),
+                            "note": f"your {r} rod: its bar body, joints slide and spin"}
     for r in F.RODS:
-        ents[f"opponent_rod_{r}"] = {"kind": "opponent_link", "fields": dict(ROD), "what": f"the opponent's {r} rod"}
+        ents[f"opponent_rod_{r}"] = {"kind": "articulation", "fields": dict(ROD),
+                                     "note": f"the opponent's {r} rod: its bar body, joints slide and spin"}
+    ents["own_goal"] = {"kind": "scene_feature", "fields": dict(_mj.GOAL)}
+    ents["opponent_goal"] = {"kind": "scene_feature", "fields": dict(_mj.GOAL)}
+    ents["playfield"] = {"kind": "scene_feature", "fields": {"pos": "m", **_mj.BOX}}
     return {"frame": "your local frame (u towards the opponent goal, v to your left, z up; playfield z = 0, centre "
                      "(0, 0)); fields pos / lin_vel / ang_vel are (u, v, z)",
             "quaternion_order": "wxyz", "entities": ents}
 
 
 def _rod(model, data, side, rod, turned):
-    import mujoco as mj
-    b = mj.mj_name2id(model, mj.mjtObj.mjOBJ_BODY, f"{side}_{rod}")
-    js = _mj.joints(model, data, [f"{side}_{rod}_slide", f"{side}_{rod}_spin"])
-    out = {"pos": _mj.r(data.xpos[b]), "slide": js["joint_pos"].get(f"{side}_{rod}_slide"),
-           "angle": js["joint_pos"].get(f"{side}_{rod}_spin"),
-           "slide_velocity": js["joint_vel"].get(f"{side}_{rod}_slide"),
-           "angular_velocity": js["joint_vel"].get(f"{side}_{rod}_spin")}
+    b = _mj.body_id(model, f"{side}_{rod}")
+    js = _mj.strip(_mj.joints(model, data, [f"{side}_{rod}_slide", f"{side}_{rod}_spin"]),
+                   prefix_len=len(f"{side}_{rod}_"))
+    out = {**_mj.body(model, data, b), **js, **_mj.body_box(model, data, b, subtree=True)}
     return _mj.turn(out) if turned else out
 
 
@@ -53,8 +54,13 @@ def read(m, seat, names):
     out = {}
     for n in names:
         if n == "ball":
-            b = _mj.free_joint(model, data, "ball")
+            b = {**_mj.free_joint(model, data, "ball"), **_mj.free_box(model, data, "ball")}
             out[n] = _mj.turn(b) if turned else b
+        elif n in ("own_goal", "opponent_goal"):
+            out[n] = _mj.goals(model, data, lambda g: g.startswith("goal_"), turned)[n]
+        elif n == "playfield":
+            v = _mj.geom_box(model, data, "playfield")
+            out[n] = _mj.turn(v) if turned else v
         elif n.startswith("opponent_rod_"):
             out[n] = _rod(model, data, them, n[len("opponent_rod_"):], turned)
         elif n.startswith("rod_"):
