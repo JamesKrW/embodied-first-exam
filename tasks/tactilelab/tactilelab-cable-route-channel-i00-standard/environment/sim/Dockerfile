@@ -312,7 +312,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:tactilelab-files-0.7.0@sha256:a36dfcd052277a5
      /sim/live_video.py \
      /sim/finalize.sh \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-resetpose@sha256:90a9bd8fd47f66371cba9378ccc5954544457eab8dc60efe8d25dfb58ac329aa \
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 \
      /rcb1.py \
      /rcb_limited.py \
      /run.sh \

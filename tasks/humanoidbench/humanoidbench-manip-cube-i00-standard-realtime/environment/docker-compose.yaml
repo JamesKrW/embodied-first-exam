@@ -22,7 +22,7 @@ services:
     command: python /srv/rcb_realtime.py
     restart: on-failure:6                               # a crash resumes the same episode, paused, never a reset
     environment:
-      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_TASK: cube
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "A cube starts just above and in front of each palm. Rotate both cubes, without dropping them, to the goal orientation: that of the translucent cube with the same faces floating above and between the hands."

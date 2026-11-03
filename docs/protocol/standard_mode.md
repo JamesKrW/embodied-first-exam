@@ -218,19 +218,32 @@ set `RCB_STATE_OPS: "1"` and a reset budget of 1000 in the `sim` service and add
   `embodied_first_exam/standard/ablation_selftest.py`, `embodied_first_exam/standard/v2_1/selftest.py`,
   `embodied_first_exam/standard/realtime/ablation_selftest.py`.
 
-### Object poses (an ablation, `RCB_EXPOSE_OBJECT_POSES=1`)
-Not part of the protocol's official configuration, and against "Never provided" (object poses) on purpose: a switch
-every eai-standard service of this branch reads from its `sim` environment, off by default. The ablation's task dirs set
-`RCB_EXPOSE_OBJECT_POSES: "1"` in the `sim` service and add the instruction section `## This run: object poses`. With it on:
-- Every `/submit`, `/observe`, `/reset` and `/load_state` answer's `meta` carries `objects` = `{name: {"pos": [x, y, z]
-  (m), "quat": [4], "size": [...]}}`, each object's pose at the state the answer ends in; `quat` is absent where the task
-  has no orientation for it (a deformable's centroid), `size` present only where the privileged twin gives one.
-- `/spec.object_poses` = `{units, frame, quaternion_order, objects, note}`. The objects are the privileged twin's objects
-  (same names) or else the scene's non-robot free bodies; only poses: no velocities, goals, regions, predicate values or
-  thresholds. The frame is the one the service already gives the robot's poses in (world, or the robot / odometry frame
-  where the service withholds world).
-- The 2.2 / 2.4 layers' spec check accepts that one key; an adapter without the hook refuses to start with the switch on
-  (2.1: the adapter's `object_poses()` / `object_pose_spec()`; 2.2 / 2.4: `Service(object_poses=..., object_pose_spec=...)`).
+### Privileged state queries (an ablation, `RCB_STATE_QUERY=1`)
+Not part of the protocol's official configuration, and against "Never provided" (object poses, the scene's state) on
+purpose: a switch every eai-standard service of this branch reads from its `sim` environment, off by default (then both
+routes are 404 and nothing else changes). The ablation's task dirs set `RCB_STATE_QUERY: "1"` in the `sim` service and
+add the instruction section `## This run: privileged state queries` (`scripts/ablation_tasks.py`). With it on:
+- **`GET /state/entities`** answers `{"frame", "quaternion_order", "entities": {name: {"kind", "fields": {field:
+  unit}}}}`, fixed for the trial. Kinds: `robot` (the robot's base or root, always present), `robot_link` (end
+  effectors, hands, feet, pelvis, head ...), `object` (every task-relevant object), `articulation` (doors, drawers,
+  faucets, hurdles: their joints) and `scene_feature` (zones, lines, hazards, canvas regions, field geometry).
+- **`POST /state/query`** `{"names": [...], "fields": [...]}` (`fields` optional: every field of each name) answers JSON
+  `{"state": {name: {field: value}}, "control_steps", "sim_time_s", "state_queries"}`: the current values in the world
+  frame `frame` describes. The usual fields: `pos` [3] m, `quat` [4], `lin_vel` [3] m/s, `ang_vel` [3] rad/s,
+  `height_above_ground` m, `joint_pos` / `joint_vel` {joint: rad or m}, `joint_range`, `size` [3] m (full extents),
+  `bbox` [[min], [max]] m, and a benchmark's own physical state with its unit (e.g. a canvas region's paint coverage).
+  A field an entity lacks is left out of its entry; an unknown name or field (or any other key in the body) is a 400
+  that lists the valid ones.
+- A query only reads the simulator: no control step, the clock neither advances nor pauses (2.1, 2.2 and 2.4 serve it
+  between calls; 2.3 on the simulator thread between two control steps, at the current simulation time). It is served
+  only while the episode runs: a 409 after the episode's end. An error reading the state is a 500 that ends nothing.
+- Never in the table: task predicates, success flags, progress, rewards, distances to a goal, thresholds, referee or
+  hold counters, or a goal the instruction does not state.
+- Every answered query is logged in `episode.jsonl` (`ev: state_query`: names, fields, control steps); `final.json` and
+  `/status` carry `state_queries` (the count, kept across a crash resume), and the graders copy it into `reward.json`.
+- Shared implementation: `StateTable` and `plan_state_query` in `rcb_service.py` (2.1, and 2.3 through
+  `rcb_realtime.py`: the adapter's `state_table()`) and `rcb_limited.py` (2.2, 2.4: `Service(state_table=...)`;
+  `toy_server.py` is the reference adapter); the same tests as above.
 
 ## Part 2 — `eai-standard/2.2`: capabilities added to 2.1
 

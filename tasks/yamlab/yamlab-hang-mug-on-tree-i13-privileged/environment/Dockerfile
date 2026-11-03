@@ -85,7 +85,7 @@ WORKDIR /app
 # Everything task-specific is copied here; YAMLab's demonstrations are not in the image.
 FROM yamlab-base
 COPY instance.json /app/instance.json
-COPY --from=ghcr.io/mll-lab-nu/efe:yamlab-files-0.5.0-resetpose@sha256:00e2f3d2c05f5e9b2444783c978eaf00aeda7f4767ccb4fe43dabd41747c2b98 /privileged/environment/rcb_yamlab.py /opt/tools/rcb_yamlab.py
+COPY --from=ghcr.io/mll-lab-nu/efe:yamlab-files-0.5.0-stateq@sha256:b38d280ed9a712c035131b04406dca1533bf074596febc8041323909d1c15801 /privileged/environment/rcb_yamlab.py /opt/tools/rcb_yamlab.py
 ENV PYTHONPATH=/opt/tools
 RUN mkdir -p /app/output
 WORKDIR /app

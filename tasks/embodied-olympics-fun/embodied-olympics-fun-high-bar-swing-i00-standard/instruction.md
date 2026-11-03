@@ -178,6 +178,32 @@ sensor; angular velocity `gx, gy, gz`, rad/s; acceleration `ax, ay, az`, m/s², 
 4 joints / lowcmd; the G1 also 5 walk_falcon, 6 walk_agile), the velocity command in force (`cmd_vx`, `cmd_vy`, `cmd_wz`) and `time_s`, the attempt's time. Then, at the end of the row, the grippers: `jaw_opening_left`, `jaw_speed_left`, `jaw_force_left`, `jaw_opening_right`, `jaw_speed_right`, `jaw_force_right` (the opening between the pads in m, its speed in m/s, + opening, and the clamp force in N, + closing); a gripper's `holding_*` is 1 while both its jaws touch the same object. A
 real G1 has no sensor for its position in the venue, and neither do you: that is what the cameras are for.
 
+## This run: privileged state queries
+
+This run lets you query the simulator's state. This section overrides anything above, and anything in `/spec`, that
+says object poses or the scene's state are never given.
+
+- `GET /state/entities` (on the same base URL as your other calls) lists what you can query:
+  `{"frame": ..., "quaternion_order": ..., "entities": {name: {"kind": ..., "fields": {field: unit}}}}`. The
+  kinds are `robot` (the robot's base or root), `robot_link` (a hand, a foot, an end effector), `object`,
+  `articulation` (a door, a drawer, a faucet: its joints) and `scene_feature` (a zone, a line, a hazard, a canvas
+  region). The list is fixed for the run.
+- `POST /state/query` with `{"names": ["robot", ...], "fields": ["pos", "quat"]}` answers JSON
+  `{"state": {name: {field: value}}, "control_steps": ..., "sim_time_s": ..., "state_queries": ...}` with the
+  current values. `fields` is optional: without it you get every field of each name. In Python:
+  `requests.post(base + "/state/query", json={"names": ["robot"]}).json()["state"]`.
+  - The usual fields: `pos` [x, y, z] m, `quat` (in `quaternion_order`), `lin_vel` m/s, `ang_vel` rad/s,
+    `height_above_ground` m, `joint_pos` / `joint_vel` {joint: value}, `size` [3] m (full extents), and `bbox`
+    [[min x, y, z], [max x, y, z]] m. A task may add its own; each field's unit is in the list.
+  - All values are in the world frame that `frame` describes.
+  - A field that an entity does not have is left out of its entry.
+  - An unknown name or field is a 400 that lists the valid ones.
+- A query only reads. It takes no control step, and it does not advance or pause the clock. In standard-realtime it
+  answers at the current simulation time while the robot keeps moving. It is served while the episode runs (409 after
+  the episode ended). Queries are counted and recorded; they do not change the grading.
+- Nothing else changes: the goal, the success rule and its thresholds are not given, and no answer says whether the
+  task is done.
+
 ## External material
 The network is open. You may install packages (pip, apt), and you may search for, download and use public tools, robot models and pretrained controllers (for example a published Unitree G1 walking, jumping or whole-body policy): finding existing work and adapting it to this robot is encouraged. Say in your notes what you used. You may read anything installed in your container, this benchmark's own source code included. The one thing not to look up is a ready-made solution to this exact task, such as this benchmark's reference solutions. This is an honour rule; trials are reviewed.
 

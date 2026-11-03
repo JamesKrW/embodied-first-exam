@@ -28,6 +28,7 @@ services:
     command: python /srv/rcb_realtime.py
     restart: on-failure:6          # N >= 3 (docs/protocol/standard_mode.md); a resume continues the episode, paused
     environment:
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_INSTANCE: /srv/instance.json
       RCB_DATA: /data
       RCB_WALL_CLOCK_S: "1800"

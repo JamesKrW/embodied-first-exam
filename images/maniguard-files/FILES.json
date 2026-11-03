@@ -1,12 +1,12 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:maniguard-files-0.5.0-resetpose@sha256:a83013a92c91bdabefedb4f2d741191882f5e120f0dc21a70e54b5d6604f9758",
+ "image": "ghcr.io/mll-lab-nu/efe:maniguard-files-0.5.0-stateq@sha256:dbeb9245e2e3d937d4b67be3dfbb4f43832aa912d46d64c96618eb900d343272",
  "source": "embodied_first_exam/benchmarks/maniguard",
  "files": {
   "privileged/environment/rcb_maniguard.py": "ab479550a5c89a7732245680b306c645672a100ed92340d4e8db0e3eba75b1a2",
   "privileged/tests/grade.py": "92218daba686ad789e3bf8cb8424bb37d81d3a8a9c9ff4bc4c48f5275ec2f134",
   "sim/finalize.sh": "8885e825c41e1c80f9dd7b6b393f8bd37134c1d4ea65052cfd98bf50d60b0cdb",
   "sim/live_video.py": "2531062224978257c86fbf9c38b58c0f46480390d775d4de4f807932791dbfb3",
-  "sim/server.py": "8db2d512af221eaaf96db9a8378dc4181132f027eac8a6b03f2661a5968e82db",
-  "standard/tests/grade.py": "60b22dcaf003ecd753c52cfc01b4c792e98ef7e012e6e44ab350b3c89c00ba23"
+  "sim/server.py": "7243c4594d00d4c166c2a36727839c4b94a31be520c6f85cf9464d2bac8f3cb0",
+  "standard/tests/grade.py": "2df5a04da253c1d3156e4983121bffdb3f817b6ba24a12217ada6acadc7eb784"
  }
 }

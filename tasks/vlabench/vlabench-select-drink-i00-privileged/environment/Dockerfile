@@ -43,7 +43,7 @@ WORKDIR /app
 # VLABench privileged task: the VLABench image (stage vlabench-base above), the task's tooling and its frozen instance.
 FROM vlabench-base
 COPY instance.json /app/instance.json
-COPY --from=ghcr.io/mll-lab-nu/efe:vlabench-files-0.5.0-resetpose@sha256:dd3143e3b83826d4486752f41400a89c28241ac801d6f9507f0d4321a9f64724 /privileged/environment/vlb_tool.py /opt/tools/vlb_tool.py
+COPY --from=ghcr.io/mll-lab-nu/efe:vlabench-files-0.5.0-stateq@sha256:f59f1599d809f99c0af5da1478f02f0829f89b1adfce9cd8269572b5d2d1017d /privileged/environment/vlb_tool.py /opt/tools/vlb_tool.py
 ENV PYTHONPATH=/opt/tools:/opt/VLABench:/opt/rrt-algorithms
 RUN mkdir -p /app/output
 WORKDIR /app

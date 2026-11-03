@@ -20,7 +20,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6          # a crash retries; mid-episode the service resumes the same episode from its journal (never a reset; server.py)
     environment:
-      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_TASK: hanging_mug
       RCB_INSTANCE: /srv/instance.json
       PYTHONPATH: /srv:/opt/RoboTwin

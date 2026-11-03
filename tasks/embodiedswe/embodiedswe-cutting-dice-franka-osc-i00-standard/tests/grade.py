@@ -47,7 +47,9 @@ unfinished = not d.get("finalized")
 infra = bool(d.get("infra_error")) or unfinished
 sim_error = d.get("reason") == "error"
 ok = bool(d.get("success")) and not infra and not sim_error
-write(ok, {"success": int(ok), "progress": 0.0 if infra else num("progress"), "live_success": int(bool(d.get("success"))),
+# the state-query ablation's count (RCB_STATE_QUERY=1: final.json then has state_queries; nothing without it)
+SQ = {"state_queries": int(num("state_queries"))} if "state_queries" in d else {}
+write(ok, {**SQ, "success": int(ok), "progress": 0.0 if infra else num("progress"), "live_success": int(bool(d.get("success"))),
            "graded_by_live": 1, "replays": 0, "finalized": int(not unfinished), "missing_log": 0,
            "n_actions": int(num("n_actions")), "sim_steps": int(num("control_steps")), "physics_steps": int(num("physics_steps")),
            "steps": int(num("steps")), "calls": int(num("calls")), "elapsed_s": num("elapsed_s"),

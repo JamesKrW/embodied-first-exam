@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """CPU-only self-test of the shared 2.2 layer's ablation switches on the toy adapter (toy_server.py under run.sh, as
-selftest.py runs it): RCB_EXPOSE_OBJECT_POSES (meta["objects"], /spec.object_poses) and RCB_STATE_OPS (/reset,
+selftest.py runs it): RCB_STATE_QUERY (GET /state/entities, POST /state/query, state_queries) and RCB_STATE_OPS (/reset,
 /save_state, /load_state, their counters, refusals, crash-resume replay and final.json fields). With both off the
 service answers exactly as before: the new routes are 404 and no new key appears. Needs numpy + requests.
 
@@ -34,37 +34,67 @@ def switches_off_change_nothing():
     try:
         r = c.robot()
         spec = r.spec()
-        expect("object_poses" not in spec and "state_ops" not in spec and spec["budget"]["reset"] == 0, f"spec {sorted(spec)}")
+        expect("state_query" not in spec and "state_ops" not in spec and spec["budget"]["reset"] == 0, f"spec {sorted(spec)}")
         res = r.submit("joint_position", chunk(3, 0.2), dt=0.05, video="none")
         expect("objects" not in res.meta and "saves" not in res.meta and "episode" not in res.meta, f"meta {sorted(res.meta)}")
-        for p in ("/reset", "/save_state", "/load_state"):
+        for p in ("/reset", "/save_state", "/load_state", "/state/query"):
             expect(post(c, p).status_code == 404, f"{p} without the switch")
+        expect(requests.get(c.url + "/state/entities", timeout=60).status_code == 404, "entities without the switch")
         expect(c.end() == 2, "verdict")
         fin = c.final()
-        expect(not ({"saves", "loads", "episodes_log", "resets_at_success"} & set(fin)), f"final {sorted(fin)}")
+        expect(not ({"saves", "loads", "episodes_log", "resets_at_success", "state_queries"} & set(fin)),
+               f"final {sorted(fin)}")
     finally:
         c.down()
 
 
 @case
-def object_poses_in_every_answer():
-    c = T.Compose("abl_pose", RCB_EXPOSE_OBJECT_POSES="1")
+def state_query_reads_without_stepping():
+    c = T.Compose("abl_query", RCB_STATE_QUERY="1")
     try:
         r = c.robot()
-        op = r.spec()["object_poses"]
-        expect(op["objects"] == ["block"] and op["quaternion_order"] == "wxyz" and op["units"] == "m", f"spec {op}")
-        o = r.get_obs(video="none").meta["objects"]
-        expect(o == {"block": {"pos": [0.5, 0.0, 0.0], "quat": [1.0, 0.0, 0.0, 0.0]}}, f"observe objects {o}")
+        expect("state_query" in r.spec() and "objects" not in r.get_obs(video="none").meta, "spec note, no pushed state")
+        ents = requests.get(c.url + "/state/entities", timeout=60).json()
+        expect(ents["quaternion_order"] == "wxyz" and ents["entities"]["block"]["kind"] == "object"
+               and ents["entities"]["block"]["fields"]["pos"] == "m" and ents["entities"]["arm"]["kind"] == "robot",
+               f"entities {ents}")
+        q = post(c, "/state/query", {"names": ["block"], "fields": ["pos"]}).json()
+        expect(q["state"] == {"block": {"pos": [0.5, 0.0, 0.0]}} and q["control_steps"] == 0 and q["state_queries"] == 1,
+               f"query {q}")
         res = r.submit("joint_position", chunk(30, 0.6), dt=0.05, video="none")   # the tip reaches the block, pushes it
-        expect(res.meta["objects"]["block"]["pos"][0] > 0.5, f"the pose follows the block {res.meta['objects']}")
+        q = post(c, "/state/query", {"names": ["block", "arm"]}).json()
+        expect(q["state"]["block"]["pos"][0] > 0.5 and set(q["state"]["arm"]) == {"joint_pos", "tip_pos"}
+               and q["state_queries"] == 2 and q["control_steps"] == int(res.meta["executed_rows"]),
+               f"the state follows the block {q}")
+        both = post(c, "/state/query", {"names": ["block", "arm"], "fields": ["quat"]}).json()
+        expect(both["state"] == {"block": {"quat": [1.0, 0.0, 0.0, 0.0]}, "arm": {}} and both["control_steps"] == q["control_steps"],
+               f"a field an entity lacks is left out, no step taken {both}")
+        bad = post(c, "/state/query", {"names": ["blok"]})
+        expect(bad.status_code == 400 and bad.json()["unknown"] == ["blok"] and "block" in bad.json()["names"], bad.text)
+        bad = post(c, "/state/query", {"names": ["block"], "fields": ["velocity"]})
+        expect(bad.status_code == 400 and bad.json()["fields"]["block"] == ["pos", "quat"], bad.text)
+        for body in ({}, {"names": []}, {"names": ["block"], "field": ["pos"]}, {"names": "block"}):
+            expect(post(c, "/state/query", body).status_code == 400, f"malformed {body}")
         expect(post(c, "/reset").status_code == 404, "no state ops without RCB_STATE_OPS")
+        c.kill_service()                                   # the count survives a crash (each query is logged)
+        r.wait_ready(60)
+        expect(post(c, "/state/query", {"names": ["block"]}).json()["state_queries"] == 4, "counted across a resume")
+        r.submit("joint_position", chunk(40, 0.95), dt=0.05, video="none")
+        expect(r.status()["done"], "the episode ended")
+        late = post(c, "/state/query", {"names": ["block"]})
+        expect(late.status_code == 409, f"after the end {late.text}")
+        expect(c.end() == 2, "verdict")
+        fin = c.final()
+        expect(fin["state_queries"] == 4, f"final {fin.get('state_queries')}")
+        ev = [e for e in c.events() if e["ev"] == "state_query"]
+        expect([e["n"] for e in ev] == [1, 2, 3, 4] and ev[0]["names"] == ["block"], f"logged {ev}")
     finally:
         c.down()
 
 
 @case
 def reset_save_load_and_their_rules():
-    c = T.Compose("abl_ops", RCB_STATE_OPS="1", RCB_RESET_BUDGET="3", RCB_EXPOSE_OBJECT_POSES="1")
+    c = T.Compose("abl_ops", RCB_STATE_OPS="1", RCB_RESET_BUDGET="3", RCB_STATE_QUERY="1")
     try:
         r = c.robot()
         spec = r.spec()
@@ -80,7 +110,9 @@ def reset_save_load_and_their_rules():
         ld = post(c, "/load_state", {"handle": "s1", "cameras": []})
         expect(ld.status_code == 200, f"load {ld.text}")
         m = T.rcb_client.rcb1.decode(ld.content)[0]
-        expect(m["episode"] == 2 and m["loads"] == 1 and m["objects"]["block"]["pos"] == [0.5, 0.0, 0.0], f"load answer {m}")
+        expect(m["episode"] == 2 and m["loads"] == 1, f"load answer {m}")
+        q = post(c, "/state/query", {"names": ["block"], "fields": ["pos"]}).json()
+        expect(q["state"]["block"]["pos"] == [0.5, 0.0, 0.0] and q["control_steps"] == 0, f"the loaded state {q}")
         st = r.status()
         expect(st["episode"] == 2 and st["loads"] == 1 and st["resets_left"] == 3 and not st["done"], f"after load {st}")
         expect(st["control_steps_total"] == 10, f"journal keeps every row {st}")

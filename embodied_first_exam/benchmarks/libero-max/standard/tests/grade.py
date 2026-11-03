@@ -68,6 +68,8 @@ def main() -> None:
                "reset_budget": int(d.get("reset_budget") or 0),
                "sim_startups": int(d.get("sim_startups") or 0), "elapsed_s": float(d.get("elapsed_s") or 0.0),
                "video_rendered": int(bool(d.get("video")))}
+        if "state_queries" in d:   # the state-query ablation (RCB_STATE_QUERY=1): its /state/query calls; never the verdict
+            out["state_queries"] = int(d.get("state_queries") or 0)
     except Exception:  # noqa: BLE001 -- an unreadable final.json is the grader's failure, not the agent's
         traceback.print_exc()
         write(False, {**BLANK, "infra_error": 1, "grader_error": 1})

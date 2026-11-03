@@ -27,10 +27,13 @@ the verdict, to film it. start_sha is the frozen instance's recorded scene_sha (
 rcb_service checks when an episode begins; a KinDER that no longer builds the instance is InstanceMismatch.
 
 Ablations (off unless the task sets them; nothing here runs without them), TidyBot only:
-  rcb_service.OBJECT_POSES  object_poses(): KinDER's movable objects (its object-centric state's mujoco_movable_object,
-                            by name, as the privileged twin's state() has them), in the odometry frame (turned by the
-                            service's own transform, as the base's pose is); quaternions w x y z; size: KinDER's bounding
-                            box dimensions (bb_x, bb_y, bb_z, m, in the object's own frame).
+  rcb_service.STATE_QUERY   state_table(): the privileged state in the odometry frame (turned by the service's own
+                            transform, as the base's pose is; quaternions w x y z): the robot's base pose and velocity,
+                            its arm joints and gripper driver, its end effector and finger pads; KinDER's movable
+                            objects (pose, velocity, KinDER's bounding box dimensions, bbox); its fixtures (pose, size,
+                            bbox) and drawers (the slide joint). Names are KinDER's object-centric ones (the privileged
+                            twin's state()). A query reads a scratch copy of the live MuJoCo state (MjRead); it takes no
+                            control step. KinDER's regions (init and goal regions) are never in it.
   rcb_service.STATE_OPS     save_state() / load_state(): every array of MuJoCo's data (derived quantities included: the
                             arm's PD reads the bias forces before it steps), KinDER's cached object-centric state and
                             counters, this Session's observation and step count, the gripper command held: exact.
@@ -127,6 +130,170 @@ def depth_spec() -> dict:
     return {"cameras": list(DEPTH), "units": "metres along the camera's forward axis (planar depth, as an RGB-D camera "
             "reports it), pixel for pixel with that camera's image; noise-free", "range_m": [0.0, DEPTH_MAX_M],
             "nothing_in_range": 0.0}
+
+
+# rcb_service.STATE_QUERY: the state table (TidyBot.state_table), read by MjRead.
+class MjRead:
+    """The state-query ablation's read of a live MuJoCo simulation, read-only: refresh() copies the live qpos, qvel and
+    mocap poses into a scratch MjData of the same model and runs the position and velocity stages there (mj_kinematics,
+    mj_comPos, mj_comVel), so each pose and velocity is the current state's and the live MjData is never written. The
+    model and the live data may be given as callables (a simulator that rebuilds them on reset)."""
+
+    def __init__(self, mj, model, data):
+        self.mj, self._model, self._live = mj, model, data
+        self.m = self.d = None
+
+    def refresh(self) -> "MjRead":
+        m = self._model() if callable(self._model) else self._model
+        live = self._live() if callable(self._live) else self._live
+        if m is not self.m:
+            self.m, self.d = m, self.mj.MjData(m)
+        d = self.d
+        d.qpos[:] = live.qpos
+        d.qvel[:] = live.qvel
+        if m.nmocap:
+            d.mocap_pos[:] = live.mocap_pos
+            d.mocap_quat[:] = live.mocap_quat
+        d.time = live.time
+        self.mj.mj_kinematics(m, d)
+        self.mj.mj_comPos(m, d)
+        self.mj.mj_comVel(m, d)
+        return self
+
+    def vel(self, objtype: str, i: int):
+        """(linear m/s, angular rad/s) of a body or site, world frame, at its frame origin."""
+        r = np.zeros(6)
+        self.mj.mj_objectVelocity(self.m, self.d, getattr(self.mj.mjtObj, f"mjOBJ_{objtype.upper()}"), int(i), r, 0)
+        return r[3:].copy(), r[:3].copy()
+
+    def site_quat(self, i: int):
+        q = np.zeros(4)
+        self.mj.mju_mat2Quat(q, self.d.site_xmat[i])
+        return q
+
+    def body_geoms(self, b: int) -> list:
+        """The geoms of body b and of every body fixed to it (reached without crossing a joint)."""
+        m, out, todo = self.m, [], [int(b)]
+        while todo:
+            c = todo.pop()
+            out += range(int(m.body_geomadr[c]), int(m.body_geomadr[c]) + int(m.body_geomnum[c])) if m.body_geomnum[c] else []
+            todo += [k for k in range(c + 1, m.nbody) if int(m.body_parentid[k]) == c and not m.body_jntnum[k]]
+        return out
+
+    def _corners(self, g: int):
+        """The 8 corners of geom g's own bounding box (model.geom_aabb), world frame, in the current state."""
+        c, h = self.m.geom_aabb[g][:3], self.m.geom_aabb[g][3:]
+        s = np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)], float)
+        return (c + s * h) @ self.d.geom_xmat[g].reshape(3, 3).T + self.d.geom_xpos[g]
+
+    def size(self, b: int):
+        """Full extents [3] (m) of body_geoms(b) along the body's own axes, or None (no geom)."""
+        gs = self.body_geoms(b)
+        if not gs:
+            return None
+        p = (np.concatenate([self._corners(g) for g in gs]) - self.d.xpos[b]) @ self.d.xmat[b].reshape(3, 3)
+        return p.max(0) - p.min(0)
+
+    def bbox(self, b: int):
+        """[[x, y, z] min, [x, y, z] max] (m) of body_geoms(b), world axes, in the current state, or None."""
+        gs = self.body_geoms(b)
+        if not gs:
+            return None
+        p = np.concatenate([self._corners(g) for g in gs])
+        return [p.min(0), p.max(0)]
+
+    def height_above_ground(self, b: int, exclude: set):
+        """The body's height above the first colliding geom straight below its frame origin that belongs to none of the
+        bodies in `exclude` (the robot itself), by ray casts on the scratch data; None when nothing is below."""
+        m, d = self.m, self.d
+        p0 = d.xpos[b].copy()
+        p = p0.copy()
+        gid = np.zeros(1, np.int32)
+        for _ in range(16):
+            dist = self.mj.mj_ray(m, d, p, np.array([0.0, 0.0, -1.0]), None, 1, -1, gid)
+            if dist < 0 or gid[0] < 0:
+                return None
+            g = int(gid[0])
+            if int(m.geom_bodyid[g]) in exclude or not (m.geom_contype[g] or m.geom_conaffinity[g]):
+                p = p - np.array([0.0, 0.0, dist + 1e-4])
+                continue
+            return float(p0[2] - (p[2] - dist))
+        return None
+
+    def subtree(self, root: int) -> set:
+        """Body ids of root and every body below it."""
+        out, m = {int(root)}, self.m
+        for b in range(int(root) + 1, m.nbody):
+            if int(m.body_parentid[b]) in out:
+                out.add(b)
+        return out
+
+    def joints(self, ids) -> dict:
+        """{name: qpos address, dof address, range or None} of hinge and slide joints."""
+        m, out = self.m, {}
+        for j in ids:
+            j = int(j)
+            if int(m.jnt_type[j]) in (2, 3):              # mjJNT_SLIDE, mjJNT_HINGE
+                rng = [float(m.jnt_range[j][0]), float(m.jnt_range[j][1])] if m.jnt_limited[j] else None
+                out[m.joint(j).name or f"joint{j}"] = (int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j]), rng)
+        return out
+
+
+def mj_body_fields(R: MjRead, b: int, *, vel: bool = True, size: bool = False, bbox: bool = False,
+                   ground_exclude: set | None = None) -> dict:
+    """StateTable fields of one MuJoCo body: pos, quat (w x y z), lin_vel / ang_vel (world frame), size, bbox,
+    height_above_ground."""
+    f = {"pos": ("m", lambda: R.d.xpos[b].copy()), "quat": ("1 (w x y z)", lambda: R.d.xquat[b].copy())}
+    if vel:
+        f["lin_vel"] = ("m/s", lambda: R.vel("body", b)[0])
+        f["ang_vel"] = ("rad/s", lambda: R.vel("body", b)[1])
+    if size and R.body_geoms(b):
+        ext = R.size(b)
+        f["size"] = ("m (full extents of its geoms and those fixed to it, along the body's axes)", lambda: ext)
+    if bbox and R.body_geoms(b):
+        f["bbox"] = ("m ([min xyz, max xyz] of its geoms and those fixed to it, world axes)", lambda: R.bbox(b))
+    if ground_exclude is not None:
+        f["height_above_ground"] = ("m", lambda: R.height_above_ground(b, ground_exclude))
+    return f
+
+
+def mj_site_fields(R: MjRead, s: int, *, vel: bool = True) -> dict:
+    f = {"pos": ("m", lambda: R.d.site_xpos[s].copy()), "quat": ("1 (w x y z)", lambda: R.site_quat(s))}
+    if vel:
+        f["lin_vel"] = ("m/s", lambda: R.vel("site", s)[0])
+        f["ang_vel"] = ("rad/s", lambda: R.vel("site", s)[1])
+    return f
+
+
+def mj_joint_fields(R: MjRead, joint_ids, *, ranges: bool = False) -> dict:
+    """joint_pos / joint_vel {joint: rad or m (/s)} (and joint_range {joint: [lo, hi]}) of hinge and slide joints."""
+    J = R.joints(joint_ids)
+    if not J:
+        return {}
+    f = {"joint_pos": ("rad or m", lambda: {n: float(R.d.qpos[a]) for n, (a, _, _) in J.items()}),
+         "joint_vel": ("rad/s or m/s", lambda: {n: float(R.d.qvel[v]) for n, (_, v, _) in J.items()})}
+    rng = {n: r for n, (_, _, r) in J.items() if r is not None}
+    if ranges and rng:
+        f["joint_range"] = ("rad or m ([lo, hi])", lambda: rng)
+    return f
+
+
+class MjStateTable:
+    """A StateTable whose query() refreshes the MjRead once, then reads every planned field from it."""
+
+    def __init__(self, table, reader: MjRead):
+        self.table, self.reader = table, reader
+
+    def add(self, *a, **k):
+        self.table.add(*a, **k)
+        return self
+
+    def entities(self) -> dict:
+        return self.table.entities()
+
+    def query(self, plan: dict) -> dict:
+        self.reader.refresh()
+        return self.table.query(plan)
 
 
 class _Robot:
@@ -314,27 +481,94 @@ class TidyBot(_Robot):
         super().reset()
         self._grip = self._robot()["pos_gripper"]
 
-    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, OBJECT_POSES)
-    def object_pose_spec(self) -> dict:
-        return {"frame": "odometry (where the base started the episode: origin on the floor under the base's centre, x "
-                         "the way it faced, y left, z up)",
-                "quaternion_order": "wxyz", "objects": [o.name for o in self.s.state() if o.type.name == MOVABLE],
-                "size": "bb_x, bb_y, bb_z: the object's bounding box dimensions in its own frame, m"}
-
-    def object_poses(self) -> dict:
-        st = self.s.state()
+    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, STATE_QUERY)
+    def state_table(self):
+        """The state-query ablation's table, in the odometry frame: the robot (base pose and velocity, arm joints
+        arm_1..7 and the gripper's driver joint), its end effector (PINCH on the arm's last link) and finger pads;
+        KinDER's movable objects (pose, velocity, KinDER's bb_x / bb_y / bb_z, bbox), fixtures (pose, size, bbox) and
+        drawers (pose, size, bbox and the slide joint). MuJoCo's world frame turned into the odometry frame by the
+        start pose (x0, y0, yaw0): p_odom = Rz(-yaw0) (p - [x0, y0, 0]); every vector and quaternion turned by Rz(-yaw0)."""
+        R = MjRead(mujoco, lambda: self.s.model, lambda: self.s.data).refresh()
+        m = R.m
         x0, y0, th0 = self._start
-        R = rot(-th0)
+        Rz = np.eye(3)
+        Rz[:2, :2] = rot(-th0)
+        o0 = np.array([x0, y0, 0.0])
         turn = np.array([math.cos(th0 / 2), 0.0, 0.0, -math.sin(th0 / 2)])   # a turn by -th0 about z
-        out = {}
+        P = lambda p: Rz @ (np.asarray(p, float) - o0)                      # noqa: E731
+        V = lambda v: Rz @ np.asarray(v, float)                             # noqa: E731
+        Q = lambda q: _qmul(turn, np.asarray(q, float))                     # noqa: E731
+
+        def box(b):
+            gs = R.body_geoms(b)
+            if not gs:
+                return None
+            p = np.concatenate([R._corners(g) for g in gs]) @ Rz.T - Rz @ o0
+            return [p.min(0), p.max(0)]
+
+        def body(b, *, vel=True, size=None, bbox=False):
+            f = {"pos": ("m", lambda: P(R.d.xpos[b])), "quat": ("1 (w x y z)", lambda: Q(R.d.xquat[b]))}
+            if vel:
+                f["lin_vel"] = ("m/s", lambda: V(R.vel("body", b)[0]))
+                f["ang_vel"] = ("rad/s", lambda: V(R.vel("body", b)[1]))
+            if size is not None:
+                f["size"] = size
+            if bbox and R.body_geoms(b):
+                f["bbox"] = ("m ([min xyz, max xyz] of its geoms and those fixed to it, odometry axes)", lambda: box(b))
+            return f
+
+        def joints(named: dict, ranges: bool = True) -> dict:
+            J = {k: (int(m.jnt_qposadr[m.joint(j).id]), int(m.jnt_dofadr[m.joint(j).id]),
+                     [float(v) for v in m.jnt_range[m.joint(j).id]] if m.jnt_limited[m.joint(j).id] else None)
+                 for k, j in named.items()}
+            f = {"joint_pos": ("rad or m", lambda: {k: float(R.d.qpos[a]) for k, (a, _, _) in J.items()}),
+                 "joint_vel": ("rad/s or m/s", lambda: {k: float(R.d.qvel[v]) for k, (_, v, _) in J.items()})}
+            rng = {k: r for k, (_, _, r) in J.items() if r is not None}
+            if ranges and rng:
+                f["joint_range"] = ("rad or m ([lo, hi])", lambda: rng)
+            return f
+
+        t = MjStateTable(rcb_service.StateTable(
+            frame="odometry (spec.odometry: where the base started the episode: origin on the floor under the base's "
+                  "centre, x the way it faced, y left, z up), the frame of the proprio base pose and of the actions' "
+                  "base moves; KinDER's world coordinates never appear",
+            quaternion_order="wxyz",
+            note="a pose is a body's frame origin; velocities are at that origin, in odometry axes; names are KinDER's "
+                 "object-centric ones"), R)
+        base = m.body("robot_base_link").id
+        t.add("robot", "robot", {**body(base), **joints({**dict(zip(ARM, ARM_JOINTS)), "gripper_driver": GRIPPER_JOINT})},
+              note="TidyBot++: the base (pose = proprio base_x, base_y, base_yaw; z on the floor), the arm's joints "
+                   "arm_1..7 (rad) and the Robotiq's driver joint gripper_driver (rad; proprio gripper is it over its "
+                   "closed limit)")
+        last = m.body("robot_bracelet_link").id
+        pinch = self.PINCH
+        t.add("end_effector", "robot_link",
+              {"pos": ("m", lambda: P(R.d.xpos[last] + R.d.xmat[last].reshape(3, 3) @ pinch)),
+               "quat": ("1 (w x y z)", lambda: Q(R.d.xquat[last]))},
+              note="spec arm.end_effector: where the finger pads meet when the gripper closes on nothing, with the "
+                   "orientation of the arm's last link")
+        for side in ("left", "right"):
+            t.add(f"{side}_pad", "robot_link", body(m.body(f"robot_{side}_pad").id), note=f"the gripper's {side} finger pad")
+        st = self.s.state()
+        names = {m.body(i).name: i for i in range(m.nbody)}
         for o in st:
-            if o.type.name != MOVABLE:
+            typ, n = o.type.name, o.name
+            if n not in names:
                 continue
-            f = {k: float(st.get(o, k)) for k in ("x", "y", "z", "qw", "qx", "qy", "qz", "bb_x", "bb_y", "bb_z")}
-            q = np.array([f["qw"], f["qx"], f["qy"], f["qz"]])
-            out[o.name] = rcb_service.pose_entry([*(R @ [f["x"] - x0, f["y"] - y0]), f["z"]],
-                                                 _qmul(turn, q / np.linalg.norm(q)), [f["bb_x"], f["bb_y"], f["bb_z"]])
-        return out
+            b = names[n]
+            if typ == MOVABLE:
+                bb = [float(st.get(o, k)) for k in ("bb_x", "bb_y", "bb_z")]
+                t.add(n, "object", body(b, size=("m (KinDER's bb_x, bb_y, bb_z: bounding box dimensions in its own "
+                                                 "frame)", lambda bb=bb: bb), bbox=True), note=f"KinDER {typ}")
+            elif typ == "mujoco_drawer" and f"{n}_joint" in [m.joint(j).name for j in range(m.njnt)]:
+                t.add(n, "articulation", {**body(b, vel=False, bbox=True), **joints({n: f"{n}_joint"})},
+                      note=f"KinDER {typ}: the drawer body and its slide joint (m)")
+            elif typ != self.robot_type and not typ.startswith("mujoco_tidybot"):
+                ext = R.size(b)
+                t.add(n, "scene_feature", body(b, vel=False, bbox=True, size=None if ext is None else
+                      ("m (full extents of its geoms and those fixed to it, along its own axes)", lambda e=ext: e)),
+                      note=f"KinDER {typ}")
+        return t
 
     def _oc(self):
         return self.s.env.unwrapped._object_centric_env

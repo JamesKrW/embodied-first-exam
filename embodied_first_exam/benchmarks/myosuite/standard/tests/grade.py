@@ -108,5 +108,6 @@ write(
         "resume_state_mismatch": int(d.get("resume_state_mismatch") or 0),
         "resume_max_joint_dev": num("resume_max_joint_dev"),
         **state_ops_fields(d, ok),
+        **({"state_queries": int(d.get("state_queries") or 0)} if "state_queries" in d else {}),   # RCB_STATE_QUERY=1
     },
 )

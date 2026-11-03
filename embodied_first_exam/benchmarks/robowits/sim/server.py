@@ -31,7 +31,14 @@ Differences from the RoboTwin service, all from the simulator: rows are streamed
 step; 4 physics substeps each), the joint action is RoboWits' own JOINT_ABS layout (per arm 7 joints + gripper width),
 `ee_pose` is solved by RoboWits' pink/pinocchio IK instead of a planner, and the wrist cameras move, so the calibration
 comes with every response and every frame (wrist cameras are link-mounted: /spec gives the link and the offset).
-Depth is Genesis' rasterizer z-depth for the same camera and pixels."""
+Depth is Genesis' rasterizer z-depth for the same camera and pixels.
+
+Ablations (rcb_limited; off unless the task sets the switch): with RCB_STATE_QUERY=1 the state table holds the robot (its
+base pose, velocity and height above the floor, the joints in the action layout), both tool frames, the gripper bases and
+fingers, every task object as Session.objects() names it (a rigid body: pose, velocity, declared size, world box; an
+articulated one also its joints with their ranges; a particle body: its centroid, mean velocity and box) and the table,
+all in the RoboWits world frame (that of /spec world and proprio), quaternions wxyz. A query reads Genesis' entity
+state."""
 from __future__ import annotations
 import json, math, os, sys, threading, time, traceback
 import numpy as np
@@ -316,22 +323,90 @@ SPEC = {
                 "the settle window that ended it (its steps are part of the recording; nothing is replayed to grade it)"),
 }
 # The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
-# RCB_EXPOSE_OBJECT_POSES=1: the task objects as Session.objects() names them (the table left out), in the world frame of
-# /spec world, ee_pose and proprio tcp_pose: position and orientation (wxyz) of a rigid object, its size where RoboWits
-# declares one; a particle body (dough, sand, water) gives its particle centroid only, as the privileged API does.
-OBJECTS = S.objects() if L.OBJECT_POSES else {}
-OBJECT_SIZE = {n: o["size"] for n, o in OBJECTS.items() if any(float(x) for x in (o.get("size") or ()))}
+# RCB_STATE_QUERY=1: the state table (module docstring, "Ablations").
+def _g(x) -> np.ndarray:
+    """A Genesis tensor of one environment as float64 numpy."""
+    x = x.detach().cpu().numpy() if hasattr(x, "detach") else np.asarray(x)
+    return np.asarray(x, dtype=np.float64)
 
 
-def object_poses() -> dict:
-    out = {}
-    for n, o in OBJECTS.items():
+def _one(x) -> np.ndarray:
+    v = _g(x)
+    return v[0] if v.ndim > 1 else v
+
+
+def _rigid_fields(ent) -> dict:
+    return {"pos": ("m", lambda: _one(ent.get_pos())), "quat": ("wxyz", lambda: _one(ent.get_quat())),
+            "lin_vel": ("m/s", lambda: _one(ent.get_vel())), "ang_vel": ("rad/s", lambda: _one(ent.get_ang()))}
+
+
+def _link_fields(link) -> dict:
+    return {"pos": ("m", lambda: _one(link.get_pos())), "quat": ("wxyz", lambda: _one(link.get_quat())),
+            "lin_vel": ("m/s", lambda: _one(link.get_vel())), "ang_vel": ("rad/s", lambda: _one(link.get_ang()))}
+
+
+def _object_joints(ent) -> dict:
+    """{field: (unit, getter)} for the hinge / slide joints of an articulated object (none for a single free body)."""
+    import genesis as gs
+    out = []
+    for j in getattr(ent, "joints", []) or []:
+        if j.type in (gs.JOINT_TYPE.REVOLUTE, gs.JOINT_TYPE.PRISMATIC):
+            dof = int(np.asarray(j.dofs_idx_local).reshape(-1)[0])
+            out.append((j.name, dof, j.type == gs.JOINT_TYPE.PRISMATIC,
+                        [float(x) for x in np.asarray(j.dofs_limit, dtype=np.float64).reshape(-1)[:2]]))
+    if not out:
+        return {}
+    names, dofs = [o[0] for o in out], [o[1] for o in out]
+    unit = "m" if all(o[2] for o in out) else ("rad" if not any(o[2] for o in out) else "rad or m (revolute / prismatic)")
+    rng = {o[0]: o[3] for o in out}
+    return {"joint_pos": (unit, lambda: dict(zip(names, _one(ent.get_dofs_position(dofs)).tolist()))),
+            "joint_vel": (unit + "/s", lambda: dict(zip(names, _one(ent.get_dofs_velocity(dofs)).tolist()))),
+            "joint_range": (unit, lambda: rng)}
+
+
+def state_table() -> L.StateTable:
+    t = L.StateTable(frame="RoboWits world frame (/spec world: that of ee_pose, proprio tcp_pose and /kinematics): the robot "
+                           "base at (0, 0, 1.08), x away from the robot, y to its left, z up; the floor is the plane z = 0; "
+                           "metres, quaternions wxyz, velocities in world axes", quaternion_order="wxyz")
+    r = S.robot
+    ent = r.robot_entity
+    t.add("robot", "robot", {**_rigid_fields(ent), "height_above_ground": ("m", lambda: float(_one(ent.get_pos())[2])),
+                             "joint_pos": ("rad (arm joints), m (gripper widths)", lambda: dict(zip(LAYOUT, S.joint_positions().tolist()))),
+                             "joint_vel": ("rad/s, m/s", lambda: dict(zip(LAYOUT, S.joint_velocities().tolist())))},
+          note="the bimanual Marvin on its fixed base (pos / quat = the base link); joint_pos / joint_vel in the action layout "
+               "(a gripper entry = its opening, the two fingers' sum)")
+    for arm in ("right", "left"):
+        t.add(f"{arm}_tcp", "robot_link", {"pos": ("m", lambda arm=arm: S.ee_pose(arm)[0]),
+                                           "quat": ("wxyz", lambda arm=arm: S.ee_pose(arm)[1])},
+              note=f"the {arm} gripper's tip frame (proprio tcp_pose)")
+    for link in getattr(ent, "links", []) or []:
+        n = str(link.name)
+        if "finger" in n.lower() or n in (r.GRIPPER_BASE_LINK_RIGHT, r.GRIPPER_BASE_LINK_LEFT):
+            t.add(n, "robot_link", _link_fields(link), note="a gripper finger" if "finger" in n.lower() else "a gripper base")
+    for n, o in S.objects().items():
+        e = S.env.get_entity(n)
         if o.get("material") == "particle":
-            out[n] = L.pose_entry(S._particles(S.env.get_entity(n)).mean(axis=0))
-        else:
-            pos, quat = S.object_pose(n)
-            out[n] = L.pose_entry(pos, quat, size=OBJECT_SIZE.get(n))
-    return out
+            t.add(n, "object", {"pos": ("m", lambda e=e: S._particles(e).mean(axis=0)),
+                                **({"lin_vel": ("m/s", lambda e=e: _one(e.get_particles_vel()).mean(axis=0))}
+                                   if hasattr(e, "get_particles_vel") else {}),
+                                "bbox": ("m", lambda n=n: S.object_bounds(n))},
+                  note="a particle body: pos = the particle centroid, lin_vel = the mean particle velocity, bbox = the "
+                       "particles' axis-aligned box [[min], [max]]")
+            continue
+        size = [float(x) for x in (o.get("size") or ())]
+        fields = {**_rigid_fields(e), **({"size": ("m", lambda size=size: size)} if any(size) else {}),
+                  "bbox": ("m", lambda n=n: S.object_bounds(n))}
+        try:
+            joints = _object_joints(e)
+        except Exception:  # noqa: BLE001
+            joints = {}
+        t.add(n, "articulation" if joints else "object", {**fields, **joints},
+              note=("fixed in place; " if o.get("fixed") else "") + "bbox = its axis-aligned box [[min], [max]] in the world frame")
+    table = S.env.get_entity("table")
+    if table is not None:
+        t.add("table", "scene_feature", {"pos": ("m", lambda: _one(table.get_pos())), "quat": ("wxyz", lambda: _one(table.get_quat())),
+                                         "bbox": ("m", lambda: S.object_bounds("table"))}, note="the table the task is set on")
+    return t
 
 
 # RCB_STATE_OPS=1: reset = Session.reset() (scene.reset(S0), the frozen start, exact on the CPU backend) with a new
@@ -650,8 +725,4 @@ open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
-                  state_ops=OPS,
-                  **({"object_poses": object_poses,
-                      "object_pose_spec": {"frame": "RoboWits world frame (/spec world: that of ee_pose, proprio tcp_pose and "
-                                                    "/kinematics)", "quaternion_order": "wxyz", "objects": list(OBJECTS)}}
-                     if L.OBJECT_POSES else {})))
+                  state_ops=OPS, state_table=state_table() if L.STATE_QUERY else None))

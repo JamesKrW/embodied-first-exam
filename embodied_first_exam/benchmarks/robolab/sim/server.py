@@ -26,7 +26,11 @@ Differences from the RoboTwin service, all from the simulator:
   neither ends the trial as an infrastructure failure (`instance_mismatch`, a give-up: nothing is served);
 - the video is filmed live (live_video.py): Isaac Lab renders every camera with each control step anyway, so a frame (the
   viewport cameras + the wrist camera, the tooling's own video frame) is kept every 3 control steps (5 per simulated
-  second) as a JPEG file; the collect hook encodes live.mp4 after the verdict."""
+  second) as a JPEG file; the collect hook encodes live.mp4 after the verdict.
+
+Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table (state_table(): the robot, its links,
+the scene's rigid objects and articulations, env-local frame, read on the main thread between calls) and RCB_STATE_OPS=1
+reset / save / load (ops_*)."""
 from __future__ import annotations
 import math, os, sys, threading, time, traceback
 from typing import Callable
@@ -533,30 +537,142 @@ def replay_row(row) -> None:
 
 
 # ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
-# RCB_EXPOSE_OBJECT_POSES=1: the rigid objects of the privileged twin's Session.objects() (Isaac Lab's scene.rigid_objects,
-# the same names) without the table, in the env-local frame (spec.world, the ee_pose action's frame), position +
-# quaternion wxyz, and the twin's size (the extent of the object's box, axis-aligned in that frame).
+# RCB_STATE_QUERY=1: state_table() below (the robot, its links, every rigid object and articulation of the scene).
 # RCB_STATE_OPS=1: reset = Session.reset() (env.reset_to of the frozen start, RoboLab's evaluation bookkeeping cleared;
 # approximate: reset_to does not restore every PhysX internal); save / load = the scene's get_state(is_relative=True) of
 # env 0 restored the same way (Session._restore: reset_to) plus the episode's own state: its control steps (n_steps;
 # the runaway guard counts per episode), the joint targets the hold keeps, the recorded rows and Isaac Lab's episode
 # length counter. The live video counts the trial's control steps across episodes (vstep).
-POSE_NAMES = [n for n in S.object_names() if n != "table"] if L.OBJECT_POSES else []
-POSE_SPEC = {"frame": "env-local = the robot's root frame (spec.world; the ee_pose action's and the proprio tcp_pose's frame), "
-                      "each object's root; size: the extent of its box, axis-aligned in that frame",
-             "quaternion_order": "wxyz", "objects": POSE_NAMES}
 
 
-def object_poses() -> dict:
-    out = {}
-    for n in POSE_NAMES:
-        p, q = S.object_pose(n)
-        try:
-            b = S.object_bounds(n); size = b[1] - b[0]
-        except Exception:  # noqa: BLE001
-            size = None
-        out[n] = L.pose_entry(p, q, size)
-    return out
+class _ReadOnce(L.StateTable):
+    """L.StateTable whose getters share one read of a data buffer per query (memo)."""
+
+    def query(self, plan: dict) -> dict:
+        self._memo = {}
+        return super().query(plan)
+
+    def memo(self, key, fn):
+        if key not in self._memo:
+            self._memo[key] = fn()
+        return self._memo[key]
+
+
+def _floor_z(origin) -> float | None:
+    """The z of the scene's ground plane in the env-local frame (a prim named like a ground plane), None without one."""
+    try:
+        import omni.usd
+        from pxr import Usd, UsdGeom
+        stage = omni.usd.get_context().get_stage()
+        cache = UsdGeom.XformCache(Usd.TimeCode.Default())
+        for prim in stage.Traverse():
+            n = prim.GetName().lower()
+            if ("groundplane" in n or n in ("ground", "ground_plane", "defaultgroundplane")) and prim.IsA(UsdGeom.Xformable):
+                return float(cache.GetLocalToWorldTransform(prim).ExtractTranslation()[2]) - float(origin[2])
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def state_table() -> _ReadOnce:
+    """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: the Franka (root pose and
+    velocities, the root's height above the ground plane, every joint with its range), its links (panda_link0..7, the
+    gripper's flange `eef_frame`, the fingertip-centre tool frame of ee_pose and proprio, the Robotiq's links), every
+    rigid object of Isaac Lab's scene (scene.rigid_objects, the privileged twin's Session.objects() names; the table as a
+    scene feature) with its box, and every other articulation of the scene with its joints. Env-local frame (/spec world):
+    Isaac Lab's world frame moved to env 0's origin, where the robot's root stands. Read from Isaac Lab's data buffers
+    (root / body / joint state, refreshed by every step) and RoboLab's WorldState boxes on the main thread, the one that
+    steps Isaac Sim, between calls: nothing steps or renders."""
+    sc = S.env.scene
+    origin = sc.env_origins[0].detach().cpu().numpy().astype(np.float64)
+    t = _ReadOnce(frame="env-local (/spec world) = the robot's root frame: the Franka base (panda_link0) at the origin, x "
+                        "forward (towards the table), y to the robot's left, z up; Isaac Lab's world frame moved to env 0's "
+                        "origin; the frame of ee_pose, proprio and /kinematics",
+                  quaternion_order="wxyz",
+                  note="bbox = the object's box, axis-aligned in this frame [[min], [max]]; size = its extent")
+
+    def arr(x):
+        return (x.detach().cpu().numpy() if hasattr(x, "detach") else np.asarray(x)).astype(np.float64)
+
+    def root(key, art):
+        def read():
+            d = art.data
+            return {"pos": arr(d.root_pos_w[0]) - origin, "quat": arr(d.root_quat_w[0]), "lin_vel": arr(d.root_lin_vel_w[0]),
+                    "ang_vel": arr(d.root_ang_vel_w[0])}
+        return lambda: t.memo(("root", key), read)
+
+    def joints(key, art):
+        return lambda: t.memo(("joints", key), lambda: (arr(M._tt(art.data.joint_pos)[0]), arr(M._tt(art.data.joint_vel)[0])))
+
+    def ranges(art):
+        lim = arr(M._tt(art.data.soft_joint_pos_limits)[0])
+        return {n: [float(lim[i, 0]), float(lim[i, 1])] for i, n in enumerate(art.joint_names)}
+
+    rob = S.robot
+    rr, rj = root("robot", rob), joints("robot", rob)
+    jn, rng = list(rob.joint_names), ranges(rob)
+    floor = _floor_z(origin)
+    t.add("robot", "robot", {
+        "pos": ("m", lambda: rr()["pos"]), "quat": ("1", lambda: rr()["quat"]),
+        "lin_vel": ("m/s", lambda: rr()["lin_vel"]), "ang_vel": ("rad/s", lambda: rr()["ang_vel"]),
+        "height_above_ground": ("m", lambda: None if floor is None else float(rr()["pos"][2]) - floor),
+        "joint_pos": ("rad", lambda: dict(zip(jn, rj()[0]))), "joint_vel": ("rad/s", lambda: dict(zip(jn, rj()[1]))),
+        "joint_range": ("rad", lambda: rng)},
+        note="the fixed-base Franka with a Robotiq 2F-85: pos / quat = its root (panda_link0); height_above_ground = the root "
+             "above the scene's ground plane (null when the scene has none); finger_joint = the Robotiq's driven joint")
+
+    def bodies():
+        def read():
+            d = rob.data
+            pose = M._tt(d.body_pose_w)[0] if hasattr(d, "body_pose_w") else M._tt(d.body_state_w)[0, :, :7]
+            if hasattr(d, "body_lin_vel_w"):
+                lv, av = M._tt(d.body_lin_vel_w)[0], M._tt(d.body_ang_vel_w)[0]
+            else:
+                st = M._tt(d.body_state_w)[0]; lv, av = st[:, 7:10], st[:, 10:13]
+            pose = arr(pose)
+            return pose[:, :3] - origin, pose[:, 3:7], arr(lv), arr(av)
+        return t.memo("bodies", read)
+    bn = list(rob.body_names)
+    for i, b in enumerate(bn):
+        if not (b.startswith("panda_link") or "finger" in b or b in ("base_link", "robotiq_arg2f_base_link")):
+            continue
+        t.add(b, "robot_link", {"pos": ("m", lambda i=i: bodies()[0][i]), "quat": ("1", lambda i=i: bodies()[1][i]),
+                                "lin_vel": ("m/s", lambda i=i: bodies()[2][i]), "ang_vel": ("rad/s", lambda i=i: bodies()[3][i])},
+              note=f"link {b}")
+    eef = lambda: t.memo("eef", S.eef_frame_pose)  # noqa: E731
+    tcp = lambda: t.memo("tcp", S.ee_pose)  # noqa: E731
+    t.add("eef_frame", "robot_link", {"pos": ("m", lambda: eef()[0]), "quat": ("1", lambda: eef()[1])},
+          note="RoboLab's eef_frame: the gripper flange (Robotiq base), +z towards the fingertips")
+    t.add("tcp", "robot_link", {"pos": ("m", lambda: tcp()[0]), "quat": ("1", lambda: tcp()[1])},
+          note="the fingertip-centre tool frame: the ee_pose action's and proprio tcp_pose's frame")
+
+    def bounds(n):
+        def read():
+            try:
+                return S.object_bounds(n)
+            except Exception:  # noqa: BLE001
+                return None
+        return lambda: t.memo(("bounds", n), read)
+    for n in sorted(sc.rigid_objects.keys()):
+        o = sc.rigid_objects[n]
+        g, bb = root(("obj", n), o), bounds(n)
+        fields = {"pos": ("m", lambda g=g: g()["pos"]), "quat": ("1", lambda g=g: g()["quat"]),
+                  "lin_vel": ("m/s", lambda g=g: g()["lin_vel"]), "ang_vel": ("rad/s", lambda g=g: g()["ang_vel"]),
+                  "bbox": ("m", lambda bb=bb: bb()), "size": ("m", lambda bb=bb: None if bb() is None else bb()[1] - bb()[0])}
+        t.add(n, "scene_feature" if n == "table" else "object", fields)
+    for n in sorted(getattr(sc, "articulations", {}) or {}):
+        art = sc.articulations[n]
+        if art is rob or n == "robot":
+            continue
+        g, j = root(("art", n), art), joints(("art", n), art)
+        names, rg = list(art.joint_names), ranges(art)
+        t.add(n, "articulation", {
+            "pos": ("m", lambda g=g: g()["pos"]), "quat": ("1", lambda g=g: g()["quat"]),
+            "lin_vel": ("m/s", lambda g=g: g()["lin_vel"]), "ang_vel": ("rad/s", lambda g=g: g()["ang_vel"]),
+            "joint_pos": ("rad or m", lambda names=names, j=j: dict(zip(names, j()[0]))),
+            "joint_vel": ("rad/s or m/s", lambda names=names, j=j: dict(zip(names, j()[1]))),
+            "joint_range": ("rad or m", lambda rg=rg: rg)})
+    return t
 
 
 def _new_episode() -> None:
@@ -621,4 +737,4 @@ print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", f
 serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
                   **({"state_ops": OPS} if OPS is not None else {}),
-                  **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})))
+                  state_table=state_table() if L.STATE_QUERY else None))

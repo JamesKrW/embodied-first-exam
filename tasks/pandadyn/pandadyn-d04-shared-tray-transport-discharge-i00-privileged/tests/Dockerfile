@@ -4,7 +4,7 @@
 # the verdict.
 FROM ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0
 COPY instance.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:pandadyn-files-0.4.0-resetpose@sha256:7f67caa107cabbfc9839b06cc8d5671de08d1d7d40dc2b1c8740dda01f9c63bb /privileged/environment/rcb_pandadyn.py /privileged/tests/grade.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:pandadyn-files-0.4.0-stateq@sha256:0e3040f17793b580799dc932a9438e070f7d5f6769305b381fb2505403224126 /privileged/environment/rcb_pandadyn.py /privileged/tests/grade.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests:/opt/pandadyn
 WORKDIR /tests

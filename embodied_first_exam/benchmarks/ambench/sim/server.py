@@ -30,7 +30,14 @@ Differences from the YAMLab service, all from the robot and the simulator:
   illustration, never a verdict);
 - the start state is checked before the agent is served: the rebuilt scene's state hash against the frozen instance's
   (instance.json `initial_sha`); a mismatch ends the trial as an infrastructure failure (`instance_mismatch`, a give-up:
-  nothing is served)."""
+  nothing is served).
+
+Ablations (rcb_limited; off unless the task sets the switch): with RCB_STATE_QUERY=1 the state table holds the robot (the
+airframe's pose, velocity and height above the ground, every joint with its range), the tool frame and the gripper links,
+and every articulation and rigid object of the scene but the robot (its root pose and velocity, the extents of its USD
+geometry, an articulation's joints with their ranges), all in the task's world frame relative to the environment's origin
+(the frame of /spec world and proprio), quaternions wxyz. A query reads Isaac Lab's scene tensors once and answers from
+them; the episode's end is never queried (the layer answers 409 then, when Isaac Lab has already reset the scene)."""
 from __future__ import annotations
 import json, math, os, sys, threading, time, traceback
 from typing import Callable
@@ -188,25 +195,108 @@ SPEC = {
               "frames_encoding": "uint16 mm, zlib", "noise": L.DEPTH_NOISE},
 }
 # The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
-# RCB_EXPOSE_OBJECT_POSES=1: every articulation but the robot and every rigid object, as Session.objects() names them:
-# the root's position (relative to the environment's origin, the frame of /spec world, ee_pose and proprio) and
-# orientation (wxyz); no joint state of an articulated object. Isaac Lab resets the scene inside the step that ends an
-# episode, so once it has ended the poses are the end state's (the Session's end capture, as proprio), or none at all.
-OBJECTS = list(S.objects()) if L.OBJECT_POSES else []
+# RCB_STATE_QUERY=1: the state table (module docstring, "Ablations").
+class IsaacStateTable:
+    """The state table over Isaac Lab's scene data: each query reads every tensor it needs once (the robot's link states
+    and joints, each object's root state and joints) and answers from those numbers. Reads only (no step, no reset, no
+    write to the scene)."""
+
+    def __init__(self, frame: str, note: str | None = None):
+        self.table = L.StateTable(frame=frame, quaternion_order="wxyz", note=note)
+        self.add, self.cache = self.table.add, {}
+
+    def entities(self) -> dict:
+        return self.table.entities()
+
+    def query(self, plan: dict) -> dict:
+        self.cache = {}
+        try:
+            return self.table.query(plan)
+        finally:
+            self.cache = {}
+
+    def read(self, key: str, fn):
+        if key not in self.cache:
+            self.cache[key] = fn()
+        return self.cache[key]
 
 
-def object_poses() -> dict:
-    if S.done:
-        snap = (S._end or {}).get("snap")
-        if not snap:
-            return {}
-        roots = {n: (snap["art"][n][0] if n in snap["art"] else snap["rig"].get(n)) for n in OBJECTS}
-    else:
-        sc = S.env.scene
-        roots = {n: M._np((sc.articulations[n] if n in sc.articulations else sc.rigid_objects[n]).data.root_state_w[0])
-                 for n in OBJECTS}
-    o = M._np(S.env.scene.env_origins[0])
-    return {n: L.pose_entry(np.asarray(r[:3], dtype=np.float64) - o, r[3:7]) for n, r in roots.items() if r is not None}
+def _usd_extent(prim_path: str) -> list | None:
+    """Full extents (m) of a prim's geometry in its own frame (USD bounding box of the built stage), or None."""
+    try:
+        import re as _re
+        import omni.usd
+        from pxr import Usd, UsdGeom
+        path = _re.sub(r"env_\.\*", "env_0", str(prim_path).replace("{ENV_REGEX_NS}", "/World/envs/env_0"))
+        prim = omni.usd.get_context().get_stage().GetPrimAtPath(path)
+        if not prim or not prim.IsValid():
+            return None
+        box = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_]).ComputeUntransformedBound(prim)
+        rng = box.ComputeAlignedRange()
+        if rng.IsEmpty():
+            return None
+        return [float(x) for x in (rng.GetMax() - rng.GetMin())]
+    except Exception:  # noqa: BLE001 -- the extents are a convenience: no size field without them
+        return None
+
+
+def state_table() -> IsaacStateTable:
+    env, sc = S.env, S.env.scene
+    t = IsaacStateTable("the task's world frame: z up, the ground is the plane z = 0, positions relative to the "
+                        "environment's origin (the frame of /spec world, ee_pose actions and proprio tcp_pose / base_pose); "
+                        "metres, quaternions wxyz; velocities in world axes")
+    origin = lambda: t.read("origin", lambda: _np(sc.env_origins[0]))  # noqa: E731
+    _np = M._np
+    robot = env.robot
+    links = lambda: t.read("robot_links", lambda: _np(robot.data.body_link_state_w[0]))  # noqa: E731
+    jpos = lambda: t.read("robot_jpos", lambda: _np(robot.data.joint_pos[0]))  # noqa: E731
+    jvel = lambda: t.read("robot_jvel", lambda: _np(robot.data.joint_vel[0]))  # noqa: E731
+    jnames = list(robot.joint_names)
+    base, ee = int(_np(env.base_link_idx).reshape(-1)[0]), int(_np(env.ee_link_idx).reshape(-1)[0])
+
+    def link_fields(i: int) -> dict:
+        return {"pos": ("m", lambda: links()[i, :3] - origin()), "quat": ("wxyz", lambda: links()[i, 3:7]),
+                "lin_vel": ("m/s", lambda: links()[i, 7:10]), "ang_vel": ("rad/s", lambda: links()[i, 10:13])}
+
+    try:
+        lim = _np(robot.data.joint_pos_limits[0])
+        ranges = {n: lim[k].tolist() for k, n in enumerate(jnames)}
+    except Exception:  # noqa: BLE001
+        ranges = None
+    t.add("robot", "robot", {**link_fields(base), "height_above_ground": ("m", lambda: float(links()[base, 2] - origin()[2])),
+                             "joint_pos": ("rad (arm), m (fingers)", lambda: dict(zip(jnames, jpos().tolist()))),
+                             "joint_vel": ("rad/s (arm), m/s (fingers)", lambda: dict(zip(jnames, jvel().tolist()))),
+                             **({"joint_range": ("rad (arm), m (fingers)", lambda: ranges)} if ranges else {})},
+          note="the FA-Hexa: pos / quat / velocities are the airframe's (base_link, proprio base_pose / base_vel); "
+               "height_above_ground = its height above the ground plane")
+    bodies = list(robot.body_names)
+    t.add("tcp", "robot_link", link_fields(ee), note=f"the tool frame ({bodies[ee]}, proprio tcp_pose)")
+    for i, n in enumerate(bodies):
+        if i not in (base, ee) and ("finger" in n.lower() or "gripper" in n.lower()):
+            t.add(n, "robot_link", link_fields(i), note="a gripper link")
+    for group, kind in ((sc.articulations, "articulation"), (sc.rigid_objects, "object")):
+        for name, obj in group.items():
+            if name == "robot":
+                continue
+            root = lambda obj=obj, name=name: t.read("root:" + name, lambda: _np(obj.data.root_state_w[0]))  # noqa: E731
+            fields = {"pos": ("m", lambda root=root: root()[:3] - origin()), "quat": ("wxyz", lambda root=root: root()[3:7]),
+                      "lin_vel": ("m/s", lambda root=root: root()[7:10]), "ang_vel": ("rad/s", lambda root=root: root()[10:13])}
+            extent = _usd_extent(obj.cfg.prim_path)
+            if extent is not None:
+                fields["size"] = ("m", lambda extent=extent: extent)
+            if kind == "articulation" and getattr(obj.data, "joint_pos", None) is not None:
+                names = list(obj.joint_names)
+                fields["joint_pos"] = ("rad or m", lambda obj=obj, names=names: dict(zip(names, _np(obj.data.joint_pos[0]).tolist())))
+                fields["joint_vel"] = ("rad/s or m/s", lambda obj=obj, names=names: dict(zip(names, _np(obj.data.joint_vel[0]).tolist())))
+                try:
+                    lim = _np(obj.data.joint_pos_limits[0])
+                    rng = {n: lim[k].tolist() for k, n in enumerate(names)}
+                    fields["joint_range"] = ("rad or m", lambda rng=rng: rng)
+                except Exception:  # noqa: BLE001
+                    pass
+            t.add(name, kind if kind == "object" or fields.get("joint_pos") else "object", fields,
+                  note="its root body" + ("; size: the extents of its geometry in its root frame" if extent else ""))
+    return t
 
 
 # RCB_STATE_OPS=1, reset only: Session.reset() (AM-Bench's seeded env.reset, the frozen start; approximate in-process:
@@ -526,8 +616,4 @@ open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=lambda: S.status()["state_sha"], proprio=proprio_row,
-                  state_ops=OPS,
-                  **({"object_poses": object_poses,
-                      "object_pose_spec": {"frame": "the world frame relative to the environment's origin (/spec world: that of "
-                                                    "ee_pose and proprio tcp_pose); after an episode has ended, its end state",
-                                           "quaternion_order": "wxyz", "objects": OBJECTS}} if L.OBJECT_POSES else {})))
+                  state_ops=OPS, state_table=state_table() if L.STATE_QUERY else None))

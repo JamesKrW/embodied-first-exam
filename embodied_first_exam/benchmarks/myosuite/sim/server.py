@@ -30,6 +30,7 @@ import copy
 import json
 import math
 import os
+import re
 import sys
 import threading
 import time
@@ -849,10 +850,17 @@ def end_from_signal() -> None:
 
 
 # The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
-# RCB_EXPOSE_OBJECT_POSES=1: the task's objects, the bodies the task's observation dict reads (obs_dict obj_* /
-# curr_obj_*, object1 / object2, ball): every body moved by a joint that is not the body's own, mocap bodies (opponents,
-# goalkeepers, goal markers) left out. Their MuJoCo body pose (xpos, xquat) in the world frame, as rendered.
+# RCB_STATE_QUERY=1: the state table, MyoSuite's world frame (z up; the frame of root_pose). The robot: its root body
+# (the pelvis of a free-standing body, the fixed base of an arm or a hand), its height above the ground, its centre of
+# mass, its own joints; its key links (pelvis, torso, head, feet; wrist, fingertips; the prosthesis's palm and
+# fingertips). The task's objects: the bodies the task's observation dict reads (obs_dict obj_* / curr_obj_*, object1 /
+# object2, ball), every body moved by a joint that is not the body's own; the opponent and the goalkeeper (mocap
+# bodies: pose only). Scene features: the markers the instruction describes (the baoding targets, the translucent
+# target object, the start and goal pillars), the world's named geoms (floor, terrain with its heights, goal, arena).
+# Read off a private copy of the live state (forward kinematics there): the live simulator is never written.
 OBJECT_LABELS = {"baoding": ("object1", "object2"), "soccer": ("ball",)}
+MARKER_BODIES = ("target", "start", "goal")        # the markers the instructions describe (die / object, pillars)
+MARKER_SITES = {"baoding": {"target1_site": "target1", "target2_site": "target2"}}   # where each ball should be now
 
 
 def _object_bodies() -> dict:
@@ -862,12 +870,381 @@ def _object_bodies() -> dict:
     return dict(zip(labels, ids))
 
 
-OBJECTS = _object_bodies() if L.OBJECT_POSES else {}
+# ------------------------------------------------------------------ the state table (L.STATE_QUERY)
+# Read off a private MjData: each query copies the live state (qpos, qvel, act, the mocap poses) into it and runs the
+# forward kinematics and the com velocities there, so a query never writes the live data and never changes the state
+# hash or the next step.
+_DOWN = np.array([0.0, 0.0, -1.0])
+_GEOM_SHAPES = {0: "plane", 1: "hfield", 2: "sphere", 3: "capsule", 4: "ellipsoid", 5: "cylinder", 6: "box", 7: "mesh",
+                8: "sdf"}
+U_POS, U_QUAT, U_LIN, U_ANG = "m", "1 (unit quaternion, w x y z)", "m/s", "rad/s"
+U_JPOS, U_JVEL = "rad (hinge), m (slide), unit quaternion w x y z (ball)", "rad/s, m/s; ball: rad/s about the child's axes"
+U_BOX = "m: [[x, y, z] min, [x, y, z] max]"
 
 
-def object_poses() -> dict:
-    d = S.data
-    return {name: L.pose_entry(d.xpos[b], d.xquat[b]) for name, b in OBJECTS.items()}
+def _pattern(name: str) -> str:
+    return re.sub(r"[-+]?\d+", "#", name)
+
+
+def _stem(pattern: str) -> str:
+    return re.sub(r"_+", "_", pattern.replace("#", "")).strip("_-") or pattern
+
+
+def _groups(names: list, at_least: int) -> list:
+    """[(group name or None, [members])]: names that differ only in their numbers form a group when at least
+    `at_least` share the pattern; the others stand alone."""
+    by: dict = {}
+    for n in names:
+        by.setdefault(_pattern(n), []).append(n)
+    out = []
+    for pat, ns in by.items():
+        if len(ns) >= at_least and "#" in pat:
+            out.append((_stem(pat), ns))
+        else:
+            out += [(None, [n]) for n in ns]
+    return out
+
+
+class _Mirror:
+    """The private MjData the state table reads (see above)."""
+
+    def __init__(self, m, live):
+        self.m, self.live, self.d = m, live, mujoco.MjData(m)
+        if hasattr(m, "geom_aabb"):
+            self.aabb = np.array(m.geom_aabb, dtype=np.float64).reshape(-1, 6)
+        else:
+            self.aabb = np.c_[np.zeros((m.ngeom, 3)), np.repeat(np.asarray(m.geom_rbound)[:, None], 3, 1)]
+        for g in range(m.ngeom):                     # a plane: its drawn extent, flat (0: unbounded)
+            if m.geom_type[g] == 0:
+                self.aabb[g] = [0.0, 0.0, 0.0, m.geom_size[g][0], m.geom_size[g][1], 0.0]
+        self._gid = np.zeros(1, np.int32)
+
+    def refresh(self) -> None:
+        m, src, d = self.m, self.live(), self.d
+        d.qpos[:] = src.qpos
+        d.qvel[:] = src.qvel
+        if m.na:
+            d.act[:] = src.act
+        if m.nmocap:
+            d.mocap_pos[:] = src.mocap_pos
+            d.mocap_quat[:] = src.mocap_quat
+        d.time = src.time
+        mujoco.mj_kinematics(m, d)
+        mujoco.mj_comPos(m, d)
+        mujoco.mj_comVel(m, d)
+
+    def vel(self, i: int, obj=mujoco.mjtObj.mjOBJ_BODY) -> np.ndarray:
+        """[angular (rad/s), linear (m/s)] of a body or site, world axes, at its origin."""
+        out = np.zeros(6)
+        mujoco.mj_objectVelocity(self.m, self.d, obj, int(i), out, 0)
+        return out
+
+    def site_quat(self, s: int) -> np.ndarray:
+        q = np.zeros(4)
+        mujoco.mju_mat2Quat(q, self.d.site_xmat[s])
+        return q
+
+    def geom_quat(self, g: int) -> np.ndarray:
+        q = np.zeros(4)
+        mujoco.mju_mat2Quat(q, self.d.geom_xmat[g])
+        return q
+
+    def box(self, geoms) -> list | None:
+        """The world axis-aligned box around the geoms (an unbounded plane left out); None if nothing is left."""
+        lo, hi, d = np.full(3, np.inf), np.full(3, -np.inf), self.d
+        for g in geoms:
+            a = self.aabb[g]
+            if self.m.geom_type[g] == 0 and not a[3]:
+                continue
+            R = d.geom_xmat[g].reshape(3, 3)
+            c, h = d.geom_xpos[g] + R @ a[:3], np.abs(R) @ a[3:]
+            lo, hi = np.minimum(lo, c - h), np.maximum(hi, c + h)
+        return [lo, hi] if np.isfinite(lo).all() else None
+
+    def local_size(self, b: int) -> list | None:
+        """Full extents [3] (m) of body b's own geoms along the body's axes (a model constant)."""
+        m = self.m
+        lo, hi = np.full(3, np.inf), np.full(3, -np.inf)
+        for g in range(m.ngeom):
+            if m.geom_bodyid[g] != b or (m.geom_type[g] == 0 and not self.aabb[g][3]):
+                continue
+            R = np.zeros(9)
+            mujoco.mju_quat2Mat(R, m.geom_quat[g])
+            R = R.reshape(3, 3)
+            c, h = m.geom_pos[g] + R @ self.aabb[g][:3], np.abs(R) @ self.aabb[g][3:]
+            lo, hi = np.minimum(lo, c - h), np.maximum(hi, c + h)
+        return (hi - lo).tolist() if np.isfinite(lo).all() else None
+
+    def part(self, what: str, i: int, geoms) -> dict:
+        """One part of a scene-feature group: a geom's pose and extents, or a body's pose and box."""
+        if what == "geom":
+            return {"pos": self.d.geom_xpos[i], "quat": self.geom_quat(i), "size": 2 * self.aabb[i][3:]}
+        return {"pos": self.d.xpos[i], "quat": self.d.xquat[i], "bbox": self.box(geoms)}
+
+    def heights(self, g: int) -> dict:
+        """A height field geom's surface: world x, y of the samples (the geom unrotated) and their world z."""
+        m, h = self.m, int(self.m.geom_dataid[g])
+        nr, nc, (sx, sy, sz, _) = int(m.hfield_nrow[h]), int(m.hfield_ncol[h]), m.hfield_size[h]
+        a = int(m.hfield_adr[h])
+        z = np.asarray(m.hfield_data[a:a + nr * nc]).reshape(nr, nc)
+        kr, kc = max(1, -(-nr // 64)), max(1, -(-nc // 64))
+        c = self.d.geom_xpos[g]
+        return {"x": c[0] + np.linspace(-sx, sx, nc)[::kc], "y": c[1] + np.linspace(-sy, sy, nr)[::kr],
+                "z": c[2] + sz * z[::kr, ::kc]}
+
+    def tangible(self, g: int) -> bool:
+        """A geom that collides, or that a camera shows (alpha above 0 and in a group drawn by default); an invisible
+        helper that does neither is no part of the scene."""
+        m = self.m
+        if m.geom_contype[g] or m.geom_conaffinity[g]:
+            return True
+        mat = int(m.geom_matid[g])
+        alpha = m.mat_rgba[mat][3] if mat >= 0 else m.geom_rgba[g][3]
+        return bool(alpha > 0 and m.geom_group[g] < 3)
+
+    def drop(self, p, skip: np.ndarray) -> float | None:
+        """Distance straight down from p to the first collidable geom whose body is not in `skip` (a bool mask over
+        bodies); None if there is none."""
+        m, d, gid = self.m, self.d, self._gid
+        p, gone = np.array(p, dtype=np.float64), 0.0
+        for _ in range(32):
+            dist = mujoco.mj_ray(m, d, p, _DOWN, None, 1, -1, gid)
+            if dist < 0 or gid[0] < 0:
+                return None
+            g = int(gid[0])
+            if not skip[m.geom_bodyid[g]] and (m.geom_contype[g] or m.geom_conaffinity[g]):
+                return gone + dist
+            step = dist + 1e-6
+            gone += step
+            p[2] -= step
+        return None
+
+    def joint(self, j: int, vel: bool = False):
+        m, d = self.m, self.d
+        if vel:
+            a = int(m.jnt_dofadr[j])
+            return d.qvel[a:a + 3].copy() if m.jnt_type[j] == 1 else float(d.qvel[a])
+        a = int(m.jnt_qposadr[j])
+        return d.qpos[a:a + 4].copy() if m.jnt_type[j] == 1 else float(d.qpos[a])
+
+    def joint_range(self, j: int):
+        m = self.m
+        return [float(m.jnt_range[j][0]), float(m.jnt_range[j][1])] if m.jnt_limited[j] else None
+
+
+class _MirrorTable(L.StateTable):
+    """A state table whose getters read a _Mirror: one refresh per query."""
+
+    def __init__(self, mirror: _Mirror, **kw):
+        super().__init__(**kw)
+        self.mirror, self.taken = mirror, set()
+
+    def query(self, plan: dict) -> dict:
+        self.mirror.refresh()
+        return super().query(plan)
+
+    def put(self, name: str, kind: str, fields: dict, note: str | None = None) -> str:
+        """add() under a name not taken yet (a clash gets a numbered suffix)."""
+        n, k = name, 2
+        while n in self.taken:
+            n, k = f"{name}_{k}", k + 1
+        self.taken.add(n)
+        self.add(n, kind, fields, note)
+        return n
+
+
+def _mj_robot(t: _MirrorTable, name: str, root: int, mask: np.ndarray, skip: np.ndarray, joints: dict,
+              links: dict, extra: dict | None = None, note: str | None = None) -> None:
+    """The robot (its root body `root`, the bodies in `mask`) and its key links {label: ("body" | "site", id)};
+    joints {label: joint id}; height_above_ground looks straight down from the root past every body in `skip`."""
+    M = t.mirror
+    t.put(name, "robot", {
+        "pos": (U_POS, lambda: M.d.xpos[root]), "quat": (U_QUAT, lambda: M.d.xquat[root]),
+        "lin_vel": (U_LIN, lambda: M.vel(root)[3:]), "ang_vel": (U_ANG, lambda: M.vel(root)[:3]),
+        "height_above_ground": ("m (null: nothing below)", lambda: M.drop(M.d.xpos[root], skip)),
+        "com": (U_POS, lambda: M.d.subtree_com[root]),
+        **({"joint_pos": (U_JPOS, lambda: {k: M.joint(j) for k, j in joints.items()}),
+            "joint_vel": (U_JVEL, lambda: {k: M.joint(j, True) for k, j in joints.items()})} if joints else {}),
+        **(extra or {})}, note)
+    for label, (what, i) in links.items():
+        if what == "site":
+            f = {"pos": (U_POS, lambda i=i: M.d.site_xpos[i]), "quat": (U_QUAT, lambda i=i: M.site_quat(i)),
+                 "lin_vel": (U_LIN, lambda i=i: M.vel(i, mujoco.mjtObj.mjOBJ_SITE)[3:]),
+                 "ang_vel": (U_ANG, lambda i=i: M.vel(i, mujoco.mjtObj.mjOBJ_SITE)[:3])}
+        else:
+            f = {"pos": (U_POS, lambda i=i: M.d.xpos[i]), "quat": (U_QUAT, lambda i=i: M.d.xquat[i]),
+                 "lin_vel": (U_LIN, lambda i=i: M.vel(i)[3:]), "ang_vel": (U_ANG, lambda i=i: M.vel(i)[:3])}
+        t.put(label, "robot_link", f)
+
+
+def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, chain_min: int = 16,
+              group_min: int = 8, expand: tuple = ()) -> np.ndarray:
+    """Every top-level body that is not the robot's (`robot`: a bool mask over bodies; a body named in `expand` stands
+    for its children instead) and the world body's named geoms:
+      a body under a free joint or a mocap body: an object (bodies that differ only in their numbers, at least
+      chain_min of them, are one chain: a rope);
+      a body whose subtree has joints: an articulation (at least group_min alike: one entity with its parts);
+      any other body with geoms, and the world body's named geoms: scene features (alike names: one entity with parts).
+    Names for which skip_name() is true are left out (decoration), and so are geoms that neither collide nor show.
+    Gives the bool mask over bodies of what moves freely (objects), for height_above_ground."""
+    M, m = t.mirror, t.mirror.m
+    parent = np.asarray(m.body_parentid)
+    units = []
+    for b in range(1, m.nbody):
+        if parent[b] == 0 and not robot[b] and m.body(b).name and not skip_name(m.body(b).name):
+            units += ([c for c in range(m.nbody) if parent[c] == b and m.body(c).name] if m.body(b).name in expand
+                      else [b])
+    unit_of, us = np.full(m.nbody, -1), set(units)
+    for c in range(1, m.nbody):
+        b = c
+        while b > 0 and b not in us:
+            b = int(parent[b])
+        unit_of[c] = b if b > 0 else -1
+    gunit, junit = unit_of[np.asarray(m.geom_bodyid)], unit_of[np.asarray(m.jnt_bodyid)]
+    free_mask = np.zeros(m.nbody, bool)
+    objs, arts, stat = {}, {}, {}
+    for b in units:
+        geoms = [int(g) for g in np.flatnonzero(gunit == b) if not skip_name(m.geom(g).name) and M.tangible(g)]
+        joints = [int(j) for j in np.flatnonzero(junit == b)]
+        if m.body_mocapid[b] >= 0 or (joints and m.jnt_type[joints[0]] == 0 and m.jnt_bodyid[joints[0]] == b):
+            free_mask |= unit_of == b
+            objs[m.body(b).name] = (b, geoms, [j for j in joints if m.jnt_type[j] != 0])
+        elif joints:
+            arts[m.body(b).name] = (b, geoms, joints)
+        elif geoms:
+            stat[m.body(b).name] = (b, geoms)
+    for gname, members in _groups(list(objs), chain_min):
+        if gname is None:
+            b, geoms, joints = objs[members[0]]
+            mocap = m.body_mocapid[b] >= 0
+            f = {"pos": (U_POS, lambda b=b: M.d.xpos[b]), "quat": (U_QUAT, lambda b=b: M.d.xquat[b])}
+            if not mocap:
+                f |= {"lin_vel": (U_LIN, lambda b=b: M.vel(b)[3:]), "ang_vel": (U_ANG, lambda b=b: M.vel(b)[:3])}
+            if (size := M.local_size(b)) is not None:
+                f["size"] = ("m (full extents along the body's axes)", lambda s=size: s)
+            f["bbox"] = (U_BOX, lambda g=geoms: M.box(g))
+            if joints:
+                f |= {"joint_pos": (U_JPOS, lambda js=joints: {m.joint(j).name: M.joint(j) for j in js}),
+                      "joint_vel": (U_JVEL, lambda js=joints: {m.joint(j).name: M.joint(j, True) for j in js})}
+            t.put(members[0], "object", f, "moved by the scene (a mocap body)" if mocap else None)
+        else:
+            bs = [objs[n][0] for n in members]
+            geoms = [g for n in members for g in objs[n][1]]
+            t.put(gname, "object", {
+                "pos": ("m (the mean of its parts' positions)", lambda bs=bs: M.d.xpos[bs].mean(0)),
+                "bbox": (U_BOX, lambda g=geoms: M.box(g)),
+                "points": ("m: [[x, y, z]] each part's position, in the order of the note",
+                           lambda bs=bs: M.d.xpos[bs])}, f"a chain of {len(bs)} bodies: {', '.join(members)}")
+    for gname, members in _groups(list(arts), group_min):
+        joints = [j for n in members for j in arts[n][2]]
+        geoms = [g for n in members for g in arts[n][1]]
+        f = {"joint_pos": (U_JPOS, lambda js=joints: {m.joint(j).name: M.joint(j) for j in js}),
+             "joint_vel": (U_JVEL, lambda js=joints: {m.joint(j).name: M.joint(j, True) for j in js}),
+             "joint_range": ("as joint_pos: [lower, upper] (null: unlimited)",
+                             lambda js=joints: {m.joint(j).name: M.joint_range(j) for j in js}),
+             "bbox": (U_BOX, lambda g=geoms: M.box(g))}
+        if gname is None:
+            b = arts[members[0]][0]
+            t.put(members[0], "articulation", {"pos": (U_POS, lambda b=b: M.d.xpos[b]),
+                                               "quat": (U_QUAT, lambda b=b: M.d.xquat[b]), **f})
+        else:
+            bs = {n: arts[n][0] for n in members}
+            f["parts"] = ("{part: {pos m, quat w x y z}}",
+                          lambda bs=bs: {n: {"pos": M.d.xpos[b], "quat": M.d.xquat[b]} for n, b in bs.items()})
+            t.put(gname, "articulation", f, f"{len(bs)} alike bodies")
+    feats = {n: ("body", b, geoms) for n, (b, geoms) in stat.items()}
+    for g in range(m.ngeom):
+        n = m.geom(g).name
+        if m.geom_bodyid[g] == 0 and n and not skip_name(n) and n not in feats and M.tangible(g):
+            feats[n] = ("geom", g, [g])
+    for gname, members in _groups(list(feats), 2):
+        if gname is None:
+            what, i, geoms = feats[members[0]]
+            if what == "geom":
+                f = {"shape": ("geom type", lambda i=i: _GEOM_SHAPES.get(int(m.geom_type[i]), "other")),
+                     "pos": (U_POS, lambda i=i: M.d.geom_xpos[i]), "quat": (U_QUAT, lambda i=i: M.geom_quat(i)),
+                     "size": ("m (full extents along its own axes; 0: unbounded)", lambda i=i: 2 * M.aabb[i][3:])}
+                if m.geom_type[i] == 1:
+                    f["heights"] = ("m: {x [ncol], y [nrow], z [nrow][ncol]} world heights of the surface on a grid "
+                                    "(every k-th sample, at most 64 a side)", lambda i=i: M.heights(i))
+            else:
+                f = {"pos": (U_POS, lambda i=i: M.d.xpos[i]), "quat": (U_QUAT, lambda i=i: M.d.xquat[i])}
+            f["bbox"] = (U_BOX, lambda g=geoms: M.box(g))
+            t.put(members[0], "scene_feature", f)
+        else:
+            parts = {n: feats[n] for n in members}
+            geoms = [g for n in members for g in feats[n][2]]
+            t.put(gname, "scene_feature", {
+                "bbox": (U_BOX, lambda g=geoms: M.box(g)),
+                "parts": ("{part: {pos m, quat w x y z, size m (full extents)} or {pos m, quat, bbox m}}",
+                          lambda ps=parts: {n: M.part(*p) for n, p in ps.items()})}, f"{len(parts)} alike parts")
+    return free_mask
+
+
+def state_table() -> _MirrorTable:
+    m = MD
+    t = _MirrorTable(_Mirror(m, lambda: S.data), quaternion_order="wxyz", frame=(
+        "MyoSuite's world frame: metres, z up (the frame of /spec's root_pose); a free-standing body's /kinematics "
+        "base frame is this frame moved to robot.pos and turned by robot.quat"))
+    rootid = np.asarray(m.body_rootid)
+    robot = np.isin(rootid, sorted({int(rootid[m.jnt_bodyid[j]]) for j in J_ID}))
+    skip = robot.copy()                             # height_above_ground looks past the robot and what moves freely
+    bid = lambda n: mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, n)  # noqa: E731
+    sid = lambda n: mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, n)  # noqa: E731
+    links = {}
+    if BODY in ("legs", "osl"):
+        links["pelvis"] = ("site", sid("pelvis")) if sid("pelvis") >= 0 else ("body", _rb)
+        for n in ("torso", "head"):
+            if sid(n) >= 0:
+                links[n] = ("site", sid(n))
+            elif bid(n) >= 0:
+                links[n] = ("body", bid(n))
+        for n in ("calcn_r", "toes_r", "calcn_l", "toes_l", "osl_knee_assembly", "osl_foot_assembly"):
+            if bid(n) >= 0:
+                links[n] = ("body", bid(n))
+    else:
+        for n in ("radius", "lunate"):
+            if bid(n) >= 0:
+                links[{"radius": "forearm", "lunate": "wrist"}[n]] = ("body", bid(n))
+        if TIPS:
+            links |= {n: ("site", sid(n)) for n in TIPS}
+        else:
+            links |= {n: ("body", bid(n)) for n in ("distal_thumb", "distph2", "distph3", "distph4", "distph5")
+                      if bid(n) >= 0}
+        links |= {n: ("body", bid(n)) for n in ("prosthesis/palm", "prosthesis/thumb3", "prosthesis/index3",
+                                                 "prosthesis/middle3", "prosthesis/ring3", "prosthesis/pinky3")
+                  if bid(n) >= 0}
+    _mj_robot(t, "robot", _rb, robot, skip, {n: j for n, j in zip(J_NAMES, J_ID)}, links,
+              note=f"{ROBOT[0]}: pos / quat / velocities are its root body's ({ROOT_BODY or 'unnamed'})")
+    M = t.mirror
+    for name, b in _object_bodies().items():
+        skip |= rootid == rootid[b]
+        geoms = [g for g in range(m.ngeom) if rootid[m.geom_bodyid[g]] == rootid[b] and M.tangible(g)]
+        f = {"pos": (U_POS, lambda b=b: M.d.xpos[b]), "quat": (U_QUAT, lambda b=b: M.d.xquat[b]),
+             "lin_vel": (U_LIN, lambda b=b: M.vel(b)[3:]), "ang_vel": (U_ANG, lambda b=b: M.vel(b)[:3]),
+             "bbox": (U_BOX, lambda g=geoms: M.box(g))}
+        if (size := M.local_size(b)) is not None:
+            f["size"] = ("m (full extents along the body's axes)", lambda s=size: s)
+        t.put(name, "object", f, None if name == m.body(b).name else f"MuJoCo body {m.body(b).name!r}")
+    for b in range(1, m.nbody):
+        if m.body_parentid[b] != 0 or robot[b] or skip[b]:
+            continue
+        geoms = [g for g in range(m.ngeom) if rootid[m.geom_bodyid[g]] == b and M.tangible(g)]
+        f = {"pos": (U_POS, lambda b=b: M.d.xpos[b]), "quat": (U_QUAT, lambda b=b: M.d.xquat[b]),
+             "bbox": (U_BOX, lambda g=geoms: M.box(g))}
+        if m.body(b).name in MARKER_BODIES:
+            t.put(m.body(b).name, "scene_feature", f, "a marker the instruction describes")
+        elif m.body_mocapid[b] >= 0:
+            skip |= rootid == b
+            t.put(m.body(b).name, "object", f, "moved by the scene (a mocap body)")
+        elif geoms and m.body(b).name:
+            t.put(m.body(b).name, "scene_feature", f)
+    for site, label in MARKER_SITES.get(TASK, {}).items():
+        if (i := sid(site)) >= 0:
+            t.put(label, "scene_feature", {"pos": (U_POS, lambda i=i: M.d.site_xpos[i])},
+                  "a marker the instruction describes")
+    _mj_scene(t, np.ones(m.nbody, bool))           # the world body's named geoms
+    return t
 
 
 # RCB_STATE_OPS=1: reset = Session.reset() (the frozen instance) and the episode's record cleared. A snapshot holds what
@@ -1077,9 +1454,7 @@ try:
             state_sha=S.state_sha,
             proprio=proprio_row,
             state_ops=OPS,
-            **({"object_poses": object_poses,
-                "object_pose_spec": {"frame": "MyoSuite's world frame (z up; the frame of root_pose)",
-                                     "quaternion_order": "wxyz", "objects": list(OBJECTS)}} if OBJECTS else {}),
+            state_table=state_table() if L.STATE_QUERY else None,
         ),
         port=int(os.environ.get("RCB_PORT", "8000")),
     )

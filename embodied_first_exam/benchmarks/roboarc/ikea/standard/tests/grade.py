@@ -78,7 +78,13 @@ def grade() -> None:
                "sim_startups": num("sim_startups"), "resumes": num("resumes"), "resume_state_mismatch": num("resume_state_mismatch"),
                "instance_mismatch": int(mismatch), "video_rendered": int(bool(videos)), "video_segments": len(videos),
                "sim_error": int(sim_error), "dump_lost": int(dump_lost), "infra_error": int(infra), "grader_error": 0,
-               **state_ops_fields(d, ok, num)})
+               **state_ops_fields(d, ok, num),
+               **state_query_fields(d)})
+
+
+def state_query_fields(d: dict) -> dict:
+    """The state-query ablation's count (RCB_STATE_QUERY=1: final.json then has state_queries; {} without it)."""
+    return {"state_queries": int(d["state_queries"] or 0)} if "state_queries" in d else {}
 
 
 def state_ops_fields(d: dict, ok: bool, num) -> dict:

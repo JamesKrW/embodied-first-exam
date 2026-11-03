@@ -34,13 +34,14 @@ def write(ok, out):
 
 def state_ops_fields(d, ok):
     """The unlimited-reset ablation's record (the service writes it with RCB_STATE_OPS=1): saves and loads, and for a
-    success resets_at_success / loads_at_success; first_success = a success with no reset and no load. Numbers only; {}
-    without the switch."""
-    if "loads" not in d:
-        return {}
+    success resets_at_success / loads_at_success; first_success = a success with no reset and no load; and the
+    state-query ablation's state_queries (RCB_STATE_QUERY=1). Numbers only; {} without the switches."""
     n = lambda k: int(d.get(k) or 0)  # noqa: E731
+    sq = {"state_queries": n("state_queries")} if "state_queries" in d else {}
+    if "loads" not in d:
+        return sq
     out = {"resets": n("resets"), "reset_budget": n("reset_budget"), "saves": n("saves"), "loads": n("loads"),
-           "first_success": int(bool(ok) and n("resets") + n("loads") == 0)}
+           "first_success": int(bool(ok) and n("resets") + n("loads") == 0), **sq}
     if ok:
         out.update({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d})
     return out

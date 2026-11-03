@@ -19,7 +19,13 @@ episode ends the service writes /data/trajectory.npz + /data/episode.json with t
 this simulator when the episode ends); the collect hook (finalize.sh) makes it exit, writes that verdict into final.json
 (nothing is replayed to grade it: owner, 2026-10-17) and renders the video from the trajectory. The frozen
 instance is checked when the service builds it: a scene whose start state does not hash to the instance's recorded
-`state_sha` gets no episode (instance_mismatch, an infrastructure failure)."""
+`state_sha` gets no episode (instance_mismatch, an infrastructure failure).
+
+Ablations (off unless the task sets them; nothing changes when off): RCB_STATE_OPS=1, POST /reset, /save_state and
+/load_state (the hooks below); RCB_STATE_QUERY=1, GET /state/entities and POST /state/query on state_table(): the
+privileged state in MuJoCo's world frame (quaternions w x y z): the robot's trunk pose, velocity and height above the
+ground, every joint, the IMU site and the feet, and the ground (plane or height field). A query reads a scratch copy of
+the live state (MjRead), under the service lock between calls; it takes no control step."""
 
 import copy
 import math
@@ -596,8 +602,7 @@ def end_from_signal() -> None:
     os._exit(0)
 
 
-# The reset ablation's hooks (RCB_STATE_OPS=1; rcb_limited "ablations"). No object-pose hook: the quadruped tasks have no
-# objects. reset = Session.reset() (the frozen t = 0 state, settle included) and the episode's record cleared; a snapshot
+# The reset ablation's hooks (RCB_STATE_OPS=1; rcb_limited "ablations"). reset = Session.reset() (the frozen t = 0 state, settle included) and the episode's record cleared; a snapshot
 # = MuJoCo's integration state and warning counters, the Session's episode state (targets, step counter, the fall, the
 # tracking / gait / pose logs the check reads) and a copy of the graded rows: loading it continues exactly as the saved
 # episode would have (MuJoCo's derived readings are recomputed from the restored state).
@@ -630,6 +635,207 @@ def ops_load(snap) -> None:
 
 
 OPS = L.StateOps(budget=RESET_BUDGET, reset=ops_reset, save=ops_save, load=ops_load) if L.STATE_OPS else None
+
+
+class MjRead:
+    """The state-query ablation's read of a live MuJoCo simulation, read-only: refresh() copies the live qpos, qvel and
+    mocap poses into a scratch MjData of the same model and runs the position and velocity stages there (mj_kinematics,
+    mj_comPos, mj_comVel), so each pose and velocity is the current state's and the live MjData is never written. The
+    model and the live data may be given as callables (a simulator that rebuilds them on reset)."""
+
+    def __init__(self, mj, model, data):
+        self.mj, self._model, self._live = mj, model, data
+        self.m = self.d = None
+
+    def refresh(self) -> "MjRead":
+        m = self._model() if callable(self._model) else self._model
+        live = self._live() if callable(self._live) else self._live
+        if m is not self.m:
+            self.m, self.d = m, self.mj.MjData(m)
+        d = self.d
+        d.qpos[:] = live.qpos
+        d.qvel[:] = live.qvel
+        if m.nmocap:
+            d.mocap_pos[:] = live.mocap_pos
+            d.mocap_quat[:] = live.mocap_quat
+        d.time = live.time
+        self.mj.mj_kinematics(m, d)
+        self.mj.mj_comPos(m, d)
+        self.mj.mj_comVel(m, d)
+        return self
+
+    def vel(self, objtype: str, i: int):
+        """(linear m/s, angular rad/s) of a body or site, world frame, at its frame origin."""
+        r = np.zeros(6)
+        self.mj.mj_objectVelocity(self.m, self.d, getattr(self.mj.mjtObj, f"mjOBJ_{objtype.upper()}"), int(i), r, 0)
+        return r[3:].copy(), r[:3].copy()
+
+    def site_quat(self, i: int):
+        q = np.zeros(4)
+        self.mj.mju_mat2Quat(q, self.d.site_xmat[i])
+        return q
+
+    def body_geoms(self, b: int) -> list:
+        """The geoms of body b and of every body fixed to it (reached without crossing a joint)."""
+        m, out, todo = self.m, [], [int(b)]
+        while todo:
+            c = todo.pop()
+            out += range(int(m.body_geomadr[c]), int(m.body_geomadr[c]) + int(m.body_geomnum[c])) if m.body_geomnum[c] else []
+            todo += [k for k in range(c + 1, m.nbody) if int(m.body_parentid[k]) == c and not m.body_jntnum[k]]
+        return out
+
+    def _corners(self, g: int):
+        """The 8 corners of geom g's own bounding box (model.geom_aabb), world frame, in the current state."""
+        c, h = self.m.geom_aabb[g][:3], self.m.geom_aabb[g][3:]
+        s = np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)], float)
+        return (c + s * h) @ self.d.geom_xmat[g].reshape(3, 3).T + self.d.geom_xpos[g]
+
+    def size(self, b: int):
+        """Full extents [3] (m) of body_geoms(b) along the body's own axes, or None (no geom)."""
+        gs = self.body_geoms(b)
+        if not gs:
+            return None
+        p = (np.concatenate([self._corners(g) for g in gs]) - self.d.xpos[b]) @ self.d.xmat[b].reshape(3, 3)
+        return p.max(0) - p.min(0)
+
+    def bbox(self, b: int):
+        """[[x, y, z] min, [x, y, z] max] (m) of body_geoms(b), world axes, in the current state, or None."""
+        gs = self.body_geoms(b)
+        if not gs:
+            return None
+        p = np.concatenate([self._corners(g) for g in gs])
+        return [p.min(0), p.max(0)]
+
+    def height_above_ground(self, b: int, exclude: set):
+        """The body's height above the first colliding geom straight below its frame origin that belongs to none of the
+        bodies in `exclude` (the robot itself), by ray casts on the scratch data; None when nothing is below."""
+        m, d = self.m, self.d
+        p0 = d.xpos[b].copy()
+        p = p0.copy()
+        gid = np.zeros(1, np.int32)
+        for _ in range(16):
+            dist = self.mj.mj_ray(m, d, p, np.array([0.0, 0.0, -1.0]), None, 1, -1, gid)
+            if dist < 0 or gid[0] < 0:
+                return None
+            g = int(gid[0])
+            if int(m.geom_bodyid[g]) in exclude or not (m.geom_contype[g] or m.geom_conaffinity[g]):
+                p = p - np.array([0.0, 0.0, dist + 1e-4])
+                continue
+            return float(p0[2] - (p[2] - dist))
+        return None
+
+    def subtree(self, root: int) -> set:
+        """Body ids of root and every body below it."""
+        out, m = {int(root)}, self.m
+        for b in range(int(root) + 1, m.nbody):
+            if int(m.body_parentid[b]) in out:
+                out.add(b)
+        return out
+
+    def joints(self, ids) -> dict:
+        """{name: qpos address, dof address, range or None} of hinge and slide joints."""
+        m, out = self.m, {}
+        for j in ids:
+            j = int(j)
+            if int(m.jnt_type[j]) in (2, 3):              # mjJNT_SLIDE, mjJNT_HINGE
+                rng = [float(m.jnt_range[j][0]), float(m.jnt_range[j][1])] if m.jnt_limited[j] else None
+                out[m.joint(j).name or f"joint{j}"] = (int(m.jnt_qposadr[j]), int(m.jnt_dofadr[j]), rng)
+        return out
+
+
+def mj_body_fields(R: MjRead, b: int, *, vel: bool = True, size: bool = False, bbox: bool = False,
+                   ground_exclude: set | None = None) -> dict:
+    """StateTable fields of one MuJoCo body: pos, quat (w x y z), lin_vel / ang_vel (world frame), size, bbox,
+    height_above_ground."""
+    f = {"pos": ("m", lambda: R.d.xpos[b].copy()), "quat": ("1 (w x y z)", lambda: R.d.xquat[b].copy())}
+    if vel:
+        f["lin_vel"] = ("m/s", lambda: R.vel("body", b)[0])
+        f["ang_vel"] = ("rad/s", lambda: R.vel("body", b)[1])
+    if size and R.body_geoms(b):
+        ext = R.size(b)
+        f["size"] = ("m (full extents of its geoms and those fixed to it, along the body's axes)", lambda: ext)
+    if bbox and R.body_geoms(b):
+        f["bbox"] = ("m ([min xyz, max xyz] of its geoms and those fixed to it, world axes)", lambda: R.bbox(b))
+    if ground_exclude is not None:
+        f["height_above_ground"] = ("m", lambda: R.height_above_ground(b, ground_exclude))
+    return f
+
+
+def mj_site_fields(R: MjRead, s: int, *, vel: bool = True) -> dict:
+    f = {"pos": ("m", lambda: R.d.site_xpos[s].copy()), "quat": ("1 (w x y z)", lambda: R.site_quat(s))}
+    if vel:
+        f["lin_vel"] = ("m/s", lambda: R.vel("site", s)[0])
+        f["ang_vel"] = ("rad/s", lambda: R.vel("site", s)[1])
+    return f
+
+
+def mj_joint_fields(R: MjRead, joint_ids, *, ranges: bool = False) -> dict:
+    """joint_pos / joint_vel {joint: rad or m (/s)} (and joint_range {joint: [lo, hi]}) of hinge and slide joints."""
+    J = R.joints(joint_ids)
+    if not J:
+        return {}
+    f = {"joint_pos": ("rad or m", lambda: {n: float(R.d.qpos[a]) for n, (a, _, _) in J.items()}),
+         "joint_vel": ("rad/s or m/s", lambda: {n: float(R.d.qvel[v]) for n, (_, v, _) in J.items()})}
+    rng = {n: r for n, (_, _, r) in J.items() if r is not None}
+    if ranges and rng:
+        f["joint_range"] = ("rad or m ([lo, hi])", lambda: rng)
+    return f
+
+
+class MjStateTable:
+    """A StateTable whose query() refreshes the MjRead once, then reads every planned field from it."""
+
+    def __init__(self, table, reader: MjRead):
+        self.table, self.reader = table, reader
+
+    def add(self, *a, **k):
+        self.table.add(*a, **k)
+        return self
+
+    def entities(self) -> dict:
+        return self.table.entities()
+
+    def query(self, plan: dict) -> dict:
+        self.reader.refresh()
+        return self.table.query(plan)
+
+
+def state_table():
+    """The state-query ablation's table (RCB_STATE_QUERY=1), built once after the scene, in MuJoCo's world frame: the
+    quadruped (`robot`: its trunk's pose, world-frame velocity and height above the ground straight below it, by a ray
+    cast that skips the robot's own geoms; every leg joint with its range), its IMU site and feet (robot_link), and the
+    ground (`floor`: a plane or the rough terrain's height field). The scene has no object. Read by MjRead (a scratch
+    copy of the live state, positions and velocities recomputed there)."""
+    R = MjRead(mujoco, lambda: S.model, lambda: S.data).refresh()
+    m = R.m
+    root = int(S._root)
+    robot = R.subtree(root)
+    t = MjStateTable(L.StateTable(
+        frame=("MuJoCo's world frame (metres, z up; the ground is the scene feature `floor`). The /kinematics trunk frame "
+               "is this frame moved to robot.pos / robot.quat; proprio's IMU readings are in the frame of the IMU site, "
+               "the robot_link `imu`"),
+        quaternion_order="wxyz",
+        note="every pose is a body's or site's frame origin; velocities are world-frame, at that origin"), R)
+    joints = [j for j in range(m.njnt) if int(m.jnt_bodyid[j]) in robot]
+    t.add("robot", "robot", {**mj_body_fields(R, root, ground_exclude=robot), **mj_joint_fields(R, joints, ranges=True)},
+          note=f"{S.robot['name']}: the trunk body {m.body(root).name!r} (floating base)")
+    imu = int(S._imu)
+    t.add("imu", "robot_link", mj_site_fields(R, imu), note=f"the IMU site {m.site(imu).name!r} on the trunk")
+    for f in S.robot["feet"]:
+        sid = m.site(f).id
+        t.add(f if f.startswith("foot") else f"foot_{f}", "robot_link", mj_site_fields(R, sid), note=f"the foot site {f!r}")
+    g = int(S._floor)
+    kind = "hfield" if int(m.geom_type[g]) == int(mujoco.mjtGeom.mjGEOM_HFIELD) else "plane"
+    size = m.hfield_size[int(m.geom_dataid[g])].copy() if kind == "hfield" else m.geom_size[g].copy()
+    t.add("floor", "scene_feature",
+          {"pos": ("m", lambda: R.d.geom_xpos[g].copy()), "type": ("plane or hfield", lambda: kind),
+           "size": ("m (plane: half-sizes x, y and grid spacing; hfield: half-sizes x, y, the top's height, the base's "
+                    "depth)", lambda: size)},
+          note="the ground geom `floor`")
+    return t
+
+
+STATE_TABLE = state_table() if L.STATE_QUERY else None
 
 
 def ops_fields() -> dict:
@@ -745,4 +951,5 @@ def serve(svc: L.Service, port: int) -> None:
 
 serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                 on_submit_error=lambda exc: finish("error"), log=EP.log, episode=EP, state_sha=S.state_sha,
-                proprio=proprio_row, state_ops=OPS), port=int(os.environ.get("RCB_PORT", "8000")))
+                proprio=proprio_row, state_ops=OPS, state_table=STATE_TABLE if L.STATE_QUERY else None),
+      port=int(os.environ.get("RCB_PORT", "8000")))

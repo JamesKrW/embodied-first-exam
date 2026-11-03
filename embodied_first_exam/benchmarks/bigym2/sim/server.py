@@ -20,9 +20,14 @@ joint angles and velocities, gripper states, the pelvis pose its base controller
 success check or its parts.
 
 Ablations (off unless the task sets them; nothing here runs without them):
-  rcb_service.OBJECT_POSES  object_poses(): every free body of the scene (the task's props; the robot's base moves on
-                            slide joints, so none is the robot's), by body name, in MuJoCo's world frame: the room's, the
-                            frame of proprio's pelvis_x, pelvis_y, pelvis_z, pelvis_yaw; read off qpos; quaternions w x y z.
+  rcb_service.STATE_QUERY   state_table(): the robot (the pelvis: pose, velocity, height above the floor; every joint
+                            with its range), its torso, wrists, feet and both grippers' points between the finger pads,
+                            every free body outside the robot (the task's props: pose, velocity, extents), every body
+                            outside the robot with hinge / slide joints (doors, drawers, racks: an articulation with its
+                            joints) and every fixed body with collision geometry (counters, cabinets, walls: a scene
+                            feature with pose and extents), in MuJoCo's world frame: the room's, the frame of proprio's
+                            pelvis_x, pelvis_y, pelvis_z, pelvis_yaw; quaternions w x y z. A query copies the live joint
+                            state into a private MjData and runs MuJoCo's kinematics there, between two control steps.
   rcb_service.STATE_OPS     save_state() / load_state(): the episode's sim rows since the frozen start, re-run from a
                             reset on load (upstream's env, its whole-body controller and its success timers keep state
                             no array snapshot reaches; the same rows from the same start give the same state, which the
@@ -66,12 +71,6 @@ class BiGym2:
         self.facts = self.instance["t0"]["robot"]  # the robot's description: joint axes, camera mounts
         self.cmd = self.ep.hold_row()
         self._rows: list = []                      # rcb_service.STATE_OPS: the sim rows since the frozen start
-        if rcb_service.OBJECT_POSES:               # the props: every free joint's body outside the robot's namespace
-            import mujoco
-            m, ns = self.ep.model, getattr(self.ep.tools.robot, "namespace", "") or "\0"
-            self._props = [(m.body(int(m.jnt_bodyid[j])).name, int(m.jnt_qposadr[j])) for j in range(m.njnt)
-                           if m.jnt_type[j] == mujoco.mjtJoint.mjJNT_FREE
-                           and not m.body(int(m.jnt_bodyid[j])).name.startswith(ns)]
 
     # ------------------------------------------------------------------ the rcb_service.Sim contract
     def spec(self) -> dict:
@@ -153,15 +152,49 @@ class BiGym2:
         if rcb_service.STATE_OPS:
             self._rows = []
 
-    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, OBJECT_POSES)
-    def object_pose_spec(self) -> dict:
-        return {"frame": "MuJoCo's world frame, the room's (z up; the frame of proprio's pelvis_x, pelvis_y, pelvis_z, "
-                         "pelvis_yaw)", "quaternion_order": "wxyz", "objects": [n for n, _ in self._props]}
+    # ------------------------------------------------------------------ ablations (rcb_service.STATE_OPS, STATE_QUERY)
+    def state_table(self) -> "MjStateTable":
+        import mujoco
 
-    def object_poses(self) -> dict:
-        q = self.ep.data.qpos
-        return {n: rcb_service.pose_entry(q[a:a + 3], np.asarray(q[a + 3:a + 7]) / np.linalg.norm(q[a + 3:a + 7]))
-                for n, a in self._props}
+        m, ns = self.ep.model, getattr(self.ep.tools.robot, "namespace", "") or ""
+        t = MjStateTable(self.ep, "MuJoCo's world frame, the room's: z up, the floor at z = 0 (the frame of proprio's "
+                                  "pelvis_x, pelvis_y, pelvis_z, pelvis_yaw); metres, quaternions w x y z, velocities in "
+                                  "world axes")
+        name = lambda b: m.body(b).name  # noqa: E731
+        robot = {b for b in range(1, m.nbody) if ns and name(b).startswith(ns)}
+        if not robot:
+            raise RuntimeError("the robot's bodies are not namespaced: the state table cannot tell them from the props")
+        pelvis = m.body(ns + "pelvis").id
+        rj = [j for j in range(m.njnt) if int(m.jnt_bodyid[j]) in robot and int(m.jnt_type[j]) in t.hinge_slide]
+        t.add("robot", "robot", {**t.body(pelvis), "height_above_ground": ("m", lambda: float(t.data.xpos[pelvis][2])),
+                                 **t.joints(rj, strip=ns)},
+              note="the Unitree G1: pos / quat = its pelvis; joint_pos / joint_vel = every joint (its pelvis_x / y / z / "
+                   "rz base slides, legs, waist, arms, grippers' fingers)")
+        for side in ("left", "right"):
+            t.add(f"{side}_gripper", "robot_link", t.site(m.site(f"{ns}{side}_end_effector").id),
+                  note=f"the {side} gripper's point between its finger pads")
+        for suffix in ("torso_link", "head_link", "left_wrist_yaw_link", "right_wrist_yaw_link", "left_ankle_roll_link",
+                       "right_ankle_roll_link"):
+            try:
+                b = m.body(ns + suffix).id
+            except KeyError:
+                continue
+            t.add(suffix, "robot_link", t.body(b))
+        free = int(mujoco.mjtJoint.mjJNT_FREE)
+        for b in range(1, m.nbody):
+            if b in robot or not name(b) or m.body_mocapid[b] >= 0:
+                continue
+            own = list(range(int(m.body_jntadr[b]), int(m.body_jntadr[b]) + int(m.body_jntnum[b])))
+            if any(int(m.jnt_type[j]) == free for j in own):
+                t.add(name(b), "object", {**t.body(b), "size": ("m", lambda e=t.extent(b): e)})
+            elif own:
+                hs = [j for j in own if int(m.jnt_type[j]) in t.hinge_slide]
+                if hs:
+                    t.add(name(b), "articulation", {**t.body(b), **t.joints(hs)})
+            elif int(m.body_weldid[b]) == 0 and int(m.body_parentid[b]) == 0 and t.colliding(b):
+                t.add(name(b), "scene_feature", {**t.body(b, velocity=False), "size": ("m", lambda e=t.extent(b): e)},
+                      note="fixed in the room")
+        return t
 
     def save_state(self) -> dict:
         return {"rows": np.asarray(self._rows, dtype=np.float64).reshape(-1, self.raw_dim), "sha": self.state_sha()}
@@ -190,6 +223,92 @@ class BiGym2:
                             path[: -len(".mp4")] + ".last.png"], check=False, timeout=60)
         except Exception:  # noqa: BLE001
             pass
+
+
+class MjStateTable:
+    """rcb_service.STATE_QUERY's table over a private MjData: each query copies the live qpos / qvel / mocap poses into
+    it and runs mj_kinematics, mj_comPos and mj_comVel there; the live MjData is never touched."""
+
+    def __init__(self, ep, frame: str):
+        import mujoco
+
+        self.mj, self.ep = mujoco, ep
+        self.model = ep.model
+        self.data = mujoco.MjData(self.model)
+        self.table = rcb_service.StateTable(frame=frame, quaternion_order="wxyz")
+        self.add = self.table.add
+        self.hinge_slide = (int(mujoco.mjtJoint.mjJNT_HINGE), int(mujoco.mjtJoint.mjJNT_SLIDE))
+
+    def entities(self) -> dict:
+        return self.table.entities()
+
+    def query(self, plan: dict) -> dict:
+        m, live = self.ep.model, self.ep.data
+        if m is not self.model:                      # a rebuilt env: the same scene, a new model object
+            self.model, self.data = m, self.mj.MjData(m)
+        d = self.data
+        d.qpos[:], d.qvel[:] = live.qpos, live.qvel
+        d.mocap_pos[:], d.mocap_quat[:] = live.mocap_pos, live.mocap_quat
+        self.mj.mj_kinematics(m, d)
+        self.mj.mj_comPos(m, d)
+        self.mj.mj_comVel(m, d)
+        return self.table.query(plan)
+
+    def vel(self, b: int) -> np.ndarray:
+        out = np.zeros(6)
+        self.mj.mj_objectVelocity(self.model, self.data, self.mj.mjtObj.mjOBJ_BODY, b, out, 0)
+        return out                                   # [angular, linear], world axes, at the body's origin
+
+    def body(self, b: int, velocity: bool = True) -> dict:
+        f = {"pos": ("m", lambda: self.data.xpos[b].copy()), "quat": ("wxyz", lambda: self.data.xquat[b].copy())}
+        if velocity:
+            f["lin_vel"] = ("m/s", lambda: self.vel(b)[3:])
+            f["ang_vel"] = ("rad/s", lambda: self.vel(b)[:3])
+        return f
+
+    def site(self, i: int) -> dict:
+        def quat():
+            q = np.zeros(4)
+            self.mj.mju_mat2Quat(q, self.data.site_xmat[i])
+            return q
+        return {"pos": ("m", lambda: self.data.site_xpos[i].copy()), "quat": ("wxyz", quat)}
+
+    def joints(self, ids: list, strip: str = "") -> dict:
+        m = self.model
+        names = [m.joint(j).name.removeprefix(strip) for j in ids]
+        qa = [int(m.jnt_qposadr[j]) for j in ids]
+        va = [int(m.jnt_dofadr[j]) for j in ids]
+        kinds = {int(m.jnt_type[j]) for j in ids}
+        slide = int(self.mj.mjtJoint.mjJNT_SLIDE)
+        unit, vunit = (("rad or m (hinge / slide)", "rad/s or m/s (hinge / slide)") if len(kinds) > 1 else
+                       (("m", "m/s") if kinds == {slide} else ("rad", "rad/s")))
+        rng = {n: m.jnt_range[j].tolist() for n, j in zip(names, ids) if m.jnt_limited[j]}
+        out = {"joint_pos": (unit, lambda: dict(zip(names, self.data.qpos[qa].tolist()))),
+               "joint_vel": (vunit, lambda: dict(zip(names, self.data.qvel[va].tolist())))}
+        if rng:
+            out["joint_range"] = (unit, lambda: rng)
+        return out
+
+    def colliding(self, b: int) -> bool:
+        m = self.model
+        return any(int(m.geom_bodyid[g]) == b and (m.geom_contype[g] or m.geom_conaffinity[g]) for g in range(m.ngeom))
+
+    def extent(self, b: int) -> list:
+        """Full extents (m) of a body's geoms (its collision geoms when it has any) along its own axes."""
+        m = self.model
+        geoms = [g for g in range(m.ngeom) if int(m.geom_bodyid[g]) == b and int(m.geom_type[g]) != int(self.mj.mjtGeom.mjGEOM_PLANE)]
+        geoms = [g for g in geoms if m.geom_contype[g] or m.geom_conaffinity[g]] or geoms
+        pts = []
+        for g in geoms:
+            R = np.zeros(9)
+            self.mj.mju_quat2Mat(R, m.geom_quat[g])
+            c, h = m.geom_aabb[g][:3], m.geom_aabb[g][3:]
+            for sg in np.array(np.meshgrid([-1, 1], [-1, 1], [-1, 1])).T.reshape(-1, 3):
+                pts.append(m.geom_pos[g] + R.reshape(3, 3) @ (c + sg * h))
+        if not pts:
+            return [0.0, 0.0, 0.0]
+        pts = np.asarray(pts)
+        return (pts.max(axis=0) - pts.min(axis=0)).tolist()
 
 
 def build() -> BiGym2:

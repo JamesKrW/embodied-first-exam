@@ -32,14 +32,18 @@ def load(path: Path, name: str):
     return mod
 
 
-def layer(ops: bool):
+def layer(ops: bool, query: bool = False):
     os.environ.pop("RCB_STATE_OPS", None)
+    os.environ.pop("RCB_STATE_QUERY", None)
     if ops:
         os.environ["RCB_STATE_OPS"] = "1"
+    if query:
+        os.environ["RCB_STATE_QUERY"] = "1"
     src = sorted((ROOT / "embodied_first_exam/benchmarks").glob("*/sim/rcb_service.py"))[0]
     S = load(src, "rcb_service")
-    R = load(HERE / "rcb_realtime.py", f"rcb_realtime_{int(ops)}")
+    R = load(HERE / "rcb_realtime.py", f"rcb_realtime_{int(ops)}{int(query)}")
     os.environ.pop("RCB_STATE_OPS", None)
+    os.environ.pop("RCB_STATE_QUERY", None)
     return S, R
 
 
@@ -94,9 +98,37 @@ def main() -> int:
             check(exc.code == 409, f"2.3 unknown handle: {exc.code}")
     finally:
         shutil.rmtree(d)
+    S, R = layer(False, query=True)                      # RCB_STATE_QUERY on the realtime clock
+    d = tempfile.mkdtemp()
+    try:
+        svc = R.RealtimeService(T.Toy(), data=d, reset_budget=0, slowdown=1.0)
+        svc.start()
+        r = svc.front("GET", "/state/entities")
+        check(r[0] == "reply" and r[1] == 200 and "x" in json.loads(r[3])["entities"], f"2.3 entities {r[:2]}")
+        r = svc.front("POST", "/state/query", 12, lambda n: b'{"names": 1}')
+        check(r[0] == "reply" and r[1] == 400, f"2.3 malformed query refused up front {r[:2]}")
+        body = b'{"names": ["x"], "fields": ["pos"]}'
+        route, plan = svc.front("POST", "/state/query", len(body), lambda n: body)
+        check(route == "/state/query" and plan == {"x": ["pos"]}, f"2.3 query routed {route} {plan}")
+        svc._step("joints", np.array([0.2, 0.0])); svc._checkpoint("submit")
+        svc.running = True                                   # as if the clock ran: the query leaves it running
+        steps = len(svc.episode)
+        job = R._Job("POST", "/state/query")
+        svc._rt_state_query(plan, job)
+        out = json.loads(job.reply[3])
+        check(job.reply[1] == 200 and out["state"] == {"x": {"pos": [0.2]}} and out["running"] and svc.running
+              and len(svc.episode) == steps and out["state_queries"] == 1, f"2.3 query {out}")
+        svc._end("failed")
+        try:                                             # the simulator thread's answer once the episode has ended
+            svc._rt_state_query(plan, R._Job("POST", "/state/query")); check(False, "2.3 query after the end answered")
+        except R.Refused as exc:
+            check(exc.code == 409, f"2.3 query after the end {exc.code}")
+    finally:
+        shutil.rmtree(d)
     if fails:
         print(f"{len(fails)} failure(s)"); return 1
-    print("ok 2.3 state ops: save while running, load pauses the clock, resume replays the ops, unknown handle 409")
+    print("ok 2.3 state ops: save while running, load pauses the clock, resume replays the ops, unknown handle 409; "
+          "state query: entities, 400 up front, read without a step while the clock runs, 409 after the end")
     return 0
 
 

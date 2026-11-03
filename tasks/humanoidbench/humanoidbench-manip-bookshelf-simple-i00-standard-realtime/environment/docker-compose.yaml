@@ -22,7 +22,7 @@ services:
     command: python /srv/rcb_realtime.py
     restart: on-failure:6                               # a crash resumes the same episode, paused, never a reset
     environment:
-      RCB_EXPOSE_OBJECT_POSES: "1"   # the object-pose ablation (meta["objects"])
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_TASK: bookshelf_simple
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "Put each of the five red-tinted objects (the other seven are grey) onto its place on the bookshelf, shown as a translucent copy of it in the same colour, one at a time, palest first and darkest last."

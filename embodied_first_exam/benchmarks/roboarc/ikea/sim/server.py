@@ -1003,26 +1003,163 @@ def replay_row(row) -> None:
 
 
 # ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
-# RCB_EXPOSE_OBJECT_POSES=1: the furniture parts (rcb_ikea.part_bodies: every movable body that is not the robot's, the
-# privileged twin's parts), body frame pose in the robot frame (spec world.frame, to_robot), quaternion wxyz.
+# RCB_STATE_QUERY=1: the state table (rcb_limited.StateTable), in the robot frame every other pose of this service is in
+# (spec world.frame, to_robot; velocities in its axes), quaternions wxyz. The robot: the left base link (the frame's
+# origin), its height above the pedestal it stands on, the arm and finger joints with their ranges; links: each arm's
+# tcp site, hand and fingers, the right arm's base. Objects: the furniture parts (rcb_ikea.part_bodies, the privileged
+# twin's parts): pose, velocities, size along the body axes; a part with hinge / slide joints is an articulation with
+# its joints. Scene features: the fixed colliding geometry (bench, pedestals): the centre of its top face and its x / y
+# extents (the floor's height, and so the bench's, is never given). Each query is one main-thread job: the live
+# qpos / qvel copied into a private MjData, mj_kinematics + mj_comPos + mj_comVel there; the live data is never touched.
 # RCB_STATE_OPS=1, exact (MuJoCo on the CPU): save = rcb_ikea.Session.get_state() (MuJoCo's integration state, the
 # mechanism's latched welds and the success monitor, the recorded rows, the breakdown watch, MuJoCo's warning counters)
 # + the model's eq_data (the welds' frames, which the mechanism writes into the model, as verdict() keeps them) + the
 # clamp's tick counter + the episode's E keys (the settle-failure count and the last verdicts); load = set_state of
 # a copy; reset = load of the frozen start, taken before the episode begins (Session.reset() would build a new model).
-POSE_IDS = [int(b) for b in R.part_bodies(m)] if L.OBJECT_POSES else []
-POSE_SPEC = {"frame": "the world frame of spec world.frame (origin at the left arm's base link), each part's body frame",
-             "quaternion_order": "wxyz", "objects": [m.body(b).name for b in POSE_IDS]}
 EP_KEYS = ("settle_failed", "verdict", "settled_verdict")
+_ROT = T_RW[:3, :3]
+_FREE, _HINGED = int(mujoco.mjtJoint.mjJNT_FREE), (int(mujoco.mjtJoint.mjJNT_HINGE), int(mujoco.mjtJoint.mjJNT_SLIDE))
 
 
-def _object_poses() -> dict:
-    return {m.body(b).name: (lambda p: L.pose_entry(p[:3], p[3:]))(to_robot(np.concatenate([d.xpos[b], d.xquat[b]])))
-            for b in POSE_IDS}
+def _geom_corners(g: int, xpos, xmat) -> np.ndarray:
+    """The 8 corners of a geom's bounding box (MuJoCo geom_aabb, geom frame) at the given geom pose."""
+    centre, half = m.geom_aabb[g][:3], m.geom_aabb[g][3:]
+    signs = np.array(np.meshgrid([-1, 1], [-1, 1], [-1, 1])).T.reshape(-1, 3)
+    return np.asarray(xpos) + (np.asarray(xmat).reshape(3, 3) @ (centre + signs * half).T).T
 
 
-def object_poses() -> dict:
-    return on_main(_object_poses)
+def _body_extent(b: int) -> list:
+    """Full extents (m) of a body's collision geoms (all its geoms if none collide) along the body's axes."""
+    geoms = [g for g in range(m.ngeom) if int(m.geom_bodyid[g]) == b and int(m.geom_type[g]) != int(mujoco.mjtGeom.mjGEOM_PLANE)]
+    colliding = [g for g in geoms if m.geom_contype[g] or m.geom_conaffinity[g]]
+    corners = []
+    for g in colliding or geoms:
+        rot = np.zeros(9); mujoco.mju_quat2Mat(rot, m.geom_quat[g])
+        corners.append(_geom_corners(g, m.geom_pos[g], rot))
+    if not corners:
+        return [0.0, 0.0, 0.0]
+    c = np.concatenate(corners)
+    return (c.max(axis=0) - c.min(axis=0)).tolist()
+
+
+class IkeaStateTable:
+    """entities() / query(plan): each query runs on the main thread over a private MjData (see the ablations note)."""
+
+    def __init__(self):
+        self.table = L.StateTable(frame=WORLD_FRAME + "; velocities in its axes, metres", quaternion_order="wxyz")
+        self.data = mujoco.MjData(m)
+        self.add = self.table.add
+
+    def entities(self) -> dict:
+        return self.table.entities()
+
+    def _query(self, plan: dict) -> dict:
+        q = self.data
+        q.qpos[:], q.qvel[:] = d.qpos, d.qvel
+        q.mocap_pos[:], q.mocap_quat[:] = d.mocap_pos, d.mocap_quat
+        mujoco.mj_kinematics(m, q); mujoco.mj_comPos(m, q); mujoco.mj_comVel(m, q)
+        return self.table.query(plan)
+
+    def query(self, plan: dict) -> dict:
+        return on_main(self._query, plan)
+
+    def velocity(self, kind, index: int) -> np.ndarray:
+        out = np.zeros(6)
+        mujoco.mj_objectVelocity(m, self.data, kind, index, out, 0)
+        return np.concatenate([_ROT @ out[:3], _ROT @ out[3:]])      # [angular, linear], robot-frame axes
+
+    def body(self, b: int) -> dict:
+        q, B = self.data, mujoco.mjtObj.mjOBJ_BODY
+        return {"pos": ("m", lambda: to_robot(np.concatenate([q.xpos[b], q.xquat[b]]))[:3]),
+                "quat": ("wxyz", lambda: to_robot(np.concatenate([q.xpos[b], q.xquat[b]]))[3:]),
+                "lin_vel": ("m/s", lambda: self.velocity(B, b)[3:]), "ang_vel": ("rad/s", lambda: self.velocity(B, b)[:3])}
+
+    def site(self, i: int) -> dict:
+        q, S_ = self.data, mujoco.mjtObj.mjOBJ_SITE
+        return {"pos": ("m", lambda: to_robot(np.concatenate([q.site_xpos[i], _quat(q.site_xmat[i])]))[:3]),
+                "quat": ("wxyz", lambda: to_robot(np.concatenate([q.site_xpos[i], _quat(q.site_xmat[i])]))[3:]),
+                "lin_vel": ("m/s", lambda: self.velocity(S_, i)[3:]), "ang_vel": ("rad/s", lambda: self.velocity(S_, i)[:3])}
+
+    def joints(self, ids: list) -> dict:
+        q = self.data
+        names = [m.joint(j).name or f"joint{j}" for j in ids]
+        qadr = [int(m.jnt_qposadr[j]) for j in ids]
+        vadr = [int(m.jnt_dofadr[j]) for j in ids]
+        kinds = {int(m.jnt_type[j]) for j in ids}
+        unit = "rad or m (hinge / slide)" if len(kinds) > 1 else ("m" if kinds == {int(mujoco.mjtJoint.mjJNT_SLIDE)} else "rad")
+        fields = {"joint_pos": (unit, lambda: dict(zip(names, q.qpos[qadr].tolist()))),
+                  "joint_vel": ("rad/s or m/s (hinge / slide)" if len(kinds) > 1 else unit + "/s",
+                                lambda: dict(zip(names, q.qvel[vadr].tolist())))}
+        ranges = {n: m.jnt_range[j].tolist() for n, j in zip(names, ids) if m.jnt_limited[j]}
+        if ranges:
+            fields["joint_range"] = (unit, lambda: ranges)
+        return fields
+
+
+def _surface(dd, geoms: list) -> tuple[np.ndarray, list]:
+    """(the centre of the top face, [x extent, y extent]) of fixed geoms' bounding box, robot frame."""
+    c = np.concatenate([_geom_corners(g, dd.geom_xpos[g], dd.geom_xmat[g]) for g in geoms])
+    c = (T_RW[:3, :3] @ c.T).T + T_RW[:3, 3]
+    lo, hi = c.min(axis=0), c.max(axis=0)
+    return np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, hi[2]]), [float(hi[0] - lo[0]), float(hi[1] - lo[1])]
+
+
+def _support(dd, geoms: list) -> float | None:
+    """The robot-frame height of the highest fixed top face under the frame's origin (the left base's pedestal)."""
+    tops = []
+    for g in geoms:
+        top, ext = _surface(dd, [g])
+        if top[2] <= 1e-3 and abs(top[0]) <= ext[0] / 2 + 1e-6 and abs(top[1]) <= ext[1] / 2 + 1e-6:
+            tops.append(float(top[2]))
+    return max(tops) if tops else None
+
+
+def state_table() -> IkeaStateTable:
+    t = IkeaStateTable()
+    mujoco.mj_kinematics(m, t.data)
+    robot = set(int(b) for b in R.robot_bodies(m))
+    fixed = [g for g in range(m.ngeom) if int(m.geom_bodyid[g]) not in robot and int(m.body_weldid[m.geom_bodyid[g]]) == 0
+             and int(m.geom_type[g]) != int(mujoco.mjtGeom.mjGEOM_PLANE) and (m.geom_contype[g] or m.geom_conaffinity[g])]
+    support = _support(t.data, fixed)
+    arm_j = [j for a in ARMS for j in ARM_JOINTS[a]] + [j for a in ARMS for j in FINGERS[a]]
+    height = {} if support is None else \
+        {"height_above_ground": ("m", lambda: float(to_robot(link_pose(t.data, ROOT))[2]) - support)}
+    t.add("robot", "robot", {**t.body(_root), **height, **t.joints(arm_j)},
+          note=f"{R_SPEC['name']} on fixed pedestals; pos / quat = the left base link {ROOT} (the frame's origin); "
+               "height_above_ground = its height above the top of the pedestal it stands on; joint_pos / joint_vel = the arm "
+               "joints then each gripper's finger joints")
+    for a in ARMS:
+        t.add(f"{a}_tcp", "robot_link", t.site(SITE_ID[TCP[a]]), note=f"the {a} arm's tool frame (proprio tcp_pose, site {TCP[a]})")
+        t.add(f"{a}_hand", "robot_link", t.body(m.body(EE[a]).id), note=f"the {a} arm's end-effector link {EE[a]}")
+        for j in FINGERS[a]:
+            b = int(m.jnt_bodyid[j])
+            t.add(m.body(b).name, "robot_link", t.body(b), note=f"a finger of the {a} gripper")
+    t.add("right_base", "robot_link", t.body(m.body(BASE["right"]).id), note=f"the right arm's base link {BASE['right']} (fixed)")
+    for b in (int(x) for x in R.part_bodies(m)):
+        own = list(range(int(m.body_jntadr[b]), int(m.body_jntadr[b]) + int(m.body_jntnum[b])))
+        hinged = [j for j in own if int(m.jnt_type[j]) in _HINGED]
+        size = _body_extent(b)
+        if hinged:
+            t.add(m.body(b).name, "articulation", {**t.body(b), **t.joints(hinged), "size": ("m", lambda e=size: e)},
+                  note="a jointed furniture part")
+        else:
+            t.add(m.body(b).name, "object", {**t.body(b), "size": ("m", lambda e=size: e)},
+                  note="a furniture part" + ("" if any(int(m.jnt_type[j]) == _FREE for j in own) else
+                                             f" (rigidly attached to {m.body(int(m.body_parentid[b])).name!r})"))
+    groups = {}
+    for g in fixed:
+        b = int(m.geom_bodyid[g])
+        groups.setdefault(m.geom(g).name if b == 0 else m.body(b).name, []).append(g)
+    for name, geoms in groups.items():
+        if not name:
+            continue
+        top, ext = _surface(t.data, geoms)
+        t.add(name, "scene_feature", {"top_pos": ("m", lambda top=top: top), "size_xy": ("m", lambda ext=ext: ext)},
+              note="fixed: the centre of its top face and its x / y extents")
+    return t
+
+
+STATE_TABLE = state_table() if L.STATE_QUERY else None
 
 
 def _snap() -> dict:
@@ -1074,7 +1211,7 @@ threading.Thread(target=L.serve, daemon=True, args=(L.Service(
     kinematics=lambda req: on_main(do_kinematics, req), status=status, on_submit_error=lambda exc: on_main(fail, exc), log=log,
     episode=EP, state_sha=lambda: on_main(s.state_sha), proprio=lambda: on_main(proprio_row),
     **({"state_ops": OPS} if OPS is not None else {}),
-    **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})),)).start()
+    state_table=STATE_TABLE),)).start()
 while True:
     if deadline_reached():                      # between simulator jobs: never inside a call
         finish("timeout")

@@ -34,7 +34,11 @@ Differences from the other 2.2 services, all from the simulator and the benchmar
   (/out/journal.f64), every completed call checkpointed (rows, state hash, proprio row); after a crash compose restarts the
   container (run.sh exits non-zero) and this service replays the journal and continues the SAME episode. Resume class
   `approx` (OmniGibson declares rollouts nondeterministic) until the determinism probe says otherwise
-  (docs/benchmarks/maniguard.md)."""
+  (docs/benchmarks/maniguard.md).
+
+Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table (state_table(): the robot, its links,
+the scene's objects but the goal region's marker, its particle systems; world frame, read between calls) and RCB_STATE_OPS=1
+the reset (ops_reset)."""
 from __future__ import annotations
 import math, os, sys, threading, time, traceback
 import numpy as np
@@ -444,20 +448,155 @@ def replay_row(row) -> None:
 
 
 # The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
-# RCB_EXPOSE_OBJECT_POSES=1: every scene object but the robot, as Session.objects() names them, the goal region's marker
-# left out: position and orientation (world frame, quaternion xyzw as everywhere in this service) and size = the
-# extents of its axis-aligned bounding box (world axes), the privileged twin's aabb.
+# RCB_STATE_QUERY=1: state_table() below (the robot, its links, the scene's objects and particle systems).
 def _goal_marker(name: str) -> bool:
     return name.startswith("goal_region__") or name == (S.region or {}).get("marker_name")
 
 
-OBJECTS = [n for n in S.objects() if not _goal_marker(n)] if L.OBJECT_POSES else []
+class _ReadOnce(L.StateTable):
+    """L.StateTable whose getters share one read per body per query (memo)."""
+
+    def query(self, plan: dict) -> dict:
+        self._memo = {}
+        return super().query(plan)
+
+    def memo(self, key, fn):
+        if key not in self._memo:
+            self._memo[key] = fn()
+        return self._memo[key]
 
 
-def object_poses() -> dict:
-    objs = S.objects()
-    return {n: L.pose_entry(objs[n]["position"], objs[n]["orientation_xyzw"],
-                            np.subtract(objs[n]["aabb"][1], objs[n]["aabb"][0])) for n in OBJECTS if n in objs}
+def _f64(x) -> np.ndarray:
+    return M._np(x).astype(np.float64).reshape(-1)
+
+
+def state_table() -> _ReadOnce:
+    """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: the Panda (its fixed base pose, the
+    base's height above the floor, every joint), its links (the base, panda_link1..7, the end-effector frame, the
+    fingertip centre, the fingers), and every scene object but the robot and the goal region's marker, by Session.objects()'s
+    names (the privileged twin's): an articulated one as an articulation with its joint state and ranges, a fixed body
+    without joints (the desk, a shelf) as a scene feature, every other one as an object; an active particle system (dust,
+    a liquid) as an object with its particles' centroid and bounding box. No safety proposition, monitor or goal value is
+    in it. Every read is OmniGibson's getters of the live PhysX state, on the thread that serves the requests (the one
+    that steps Isaac), between calls: nothing steps or renders."""
+    r = S.robot
+    t = _ReadOnce(frame="the scene's world frame (/spec world): right-handed, z up, the floor is the plane z = 0; the frame of "
+                        "proprio tcp_pose, ee_pose and /kinematics",
+                  quaternion_order="xyzw",
+                  note="positions in m; an object's pos / quat are its base link's; bbox = the world-axis-aligned box of its "
+                       "collision meshes [[min], [max]]")
+    jn = list(r.joints)
+
+    def body(key, prim):
+        def read():
+            p, q = prim.get_position_orientation()
+            return {"pos": _f64(p), "quat": _f64(q), "lin_vel": _f64(prim.get_linear_velocity()),
+                    "ang_vel": _f64(prim.get_angular_velocity())}
+        return lambda: t.memo(key, read)
+
+    def robot_joints():
+        return t.memo("robot.joints", lambda: (_f64(r.get_joint_positions()), _f64(r.get_joint_velocities())))
+
+    rb = body("robot", r.root_link)
+    t.add("robot", "robot", {
+        "pos": ("m", lambda: rb()["pos"]), "quat": ("1", lambda: rb()["quat"]),
+        "lin_vel": ("m/s", lambda: rb()["lin_vel"]), "ang_vel": ("rad/s", lambda: rb()["ang_vel"]),
+        "height_above_ground": ("m", lambda: float(rb()["pos"][2])),
+        "joint_pos": ("rad or m", lambda: dict(zip(jn, robot_joints()[0]))),
+        "joint_vel": ("rad/s or m/s", lambda: dict(zip(jn, robot_joints()[1]))),
+        "joint_range": ("rad or m", lambda: {n: [float(r.joints[n].lower_limit), float(r.joints[n].upper_limit)] for n in jn})},
+        note=f"the fixed-base Franka Panda: pos / quat = its base link {r.root_link_name}; height_above_ground = the base "
+             "above the floor")
+
+    def add_link(name, link, note=None):
+        lb = body(f"link.{link}", r.links[link])
+        t.add(name, "robot_link", {"pos": ("m", lambda: lb()["pos"]), "quat": ("1", lambda: lb()["quat"]),
+                                   "lin_vel": ("m/s", lambda: lb()["lin_vel"]), "ang_vel": ("rad/s", lambda: lb()["ang_vel"])},
+              note=note or f"link {link}")
+        return lb
+
+    for link in r.links:
+        if link.endswith(tuple(f"link{i}" for i in range(1, 8))) and link != r.root_link_name:
+            add_link(link, link)
+    arm = r.default_arm
+    eef = r.eef_link_names[arm]
+    lb = add_link("eef", eef, f"link {eef}: the end-effector frame (proprio eef pose, ee_pose frame 'eef')")
+    off = S._tcp_off()
+    t.add("tcp", "robot_link", {
+        "pos": ("m", lambda: (M._T_of(lb()["pos"], lb()["quat"]) @ off)[:3, 3]),
+        "quat": ("1", lambda: M._xyzw_of_R((M._T_of(lb()["pos"], lb()["quat"]) @ off)[:3, :3]))},
+        note=f"the fingertip centre (proprio tcp_pose): {eef} moved {off[2, 3]:.4f} m along its +z")
+    for k, fl in enumerate(r.finger_link_names[arm] if hasattr(r, "finger_link_names") else []):
+        if fl in r.links:
+            add_link(f"finger_{k}", fl)
+
+    def obj_read(o):
+        def read():
+            try:
+                p, q = o.get_position_orientation()
+                out = {"pos": _f64(p), "quat": _f64(q)}
+            except Exception:  # noqa: BLE001
+                return None
+            for k, fn in (("lin_vel", "get_linear_velocity"), ("ang_vel", "get_angular_velocity")):
+                try:
+                    out[k] = _f64(getattr(o, fn)())
+                except Exception:  # noqa: BLE001
+                    out[k] = None
+            try:
+                lo, hi = o.aabb
+                out["bbox"] = [_f64(lo), _f64(hi)]
+            except Exception:  # noqa: BLE001
+                out["bbox"] = None
+            return out
+        return lambda: t.memo(f"obj.{o.name}", read)
+
+    def field(get, k):
+        return lambda: (get() or {}).get(k)
+
+    for o in sorted((o for o in S.env.scene.objects if o is not r and not _goal_marker(o.name)), key=lambda o: o.name):
+        g = obj_read(o)
+        fields = {"pos": ("m", field(g, "pos")), "quat": ("1", field(g, "quat")), "bbox": ("m", field(g, "bbox"))}
+        try:
+            n_dof, fixed = int(getattr(o, "n_dof", 0) or 0), bool(getattr(o, "fixed_base", False))
+        except Exception:  # noqa: BLE001
+            n_dof, fixed = 0, False
+        if n_dof > 0:
+            jnames = list(o.joints)
+            rng = {j: [float(jp.lower_limit), float(jp.upper_limit)] for j, jp in o.joints.items()}
+
+            def jread(o=o):
+                return t.memo(f"joints.{o.name}", lambda: (_f64(o.get_joint_positions()), _f64(o.get_joint_velocities())))
+            fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel")),
+                           "joint_pos": ("rad or m", lambda jnames=jnames, jread=jread: dict(zip(jnames, jread()[0]))),
+                           "joint_vel": ("rad/s or m/s", lambda jnames=jnames, jread=jread: dict(zip(jnames, jread()[1]))),
+                           "joint_range": ("rad or m", lambda rng=rng: rng)})
+            kind = "articulation"
+        elif fixed:
+            kind = "scene_feature"
+        else:
+            fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel"))})
+            kind = "object"
+        t.add(o.name, kind, fields, note=f"category {getattr(o, 'category', '?')}")
+    try:
+        systems = dict(S.env.scene.active_systems)
+    except Exception:  # noqa: BLE001
+        systems = {}
+    for name, sysm in sorted(systems.items()):
+        if name in t._ents or not hasattr(sysm, "get_particles_position_orientation"):
+            continue
+
+        def particles(sysm=sysm, name=name):
+            def read():
+                try:
+                    p = M._np(sysm.get_particles_position_orientation()[0]).astype(np.float64).reshape(-1, 3)
+                except Exception:  # noqa: BLE001
+                    return None
+                return {"pos": p.mean(0), "bbox": [p.min(0), p.max(0)]} if len(p) else None
+            return t.memo(f"particles.{name}", read)
+        t.add(name, "object", {"pos": ("m", lambda particles=particles: (particles() or {}).get("pos")),
+                               "bbox": ("m", lambda particles=particles: (particles() or {}).get("bbox"))},
+              note="a particle system: the centroid and the axis-aligned box of its particles; null when it holds none")
+    return t
 
 
 # RCB_STATE_OPS=1, reset only: Session.reset() (OmniGibson's load_state of the frozen start S0, approximate in-process:
@@ -499,8 +638,4 @@ open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at call ' + str(E['calls']) if resumed else ''})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
-                  state_ops=OPS,
-                  **({"object_poses": object_poses,
-                      "object_pose_spec": {"frame": "world (the scene's world frame, as proprio tcp_pose and /kinematics); size = "
-                                                    "axis-aligned bounding box extents along the world axes",
-                                           "quaternion_order": "xyzw", "objects": OBJECTS}} if L.OBJECT_POSES else {})))
+                  state_ops=OPS, state_table=state_table() if L.STATE_QUERY else None))

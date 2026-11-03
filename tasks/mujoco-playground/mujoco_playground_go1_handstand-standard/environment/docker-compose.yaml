@@ -22,6 +22,7 @@ services:
     command: sh /srv/run.sh
     restart: on-failure:6          # N >= 3 (docs/protocol/standard_mode.md); a resume continues the episode
     environment:
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_INSTANCE: /srv/instance.json
       RCB_TOOL: /srv/rcb_quadruped.py
       RCB_DATA: /data

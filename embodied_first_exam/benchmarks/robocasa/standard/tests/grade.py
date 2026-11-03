@@ -87,6 +87,8 @@ def main() -> None:
                    loads=loads, first_success=int(ok and resets + loads == 0))
         if ok:  # only for a success
             out.update({k: num(d[k], int) for k in ("resets_at_success", "loads_at_success") if k in d})
+    if "state_queries" in d:  # the state-query ablation (RCB_STATE_QUERY=1): /state/query calls answered; never the verdict
+        out["state_queries"] = num(d.get("state_queries"), int)
     write(out)
 
 

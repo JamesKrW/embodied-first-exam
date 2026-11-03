@@ -30,11 +30,13 @@ def write(ok, out):
 def state_ops_fields(d: dict, ok: bool) -> dict:
     """The unlimited-reset ablation's record (RCB_STATE_OPS=1: final.json then has saves and loads; {} without it):
     resets, saves, loads, the budget, first_success (no reset and no load before the success: a load begins a new
-    episode, as a reset does) and, for a success, resets_at_success / loads_at_success."""
-    if "saves" not in d:
-        return {}
+    episode, as a reset does) and, for a success, resets_at_success / loads_at_success; and the state-query ablation's
+    state_queries (RCB_STATE_QUERY=1: final.json then has it; never the verdict)."""
     n = lambda k: int(float(d.get(k) or 0))  # noqa: E731
-    return {"resets": n("resets"), "saves": n("saves"), "loads": n("loads"), "reset_budget": n("reset_budget"),
+    sq = {"state_queries": n("state_queries")} if "state_queries" in d else {}
+    if "saves" not in d:
+        return sq
+    return {**sq, "resets": n("resets"), "saves": n("saves"), "loads": n("loads"), "reset_budget": n("reset_budget"),
             "first_success": int(ok and n("resets") + n("loads") == 0),
             **({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d} if ok else {})}
 

@@ -6,7 +6,7 @@
 #  2. numpy + requests (no simulator, no image, no GPU): the eai-standard/2.2 and 2.4 layers' selftests on a stub
 #     simulator (embodied_first_exam/standard/), the 2.1 service's first-attempt record on a toy simulator (v2_1/), and
 #     the per-call image budget of the 2.1, 2.2 and 2.3 layers (frames_selftest.py), and the reset + save/load and
-#     object-pose switches of the 2.2 / 2.4 and 2.3 layers (ablation_selftest.py). Run when both modules can be imported, skipped with a note otherwise;
+#     state-query switches of the 2.2 / 2.4 and 2.3 layers (ablation_selftest.py). Run when both modules can be imported, skipped with a note otherwise;
 #     `--all` makes a missing module a failure.
 # A benchmark's own tests live with its tasks (their tests/), not here. The resource monitor's tests are run by
 # check-monitor.py.

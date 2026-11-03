@@ -1,7 +1,7 @@
 # Base image = BiGym 2.0 (bigym 1.0.0, MuJoCo 3.8.1, GR00T-WBC) (images/bigym2/). Everything task-specific is copied here.
 FROM ghcr.io/mll-lab-nu/efe:bigym2-0.1.1
 COPY instance.json /app/instance.json
-COPY --from=ghcr.io/mll-lab-nu/efe:bigym2-files-0.4.0-resetpose@sha256:8d0eea72238bd77018ad9fac08512cdfc305e16201b095bdca311d58d66a75d9 /privileged/environment/rcb_bigym2.py /opt/tools/rcb_bigym2.py
+COPY --from=ghcr.io/mll-lab-nu/efe:bigym2-files-0.4.0-stateq@sha256:1bb199cf988acabd348d3686f0682d549fcd76748deafdedf7c892b4b307286c /privileged/environment/rcb_bigym2.py /opt/tools/rcb_bigym2.py
 ENV PYTHONPATH=/opt/tools
 RUN mkdir -p /app/output
 WORKDIR /app

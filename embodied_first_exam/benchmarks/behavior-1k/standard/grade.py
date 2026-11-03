@@ -61,6 +61,8 @@ try:
         out.update({"resets": n("resets"), "saves": n("saves"), "loads": n("loads"), "reset_budget": n("reset_budget"),
                     "first_success": int(ok and n("resets") + n("loads") == 0),
                     **({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d} if ok else {})})
+    if "state_queries" in d:   # the state-query ablation's count (RCB_STATE_QUERY=1); it never decides anything
+        out["state_queries"] = int(float(d.get("state_queries") or 0))
 except Exception:  # noqa: BLE001 -- an unreadable final.json is not the agent's failure
     traceback.print_exc()
     write(False, {**NONE, "missing_log": 0, "infra_error": 1, "grader_error": 1}); raise SystemExit

@@ -40,6 +40,11 @@ def state_ops_fields(d, ok):
     return out
 
 
+def state_query_fields(d):
+    """The state-query ablation's count (RCB_STATE_QUERY=1: final.json then has state_queries; {} without it)."""
+    return {"state_queries": int(float(d.get("state_queries") or 0))} if "state_queries" in d else {}
+
+
 def verdict(d):
     m = d.get("metrics") or {}
     live_verdict = d.get("graded_by") == "live"
@@ -61,7 +66,7 @@ def verdict(d):
                 **{k: float(d.get(k) or 0) for k in RECOVERY}, "gave_up": int(bool(d.get("gave_up"))),
                 "instance_mismatch": int(str(d.get("reason") or "").startswith("instance_mismatch")),
                 "sim_error": int(sim_error), "missing_log": 0, "infra_error": int(infra), "grader_error": int(grade_error),
-                **state_ops_fields(d, ok)}
+                **state_ops_fields(d, ok), **state_query_fields(d)}
 
 
 def main():

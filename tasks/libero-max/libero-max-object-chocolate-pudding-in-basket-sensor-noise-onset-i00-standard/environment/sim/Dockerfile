@@ -3,10 +3,10 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:libero-max-0.1.1
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:libero-max-files-0.4.0-resetpose@sha256:bb46a93b4c58e8a6410fc89121b470dc674915c8c07e3c90ba2422d25de71a68 \
+COPY --from=ghcr.io/mll-lab-nu/efe:libero-max-files-0.4.0-stateq@sha256:f462834fd38d45863fed689ab86f96201772b488e968e40d076aa991a9ce469c \
      /sim/finalize.sh \
      /privileged/environment/lmx_tool.py \
      /sim/rcb_service.py \
      /sim/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-resetpose@sha256:90a9bd8fd47f66371cba9378ccc5954544457eab8dc60efe8d25dfb58ac329aa /rcb1.py /srv/rcb1.py
+COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 /rcb1.py /srv/rcb1.py

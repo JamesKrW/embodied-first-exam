@@ -1,5 +1,5 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-resetpose@sha256:9d1f54a40c8ea34df8a02efd57fd333ff7b7e96fee2bf691c83fa44551804a1f",
+ "image": "ghcr.io/mll-lab-nu/efe:dexhand-files-0.4.0-stateq@sha256:21852e2ab6751b6f200608173cc10f64296b1b49be905d3eb7158f26fa2a4149",
  "source": "embodied_first_exam/benchmarks/dexhand",
  "files": {
   "privileged/environment/arm_rig.py": "5b9e26e313c7a935dfbf04b34aec8047bd713677c638622b8baeaf09453c5a3a",
@@ -597,7 +597,7 @@
   "sim/finalize.py": "e9f0ae2cb3f816614a164a0ceb2d87f5f8c0c5265a7504433a9f7abd113df8bd",
   "sim/finalize.sh": "7c347b83c53411c1c010b8a3fb5c2b27869ec597b5231ca125ebb72702a4ef38",
   "sim/rcb_dexhand.py": "3e1bd8364414fa26e2b83710665c44152a6c7d199851f6fab361a31aeb3b9742",
-  "sim/server.py": "79e8ce2dd58c206ac2032154363d69182ff8f0ff9bf73bb4f4fa5eabb7c5caf2",
-  "standard/tests/grade.py": "04d68a639360f6082b1263cbc86aad78651cd125450825b0518c94227dcea1b9"
+  "sim/server.py": "8334b2008cc6b1525c1467cd0523e66c1839532a88471847615f68c6ecc0088e",
+  "standard/tests/grade.py": "e854ecfc9e5a88b487e2c1c35331f9c22f0fb91b0f1afbffe48604834cdbf681"
  }
 }

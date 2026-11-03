@@ -4,7 +4,9 @@ services' shared layer): GET /spec, GET /status, POST /observe, POST /submit (RC
 proprio as raw blobs, never base64), POST /kinematics (stateless FK / IK of the robot's model). Logs every call to /data/episode.jsonl.
 Nothing about the sheets except camera images ever leaves this process: no score, no record of the strokes, no exact canvas, no brush state,
 no brush model; depth is the renderer's geometry (the ink and paint are colours on the sheets, never in depth). The target is the picture
-/app/target.png in the agent's container.
+/app/target.png in the agent's container. Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table
+(state_table(): the robot, its links, the brush and its tip, the board, the plate and its wells, the sheets and the main sheet's
+regions with their ink / paint coverage, in the world frame); RCB_STATE_OPS=1 serves reset / save / load (ops_*).
 
 Differences from the RoboLab service, all from the task:
 - rows are streamed at the 20 Hz CONTROL rate (physics 100 Hz, 5 substeps); the joint action is ManiSkill's pd_joint_pos (7 targets);
@@ -558,8 +560,7 @@ def _end_from_signal():
     os._exit(0)          # run.sh keeps the container up for the collect hook
 
 
-# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches). RCB_EXPOSE_OBJECT_POSES=1 has
-# nothing to expose (the sheets, wells and plate are fixed; /spec static places them) and is not served.
+# The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches). RCB_STATE_QUERY=1: state_table().
 # RCB_STATE_OPS=1: reset = Session.reset() (the frozen instance: env.reset(seed=0) with the start joints, blank sheets and
 # a dry brush, exact), a new recording of the graded rows, no ee_pose target. save / load (not for the MyPaint media,
 # whose brush engine keeps its stroke state in libmypaint, out of reach: reset only there): ManiSkill's sim state
@@ -622,6 +623,130 @@ def ops_fields(success: bool) -> dict:
     return OPS.fields(bool(success), E["reason"], EP.events(), E.get("t_first"), EP.rows)
 
 
+REGION_GRID = 8                         # RCB_STATE_QUERY: the main sheet's regions, REGION_GRID x REGION_GRID cells
+
+
+class _ReadOnce(L.StateTable):
+    """L.StateTable whose getters share one read per sheet / link per query (memo)."""
+
+    def query(self, plan: dict) -> dict:
+        self._memo = {}
+        return super().query(plan)
+
+    def memo(self, key, fn):
+        if key not in self._memo:
+            self._memo[key] = fn()
+        return self._memo[key]
+
+
+def state_table() -> _ReadOnce:
+    """The state-query ablation's table (RCB_STATE_QUERY=1): the Panda (base pose, joints), its links, the brush (the
+    handle's pose and its tip, the TCP), the drawing board, the plate and its wells, both sheets with their ink / paint
+    coverage, and the main sheet's REGION_GRID x REGION_GRID regions with theirs. Coverage = the mean of the sheet's ink
+    (or paint) coverage raster over the area, 0 = blank paper, 1 = fully covered, a stroke still pressed included: the
+    same raster the cameras show, never compared with the target. World frame of /spec world (ManiSkill's), quaternions
+    wxyz; read from ManiSkill's link poses and velocities and the painter's rasters between calls under the service lock
+    (PhysX on the CPU, nothing steps or renders)."""
+    t = _ReadOnce(frame="the world frame of /spec world: the robot's base (panda_link0) stands at (-0.615, 0, 0) with the "
+                        "world's orientation; x forward (away from the base), y to the robot's left, z up; the table top is "
+                        "z = 0, the board top and the paper surface z = 0.02",
+                  quaternion_order="wxyz",
+                  note="sheets: rows run along -x (row 0 = the far edge), columns along -y (column 0 = the left edge seen from "
+                       "the base), as in /app/target.png and canvas_cam")
+    r = S.robot
+    links = r.links_map
+    try:
+        floor_z = -float(S.u.table_scene.table_height)
+    except Exception:  # noqa: BLE001
+        floor_z = None
+
+    def v3(x):
+        return np.asarray(x.cpu() if hasattr(x, "cpu") else x, np.float64).reshape(-1)
+
+    def link_read(name):
+        def read():
+            lk = links[name]
+            pz = lk.pose
+            out = {"pos": v3(pz.p[0]), "quat": v3(pz.q[0])}
+            for k in ("linear_velocity", "angular_velocity"):
+                try:
+                    out[k] = v3(getattr(lk, k)[0])
+                except Exception:  # noqa: BLE001
+                    out[k] = None
+            return out
+        return lambda: t.memo(("link", name), read)
+
+    jn = [j.name for j in r.get_active_joints()]
+    base = link_read("panda_link0")
+
+    def joints():
+        return t.memo("joints", lambda: (r.get_qpos()[0].cpu().numpy().astype(np.float64),
+                                         r.get_qvel()[0].cpu().numpy().astype(np.float64)))
+    t.add("robot", "robot", {
+        "pos": ("m", lambda: base()["pos"]), "quat": ("1", lambda: base()["quat"]),
+        "lin_vel": ("m/s", lambda: base()["linear_velocity"]), "ang_vel": ("rad/s", lambda: base()["angular_velocity"]),
+        "height_above_ground": ("m", lambda: None if floor_z is None else float(base()["pos"][2]) - floor_z),
+        "joint_pos": ("rad", lambda: dict(zip(jn, joints()[0]))), "joint_vel": ("rad/s", lambda: dict(zip(jn, joints()[1]))),
+        "joint_range": ("rad", lambda: {n: [float(lo), float(hi)] for n, (lo, hi) in zip(jn, S._qlim)})},
+        note="the fixed-base Panda (franka-panda): pos / quat = its base link panda_link0; height_above_ground = the base "
+             "above the floor under the table")
+    for name in [f"panda_link{i}" for i in range(1, 8)] + ["panda_hand", "panda_hand_tcp"]:
+        if name not in links:
+            continue
+        g = link_read(name)
+        t.add({"panda_hand": "hand", "panda_hand_tcp": "tcp"}.get(name, name), "robot_link",
+              {"pos": ("m", lambda g=g: g()["pos"]), "quat": ("1", lambda g=g: g()["quat"]),
+               "lin_vel": ("m/s", lambda g=g: g()["linear_velocity"]), "ang_vel": ("rad/s", lambda g=g: g()["angular_velocity"])},
+              note={"panda_hand": "link panda_hand: the stick that holds the brush",
+                    "panda_hand_tcp": "link panda_hand_tcp: the TCP = the brush tip (proprio tip_*)"}.get(name, f"link {name}"))
+    hand, tip = link_read("panda_hand"), link_read("panda_hand_tcp")
+    t.add("brush", "object", {
+        "pos": ("m", lambda: hand()["pos"]), "quat": ("1", lambda: hand()["quat"]),
+        "tip_pos": ("m", lambda: tip()["pos"]), "tip_quat": ("1", lambda: tip()["quat"]),
+        "lin_vel": ("m/s", lambda: tip()["linear_velocity"]), "ang_vel": ("rad/s", lambda: tip()["angular_velocity"]),
+        "length": ("m", lambda: float(BR["bristle_m"]))},
+        note="the tool the robot holds: pos / quat = the holder (link panda_hand); tip_pos / tip_quat = its tip (the TCP), "
+             "the velocities the tip's; length = the tuft (or nib) below the rigid holder")
+    t.add("board", "scene_feature", {"pos": ("m", lambda: [-0.1, 0.0, 0.01]), "quat": ("1", lambda: [1.0, 0.0, 0.0, 0.0]),
+                                     "size": ("m", lambda: [0.8, 1.2, 0.02])},
+          note="the drawing board the sheets lie on (a fixed box)")
+    (px, py), (hx, hy, hz) = W0["plate_center_xy"], W0["plate_half_size"]
+    t.add("plate", "scene_feature", {"pos": ("m", lambda: [px, py, float(W0["plate_top_z"]) - hz]),
+                                     "quat": ("1", lambda: [1.0, 0.0, 0.0, 0.0]), "size": ("m", lambda: [2 * hx, 2 * hy, 2 * hz])},
+          note=f"the {WORD} plate (a fixed box) that holds the wells")
+    for w in W0["wells"]:
+        t.add(f"well_{w['name']}", "scene_feature", {
+            "pos": ("m", lambda w=w: [w["center_xy"][0], w["center_xy"][1], float(W0["surface_z"])]),
+            "radius": ("m", lambda w=w: float(w["radius_m"])), "rgb": ("0..1", lambda w=w: w["rgb"])},
+            note=f"a {WORD} well on the plate: pos = the centre of its surface (the tip below it loads {WORD})")
+
+    def raster(name):
+        return t.memo(("ink", name), lambda: np.asarray(S.painter.display_ink(name), np.float64))
+
+    for name, sh in S.sheets.items():
+        t.add(f"{name}_sheet", "scene_feature", {
+            "pos": ("m", lambda sh=sh: [sh.center[0], sh.center[1], sh.z]), "quat": ("1", lambda: [1.0, 0.0, 0.0, 0.0]),
+            "size": ("m", lambda sh=sh: [sh.size_x, sh.size_y, 0.0]),
+            "coverage": ("0..1", lambda name=name: float(raster(name).mean()))},
+            note=("the main sheet (the canvas that is scored)" if name == "main" else f"the {name} sheet (never scored)")
+                 + f": pos = the centre of its surface; size along world x and y; raster {sh.rows} x {sh.cols} px")
+    sh = S.sheets["main"]
+    rb = np.linspace(0, sh.rows, REGION_GRID + 1).round().astype(int)
+    cb = np.linspace(0, sh.cols, REGION_GRID + 1).round().astype(int)
+    for i in range(REGION_GRID):
+        for j in range(REGION_GRID):
+            r0, r1, c0, c1 = rb[i], rb[i + 1], cb[j], cb[j + 1]
+            x0, y0 = sh.px_to_world(c0 - 0.5, r0 - 0.5)          # the cell's far-left corner
+            x1, y1 = sh.px_to_world(c1 - 0.5, r1 - 0.5)
+            t.add(f"main_sheet_region_r{i}_c{j}", "scene_feature", {
+                "pos": ("m", lambda x=(x0 + x1) / 2, y=(y0 + y1) / 2: [float(x), float(y), sh.z]),
+                "size": ("m", lambda sx=abs(x0 - x1), sy=abs(y0 - y1): [float(sx), float(sy), 0.0]),
+                "coverage": ("0..1", lambda a=(r0, r1, c0, c1): float(raster("main")[a[0]:a[1], a[2]:a[3]].mean()))},
+                note=f"main sheet raster rows {r0}..{r1 - 1}, columns {c0}..{c1 - 1} (row r{i} of {REGION_GRID} from the far "
+                     f"edge, column c{j} of {REGION_GRID} from the left edge seen from the base)")
+    return t
+
+
 L.check_spec(SPEC)                     # a spec that misses a 2.2 field or names a forbidden one never serves
 EP.scene_built()                       # the startup watchdog stands down: a long resume replay is not a hang
 S.record_start()                       # before begin(): a resume's journal replay is part of the recorded trajectory
@@ -634,4 +759,4 @@ open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at control step %d' % ctrl_steps() if resumed else ''})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
-                  state_ops=OPS))
+                  state_ops=OPS, state_table=state_table() if L.STATE_QUERY else None))

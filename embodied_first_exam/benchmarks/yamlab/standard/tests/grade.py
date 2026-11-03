@@ -45,6 +45,10 @@ def state_ops_fields(d, ok):
     if ok:
         out.update({k: n(k) for k in ("resets_at_success", "loads_at_success") if k in d})
     return out
+def state_query_fields(d):
+    """The state-query ablation's count (the service writes it with RCB_STATE_QUERY=1): state_queries, the /state/query
+    calls answered; {} without the switch. Never part of the verdict."""
+    return {"state_queries": int(d.get("state_queries") or 0)} if "state_queries" in d else {}
 unfinished = not d.get("finalized")                        # the collect hook never completed final.json
 infra = bool(d.get("infra_error")) or unfinished
 sim_error = d.get("reason") == "error"                     # PROTOCOL §4: a simulator error is the agent's 0, whatever success came before
@@ -61,4 +65,4 @@ write(ok, {"success": int(ok), "live_success": int(bool(d.get("success"))), "gra
            "sim_crashed_on_call": int(d.get("reason") == "sim_crashed_on_call"),
            "sim_startups": int(num("sim_startups")), "resumes": int(num("resumes")),
            "resume_state_mismatch": int(num("resume_state_mismatch")), "resume_max_tcp_dev_m": num("resume_max_tcp_dev_m"),
-           "resume_max_joint_dev": num("resume_max_joint_dev"), **state_ops_fields(d, ok)})
+           "resume_max_joint_dev": num("resume_max_joint_dev"), **state_ops_fields(d, ok), **state_query_fields(d)})

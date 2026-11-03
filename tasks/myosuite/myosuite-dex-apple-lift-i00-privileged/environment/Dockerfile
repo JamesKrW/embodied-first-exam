@@ -2,7 +2,7 @@
 # CPU only. The base image has MyoSuite's trained baselines removed (they are this benchmark's reference solutions).
 FROM ghcr.io/mll-lab-nu/efe:myosuite-0.1.1
 COPY instance.npz /app/instance.npz
-COPY --from=ghcr.io/mll-lab-nu/efe:myosuite-files-0.4.0-resetpose@sha256:cb5ada448ff5e7b6b2295fd2edeabd4b7031cec8fd03acb56079fb20b2b41716 /privileged/environment/rcb_myosuite.py /opt/tools/rcb_myosuite.py
+COPY --from=ghcr.io/mll-lab-nu/efe:myosuite-files-0.4.0-stateq@sha256:d17e72a5798e3f8da7966baaf83ee7cf424b24d4cfebbe2320d22bd68555d302 /privileged/environment/rcb_myosuite.py /opt/tools/rcb_myosuite.py
 ENV PYTHONPATH=/opt/tools
 RUN mkdir -p /app/output
 WORKDIR /app
