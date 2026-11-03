@@ -16,6 +16,50 @@ The selected policy is tested on 12 disjoint cases in two fresh processes. Binar
 ## Modeling limitations
 Simulation transfer only, not hardware. Fixed 98→512→256→128→29 ELU actor and public PD wrapper. Coding-agent feedback is noisy joint angles, public commands and images.
 
+## This run: unlimited resets, save and load
+
+This run raises the deployment budget and adds two calls. This section overrides anything above, and anything in
+`/describe`, that says there are three rounds, or that no reset exists.
+
+- You have 1003 deployment rounds (`max_rounds` in `/describe`): in practice as many as your time allows. Every
+  deployment starts each development case afresh from its starting state (that is the reset); the cases and the hidden
+  dynamics stay the same.
+- `POST /save_state` with `{"round_id": 0, "case": 0, "t": 4.0}` names the state of that completed development
+  episode at its telemetry time at or before `t` seconds and answers `{"handle": "s1", "t": ...}`. The handle is all
+  you get, never the state's contents. At most 32 handles are kept (the least recently used one is dropped).
+- `POST /load_state` with `{"handle": "s1"}` makes your next deployment run only that case, starting from that saved
+  state, with the policy you deploy taking over there. The controller's run-time state (its phase, timers,
+  integrators, last action) carries over; its parameters are the new policy's. The loaded deployment's feedback covers
+  the whole episode, the saved path included, and its answer has `start` and `load_verified`. `{"handle": null}`
+  cancels a pending load. Saves and loads cost no round. In Python: `c.save_state(round_id, case, t)`, `c.load_state(handle)`, then `c.deploy(policy, diagnosis)`.
+- Grading is unchanged: the selected round's policy (sealed, or else the latest completed round) runs every held-out
+  case from its start, as described above; a policy deployed after a load is evaluated like any other.
+- Your time keeps running across deployments, saves and loads.
+
+## This run: privileged state queries
+
+This run lets you read the simulator's true state during your development episodes. This section overrides anything
+above, and anything in `/describe`, that says the true state is never returned during adaptation.
+
+- `GET /state/entities` (in Python: `Client().state_entities()`) lists what you can query: `{"frame", "quaternion_order", "entities": {name:
+  {"kind", "fields": {field: unit}, "static"}}, "rounds"}`. The kinds are `robot` (the robot's base or root),
+  `robot_link` (a foot, a hand, the torso), `object` and `scene_feature` (poles, a parking slot, a pad, the terrain).
+  `rounds` lists the completed rounds you can query.
+- `POST /state/query` with `{"names": [...], "fields": [...], "round_id": ..., "case": ..., "t": ...}` (in Python:
+  `Client().state_query(["robot"], case=0)`) answers `{"round_id", "cases": [{"case", "t": [...], "state": {name: {field: [one value per time]}}}],
+  "state_queries"}`: the true state (no noise, no bias) of that round's development episodes at their telemetry
+  times. Only `names` is required: `fields` defaults to every field, `round_id` to the latest completed round, `case`
+  to every development case of that round, and `t` (seconds, or a window `[t0, t1]`) to every sample. A `static`
+  entity gives one value instead of a list.
+  - The usual fields: `pos` [x, y, z] m, `quat` (in `quaternion_order`), `lin_vel` m/s, `ang_vel` rad/s (both in the
+    world frame), `height_above_ground` m, `joint_pos` / `joint_vel` {joint: value}, `size` m. Each field's unit is
+    in the list.
+  - An unknown name, field or round is a 400 that lists the valid ones.
+- A query runs no simulation, changes nothing and costs no round. Queries are counted and recorded; they do not change
+  the grading. After adaptation has ended a query is refused (409).
+- Nothing else changes: deployments return the same noisy feedback, and no answer holds a score, a success flag, the
+  hidden dynamics or anything about the held-out cases.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

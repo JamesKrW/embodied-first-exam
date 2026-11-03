@@ -91,8 +91,10 @@ def load_force_asset(path):
     return weights
 
 
-def rollout(policy, case, out, asset=None, render=False):
-    """Policy may be a validated JSON object or a path; never execute agent code."""
+def rollout(policy, case, out, asset=None, render=False, ablation=None):
+    """Policy may be a validated JSON object or a path; never execute agent code. ablation (None: the plain rollout): a
+    hook of the service's ablations; it gets the true state at each telemetry time (record) and may hand a later policy
+    to take over at a control step (switch)."""
     if isinstance(policy, (str, Path)):
         raw = Path(policy).read_bytes()
         if len(raw) > 16384:
@@ -163,9 +165,27 @@ def rollout(policy, case, out, asset=None, render=False):
         mujoco.mjtWarning.mjWARN_BADQVEL,
         mujoco.mjtWarning.mjWARN_BADQACC,
     ]
+    if ablation is not None:
+        from .ablation import carry, controller_state
     try:
         for k in range(steps):
             t = k * DT
+            if ablation is not None:
+                if k % 5 == 0:
+                    rot = data.xmat[1].reshape(3, 3)
+                    ablation.record(
+                        t,
+                        {"drone": {"pos": data.qpos[:3], "quat": data.qpos[3:7], "lin_vel": data.qvel[:3],
+                                   "ang_vel": rot @ data.qvel[3:6], "height_above_ground": float(data.qpos[2]),
+                                   "rotor_thrust": vehicle.rotor}},
+                        [data.time, data.qpos, data.qvel, vehicle.rotor, [vehicle.saturated_steps],
+                         controller_state(controller), rng.bit_generator.state, [force_calls, clipped_forces]],
+                    )
+                later = ablation.switch(t)
+                if later is not None:   # a load: the next policy takes over with this controller's run-time state
+                    new_policy = validate(json.loads(Path(later).read_text()))
+                    controller = carry(controller, Controller(policy), Controller(new_policy))
+                    policy = new_policy
             obs = vehicle.observation(t, target(t, **command), rng)
             contact = vehicle.step(controller.action(obs), obs, policy, residual)
             finite = bool(np.isfinite(data.qpos).all() and np.isfinite(data.qvel).all())
