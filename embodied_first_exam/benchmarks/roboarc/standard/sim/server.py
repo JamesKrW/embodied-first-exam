@@ -715,13 +715,14 @@ def replay_row(row) -> None:
 # (spec world.frame, to_robot; velocities in its axes), quaternions wxyz. The robot: its root link, its height above the
 # table top it is mounted on, every robot joint (the privileged twin's articulation state) and the arm joints' ranges;
 # links: each arm's TCP (proprio tcp_pose), hand and finger links. Objects: the task's own entities of Session.objects()
-# (the privileged twin's names: the robot, the table and the lab scene props left out), without visual-only markers (an
-# entity with no collision geometry, or whose morph turns collision off): a free body as an object (pose, velocities, its axis-aligned box), an entity
+# (the privileged twin's names: the robot, the table and the lab scene props left out), without visual-only markers (a
+# rigid entity with no collision geometry, or whose morph turns collision off: goal regions drawn on the table): a free body as an object (pose, velocities, its axis-aligned box), an entity
 # with revolute / prismatic joints as an articulation (base pose, joint positions / velocities), a fixed one as a scene
 # feature, a deformable (cloth, rope, FEM mesh) as its particles' / vertices' centroid, mean velocity and box; an entity
-# of several links adds each link's position. The table: the centre of its top face and its x / y extents (the floor,
-# and so the table's height, is never given). Each query is one main-thread job reading the world's state once
-# (World.read_state, the entities' AABBs): a read, no physics step.
+# of several links is given by its root link. The table: its top face only (centre, the world axes' orientation, x / y
+# extents with zero height, the face's axis-aligned box); the table's height above the floor is never given. The fields are pos, quat, size, bbox, lin_vel, ang_vel, joint_pos, joint_vel, joint_range and
+# height_above_ground only. Each query is one main-thread job reading the world's state once (World.read_state, the
+# entities' AABBs): a read, no physics step.
 # RCB_STATE_OPS=1, reset only: Session.reset() (env.privileged.rewind_to(S0), the frozen first checkpoint; its rewind
 # event re-applies the torque caps and resets the safety monitor; approximate on Genesis' GPU solvers), the recording
 # restarted (the graded rows from the frozen start) and this service's episode keys cleared. No save / load: the
@@ -817,10 +818,6 @@ class ArcStateTable:
                 "joint_vel": (unit.replace("rad", "rad/s").replace(" m", " m/s") if " or " in unit else unit + "/s",
                               lambda: {n: float(np.asarray(j()[n]["velocity"]).reshape(-1)[0]) for n in names})}
 
-    def link_positions(self, entity: str, links: list) -> dict:
-        k = lambda: self.ws()["articulations"][entity]["links"]
-        return {"link_pos": ("m", lambda: {n: _rpos(k()[n]["position_m"]) for n in links})}
-
 
 def _hinged(entity) -> tuple[list, str, dict]:
     """(the names of an entity's revolute / prismatic joints, their unit, {name: [lo, hi]} where the joint has limits)."""
@@ -837,6 +834,11 @@ def _hinged(entity) -> tuple[list, str, dict]:
                 pass
     unit = "rad or m (revolute / prismatic)" if len(kinds) > 1 else ("m" if kinds == {True} else "rad")
     return names, unit, ranges
+
+
+# entity names that state a role in the task: the same body under a neutral name (the scene's own names stay in
+# s.objects(); only the state table renames them)
+NEUTRAL = {"target_ring": "ring_0", "lock_goal": "lock_end", "lock_goal_post": "lock_end_post"}
 
 
 def state_table() -> ArcStateTable:
@@ -866,41 +868,46 @@ def state_table() -> ArcStateTable:
     objs = S.objects()
     for n in sorted(objs):
         o, ent = objs[n], S.env._world.entities[n]
-        if _visual_only(ent) or n in t.table._ents:
+        if n in t.table._ents or NEUTRAL.get(n, n) in t.table._ents:
             continue
-        if o.get("material") in ("particle", "fem"):
-            t.add(n, "object", {"pos": ("m", lambda n=n: _rpos(t.objects()[n]["position"])),
+        if o.get("material") in ("particle", "fem"):      # a deformable (its particles / vertices collide, not its links)
+            t.add(NEUTRAL.get(n, n), "object", {"pos": ("m", lambda n=n: _rpos(t.objects()[n]["position"])),
                                 "lin_vel": ("m/s", lambda n=n: _rvec(t.objects()[n]["velocity"])),
                                 "bbox": ("m", lambda n=n: _rbox(t.objects()[n]["bounds"]))},
                   note=f"a deformable ({'cloth / rope particles' if o['material'] == 'particle' else 'FEM mesh'}): pos = the "
                        "centroid of its points, lin_vel = their mean velocity, bbox = their axis-aligned box [[min], [max]]")
             continue
-        if n not in bodies:
+        if _visual_only(ent) or n not in bodies:
             continue
         box = {"bbox": ("m", lambda n=n: t.bounds(n))}
-        links = list(arts.get(n, {}).get("links", {}))
-        multi = t.link_positions(n, links) if len(links) > 1 else {}
+        multi = len(arts.get(n, {}).get("links", {})) > 1
         names, unit, rng = _hinged(ent)
         if names and n in arts:
-            t.add(n, "articulation", {**t.rigid(n), **t.joints(n, names, unit),
-                                      **({"joint_range": (unit, lambda rng=rng: rng)} if rng else {}), **box, **multi},
+            t.add(NEUTRAL.get(n, n), "articulation", {**t.rigid(n), **t.joints(n, names, unit),
+                                      **({"joint_range": (unit, lambda rng=rng: rng)} if rng else {}), **box},
                   note=("its base is fixed; " if o.get("fixed") else "") + "pos / quat = its base link; bbox = its "
-                       "axis-aligned box [[min], [max]]" + ("; link_pos = each link's position" if multi else ""))
+                       "axis-aligned box [[min], [max]]")
         elif o.get("fixed"):
-            t.add(n, "scene_feature", {**t.rigid(n, velocity=False), **box, **multi},
-                  note="fixed in place; bbox = its axis-aligned box [[min], [max]]")
+            t.add(NEUTRAL.get(n, n), "scene_feature", {**t.rigid(n, velocity=False), **box},
+                  note="fixed in place; " + ("pos / quat = its root link; " if multi else "") + "bbox = its axis-aligned "
+                       "box [[min], [max]]")
         else:
-            t.add(n, "object", {**t.rigid(n), **box, **multi},
-                  note="bbox = its axis-aligned box [[min], [max]]" + ("; link_pos = each link's position" if multi else ""))
+            t.add(NEUTRAL.get(n, n), "object", {**t.rigid(n), **box},
+                  note=("pos / quat / velocities = its root link; " if multi else "") + "bbox = its axis-aligned box "
+                       "[[min], [max]]")
     table = S.env._world.entities.get("table")
     if table is not None and table_z is not None:
         try:
-            lo, hi = np.asarray(_rbox(M._np(table.get_AABB()).reshape(-1, 2, 3)[0]))
+            wlo, whi = np.asarray(M._np(table.get_AABB()).reshape(-1, 2, 3)[0], dtype=np.float64)
         except Exception:  # noqa: BLE001 — a table without collision geometry: its visual box
-            lo, hi = np.asarray(_rbox(M._np(table.get_vAABB()).reshape(-1, 2, 3)[0]))
-        top = [float((lo[0] + hi[0]) / 2), float((lo[1] + hi[1]) / 2), float(_rpos([0.0, 0.0, table_z])[2])]
-        t.add("table", "scene_feature", {"top_pos": ("m", lambda: top), "size_xy": ("m", lambda: [float(hi[0] - lo[0]), float(hi[1] - lo[1])])},
-              note="the table the task is set on: the centre of its top face and its x / y extents")
+            wlo, whi = np.asarray(M._np(table.get_vAABB()).reshape(-1, 2, 3)[0], dtype=np.float64)
+        wlo[2] = whi[2] = table_z                       # the top face only: the floor, and so the height, is not given
+        centre, ext = _rpos((wlo + whi) / 2).tolist(), [float(whi[0] - wlo[0]), float(whi[1] - wlo[1]), 0.0]
+        tquat, tbox = _rquat([1.0, 0.0, 0.0, 0.0]).tolist(), _rbox([wlo, whi])
+        t.add("table", "scene_feature", {"pos": ("m", lambda: centre), "quat": ("wxyz", lambda: tquat),
+                                         "size": ("m", lambda: ext), "bbox": ("m", lambda: tbox)},
+              note="the table's top face: pos = its centre, quat = its axes, size = its x / y extents (zero height), "
+                   "bbox = its axis-aligned box [[min], [max]]; fixed; the table's height above the floor is not given")
     return t
 
 

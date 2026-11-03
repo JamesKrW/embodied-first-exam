@@ -36,7 +36,8 @@ Depth is Genesis' rasterizer z-depth for the same camera and pixels.
 Ablations (rcb_limited; off unless the task sets the switch): with RCB_STATE_QUERY=1 the state table holds the robot (its
 base pose, velocity and height above the floor, the joints in the action layout), both tool frames, the gripper bases and
 fingers, every task object as Session.objects() names it (a rigid body: pose, velocity, declared size, world box; an
-articulated one also its joints with their ranges; a particle body: its centroid, mean velocity and box) and the table,
+articulated one also its joints with their ranges; a particle body: its centroid, mean velocity and box) except the
+marked regions that only show where something should go (GOAL_REGIONS), and the table,
 all in the RoboWits world frame (that of /spec world and proprio), quaternions wxyz. A query reads Genesis' entity
 state."""
 from __future__ import annotations
@@ -364,6 +365,12 @@ def _object_joints(ent) -> dict:
             "joint_range": (unit, lambda: rng)}
 
 
+# The scene's marked regions that only show where something should go (a coloured area, patch, dot, line or mat): not in
+# the state table.
+GOAL_REGIONS = {"target area", "green target area", "target patch", "apex target", "collection_zone", "goal line",
+                "blue target mat"}
+
+
 def state_table() -> L.StateTable:
     t = L.StateTable(frame="RoboWits world frame (/spec world: that of ee_pose, proprio tcp_pose and /kinematics): the robot "
                            "base at (0, 0, 1.08), x away from the robot, y to its left, z up; the floor is the plane z = 0; "
@@ -384,6 +391,8 @@ def state_table() -> L.StateTable:
         if "finger" in n.lower() or n in (r.GRIPPER_BASE_LINK_RIGHT, r.GRIPPER_BASE_LINK_LEFT):
             t.add(n, "robot_link", _link_fields(link), note="a gripper finger" if "finger" in n.lower() else "a gripper base")
     for n, o in S.objects().items():
+        if n in GOAL_REGIONS:
+            continue
         e = S.env.get_entity(n)
         if o.get("material") == "particle":
             t.add(n, "object", {"pos": ("m", lambda e=e: S._particles(e).mean(axis=0)),
@@ -401,7 +410,7 @@ def state_table() -> L.StateTable:
         except Exception:  # noqa: BLE001
             joints = {}
         t.add(n, "articulation" if joints else "object", {**fields, **joints},
-              note=("fixed in place; " if o.get("fixed") else "") + "bbox = its axis-aligned box [[min], [max]] in the world frame")
+              note="bbox = its axis-aligned box [[min], [max]] in the world frame")
     table = S.env.get_entity("table")
     if table is not None:
         t.add("table", "scene_feature", {"pos": ("m", lambda: _one(table.get_pos())), "quat": ("wxyz", lambda: _one(table.get_quat())),

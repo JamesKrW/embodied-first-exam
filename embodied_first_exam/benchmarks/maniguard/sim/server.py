@@ -37,8 +37,8 @@ Differences from the other 2.2 services, all from the simulator and the benchmar
   (docs/benchmarks/maniguard.md).
 
 Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table (state_table(): the robot, its links,
-the scene's objects but the goal region's marker, its particle systems; world frame, read between calls) and RCB_STATE_OPS=1
-the reset (ops_reset)."""
+the scene's objects but the goal region's marker, named by category and index, no particle system; world frame, read
+between calls) and RCB_STATE_OPS=1 the reset (ops_reset)."""
 from __future__ import annotations
 import math, os, sys, threading, time, traceback
 import numpy as np
@@ -448,7 +448,7 @@ def replay_row(row) -> None:
 
 
 # The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
-# RCB_STATE_QUERY=1: state_table() below (the robot, its links, the scene's objects and particle systems).
+# RCB_STATE_QUERY=1: state_table() below (the robot, its links, the scene's objects).
 def _goal_marker(name: str) -> bool:
     return name.startswith("goal_region__") or name == (S.region or {}).get("marker_name")
 
@@ -473,18 +473,21 @@ def _f64(x) -> np.ndarray:
 def state_table() -> _ReadOnce:
     """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: the Panda (its fixed base pose, the
     base's height above the floor, every joint), its links (the base, panda_link1..7, the end-effector frame, the
-    fingertip centre, the fingers), and every scene object but the robot and the goal region's marker, by Session.objects()'s
-    names (the privileged twin's): an articulated one as an articulation with its joint state and ranges, a fixed body
-    without joints (the desk, a shelf) as a scene feature, every other one as an object; an active particle system (dust,
-    a liquid) as an object with its particles' centroid and bounding box. No safety proposition, monitor or goal value is
-    in it. Every read is OmniGibson's getters of the live PhysX state, on the thread that serves the requests (the one
-    that steps Isaac), between calls: nothing steps or renders."""
+    fingertip centre, the fingers), and every scene object but the robot, the goal region's marker and visual-only bodies:
+    an articulated one as an articulation with its joint state and ranges, a fixed body without joints (the desk, a
+    shelf) as a scene feature, every other one as an object. An object is named by its category and an index,
+    `<category>_<k>`, k counting the objects of that category ordered by their start position (x, then y, then z, to
+    the cm; then by the scene's own name), so the names do not tell the task's roles. Particle systems (dust, a liquid)
+    are not in it. A failed read answers the last values read, so no value is null. No safety proposition, monitor or
+    goal value is in it. Built at the start state, before a resume replays its journal, so the entities, their names and
+    their fields are the start's. Every read is OmniGibson's getters of the live PhysX state, on the thread that serves
+    the requests (the one that steps Isaac), between calls: nothing steps or renders."""
     r = S.robot
     t = _ReadOnce(frame="the scene's world frame (/spec world): right-handed, z up, the floor is the plane z = 0; the frame of "
                         "proprio tcp_pose, ee_pose and /kinematics",
                   quaternion_order="xyzw",
                   note="positions in m; an object's pos / quat are its base link's; bbox = the world-axis-aligned box of its "
-                       "collision meshes [[min], [max]]")
+                       "collision meshes [[min], [max]]; objects are named <category>_<k>, k ordered by start position")
     jn = list(r.joints)
 
     def body(key, prim):
@@ -530,72 +533,80 @@ def state_table() -> _ReadOnce:
         if fl in r.links:
             add_link(f"finger_{k}", fl)
 
-    def obj_read(o):
+    def kept(key, fn):
+        """fn() -> {field: value}, read once per query; a failed read (or a missing value) answers the last values read.
+        Seeded here, at the episode's start: the fields it gives are the entity's for the whole episode."""
+        last = {}
+
         def read():
             try:
-                p, q = o.get_position_orientation()
-                out = {"pos": _f64(p), "quat": _f64(q)}
+                v = fn()
             except Exception:  # noqa: BLE001
-                return None
-            for k, fn in (("lin_vel", "get_linear_velocity"), ("ang_vel", "get_angular_velocity")):
-                try:
-                    out[k] = _f64(getattr(o, fn)())
-                except Exception:  # noqa: BLE001
-                    out[k] = None
-            try:
-                lo, hi = o.aabb
-                out["bbox"] = [_f64(lo), _f64(hi)]
-            except Exception:  # noqa: BLE001
-                out["bbox"] = None
-            return out
-        return lambda: t.memo(f"obj.{o.name}", read)
+                v = None
+            if v is not None and all(x is not None for x in v.values()):
+                last.clear(); last.update(v)
+                return v
+            return dict(last)
+        read()
+        return (lambda: t.memo(key, read)), set(last)
+
+    def pose_vel(o):
+        p, q = o.get_position_orientation()
+        return {"pos": _f64(p), "quat": _f64(q), "lin_vel": _f64(o.get_linear_velocity()),
+                "ang_vel": _f64(o.get_angular_velocity())}
+
+    def bbox_of(o):
+        lo, hi = o.aabb
+        return {"bbox": [_f64(lo), _f64(hi)]}
+
+    def joints_of(o):
+        names = list(o.joints)
+        return {"joint_pos": dict(zip(names, _f64(o.get_joint_positions()))),
+                "joint_vel": dict(zip(names, _f64(o.get_joint_velocities())))}
 
     def field(get, k):
-        return lambda: (get() or {}).get(k)
+        return lambda: get()[k]
 
-    for o in sorted((o for o in S.env.scene.objects if o is not r and not _goal_marker(o.name)), key=lambda o: o.name):
-        g = obj_read(o)
-        fields = {"pos": ("m", field(g, "pos")), "quat": ("1", field(g, "quat")), "bbox": ("m", field(g, "bbox"))}
+    # every scene object but the robot and the goal region's marker, named by visible category and index: ordered by
+    # category, then by start position (x, y, z, cm), then by the scene's own name
+    rows = []
+    for o in S.env.scene.objects:
+        if o is r or _goal_marker(o.name) or bool(getattr(o, "visual_only", False)) \
+                or not hasattr(o, "get_position_orientation"):
+            continue
+        try:
+            p0 = _f64(o.get_position_orientation()[0])
+        except Exception:  # noqa: BLE001
+            log({"ev": "state_table_skip", "object": o.name, "why": "no pose at the start"})
+            continue
+        rows.append((str(getattr(o, "category", None) or "object"), tuple(round(float(x), 2) for x in p0), o.name, o))
+    rows.sort(key=lambda x: x[:3])
+    count: dict = {}
+    units = {"pos": "m", "quat": "1", "bbox": "m", "lin_vel": "m/s", "ang_vel": "rad/s", "joint_pos": "rad or m",
+             "joint_vel": "rad/s or m/s"}
+    for cat, _, _, o in rows:
+        k = count.get(cat, 0); count[cat] = k + 1
+        name = f"{cat}_{k}"
+        while name in t._ents:
+            name += "_"
         try:
             n_dof, fixed = int(getattr(o, "n_dof", 0) or 0), bool(getattr(o, "fixed_base", False))
         except Exception:  # noqa: BLE001
             n_dof, fixed = 0, False
-        if n_dof > 0:
-            jnames = list(o.joints)
+        kind = "articulation" if n_dof > 0 else "scene_feature" if fixed else "object"
+        want = ["pos", "quat", "bbox"] + (["lin_vel", "ang_vel"] if kind != "scene_feature" else []) + \
+               (["joint_pos", "joint_vel"] if kind == "articulation" else [])
+        fields = {}
+        for gk, fn in (("obj", pose_vel), ("bbox", bbox_of), *((("joints", joints_of),) if kind == "articulation" else ())):
+            g, have = kept(f"{gk}.{name}", lambda fn=fn, o=o: fn(o))
+            fields.update({f: (units[f], field(g, f)) for f in want if f in have})
+        if kind == "articulation":
             rng = {j: [float(jp.lower_limit), float(jp.upper_limit)] for j, jp in o.joints.items()}
-
-            def jread(o=o):
-                return t.memo(f"joints.{o.name}", lambda: (_f64(o.get_joint_positions()), _f64(o.get_joint_velocities())))
-            fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel")),
-                           "joint_pos": ("rad or m", lambda jnames=jnames, jread=jread: dict(zip(jnames, jread()[0]))),
-                           "joint_vel": ("rad/s or m/s", lambda jnames=jnames, jread=jread: dict(zip(jnames, jread()[1]))),
-                           "joint_range": ("rad or m", lambda rng=rng: rng)})
-            kind = "articulation"
-        elif fixed:
-            kind = "scene_feature"
-        else:
-            fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel"))})
-            kind = "object"
-        t.add(o.name, kind, fields, note=f"category {getattr(o, 'category', '?')}")
-    try:
-        systems = dict(S.env.scene.active_systems)
-    except Exception:  # noqa: BLE001
-        systems = {}
-    for name, sysm in sorted(systems.items()):
-        if name in t._ents or not hasattr(sysm, "get_particles_position_orientation"):
+            fields["joint_range"] = ("rad or m", lambda rng=rng: rng)
+        if not {"pos", "quat"} <= set(fields):
+            log({"ev": "state_table_skip", "object": o.name, "why": "no pose at the start"})
             continue
-
-        def particles(sysm=sysm, name=name):
-            def read():
-                try:
-                    p = M._np(sysm.get_particles_position_orientation()[0]).astype(np.float64).reshape(-1, 3)
-                except Exception:  # noqa: BLE001
-                    return None
-                return {"pos": p.mean(0), "bbox": [p.min(0), p.max(0)]} if len(p) else None
-            return t.memo(f"particles.{name}", read)
-        t.add(name, "object", {"pos": ("m", lambda particles=particles: (particles() or {}).get("pos")),
-                               "bbox": ("m", lambda particles=particles: (particles() or {}).get("bbox"))},
-              note="a particle system: the centroid and the axis-aligned box of its particles; null when it holds none")
+        t.add(name, kind, {f: fields[f] for f in (*want, "joint_range") if f in fields}, note=f"category {cat}")
     return t
 
 
@@ -629,6 +640,7 @@ EP.scene_built()                        # the scene and everything the service n
 VIDEO = live_video.LiveVideo(DATA, ctrl_hz=CTRL_HZ, frame=lambda: S.render_grid(VIDEO_CAMS, cols=len(VIDEO_CAMS)), log=EP.log)
 VIDEO.offer(0)                          # the start state (a restarted service has it on disk already)
 S.record_start()                        # the trajectory: a resume's journal replay is recorded too
+TABLE = state_table() if L.STATE_QUERY else None   # at the start state, before a resume's journal replay
 resumed = EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC,
                    start_event={"task": TASK, "cameras": CAMS, "instance_sha": S.instance_sha}, on_end=_end_from_signal, ops=OPS)
 if resumed:
@@ -638,4 +650,4 @@ open(os.path.join(DATA, "server.pid"), "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready (startup {EP.n_startups}, resumes {EP.resumes}{', resumed at call ' + str(E['calls']) if resumed else ''})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
-                  state_ops=OPS, state_table=state_table() if L.STATE_QUERY else None))
+                  state_ops=OPS, state_table=TABLE))

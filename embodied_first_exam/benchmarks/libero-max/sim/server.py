@@ -26,8 +26,9 @@ Ablation (off unless the task sets it; nothing here runs without it): with rcb_s
 the privileged state in the world frame of /spec "frames" (quaternions w x y z): the Panda's base pose and every arm and
 finger joint, its eef site (proprio eef) and hand; the scene's movable objects (Session.state()["objects"] names: pose,
 velocity, size, bbox) and fixtures (an articulation with its hinge and slide joints, else a scene feature), the arena's
-table. A query reads a scratch copy of the live MuJoCo state (MjRead); it takes no control step. Never the goal, the
-success check or the event's record. No save_state(): one episode per process, so no reset either.
+table. A name that states a thing's role in the case loses that word (`neutral_name`: `black_book_occluder_1` is
+`black_book_1`). A query reads a scratch copy of the live MuJoCo state (MjRead); it takes no control step. Never the
+goal, the success check or the event's record. No save_state(): one episode per process, so no reset either.
 """
 
 from __future__ import annotations
@@ -207,6 +208,22 @@ def mj_joint_fields(R: MjRead, joint_ids, *, ranges: bool = False) -> dict:
     return f
 
 
+_ROLE_WORDS = frozenset({"occluder", "distractor", "obstacle", "target", "goal", "decoy"})
+
+
+def neutral_name(name: str, taken: set) -> str:
+    """A scene name without a word that states the thing's role in the case (`black_book_occluder_1`: `black_book_1`),
+    numbered on (`_2`, ...) when that name is taken."""
+    parts = [p for p in name.split("_") if p not in _ROLE_WORDS] or [name]
+    k = int(parts.pop()) if len(parts) > 1 and parts[-1].isdigit() else None
+    stem = "_".join(parts)
+    out = stem if k is None else f"{stem}_{k}"
+    while out in taken:
+        k = (k or 1) + 1
+        out = f"{stem}_{k}"
+    return out
+
+
 class MjStateTable:
     """A StateTable whose query() refreshes the MjRead once, then reads every planned field from it."""
 
@@ -384,17 +401,23 @@ class LiberoMax:
             entity, _ = backend._entity(n)
             return m.body(entity.root_body).id
 
+        taken = set(t.entities()["entities"]) | set(self.s.env.objects_dict) | set(self.s.env.fixtures_dict)
+        names = {}
+        for n in [*self.s.env.objects_dict, *self.s.env.fixtures_dict]:
+            names[n] = n if neutral_name(n, set()) == n else neutral_name(n, taken)
+            taken.add(names[n])
         for n in self.s.env.objects_dict:
-            t.add(n, "object", mj_body_fields(R, root_of(n), size=True, bbox=True), note="a movable object of the scene")
+            t.add(names[n], "object", mj_body_fields(R, root_of(n), size=True, bbox=True),
+                  note="a movable object of the scene")
         for n in self.s.env.fixtures_dict:
             b = root_of(n)
             inner = [j for j in range(m.njnt) if int(m.jnt_bodyid[j]) in R.subtree(b) and int(m.jnt_type[j]) in (2, 3)]
             if inner:
-                t.add(n, "articulation", {**mj_body_fields(R, b, vel=False, size=True, bbox=True),
-                                          **mj_joint_fields(R, inner, ranges=True)},
+                t.add(names[n], "articulation", {**mj_body_fields(R, b, vel=False, size=True, bbox=True),
+                                                 **mj_joint_fields(R, inner, ranges=True)},
                       note="a fixture with moving parts: its root body and its hinge / slide joints")
             else:
-                t.add(n, "scene_feature", mj_body_fields(R, b, vel=False, size=True, bbox=True), note="a fixture")
+                t.add(names[n], "scene_feature", mj_body_fields(R, b, vel=False, size=True, bbox=True), note="a fixture")
         have = set(t.entities()["entities"])
         for b in range(1, m.nbody):   # the arena's table (LIBERO's main_table, ...): not a fixture of the task
             n = m.body(b).name

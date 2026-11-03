@@ -22,18 +22,19 @@ This run lets you read the simulator's true state during your development episod
 above, and anything in `/describe`, that says the true state is never returned during adaptation.
 
 - `GET /state/entities` (in Python: `Client().state_entities()`) lists what you can query: `{"frame", "quaternion_order", "entities": {name:
-  {"kind", "fields": {field: unit}, "static"}}, "rounds"}`. The kinds are `robot` (the robot's base or root),
-  `robot_link` (a foot, a hand, the torso), `object` and `scene_feature` (poles, a parking slot, a pad, the terrain).
-  `rounds` lists the completed rounds you can query.
+  {"kind", "fields": {field: unit}, "static"}}, "rounds"}`. The kinds are `robot` (the robot's base or root, the
+  car, the drone), `object` (parked cars) and `scene_feature` (poles, a parking slot, a curb, a pad). `rounds` lists the
+  completed rounds you can query.
 - `POST /state/query` with `{"names": [...], "fields": [...], "round_id": ..., "case": ..., "t": ...}` (in Python:
   `Client().state_query(["car"], case=0)`) answers `{"round_id", "cases": [{"case", "t": [...], "state": {name: {field: [one value per time]}}}],
-  "state_queries"}`: the true state (no noise, no bias) of that round's development episodes at their telemetry
-  times. Only `names` is required: `fields` defaults to every field, `round_id` to the latest completed round, `case`
-  to every development case of that round, and `t` (seconds, or a window `[t0, t1]`) to every sample. A `static`
-  entity gives one value instead of a list.
+  "state_queries"}`: the state of that round's development episodes at their telemetry times, that is the true pose
+  and velocity of each body and the robot's joints as its encoders read them (the same readings as the telemetry).
+  Only `names` is required: `fields` defaults to every field, `round_id` to the latest completed round, `case` to every
+  development case of that round, and `t` (seconds, or a window `[t0, t1]`) to every sample. A `static` entity gives
+  one value instead of a list.
   - The usual fields: `pos` [x, y, z] m, `quat` (in `quaternion_order`), `lin_vel` m/s, `ang_vel` rad/s (both in the
-    world frame), `height_above_ground` m, `joint_pos` / `joint_vel` {joint: value}, `size` m. Each field's unit is
-    in the list.
+    world frame), `height_above_ground` m, `joint_pos` / `joint_vel` {joint: value}, `size` [3] m (full extents along
+    the body's axes), `bbox` [[x, y, z] min, [x, y, z] max] m. Each field's unit is in the list.
   - An unknown name, field or round is a 400 that lists the valid ones.
 - A query runs no simulation, changes nothing and costs no round. Queries are counted and recorded; they do not change
   the grading. After adaptation has ended a query is refused (409).

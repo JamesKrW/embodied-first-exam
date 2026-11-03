@@ -47,8 +47,9 @@ def rollout(
     initial_roll=0.0,
     ablation=None,
 ):
-    """ablation (None: the plain rollout): a hook of the service's ablations; it gets the true state at each telemetry
-    time (record) and may hand a later actor to take over at a policy step (switch)."""
+    """ablation (None: the plain rollout): a hook of the service's ablations; it gets the state at each telemetry time
+    (record: the simulator's, with the joints as the encoders read them, the telemetry's q) and may hand a later actor
+    to take over at a policy step (switch)."""
     if not np.isfinite(duration) or not 3 <= duration <= 120 or not np.isfinite(speed) or not 0 < speed <= 1:
         raise ValueError("Invalid operator episode specification")
     # no CPU pinning: the container's CPU quota bounds it, and pinning to the first four host CPUs put every
@@ -106,30 +107,13 @@ def rollout(
     policy_steps = int(round(duration / 0.02))
     control = actor.default.copy()
     if ablation is not None:
-        links = {"torso": "torso_link", "left_foot": "left_ankle_roll_link", "right_foot": "right_ankle_roll_link",
-                 "left_hand": "left_wrist_yaw_link", "right_hand": "right_wrist_yaw_link"}
-        links = {k: model.body(v).id for k, v in links.items()}
-        static = {"terrain": {"kind": terrain_config["kind"], "parameters": {
-            k: terrain_config[k] for k in ("slope", "rough_amplitude", "step_height", "step_width")}}}
+        pelvis = ablation.body_box(model, 1)
     try:
         for step in range(policy_steps):
             time_s = step * 0.02
             if ablation is not None:
-                if step % 5 == 0:
-                    rot = data.xmat[1].reshape(3, 3)
-                    state = {"robot": {
-                        "pos": data.qpos[:3], "quat": data.qpos[3:7], "lin_vel": data.qvel[:3],
-                        "ang_vel": rot @ data.qvel[3:6],
-                        "height_above_ground": float(data.qpos[2] - ground_height(model, data, *data.qpos[:2])),
-                        "joint_pos": dict(zip(actor.joints, data.qpos[qp].tolist())),
-                        "joint_vel": dict(zip(actor.joints, data.qvel[qv].tolist()))}}
-                    for name, b in links.items():
-                        state[name] = {"pos": data.xpos[b], "quat": data.xquat[b]}
-                        if name.endswith("foot"):
-                            state[name]["ground_height"] = float(ground_height(model, data, *data.xpos[b][:2]))
-                    ablation.record(time_s, state, [data.time, data.qpos, data.qvel, data.act, data.ctrl, last,
-                                                    np.asarray(queue).ravel(), [phase], control,
-                                                    rng.bit_generator.state], static)
+                if step % 5 == 0:   # recorded below, once the encoders are read; the state digest's items from here
+                    before = [[phase], rng.bit_generator.state]
                 later = ablation.switch(time_s)
                 if later is not None:   # a load: the next actor takes over (its observation history carries over)
                     actor = Policy(later)
@@ -137,6 +121,16 @@ def rollout(
             phase = (phase + 0.02 / 0.6) % 1
             q = data.qpos[qp].copy() + np.array(plant["angle_bias"]) + rng.normal(0, plant["angle_sigma"], 29)
             dq = data.qvel[qv].copy() + rng.normal(0, plant["velocity_sigma"], 29)
+            if ablation is not None and step % 5 == 0:
+                rot = data.xmat[1].reshape(3, 3)
+                state = {"robot": {
+                    "pos": data.qpos[:3], "quat": data.qpos[3:7], "lin_vel": data.qvel[:3],
+                    "ang_vel": rot @ data.qvel[3:6],
+                    "height_above_ground": float(data.qpos[2] - ground_height(model, data, *data.qpos[:2])),
+                    "joint_pos": dict(zip(actor.joints, q.tolist())), "joint_vel": dict(zip(actor.joints, dq.tolist())),
+                    "size": pelvis[1] - pelvis[0], "bbox": ablation.world_box(*pelvis, data.qpos[:3], data.qpos[3:7])}}
+                ablation.record(time_s, state, [data.time, data.qpos, data.qvel, data.act, data.ctrl, last,
+                                                np.asarray(queue).ravel(), before[0], control, before[1]])
             omega = data.sensordata[gyro : gyro + 3].copy() + rng.normal(0, plant["gyro_sigma"], 3)
             rot = np.empty(9)
             mujoco.mju_quat2Mat(rot, data.sensordata[quat : quat + 4])

@@ -35,10 +35,12 @@ Differences from the RoboLab service, all from the robot and the simulator:
 
 Ablations (rcb_limited; off unless the task sets the switch): with RCB_STATE_QUERY=1 the state table holds both arms (each
 a robot: its base pose and velocity, the base's height above the floor, every joint with its range), their tool frames,
-wrist flanges and fingers, every rigid object of the scene (pose, velocity, extents: a task object's box from YAMLab's
-asset_size.json) and every other articulation (pose, velocity, joints), and the table's top height, all in the
-workstation's world frame (that of /spec world and proprio), quaternions wxyz. A query reads Isaac Lab's scene tensors
-once and answers from them."""
+wrist flanges and fingers, every rigid object of the scene (pose, velocity, extents: YAMLab's asset_size.json box where
+the asset has one, else the USD bounding box) and every other articulation (pose, velocity, joints), and the table (its
+box from the floor to its top surface: centre, extents, axis-aligned box), all in the workstation's world frame (that
+of /spec world and proprio), quaternions wxyz; the fields are pos, quat, size, bbox, lin_vel, ang_vel, joint_pos,
+joint_vel, joint_range and height_above_ground only. A query reads Isaac Lab's scene tensors once and answers from
+them."""
 from __future__ import annotations
 import math, os, sys, threading, time, traceback
 from typing import Callable
@@ -304,15 +306,23 @@ def state_table() -> IsaacStateTable:
     for name, obj in sc.rigid_objects.items():
         size = S.object_size(name).tolist() if name in task_objects else _usd_extent(obj.cfg.prim_path)
         t.add(name, "object", {**root_fields("o:" + name, obj), **({"size": ("m", lambda size=size: size)} if size else {})},
-              note=("a task object: pos = the centre of its box, size = the box's extents in its own frame"
-                    if name in task_objects else "a rigid body of the scene"))
+              note="a rigid body: pos / quat = its root frame (an object asset of YAMLab's dataset: the centre and axes of "
+                   "its box)" + ("; size = its full extents in that frame" if size else ""))
     arms = {M.ARM_ASSET[a] for a in M.ARMS}
     for name, art in sc.articulations.items():
         if name not in arms:
             t.add(name, "articulation", {**root_fields("a:" + name, art), **joint_fields("a:" + name, art)})
     try:
-        table_z = float(__import__("yamlab.robot.yam", fromlist=["ROBOT"]).ROBOT.table_position[2])
-        t.add("table", "scene_feature", {"top_z": ("m", lambda: table_z)}, note="the workstation table: its top surface height")
+        tb = __import__("yamlab.robot.yam", fromlist=["ROBOT"]).ROBOT.table
+        corners = np.array([tb["bottom_left"], tb["top_right"]], dtype=np.float64)
+        lo = np.array([corners[:, 0].min(), corners[:, 1].min(), ground])
+        hi = np.array([corners[:, 0].max(), corners[:, 1].max(), float(tb["position"][2])])
+        centre, ext, box = ((lo + hi) / 2).tolist(), (hi - lo).tolist(), [lo.tolist(), hi.tolist()]
+        t.add("table", "scene_feature", {"pos": ("m", lambda: centre), "quat": ("wxyz", lambda: [1.0, 0.0, 0.0, 0.0]),
+                                         "size": ("m", lambda: ext), "bbox": ("m", lambda: box)},
+              note="the workstation table, fixed: its box from the floor to its top surface (the top's corners from the "
+                   "robot's calibration); pos = the box's centre, size = its full extents along the frame's axes, bbox = "
+                   "its axis-aligned box [[min], [max]]")
     except Exception:  # noqa: BLE001
         pass
     return t
