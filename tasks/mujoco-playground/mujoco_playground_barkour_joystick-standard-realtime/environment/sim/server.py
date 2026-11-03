@@ -279,7 +279,7 @@ def quad_state_table(S):
     frame (the standard twin's table): the
     quadruped (`robot`: its trunk's pose, world-frame velocity and height above the ground straight below it, by a ray
     cast that skips the robot's own geoms; every leg joint with its range), its IMU site and feet (robot_link), and the
-    ground (`floor`: a plane or the rough terrain's height field). The scene has no object. Read by MjRead (a scratch
+    ground (`floor`: its position and full extents). The scene has no object. Read by MjRead (a scratch
     copy of the live state, positions and velocities recomputed there)."""
     R = MjRead(mujoco, lambda: S.model, lambda: S.data).refresh()
     m = R.m
@@ -300,12 +300,15 @@ def quad_state_table(S):
         sid = m.site(f).id
         t.add(f if f.startswith("foot") else f"foot_{f}", "robot_link", mj_site_fields(R, sid), note=f"the foot site {f!r}")
     g = int(S._floor)
-    kind = "hfield" if int(m.geom_type[g]) == int(mujoco.mjtGeom.mjGEOM_HFIELD) else "plane"
-    size = m.hfield_size[int(m.geom_dataid[g])].copy() if kind == "hfield" else m.geom_size[g].copy()
+    if int(m.geom_type[g]) == int(mujoco.mjtGeom.mjGEOM_HFIELD):
+        hx, hy, top, base = (float(v) for v in m.hfield_size[int(m.geom_dataid[g])])
+        size = [2 * hx, 2 * hy, top + base]
+    else:
+        size = [2 * float(m.geom_size[g][0]), 2 * float(m.geom_size[g][1]), 0.0]
     t.add("floor", "scene_feature",
-          {"pos": ("m", lambda: R.d.geom_xpos[g].copy()), "type": ("plane or hfield", lambda: kind),
-           "size": ("m (plane: half-sizes x, y and grid spacing; hfield: half-sizes x, y, the top's height, the base's "
-                    "depth)", lambda: size)},
+          {"pos": ("m", lambda: R.d.geom_xpos[g].copy()),
+           "size": ("m (full extents along x, y and z of the ground geom's frame; 0: unbounded or flat)",
+                    lambda: size)},
           note="the ground geom `floor`")
     return t
 
