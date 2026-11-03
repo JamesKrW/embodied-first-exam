@@ -113,6 +113,20 @@ Everything you need is in `game spec`: the world frame, the release point, the c
 `focal_px`, `principal_point_px`; pinhole: u = cx + f * x_right / depth, v = cy - f * y_up / depth) and the
 execution scatter. The physics engine is mujoco (robots at 1 ms: the arm through the Franka Panda's setpoint generator and torque limits, the base by PD within the gantry's force) + a point-mass shuttle with quadratic drag integrated at 1 ms (sim/bm.py).
 
+## This run: no success signal
+
+This run hides the match's result. This section overrides anything above, and anything in `/spec`, that says the
+replies show the score.
+
+- No reply shows the score, a point's, rally's or phrase's result, who scored a goal or the match's winner: they are
+  left out of `/status`, `/observe` and every other answer (`/spec` keeps the rules). The rest is unchanged: the
+  phase (`over` once the match has ended by its rules), the reviews, the clocks, your robot's state and the images.
+- You decide when you are done: `POST http://localhost:8000/$SEAT/finish` with `{}` (`game` has no command for it; in
+  Python `requests.post(base + "/finish", json={})`). It ends your session at once and the match is decided as when
+  your session ends: before `game start` a no-show, during the match abandoned (a valid result, success 0), after the
+  match has ended its result stands. After `/finish` every call but `/spec` and `/status` is refused (409).
+- The match is graded with the task's rules: you succeed if you win it. Play it to its end before you finish.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 
