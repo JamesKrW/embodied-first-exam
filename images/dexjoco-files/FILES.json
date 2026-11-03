@@ -1,5 +1,5 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:dexjoco-files-0.2.0-stateq-pose@sha256:c9d4991e9b3e01760a147a7d5abce7f8b5d11746e8b6122e7115d1bf2591075a",
+ "image": "ghcr.io/mll-lab-nu/efe:dexjoco-files-0.2.0-stateq-leakfix@sha256:c9d4991e9b3e01760a147a7d5abce7f8b5d11746e8b6122e7115d1bf2591075a",
  "source": "embodied_first_exam/benchmarks/dexjoco",
  "files": {
   "privileged/environment/rcb_dexjoco.py": "2e94afd6a98ab14ae20e15ef9d99a9cf676a541e37c84b5c9ccc09acfcd3aa85",

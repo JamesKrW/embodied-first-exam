@@ -8,7 +8,7 @@ COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22e
      /rcb_limited.py \
      /run.sh \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:robowits-files-0.4.0-stateq-pose@sha256:ccd560ab17df600a6295470375534ddd90371d9a0e8654de96b73add1b541b95 \
+COPY --from=ghcr.io/mll-lab-nu/efe:robowits-files-0.4.0-stateq-leakfix@sha256:1982a1c8dcdc15f74afdcc2fd504ce4d84997ef865f8d25c0ebbe077bf3712a5 \
      /privileged/tests/rcb_robowits.py \
      /sim/server.py \
      /srv/

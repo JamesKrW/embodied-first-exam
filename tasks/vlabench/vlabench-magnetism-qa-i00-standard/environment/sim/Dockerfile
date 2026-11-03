@@ -47,7 +47,7 @@ WORKDIR /app
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 COPY . /srv/
 COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 /rcb1.py /srv/rcb1.py
-COPY --from=ghcr.io/mll-lab-nu/efe:vlabench-files-0.5.0-stateq-pose@sha256:7ed0c59f1ea84f723132fb45254b6adb8d2fb361700c6711c952fcec43363615 \
+COPY --from=ghcr.io/mll-lab-nu/efe:vlabench-files-0.5.0-stateq@sha256:f59f1599d809f99c0af5da1478f02f0829f89b1adfce9cd8269572b5d2d1017d \
      /sim/rcb_service.py \
      /sim/server.py \
      /privileged/environment/vlb_tool.py \

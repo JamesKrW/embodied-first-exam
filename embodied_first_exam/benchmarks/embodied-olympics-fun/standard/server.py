@@ -19,16 +19,14 @@ attempt is over, the referee's call (meta["outcome"]: "success" or the rule that
 the task's stages reached. Never an object's pose, the robot's position in the venue, or the referee's state during an episode.
 
 Ablations (off unless the task sets them; nothing here runs without them):
-  rcb_service.STATE_QUERY   state_table(): the robot (its pelvis pose and velocity, height above the ground under it,
-                            every joint) and its key links (pelvis, torso, head, palms, feet, a real hand's
-                            fingertips); every free body of the venue (balls, implements, cones, props; a rope as one
-                            chain: its mean position and box); every jointed fixture (gates, nets, the board, the bag)
-                            with its joints, a launcher (ball machines, turrets, pitchers, passers, tossers, droppers,
-                            servers, the long rope's cranks) by its pose and box only; the field's static geometry
-                            (lines, mats, pits, beams, bars, water) as scene features with pose and box (alike parts:
-                            one entity, its box), decoration and painted goal markings left out. World frame, read off a
-                            private copy of the live state (forward kinematics there): the live simulator is never
-                            written. Never the referee's state.
+  rcb_service.STATE_QUERY   state_table(): the robot (its pelvis pose and velocity, height above the ground under it, the
+                            centre of mass, every joint, what each hand grips) and its key links (pelvis, torso, head,
+                            palms, feet, a real hand's fingertips); every free body of the venue (balls, implements,
+                            cones, props; a rope as one chain); every jointed fixture (ball machines, gates, nets, the
+                            board, the bag) with its joints; the field's static geometry (lines, mats, pits, beams,
+                            bars, water) as scene features, decoration and painted goal markings left out. World frame, read off a private copy of
+                            the live state (forward kinematics there): the live simulator is never written. Never the
+                            referee's state.
   rcb_service.STATE_OPS     save_state() / load_state(): the episode's sim rows since the frozen start, re-run from a
                             reset on load: the world's controllers, policies, grips, the family's own state and the
                             referee's latches and record are all part of what they rebuild (the same rows from the same
@@ -69,6 +67,8 @@ rcb_service.Service.meta = _meta_with_call
 # forward kinematics and the com velocities there, so a query never writes the live data and never changes the state
 # hash or the next step.
 _DOWN = np.array([0.0, 0.0, -1.0])
+_GEOM_SHAPES = {0: "plane", 1: "hfield", 2: "sphere", 3: "capsule", 4: "ellipsoid", 5: "cylinder", 6: "box", 7: "mesh",
+                8: "sdf"}
 U_POS, U_QUAT, U_LIN, U_ANG = "m", "1 (unit quaternion, w x y z)", "m/s", "rad/s"
 U_JPOS, U_JVEL = "rad (hinge), m (slide), unit quaternion w x y z (ball)", "rad/s, m/s; ball: rad/s about the child's axes"
 U_BOX = "m: [[x, y, z] min, [x, y, z] max]"
@@ -167,6 +167,12 @@ class _Mirror:
             lo, hi = np.minimum(lo, c - h), np.maximum(hi, c + h)
         return (hi - lo).tolist() if np.isfinite(lo).all() else None
 
+    def part(self, what: str, i: int, geoms) -> dict:
+        """One part of a scene-feature group: a geom's pose and extents, or a body's pose and box."""
+        if what == "geom":
+            return {"pos": self.d.geom_xpos[i], "quat": self.geom_quat(i), "size": 2 * self.aabb[i][3:]}
+        return {"pos": self.d.xpos[i], "quat": self.d.xquat[i], "bbox": self.box(geoms)}
+
     def tangible(self, g: int) -> bool:
         """A geom that collides, or that a camera shows (alpha above 0 and in a group drawn by default); an invisible
         helper that does neither is no part of the scene."""
@@ -237,6 +243,7 @@ def _mj_robot(t: _MirrorTable, name: str, root: int, mask: np.ndarray, skip: np.
         "pos": (U_POS, lambda: M.d.xpos[root]), "quat": (U_QUAT, lambda: M.d.xquat[root]),
         "lin_vel": (U_LIN, lambda: M.vel(root)[3:]), "ang_vel": (U_ANG, lambda: M.vel(root)[:3]),
         "height_above_ground": ("m (null: nothing below)", lambda: M.drop(M.d.xpos[root], skip)),
+        "com": (U_POS, lambda: M.d.subtree_com[root]),
         **({"joint_pos": (U_JPOS, lambda: {k: M.joint(j) for k, j in joints.items()}),
             "joint_vel": (U_JVEL, lambda: {k: M.joint(j, True) for k, j in joints.items()})} if joints else {}),
         **(extra or {})}, note)
@@ -252,15 +259,14 @@ def _mj_robot(t: _MirrorTable, name: str, root: int, mask: np.ndarray, skip: np.
 
 
 def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, chain_min: int = 16,
-              group_min: int = 8, expand: tuple = (), no_joints=lambda n: False) -> np.ndarray:
+              group_min: int = 8, expand: tuple = ()) -> np.ndarray:
     """Every top-level body that is not the robot's (`robot`: a bool mask over bodies; a body named in `expand` stands
     for its children instead) and the world body's named geoms:
       a body under a free joint or a mocap body: an object (bodies that differ only in their numbers, at least
       chain_min of them, are one chain: a rope);
-      a body whose subtree has joints: an articulation (at least group_min alike: one entity with all their joints);
-      any other body with geoms, and the world body's named geoms: scene features (alike names: one entity, its box).
-    Names for which skip_name() is true are left out (decoration, goal markings), and so are geoms that neither collide
-    nor show. An articulation for which no_joints() is true (a launcher) is listed by its pose and box only.
+      a body whose subtree has joints: an articulation (at least group_min alike: one entity with its parts);
+      any other body with geoms, and the world body's named geoms: scene features (alike names: one entity with parts).
+    Names for which skip_name() is true are left out (decoration), and so are geoms that neither collide nor show.
     Gives the bool mask over bodies of what moves freely (objects), for height_above_ground."""
     M, m = t.mirror, t.mirror.m
     parent = np.asarray(m.body_parentid)
@@ -306,8 +312,10 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
             bs = [objs[n][0] for n in members]
             geoms = [g for n in members for g in objs[n][1]]
             t.put(gname, "object", {
-                "pos": ("m (the mean of its bodies' positions)", lambda bs=bs: M.d.xpos[bs].mean(0)),
-                "bbox": (U_BOX, lambda g=geoms: M.box(g))}, f"a chain of {len(bs)} bodies")
+                "pos": ("m (the mean of its parts' positions)", lambda bs=bs: M.d.xpos[bs].mean(0)),
+                "bbox": (U_BOX, lambda g=geoms: M.box(g)),
+                "points": ("m: [[x, y, z]] each part's position, in the order of the note",
+                           lambda bs=bs: M.d.xpos[bs])}, f"a chain of {len(bs)} bodies: {', '.join(members)}")
     for gname, members in _groups(list(arts), group_min):
         joints = [j for n in members for j in arts[n][2]]
         geoms = [g for n in members for g in arts[n][1]]
@@ -318,12 +326,13 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
              "bbox": (U_BOX, lambda g=geoms: M.box(g))}
         if gname is None:
             b = arts[members[0]][0]
-            if no_joints(members[0]):
-                f = {"bbox": f["bbox"]}
             t.put(members[0], "articulation", {"pos": (U_POS, lambda b=b: M.d.xpos[b]),
                                                "quat": (U_QUAT, lambda b=b: M.d.xquat[b]), **f})
         else:
-            t.put(gname, "articulation", f, f"{len(members)} alike bodies")
+            bs = {n: arts[n][0] for n in members}
+            f["parts"] = ("{part: {pos m, quat w x y z}}",
+                          lambda bs=bs: {n: {"pos": M.d.xpos[b], "quat": M.d.xquat[b]} for n, b in bs.items()})
+            t.put(gname, "articulation", f, f"{len(bs)} alike bodies")
     feats = {n: ("body", b, geoms) for n, (b, geoms) in stat.items()}
     for g in range(m.ngeom):
         n = m.geom(g).name
@@ -333,17 +342,20 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
         if gname is None:
             what, i, geoms = feats[members[0]]
             if what == "geom":
-                f = {"pos": (U_POS, lambda i=i: M.d.geom_xpos[i]), "quat": (U_QUAT, lambda i=i: M.geom_quat(i)),
+                f = {"shape": ("geom type", lambda i=i: _GEOM_SHAPES.get(int(m.geom_type[i]), "other")),
+                     "pos": (U_POS, lambda i=i: M.d.geom_xpos[i]), "quat": (U_QUAT, lambda i=i: M.geom_quat(i)),
                      "size": ("m (full extents along its own axes; 0: unbounded)", lambda i=i: 2 * M.aabb[i][3:])}
             else:
                 f = {"pos": (U_POS, lambda i=i: M.d.xpos[i]), "quat": (U_QUAT, lambda i=i: M.d.xquat[i])}
             f["bbox"] = (U_BOX, lambda g=geoms: M.box(g))
             t.put(members[0], "scene_feature", f)
         else:
+            parts = {n: feats[n] for n in members}
             geoms = [g for n in members for g in feats[n][2]]
             t.put(gname, "scene_feature", {
-                "pos": ("m (the centre of its bbox)", lambda g=geoms: np.mean(M.box(g), 0)),
-                "bbox": (U_BOX, lambda g=geoms: M.box(g))}, f"{len(members)} alike parts")
+                "bbox": (U_BOX, lambda g=geoms: M.box(g)),
+                "parts": ("{part: {pos m, quat w x y z, size m (full extents)} or {pos m, quat, bbox m}}",
+                          lambda ps=parts: {n: M.part(*p) for n, p in ps.items()})}, f"{len(parts)} alike parts")
     return free_mask
 
 
@@ -352,9 +364,6 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
 # hoops, goals, nets, bars and the hole are.
 _GOAL_MARKING = re.compile(r"^(?:target\w*|service_box\w*|zone\w*|mark\d*|mark_line|far_end_mark|field_mark|knoll_line|"
                            r"landing_end_line)$")
-# Ball machines, turrets, pitchers, passers, tossers, droppers, servers and the long rope's cranks: their pose and box
-# only (their joints would show the next launch).
-_LAUNCHER = re.compile(r"^(?:passer|pitcher|turret\d*_yaw|machine\d*|tosser|dropper|server|crank_\w+)$")
 
 DEPTH_CAMERAS = ("head_left",)      # the G1's head depth camera (Intel RealSense D435i)
 DEPTH_MAX_M = 10.0
@@ -502,10 +511,10 @@ class RoboFun:
             for b in under:
                 if not (parent[under] == b).any():
                     links[m.body(b).name] = ("body", b)
-        _mj_robot(t, "robot", r.pelvis, robot, skip, joints, links,
-                  note=f"{self.facts['model']}: pos / quat / velocities are the pelvis's")
-        skip |= _mj_scene(t, robot, skip_name=lambda n: n.startswith("rfo_") or bool(_GOAL_MARKING.match(n)),
-                          no_joints=lambda n: bool(_LAUNCHER.match(n)))
+        _mj_robot(t, "robot", r.pelvis, robot, skip, joints, links, extra={
+            "held": ("{side: the name of the body that hand grips, or null}", lambda: dict(w.held))},
+            note=f"{self.facts['model']}: pos / quat / velocities are the pelvis's")
+        skip |= _mj_scene(t, robot, skip_name=lambda n: n.startswith("rfo_") or bool(_GOAL_MARKING.match(n)))
         return t
 
     @staticmethod

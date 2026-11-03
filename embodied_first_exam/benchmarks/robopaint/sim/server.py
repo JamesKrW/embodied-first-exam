@@ -5,9 +5,8 @@ proprio as raw blobs, never base64), POST /kinematics (stateless FK / IK of the 
 Nothing about the sheets except camera images ever leaves this process: no score, no record of the strokes, no exact canvas, no brush state,
 no brush model; depth is the renderer's geometry (the ink and paint are colours on the sheets, never in depth). The target is the picture
 /app/target.png in the agent's container. Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table
-(state_table(): the robot, its links, the brush and its tip, the board, the plate and its wells with their colours, the sheets and
-the main sheet's regions with their ink / paint coverage, in the world frame; poses, extents and velocities only besides coverage
-and the wells' rgb); RCB_STATE_OPS=1 serves reset / save / load (ops_*).
+(state_table(): the robot, its links, the brush and its tip, the board, the plate and its wells, the sheets and the main sheet's
+regions with their ink / paint coverage, in the world frame); RCB_STATE_OPS=1 serves reset / save / load (ops_*).
 
 Differences from the RoboLab service, all from the task:
 - rows are streamed at the 20 Hz CONTROL rate (physics 100 Hz, 5 substeps); the joint action is ManiSkill's pd_joint_pos (7 targets);
@@ -642,10 +641,10 @@ class _ReadOnce(L.StateTable):
 
 def state_table() -> _ReadOnce:
     """The state-query ablation's table (RCB_STATE_QUERY=1): the Panda (base pose, joints), its links, the brush (the
-    holder's pose) and the brush tip (the TCP's pose), the drawing board, the plate and its wells (centre, extents, rgb),
-    both sheets with their ink / paint coverage, and the main sheet's REGION_GRID x REGION_GRID regions with theirs.
-    Coverage = the mean of the sheet's ink (or paint) coverage raster over the area, 0 = blank paper, 1 = fully covered,
-    a stroke still pressed included: the same raster the cameras show, never compared with the target. World frame of /spec world (ManiSkill's), quaternions
+    handle's pose and its tip, the TCP), the drawing board, the plate and its wells, both sheets with their ink / paint
+    coverage, and the main sheet's REGION_GRID x REGION_GRID regions with theirs. Coverage = the mean of the sheet's ink
+    (or paint) coverage raster over the area, 0 = blank paper, 1 = fully covered, a stroke still pressed included: the
+    same raster the cameras show, never compared with the target. World frame of /spec world (ManiSkill's), quaternions
     wxyz; read from ManiSkill's link poses and velocities and the painter's rasters between calls under the service lock
     (PhysX on the CPU, nothing steps or renders)."""
     t = _ReadOnce(frame="the world frame of /spec world: the robot's base (panda_link0) stands at (-0.615, 0, 0) with the "
@@ -686,7 +685,7 @@ def state_table() -> _ReadOnce:
     t.add("robot", "robot", {
         "pos": ("m", lambda: base()["pos"]), "quat": ("1", lambda: base()["quat"]),
         "lin_vel": ("m/s", lambda: base()["linear_velocity"]), "ang_vel": ("rad/s", lambda: base()["angular_velocity"]),
-        **({} if floor_z is None else {"height_above_ground": ("m", lambda: float(base()["pos"][2]) - floor_z)}),
+        "height_above_ground": ("m", lambda: None if floor_z is None else float(base()["pos"][2]) - floor_z),
         "joint_pos": ("rad", lambda: dict(zip(jn, joints()[0]))), "joint_vel": ("rad/s", lambda: dict(zip(jn, joints()[1]))),
         "joint_range": ("rad", lambda: {n: [float(lo), float(hi)] for n, (lo, hi) in zip(jn, S._qlim)})},
         note="the fixed-base Panda (franka-panda): pos / quat = its base link panda_link0; height_above_ground = the base "
@@ -703,12 +702,11 @@ def state_table() -> _ReadOnce:
     hand, tip = link_read("panda_hand"), link_read("panda_hand_tcp")
     t.add("brush", "object", {
         "pos": ("m", lambda: hand()["pos"]), "quat": ("1", lambda: hand()["quat"]),
-        "lin_vel": ("m/s", lambda: hand()["linear_velocity"]), "ang_vel": ("rad/s", lambda: hand()["angular_velocity"])},
-        note="the tool the robot holds: pos / quat / velocities = its holder (link panda_hand)")
-    t.add("brush_tip", "object", {
-        "pos": ("m", lambda: tip()["pos"]), "quat": ("1", lambda: tip()["quat"]),
-        "lin_vel": ("m/s", lambda: tip()["linear_velocity"]), "ang_vel": ("rad/s", lambda: tip()["angular_velocity"])},
-        note="the brush's tip (the TCP, link panda_hand_tcp; proprio tip_*)")
+        "tip_pos": ("m", lambda: tip()["pos"]), "tip_quat": ("1", lambda: tip()["quat"]),
+        "lin_vel": ("m/s", lambda: tip()["linear_velocity"]), "ang_vel": ("rad/s", lambda: tip()["angular_velocity"]),
+        "length": ("m", lambda: float(BR["bristle_m"]))},
+        note="the tool the robot holds: pos / quat = the holder (link panda_hand); tip_pos / tip_quat = its tip (the TCP), "
+             "the velocities the tip's; length = the tuft (or nib) below the rigid holder")
     t.add("board", "scene_feature", {"pos": ("m", lambda: [-0.1, 0.0, 0.01]), "quat": ("1", lambda: [1.0, 0.0, 0.0, 0.0]),
                                      "size": ("m", lambda: [0.8, 1.2, 0.02])},
           note="the drawing board the sheets lie on (a fixed box)")
@@ -717,13 +715,10 @@ def state_table() -> _ReadOnce:
                                      "quat": ("1", lambda: [1.0, 0.0, 0.0, 0.0]), "size": ("m", lambda: [2 * hx, 2 * hy, 2 * hz])},
           note=f"the {WORD} plate (a fixed box) that holds the wells")
     for w in W0["wells"]:
-        cx, cy, cz, rr = float(w["center_xy"][0]), float(w["center_xy"][1]), float(W0["surface_z"]), float(w["radius_m"])
         t.add(f"well_{w['name']}", "scene_feature", {
-            "pos": ("m", lambda c=[cx, cy, cz]: c), "size": ("m", lambda e=[2 * rr, 2 * rr, 0.0]: e),
-            "bbox": ("m", lambda b=[[cx - rr, cy - rr, cz], [cx + rr, cy + rr, cz]]: b),
-            "rgb": ("0..1", lambda w=w: w["rgb"])},
-            note=f"a round {WORD} well on the plate: pos = the centre of its surface, size = its diameter along x and y "
-                 f"(the tip below it loads {WORD})")
+            "pos": ("m", lambda w=w: [w["center_xy"][0], w["center_xy"][1], float(W0["surface_z"])]),
+            "radius": ("m", lambda w=w: float(w["radius_m"])), "rgb": ("0..1", lambda w=w: w["rgb"])},
+            note=f"a {WORD} well on the plate: pos = the centre of its surface (the tip below it loads {WORD})")
 
     def raster(name):
         return t.memo(("ink", name), lambda: np.asarray(S.painter.display_ink(name), np.float64))
@@ -733,7 +728,8 @@ def state_table() -> _ReadOnce:
             "pos": ("m", lambda sh=sh: [sh.center[0], sh.center[1], sh.z]), "quat": ("1", lambda: [1.0, 0.0, 0.0, 0.0]),
             "size": ("m", lambda sh=sh: [sh.size_x, sh.size_y, 0.0]),
             "coverage": ("0..1", lambda name=name: float(raster(name).mean()))},
-            note=f"the {name} sheet: pos = the centre of its surface; size along world x and y; raster {sh.rows} x {sh.cols} px")
+            note=("the main sheet (the canvas that is scored)" if name == "main" else f"the {name} sheet (never scored)")
+                 + f": pos = the centre of its surface; size along world x and y; raster {sh.rows} x {sh.cols} px")
     sh = S.sheets["main"]
     rb = np.linspace(0, sh.rows, REGION_GRID + 1).round().astype(int)
     cb = np.linspace(0, sh.cols, REGION_GRID + 1).round().astype(int)

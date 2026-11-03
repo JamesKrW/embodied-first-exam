@@ -19,13 +19,12 @@ Settings come from environment/docker-compose.yaml:
   RCB_RESET_BUDGET, RCB_WALL_CLOCK_S, RCB_DATA   the service's own (rcb_service.main)
 
 Ablations (off unless the task sets them; nothing here runs without them):
-  rcb_service.STATE_QUERY   state_table(): the robot (its pelvis pose and velocity, height above the ground under it,
-                            every joint) and its key links (pelvis, torso, head, hands, feet, the fingertips of a hand
-                            that has them); the task's free bodies (objects); its jointed bodies (the door and its
-                            hatch: articulations, with joint ranges); its static bodies (barriers, shelves, tables;
-                            the hurdles, alike, as one entity) and the floor as scene features, with pose and box (a
-                            geom also its extents). Bodies that only show a goal (a target orientation, ghost copies)
-                            are not in it. MuJoCo's world frame, read off a private copy of the live state (forward
+  rcb_service.STATE_QUERY   state_table(): the robot (its pelvis pose and velocity, height above the ground under it, the
+                            centre of mass, every joint) and its key links (pelvis, torso, head, hands, feet, the
+                            fingertips of a hand that has them); the task's free bodies (objects); its jointed bodies
+                            (the door and its hatch: articulations, with joint ranges); its static bodies (barriers,
+                            each hurdle, shelves, tables) and the floor as scene features; bodies that only show a
+                            goal (manip-cube's target orientation, bookshelf's ghost copies) are not in it. MuJoCo's world frame, read off a private copy of the live state (forward
                             kinematics there): the live simulator is never written.
   rcb_service.STATE_OPS     save_state() / load_state(): every array of MuJoCo's data (derived quantities included), the
                             model arrays tasks write (body_pos, body_quat, geom_rgba), the task's own state (vars(task),
@@ -72,6 +71,8 @@ TASK_SHARED = ("_env", "robot", "unwrapped")   # the task's back-references (rcb
 # forward kinematics and the com velocities there, so a query never writes the live data and never changes the state
 # hash or the next step.
 _DOWN = np.array([0.0, 0.0, -1.0])
+_GEOM_SHAPES = {0: "plane", 1: "hfield", 2: "sphere", 3: "capsule", 4: "ellipsoid", 5: "cylinder", 6: "box", 7: "mesh",
+                8: "sdf"}
 U_POS, U_QUAT, U_LIN, U_ANG = "m", "1 (unit quaternion, w x y z)", "m/s", "rad/s"
 U_JPOS, U_JVEL = "rad (hinge), m (slide), unit quaternion w x y z (ball)", "rad/s, m/s; ball: rad/s about the child's axes"
 U_BOX = "m: [[x, y, z] min, [x, y, z] max]"
@@ -170,6 +171,12 @@ class _Mirror:
             lo, hi = np.minimum(lo, c - h), np.maximum(hi, c + h)
         return (hi - lo).tolist() if np.isfinite(lo).all() else None
 
+    def part(self, what: str, i: int, geoms) -> dict:
+        """One part of a scene-feature group: a geom's pose and extents, or a body's pose and box."""
+        if what == "geom":
+            return {"pos": self.d.geom_xpos[i], "quat": self.geom_quat(i), "size": 2 * self.aabb[i][3:]}
+        return {"pos": self.d.xpos[i], "quat": self.d.xquat[i], "bbox": self.box(geoms)}
+
     def tangible(self, g: int) -> bool:
         """A geom that collides, or that a camera shows (alpha above 0 and in a group drawn by default); an invisible
         helper that does neither is no part of the scene."""
@@ -246,6 +253,7 @@ def _mj_robot(t: _MirrorTable, name: str, root: int, mask: np.ndarray, skip: np.
         "pos": (U_POS, lambda: M.d.xpos[root]), "quat": (U_QUAT, lambda: M.d.xquat[root]),
         "lin_vel": (U_LIN, lambda: M.vel(root)[3:]), "ang_vel": (U_ANG, lambda: M.vel(root)[:3]),
         "height_above_ground": ("m (null: nothing below)", lambda: M.drop(M.d.xpos[root], skip)),
+        "com": (U_POS, lambda: M.d.subtree_com[root]),
         **({"joint_pos": (U_JPOS, lambda: {k: M.joint(j) for k, j in joints.items()}),
             "joint_vel": (U_JVEL, lambda: {k: M.joint(j, True) for k, j in joints.items()})} if joints else {}),
         **(extra or {})}, note)
@@ -266,8 +274,8 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
     for its children instead) and the world body's named geoms:
       a body under a free joint or a mocap body: an object (bodies that differ only in their numbers, at least
       chain_min of them, are one chain: a rope);
-      a body whose subtree has joints: an articulation (at least group_min alike: one entity with all their joints);
-      any other body with geoms, and the world body's named geoms: scene features (alike names: one entity, its box).
+      a body whose subtree has joints: an articulation (at least group_min alike: one entity with its parts);
+      any other body with geoms, and the world body's named geoms: scene features (alike names: one entity with parts).
     Names for which skip_name() is true are left out (decoration), and so are geoms that neither collide nor show.
     Gives the bool mask over bodies of what moves freely (objects), for height_above_ground."""
     M, m = t.mirror, t.mirror.m
@@ -314,8 +322,10 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
             bs = [objs[n][0] for n in members]
             geoms = [g for n in members for g in objs[n][1]]
             t.put(gname, "object", {
-                "pos": ("m (the mean of its bodies' positions)", lambda bs=bs: M.d.xpos[bs].mean(0)),
-                "bbox": (U_BOX, lambda g=geoms: M.box(g))}, f"a chain of {len(bs)} bodies")
+                "pos": ("m (the mean of its parts' positions)", lambda bs=bs: M.d.xpos[bs].mean(0)),
+                "bbox": (U_BOX, lambda g=geoms: M.box(g)),
+                "points": ("m: [[x, y, z]] each part's position, in the order of the note",
+                           lambda bs=bs: M.d.xpos[bs])}, f"a chain of {len(bs)} bodies: {', '.join(members)}")
     for gname, members in _groups(list(arts), group_min):
         joints = [j for n in members for j in arts[n][2]]
         geoms = [g for n in members for g in arts[n][1]]
@@ -329,7 +339,10 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
             t.put(members[0], "articulation", {"pos": (U_POS, lambda b=b: M.d.xpos[b]),
                                                "quat": (U_QUAT, lambda b=b: M.d.xquat[b]), **f})
         else:
-            t.put(gname, "articulation", f, f"{len(members)} alike bodies")
+            bs = {n: arts[n][0] for n in members}
+            f["parts"] = ("{part: {pos m, quat w x y z}}",
+                          lambda bs=bs: {n: {"pos": M.d.xpos[b], "quat": M.d.xquat[b]} for n, b in bs.items()})
+            t.put(gname, "articulation", f, f"{len(bs)} alike bodies")
     feats = {n: ("body", b, geoms) for n, (b, geoms) in stat.items()}
     for g in range(m.ngeom):
         n = m.geom(g).name
@@ -339,17 +352,20 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
         if gname is None:
             what, i, geoms = feats[members[0]]
             if what == "geom":
-                f = {"pos": (U_POS, lambda i=i: M.d.geom_xpos[i]), "quat": (U_QUAT, lambda i=i: M.geom_quat(i)),
+                f = {"shape": ("geom type", lambda i=i: _GEOM_SHAPES.get(int(m.geom_type[i]), "other")),
+                     "pos": (U_POS, lambda i=i: M.d.geom_xpos[i]), "quat": (U_QUAT, lambda i=i: M.geom_quat(i)),
                      "size": ("m (full extents along its own axes; 0: unbounded)", lambda i=i: 2 * M.aabb[i][3:])}
             else:
                 f = {"pos": (U_POS, lambda i=i: M.d.xpos[i]), "quat": (U_QUAT, lambda i=i: M.d.xquat[i])}
             f["bbox"] = (U_BOX, lambda g=geoms: M.box(g))
             t.put(members[0], "scene_feature", f)
         else:
+            parts = {n: feats[n] for n in members}
             geoms = [g for n in members for g in feats[n][2]]
             t.put(gname, "scene_feature", {
-                "pos": ("m (the centre of its bbox)", lambda g=geoms: np.mean(M.box(g), 0)),
-                "bbox": (U_BOX, lambda g=geoms: M.box(g))}, f"{len(members)} alike parts")
+                "bbox": (U_BOX, lambda g=geoms: M.box(g)),
+                "parts": ("{part: {pos m, quat w x y z, size m (full extents)} or {pos m, quat, bbox m}}",
+                          lambda ps=parts: {n: M.part(*p) for n, p in ps.items()})}, f"{len(parts)} alike parts")
     return free_mask
 
 

@@ -1,12 +1,12 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:robodojo-files-0.5.0-stateq-pose@sha256:945f41ca35e95793074e359f97f5c94bed20258bbea89990e7bf00cb80294ab8",
+ "image": "ghcr.io/mll-lab-nu/efe:robodojo-files-0.5.0-stateq@sha256:b939f6aa097402f48c452168aef37b29de5743565cfc8d967eeb367fa54c0b00",
  "source": "embodied_first_exam/benchmarks/robodojo",
  "files": {
   "privileged/environment/rcb_robodojo.py": "a2e5a38e9a0aee87d7c63990e772e15fd90cc60cc971c8f496c0e5fc2335d7fb",
   "privileged/tests/grade.py": "cd7269d65a60135513ee594ee0395db343ce37da366c505c8cb728a654fbe161",
   "sim/finalize.sh": "efb7ff6fa887f0c5b0af1600f3e485304c996dfb19b532b213750a6edf7d9bf2",
   "sim/live_video.py": "2531062224978257c86fbf9c38b58c0f46480390d775d4de4f807932791dbfb3",
-  "sim/server.py": "14be4bde449c3db2c5df525d39bb683d0c4924f0f7941967c8043dfe4408b882",
+  "sim/server.py": "e6c9bcd335060e9677813edbc75a45c08629b12cbcdeeac7330c0390af157784",
   "standard/tests/grade.py": "cd72c34710547c4a56b4ed51f46afc106c8d7e51323bd0fdd316f3e26296779d"
  }
 }
