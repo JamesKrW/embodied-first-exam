@@ -9,12 +9,17 @@ reset: compose `sim` environment: RCB_RESET_BUDGET default -> 1000 (added when a
 query: compose `sim` environment: RCB_STATE_QUERY "1"; instruction: the section QUERY_HEAD.
 both:  both. Idempotent; a section or switch of an earlier form (OLD_HEADS,
        RCB_EXPOSE_OBJECT_POSES) is replaced.
+A roboEngineer task dir (its policy-submission interface) gets the same switches and headings with its own section
+texts, from scripts/ablation_roboengineer.py.
 """
 from __future__ import annotations
 
 import pathlib
 import re
 import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import ablation_roboengineer as roboengineer  # noqa: E402  (its policy-submission interface: its own section texts)
 
 BUDGET = 1000
 RESET_HEAD = "## This run: unlimited resets, save and load"
@@ -112,12 +117,13 @@ def compose(text: str, kind: str) -> str:
 STATED = re.compile(r"\b(\d+)(\*{0,2}\s+resets?)\b", re.I)
 
 
-def instruction(text: str, kind: str) -> str:
+def instruction(text: str, kind: str, d: pathlib.Path | None = None) -> str:
+    own = roboengineer.applies(d)
     secs = []
     if kind in ("reset", "both"):
         text = STATED.sub(lambda m: f"{BUDGET}{m.group(2)}" if m.group(1) != str(BUDGET) else m.group(0), text)
         if RESET_HEAD not in text:
-            secs.append(RESET_TEXT)
+            secs.append(roboengineer.reset(d) if own else RESET_TEXT)
     if kind in ("query", "both"):
         for head in OLD_HEADS:                       # an earlier section: up to the next "## " heading
             if head in text:
@@ -125,7 +131,7 @@ def instruction(text: str, kind: str) -> str:
                 j = text.index("\n## ", i + len(head)) + 1
                 text = text[:i] + text[j:]
         if QUERY_HEAD not in text:
-            secs.append(QUERY_TEXT)
+            secs.append(roboengineer.query(d) if own else QUERY_TEXT)
     if secs:
         k = text.index("\n## External material")
         text = text[:k + 1] + "".join(secs) + text[k + 1:]
@@ -137,7 +143,7 @@ def apply(d: pathlib.Path, kind: str) -> bool:
     for name, fn in (("environment/docker-compose.yaml", compose), ("instruction.md", instruction)):
         p = d / name
         old = p.read_text()
-        new = fn(old, kind)
+        new = fn(old, kind, d) if fn is instruction else fn(old, kind)
         if new != old:
             p.write_text(new)
             changed = True
@@ -152,8 +158,9 @@ def main() -> int:
     if sys.argv[1] == "apply":
         print(f"changed {sum(apply(d, kind) for d in dirs)} of {len(dirs)} task dirs")
         return 0
-    bad = [d for d in dirs if any(fn((d / n).read_text(), kind) != (d / n).read_text()
-                                  for n, fn in (("environment/docker-compose.yaml", compose), ("instruction.md", instruction)))]
+    bad = [d for d in dirs if compose((d / "environment/docker-compose.yaml").read_text(), kind)
+           != (d / "environment/docker-compose.yaml").read_text()
+           or instruction((d / "instruction.md").read_text(), kind, d) != (d / "instruction.md").read_text()]
     for d in bad:
         print(f"not in the ablation's form: {d}")
     return 1 if bad else 0

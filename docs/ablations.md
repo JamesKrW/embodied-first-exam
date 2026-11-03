@@ -50,6 +50,7 @@ Every table has the robot (`robot`: base or root pose, velocities, height above 
 | HumanoidBench | MuJoCo world | props, the door's hinges, the hurdles, barriers and targets |
 | MyoSuite | MyoSuite world | the objects and balls, the opponent and goalkeeper, the markers the instruction describes (target, start, goal), terrain heights |
 | Embodied Safety Exam | the bench or room frame | every scene object (contents, device states), zones, the hazards with their member objects |
+| roboEngineer | MuJoCo world, wxyz | of a completed round's development episodes at their telemetry times: the robot, its feet / torso / hands, the weave poles, the parking slot, parked cars and curb, the G1 terrain, the landing pad, rotor thrusts (tasks/roboengineer/README.md "Ablations") |
 
 Never in a table: task predicates, success flags, progress, rewards, distances to a goal, thresholds, referee or hold
 counters, visual-only goal markers.

@@ -26,6 +26,7 @@ services:
     working_dir: /srv
     command: python -m scripts.control_transfer.trusted.service
     environment:
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       PYTHONPATH: /srv
       MUJOCO_GL: osmesa
       CUDA_VISIBLE_DEVICES: ""
