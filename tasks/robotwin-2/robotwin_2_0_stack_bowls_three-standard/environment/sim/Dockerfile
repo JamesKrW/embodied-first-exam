@@ -4,7 +4,7 @@
 FROM ghcr.io/mll-lab-nu/efe:robotwin-0.1.2
 COPY . /srv/
 COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 /rcb1.py /srv/rcb1.py
-COPY --from=ghcr.io/mll-lab-nu/efe:robotwin-2-files-0.3.0-stateq@sha256:5989a990e683d2310ebe7f3020dbc68108386d4e8969688200b6373062d25b2d \
+COPY --from=ghcr.io/mll-lab-nu/efe:robotwin-2-files-0.3.0-stateq-pose@sha256:22548c50ca2004793e0b41d5a619d758acd576d8148b77c479e9bf41cecd7753 \
      /sim/rcb_live.py \
      /sim/server.py \
      /srv/

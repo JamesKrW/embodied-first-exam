@@ -5,7 +5,7 @@ COPY . /srv/
 COPY --from=ghcr.io/mll-lab-nu/efe:embodiedswe-files-0.3.1@sha256:ef309a60a26d8813914d4c5284eb9a1008d58f3123871491535f7cf11bbc743e \
      /rcb_embodiedswe.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodiedswe-standard-files-0.2.0-stateq@sha256:cbde5f04eb3e0063301ba196cd9227845ec24b10e6114cae2f25792c1bc70ab0 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodiedswe-standard-files-0.2.0-stateq-pose@sha256:48bd25f95c24c0ff44bcd14ffcaf14ed347b4ffc3cd56cf362fc2637f36c57e9 \
      /sim/esw_std.py \
      /sim/finalize.sh \
      /sim/live_video.py \

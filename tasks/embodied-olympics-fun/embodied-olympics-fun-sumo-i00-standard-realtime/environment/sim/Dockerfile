@@ -7,12 +7,12 @@ COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22e
      /rcb1.py \
      /realtime/rcb_realtime.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df \
      /rcb_rfo.py \
      /standard/rcb_service.py \
      /standard/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-pose@sha256:0f7ea8445439599bf61984ae98d2c0fe6b69b9d29eed2620f73f4bcf659853df \
      /rfo/__init__.py \
      /rfo/looks.py \
      /rfo/realhand.py \

@@ -1,10 +1,10 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:vlabench-files-0.5.0-stateq@sha256:f59f1599d809f99c0af5da1478f02f0829f89b1adfce9cd8269572b5d2d1017d",
+ "image": "ghcr.io/mll-lab-nu/efe:vlabench-files-0.5.0-stateq-pose@sha256:7ed0c59f1ea84f723132fb45254b6adb8d2fb361700c6711c952fcec43363615",
  "source": "embodied_first_exam/benchmarks/vlabench",
  "files": {
   "privileged/environment/vlb_tool.py": "1395c145e38a166301937a9d78308c522058433a30822b44c0e3ed757f19f8d4",
   "privileged/tests/grade.py": "3b4ea37c3e591c0cfed323b2e188b37af7ca33494b7b64b091168751fd7e8230",
   "sim/rcb_service.py": "bf4c237d6b34bf45e63967e4783436a25b1be2de2413da908945d91149348425",
-  "sim/server.py": "77b09acf73e3329c548164a3088bf51b935d19737608953c963e8122e3dc2900"
+  "sim/server.py": "558899e21186edc9d4794d60c672e525f4325fcf08e9792b7fe7c16183ca7449"
  }
 }
