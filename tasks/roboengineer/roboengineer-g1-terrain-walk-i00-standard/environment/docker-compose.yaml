@@ -26,6 +26,9 @@ services:
     working_dir: /srv
     command: python -m scripts.control_transfer.trusted.service
     environment:
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       PYTHONPATH: /srv
       MUJOCO_GL: osmesa
       CUDA_VISIBLE_DEVICES: ""

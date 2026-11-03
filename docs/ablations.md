@@ -24,7 +24,7 @@ Snapshots are exact unless marked approximate.
 
 | Coverage | Benchmarks |
 |---|---|
-| reset, save and load | BEHAVIOR-1K (approximate: serialized OmniGibson state; tasks whose transition rules create or remove objects log `object_set_changed`), EO Fun, DexHand, DexToolBench and MuJoCo Playground ALOHA (server_mj), MyoSuite, BiGym2, PandaDyn, HumanoidBench, iSpatialGym (approximate), RoboLab (approximate), RoboCasa / RoboCasa-GR1 / RoboCasa365 (approximate), KinDER, RoboTwin 2.0 (a load replays the graded rows from a rebuilt start), RoboWits (approximate), MuJoCo Playground Go1 / Spot / Barkour, DexJoCo, MetaWorld+, MolmoSpaces, VLABench, YAMLab (approximate), RoboARC IKEA, RoboPaint calligraphy (approximate) |
+| reset, save and load | BEHAVIOR-1K (approximate: serialized OmniGibson state; tasks whose transition rules create or remove objects log `object_set_changed`), EO Fun, DexHand, DexToolBench and MuJoCo Playground ALOHA (server_mj), MyoSuite, BiGym2, PandaDyn, HumanoidBench, iSpatialGym (approximate), RoboLab (approximate), RoboCasa / RoboCasa-GR1 / RoboCasa365 (approximate), KinDER, RoboTwin 2.0 (a load replays the graded rows from a rebuilt start), RoboWits (approximate), MuJoCo Playground Go1 / Spot / Barkour, DexJoCo, MetaWorld+, MolmoSpaces, VLABench, YAMLab (approximate), RoboARC IKEA, RoboPaint calligraphy (approximate), roboEngineer (its policy interface: a reset is a deployment round, save/load of a development episode, re-simulated and digest-checked; tasks/roboengineer/README.md "Ablations") |
 | reset only (no `state_ops` in `/spec`) | RoboARC TopoGym (the tooling keeps only the start as a rewind target), ManiGuard (the state dump leaves out grasp constraints), RoboDojo and AM-Bench (no physics snapshot), RoboPaint acrylic / oil (the MyPaint brush engine's state cannot be copied) |
 | not in this ablation | Embodied Safety Exam (one graded episode by design: harm is latched per episode), LIBERO-Max (one simulator per process), EmbodiedSWE (no reset to the frozen start) |
 
@@ -50,6 +50,7 @@ Every table has the robot (`robot`: base or root pose, velocities, height above 
 | HumanoidBench | MuJoCo world | props, the door's hinges, the hurdles, barriers and targets |
 | MyoSuite | MyoSuite world | the objects and balls, the opponent and goalkeeper, the markers the instruction describes (target, start, goal), terrain heights |
 | Embodied Safety Exam | the bench or room frame | every scene object (contents, device states), zones, the hazards with their member objects |
+| roboEngineer | MuJoCo world, wxyz | of a completed round's development episodes at their telemetry times: the robot, its feet / torso / hands, the weave poles, the parking slot, parked cars and curb, the G1 terrain, the landing pad, rotor thrusts (tasks/roboengineer/README.md "Ablations") |
 
 Never in a table: task predicates, success flags, progress, rewards, distances to a goal, thresholds, referee or hold
 counters, visual-only goal markers.
