@@ -57,6 +57,25 @@ Everything you need is in `game spec`: the world frame, the release point, the c
 `focal_px`, `principal_point_px`; pinhole: u = cx + f * x_right / depth, v = cy - f * y_up / depth) and the
 execution scatter. The physics engine is the phrases: MuJoCo 3.3.7 (1 ms physics steps, 10 ms control steps), two Unitree G1 of the robot library (bodies/unitree_g1, 29 DOF; Unitree's motor torque-speed curves through the library's output stage) with epees, robot x robot, blade x body and blade x blade contacts (bodies/contacts.py), NVIDIA SONIC (GR00T-WholeBodyControl b042411) on the legs, waist and free arm, the point skill on the sword arm, fencing-6's apparatus and phrase referee; each of the 2916 phrases measured once in that world (it is deterministic: 2799 earlier measurements of 1953 of the phrases all ended as in that run, with the same result at the same step) and replayed from sports/fencing/phrases/table.json.
 
+## This run: unlimited resets, save and load
+
+This run lets you restart the match and go back to a saved moment. This section overrides anything above that says
+there is one match only, or that a lost match ends your run.
+
+- `POST http://localhost:8000/$SEAT/reset` with `{}`: the match from its start again (the same instance: the world,
+  the opponent, the score and the clocks), as a new episode. You have 1000 resets (`budget.reset` in `/spec`).
+- `POST http://localhost:8000/$SEAT/save_state` with `{}` answers `{"handle": "s1", "step": ...}`: the whole match
+  now (the world, the opponent with its own internal state, the random generators, the score, the game clock) kept in
+  the service; the handle is all you get. `POST http://localhost:8000/$SEAT/load_state` with `{"handle": "s1"}` goes
+  back to it exactly, as a new episode. At most 32 handles are kept (the least recently used is dropped). Saves and
+  loads do not use up resets.
+- After a reset or a load the bout resumes at once, on the turn it had, with your clock as it was. The task's time limit keeps running.
+- A match you lose by its rules (the opponent wins it, a missed review, the clock) is held at its end: `/status` shows
+  phase `over`, and you may still reset or load. A match you win ends the run: no reset, save or load after it.
+- Only the last episode is graded, with the task's rules: from the start, or for a loaded episode the play that led
+  to the saved moment followed by what came after the load. If your session ends during a match, that match is
+  abandoned (success 0); a held loss stays a loss. `final.json` records `resets`, `saves`, `loads` and `episodes`.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 
