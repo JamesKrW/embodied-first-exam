@@ -209,8 +209,9 @@ def score(states, spec):
 
 
 def rollout(policy, case, out, render=True, nominal=False, ablation=None):
-    """ablation (None: the plain rollout): a hook of the service's ablations; it gets the true state at each telemetry
-    time (record) and may hand a later policy segment to take over at a control update (switch)."""
+    """ablation (None: the plain rollout): a hook of the service's ablations; it gets the state at each telemetry time
+    (record: the simulator's, with the joints as the encoders read them, the telemetry's q / dq) and may hand a later
+    policy segment to take over at a control update (switch)."""
     policy = json.loads(validate(policy))
     asset_hash = verify()
     spec = episode(case)
@@ -267,25 +268,16 @@ def rollout(policy, case, out, render=True, nominal=False, ablation=None):
     bad_warnings = (mujoco.mjtWarning.mjWARN_BADQPOS, mujoco.mjtWarning.mjWARN_BADQVEL, mujoco.mjtWarning.mjWARN_BADQACC)
     warning_base = [data.warning[w].number for w in bad_warnings]   # cumulative counters: only new warnings count
     if ablation is not None:
-        feet_ids = [model.geom(n).id for n in ("FL", "FR", "RL", "RR")]
-        static = {f"pole_{k}": {"pos": [x, y, 0.0], "radius": 0.045, "height": 0.72}
-                  for k, (x, y) in enumerate(spec["poles"])} if spec["task"] == "weave" else {}
+        trunk = ablation.body_box(model, base)
+        static = {}
+        for k, (x, y) in enumerate(spec["poles"] if spec["task"] == "weave" else ()):
+            lo, hi = ablation.geom_box(model, [model.geom(f"pole{k}").id])
+            static[f"pole_{k}"] = {"pos": [x, y, 0.0], "size": hi - lo, "bbox": [lo, hi]}
     try:
         for step in range(round(spec["duration"] / 0.002)):
             t = step * 0.002
             if ablation is not None and step % 25 == 0:
-                rot = data.xmat[base].reshape(3, 3)
-                ablation.record(
-                    t,
-                    {"robot": {"pos": data.qpos[:3], "quat": data.qpos[3:7], "lin_vel": data.qvel[:3],
-                               "ang_vel": rot @ data.qvel[3:6], "height_above_ground": float(data.qpos[2]),
-                               "joint_pos": dict(zip(JOINT_NAMES, data.qpos[qp].tolist())),
-                               "joint_vel": dict(zip(JOINT_NAMES, data.qvel[qv].tolist()))},
-                     **{f"foot_{n}": {"pos": data.geom_xpos[g]} for n, g in zip(("FL", "FR", "RL", "RR"), feet_ids)}},
-                    [data.time, data.qpos, data.qvel, applied, qtarget, feedforward, [yaw_prev, yaw_total],
-                     rng.bit_generator.state],
-                    static,
-                )
+                before = [[yaw_prev, yaw_total], rng.bit_generator.state]   # the state digest's, before this step's draws
             rpy = rpy_from_quat(data.qpos[3:7])
             yaw_total += angle(rpy[2] - yaw_prev)
             yaw_prev = float(rpy[2])
@@ -294,6 +286,19 @@ def rollout(policy, case, out, render=True, nominal=False, ablation=None):
             imu = rpy + rng.normal(0, 0.004, 3)
             omega = data.qvel[3:6] + rng.normal(0, 0.01, 3)
             obs = np.concatenate([q, dq, imu, omega])
+            if ablation is not None and step % 25 == 0:
+                rot = data.xmat[base].reshape(3, 3)
+                ablation.record(
+                    t,
+                    {"robot": {"pos": data.qpos[:3], "quat": data.qpos[3:7], "lin_vel": data.qvel[:3],
+                               "ang_vel": rot @ data.qvel[3:6], "height_above_ground": float(data.qpos[2]),
+                               "joint_pos": dict(zip(JOINT_NAMES, q.tolist())),
+                               "joint_vel": dict(zip(JOINT_NAMES, dq.tolist())),
+                               "size": trunk[1] - trunk[0],
+                               "bbox": ablation.world_box(*trunk, data.qpos[:3], data.qpos[3:7])}},
+                    [data.time, data.qpos, data.qvel, applied, qtarget, feedforward, *before],
+                    static,
+                )
             if step % 10 == 0:
                 c = command(t, spec)
                 if ablation is not None:

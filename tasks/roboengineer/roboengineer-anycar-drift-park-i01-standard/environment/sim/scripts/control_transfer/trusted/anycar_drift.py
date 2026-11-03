@@ -241,13 +241,18 @@ def run(
         from .ablation import carry, controller_state
 
         m = v.model
-        static = {f"parked_car_{k}": {"pos": v.data.xpos[m.body(f"parked{k}").id],
-                                      "quat": v.data.xquat[m.body(f"parked{k}").id],
-                                      "size": 2 * m.geom_size[m.geom(f"barrier_parked{k}").id]} for k in range(2)}
-        static["parking_slot"] = {"pos": [course["park_x"], course["park_y"], 0.0],
-                                  "size": [course["slot_length"], course["slot_width"]]}
-        static["curb"] = {"pos": v.data.geom_xpos[m.geom("barrier_curb").id],
-                          "size": 2 * m.geom_size[m.geom("barrier_curb").id]}
+        static = {}
+        for k in range(2):
+            b = m.body(f"parked{k}").id
+            lo, hi = ablation.geom_box(m, [m.geom(f"barrier_parked{k}").id])
+            static[f"parked_car_{k}"] = {"pos": v.data.xpos[b], "quat": v.data.xquat[b], "size": hi - lo,
+                                         "bbox": ablation.world_box(lo, hi, v.data.xpos[b], v.data.xquat[b])}
+        half = np.array([course["slot_length"] / 2, course["slot_width"] / 2, 0.0])
+        centre = np.array([course["park_x"], course["park_y"], 0.0])
+        static["parking_slot"] = {"pos": centre, "size": 2 * half, "bbox": [centre - half, centre + half]}
+        lo, hi = ablation.geom_box(m, [m.geom("barrier_curb").id])     # a world geom: world frame
+        static["curb"] = {"pos": (lo + hi) / 2, "size": hi - lo, "bbox": [lo, hi]}
+        car = ablation.body_box(m, 1, subtree=True)
         wheel_names = ("fl", "fr", "bl", "br")
     try:
         diverged = False
@@ -261,7 +266,8 @@ def run(
                         {"car": {"pos": d.qpos[:3], "quat": d.qpos[3:7], "lin_vel": d.qvel[:3],
                                  "ang_vel": rot @ d.qvel[3:6], "height_above_ground": float(d.qpos[2]),
                                  "joint_pos": {"steering": float(d.joint("steering").qpos[0])},
-                                 "joint_vel": {w: float(d.joint(w + "_spin").qvel[0]) for w in wheel_names}}},
+                                 "joint_vel": {w: float(d.joint(w + "_spin").qvel[0]) for w in wheel_names},
+                                 "size": car[1] - car[0], "bbox": ablation.world_box(*car, d.qpos[:3], d.qpos[3:7])}},
                         [d.time, d.qpos, d.qvel, d.act, d.ctrl, v.applied, list(v.brake_queue), np.ravel(list(v.buffer)),
                          v.model.dof_frictionloss[v.rear_dofs],
                          controller_state(controller), rng.bit_generator.state, vars(monitor).get("gate")],

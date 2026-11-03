@@ -36,10 +36,11 @@ A request is validated as a whole before any physics: whatever is wrong with it 
 Ablations (off unless the task sets them; nothing changes without them): RCB_STATE_OPS (reset / save / load, below) and
 RCB_STATE_QUERY: GET /state/entities and POST /state/query (STATE_QUERY_NOTE) answer from the state table: the robot
 (its base pose, velocity and height above the floor, its joints), its end-effector sites, base / torso / head links and
-fingertips, every task object (env.objects: pose, velocity, extents), every fixture with hinge / slide joints (doors,
-drawers, a microwave, a sink's faucet, stove knobs: an articulation with its joints and their ranges) and the fixtures
-the task refers to (ep_meta fixture_refs) as scene features, all in the world frame (that of the camera calibration and
-proprio's eef positions), quaternions w x y z. A query copies the live joint state into a private MjData and runs
+fingertips, every object of the scene (env.objects: pose, velocity, extents; named by category and index, the index
+ordered by position), every fixture with hinge / slide joints (doors, drawers, a microwave, a sink's faucet, stove
+knobs: an articulation with its joints and their ranges) and every other fixture with a body of its own as a scene
+feature (pose, extents), all in the world frame (that of the camera calibration and proprio's eef positions),
+quaternions w x y z. A query copies the live joint state into a private MjData and runs
 MuJoCo's kinematics there; it takes no control step. final.json and /status add state_queries.
 """
 
@@ -52,6 +53,7 @@ import importlib
 import json
 import math
 import os
+import re
 import signal
 import sys
 import tempfile
@@ -492,10 +494,12 @@ if RESET_BUDGET:
 
 
 # RCB_STATE_QUERY: the state table. Robot = every body named with ROBOT_PREFIXES (casa_tool); objects = env.objects (by
-# their root bodies, as the instance's object_cfgs and the privileged state() name them); fixtures = env.fixtures: one
-# with hinge / slide joints (a door, drawer, microwave, a sink's faucet handle and spout, a stove knob) is an
-# articulation, one the task refers to (ep_meta fixture_refs) without joints a scene feature. A query copies the live
-# qpos / qvel / mocap poses into a private MjData and runs MuJoCo's kinematics there; the live data is never touched.
+# their root bodies), each named <category>_<k> after its object_cfgs category, k counting the objects of a category in
+# the order of their position at the start (x, then y, then z); fixtures = env.fixtures: one with hinge / slide joints
+# (a door, drawer, microwave, a sink's faucet handle and spout, a stove knob) is an articulation, every other one with a
+# body of its own a scene feature. A fixture keeps its layout name; one whose name states a role is named
+# <class>_<k> instead. A query copies the live qpos / qvel / mocap poses into a private MjData and runs MuJoCo's
+# kinematics there; the live data is never touched.
 
 class CasaStateTable:
     def __init__(self, frame: str, note: str | None = None):
@@ -536,9 +540,12 @@ class CasaStateTable:
             return q
         return {"pos": ("m", lambda: self.data.site_xpos[i].copy()), "quat": ("wxyz", quat)}
 
-    def joints(self, ids: list) -> dict:
+    def joints(self, ids: list, prefix: tuple | None = None) -> dict:
+        """joint_pos / joint_vel (/ joint_range) by joint name; prefix = (old, new) renames a leading old to new."""
         m = S.model
         names = [m.joint(j).name for j in ids]
+        if prefix:
+            names = [prefix[1] + n[len(prefix[0]):] if n.startswith(prefix[0]) else n for n in names]
         qa = [int(m.jnt_qposadr[j]) for j in ids]
         va = [int(m.jnt_dofadr[j]) for j in ids]
         kinds = {int(m.jnt_type[j]) for j in ids}
@@ -625,14 +632,22 @@ def state_table() -> CasaStateTable:
     tips = [b for b in sorted(jointed - inner) if not names[b].startswith("mobilebase0_")]
     for b in dict.fromkeys(links + tips):
         t.add(names[b], "robot_link", t.body(b), note="a finger (the last jointed link of its chain)" if b in tips else None)
+    cats = {str(c.get("name")): str((c.get("info") or {}).get("cat") or "object")
+            for c in (S.meta.get("object_cfgs") or []) if isinstance(c, dict)}
+    objs = []
     for n, obj in env.objects.items():
         b = m.body(obj.root_body).id
+        cat = re.sub(r"[^a-z0-9]+", "_", cats.get(n, "object").lower()).strip("_") or "object"
+        objs.append((cat, tuple(round(float(v), 3) for v in S.data.xpos[b]), b))
+    count = {}
+    for cat, _, b in sorted(objs, key=lambda o: (o[0], o[1])):
+        count[cat] = count.get(cat, 0) + 1
         size = _subtree_extent(b)
-        t.add(n, "object", {**t.body(b), **({"size": ("m", lambda size=size: size)} if size else {})},
+        t.add(_free_name(t, f"{cat}_{count[cat]}"), "object",
+              {**t.body(b), **({"size": ("m", lambda size=size: size)} if size else {})},
               note="its root body" + ("; size along its own axes" if size else ""))
-    refs = {}
-    for ref, fx in ((S.meta.get("fixture_refs") or {}).items()):
-        refs.setdefault(str(fx), []).append(str(ref))
+    fcls = S.meta.get("fixtures") or {}
+    fixtures = []
     for n, fx in env.fixtures.items():
         prefix = getattr(fx, "naming_prefix", n + "_")
         try:
@@ -640,14 +655,39 @@ def state_table() -> CasaStateTable:
         except Exception:  # noqa: BLE001 -- a fixture without its own body (merged into the room)
             continue
         jids = [j for j in range(m.njnt) if m.joint(j).name.startswith(prefix) and int(m.jnt_type[j]) in hinge_slide]
-        note = f"the task refers to it as {', '.join(refs[n])}" if n in refs else None
+        fixtures.append((n, b, jids, prefix))
+    role = [f for f in fixtures if re.search(r"distr|target|goal|obj", f[0])]
+    cname = {}
+    count = {}
+    for n, b, _, _ in sorted(role, key=lambda f: (_fixture_class(f[0], fcls, env.fixtures[f[0]]),
+                                               tuple(round(float(v), 3) for v in S.data.xpos[f[1]]))):
+        c = _fixture_class(n, fcls, env.fixtures[n])
+        count[c] = count.get(c, 0) + 1
+        cname[n] = f"{c}_{count[c]}"
+    for n, b, jids, prefix in fixtures:
+        name = _free_name(t, cname.get(n, n))
         if jids:
-            t.add(n, "articulation", {**t.body(b), **t.joints(jids)}, note=note)
-        elif n in refs:
+            t.add(name, "articulation", {**t.body(b), **t.joints(jids, (prefix, name + "_") if name != n else None)})
+        else:
             size = _subtree_extent(b)
-            t.add(n, "scene_feature", {**t.body(b, velocity=False), **({"size": ("m", lambda size=size: size)} if size else {})},
-                  note=note)
+            t.add(name, "scene_feature",
+                  {**t.body(b, velocity=False), **({"size": ("m", lambda size=size: size)} if size else {})})
     return t
+
+
+def _fixture_class(n: str, fcls: dict, fx) -> str:
+    """A fixture's class (ep_meta fixtures[n].cls, else its Python class) in snake case."""
+    c = str((fcls.get(n) or {}).get("cls") or type(fx).__name__)
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", c).lower()
+
+
+def _free_name(t: CasaStateTable, name: str) -> str:
+    """name, or name with a suffix _b, _c, ... when the table has it already."""
+    out, k = name, 0
+    while out in t.table._ents:
+        k += 1
+        out = f"{name}_{chr(ord('a') + k)}"
+    return out
 
 
 STATE_TABLE = state_table() if STATE_QUERY else None

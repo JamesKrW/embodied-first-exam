@@ -1008,9 +1008,11 @@ def replay_row(row) -> None:
 # origin), its height above the pedestal it stands on, the arm and finger joints with their ranges; links: each arm's
 # tcp site, hand and fingers, the right arm's base. Objects: the furniture parts (rcb_ikea.part_bodies, the privileged
 # twin's parts): pose, velocities, size along the body axes; a part with hinge / slide joints is an articulation with
-# its joints. Scene features: the fixed colliding geometry (bench, pedestals): the centre of its top face and its x / y
-# extents (the floor's height, and so the bench's, is never given). Each query is one main-thread job: the live
-# qpos / qvel copied into a private MjData, mj_kinematics + mj_comPos + mj_comVel there; the live data is never touched.
+# its joints. Scene features: the fixed colliding geometry (bench, pedestals): its top face only (centre, the frame's
+# axes, x / y extents with zero height, the face's axis-aligned box); the height above the floor is never given. The
+# fields are pos, quat, size, bbox, lin_vel, ang_vel, joint_pos, joint_vel, joint_range and height_above_ground only.
+# Each query is one main-thread job: the live qpos / qvel copied into a private MjData,
+# mj_kinematics + mj_comPos + mj_comVel there; the live data is never touched.
 # RCB_STATE_OPS=1, exact (MuJoCo on the CPU): save = rcb_ikea.Session.get_state() (MuJoCo's integration state, the
 # mechanism's latched welds and the success monitor, the recorded rows, the breakdown watch, MuJoCo's warning counters)
 # + the model's eq_data (the welds' frames, which the mechanism writes into the model, as verdict() keeps them) + the
@@ -1154,8 +1156,12 @@ def state_table() -> IkeaStateTable:
         if not name:
             continue
         top, ext = _surface(t.data, geoms)
-        t.add(name, "scene_feature", {"top_pos": ("m", lambda top=top: top), "size_xy": ("m", lambda ext=ext: ext)},
-              note="fixed: the centre of its top face and its x / y extents")
+        lo, hi = [top[0] - ext[0] / 2, top[1] - ext[1] / 2, top[2]], [top[0] + ext[0] / 2, top[1] + ext[1] / 2, top[2]]
+        centre, size, box = [float(v) for v in top], [ext[0], ext[1], 0.0], [[float(v) for v in lo], [float(v) for v in hi]]
+        t.add(name, "scene_feature", {"pos": ("m", lambda c=centre: c), "quat": ("wxyz", lambda: [1.0, 0.0, 0.0, 0.0]),
+                                      "size": ("m", lambda e=size: e), "bbox": ("m", lambda b=box: b)},
+              note="fixed: its top face; pos = the face's centre, size = its x / y extents along the frame's axes (zero "
+                   "height), bbox = the face's axis-aligned box [[min], [max]]; its height above the floor is not given")
     return t
 
 

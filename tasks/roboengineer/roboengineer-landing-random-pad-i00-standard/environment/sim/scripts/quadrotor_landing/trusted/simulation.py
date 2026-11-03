@@ -151,7 +151,9 @@ def rollout(
     if ablation is not None:
         from .ablation import carry, controller_state
 
-        static = {"pad": {"pos": pad_position, "radius": PAD_RADIUS}}
+        lo, hi = ablation.geom_box(m, [m.geom("pad").id])     # a world geom: world frame
+        static = {"pad": {"pos": pad_position, "size": hi - lo, "bbox": [lo, hi]}}
+        hull = ablation.body_box(m, 1)
     try:
         for k in range(round(HORIZON / DT)):
             t = k * DT
@@ -162,7 +164,8 @@ def rollout(
                         t,
                         {"drone": {"pos": d.qpos[:3], "quat": d.qpos[3:7], "lin_vel": d.qvel[:3],
                                    "ang_vel": rot @ d.qvel[3:6], "height_above_ground": float(d.qpos[2] - CLEARANCE),
-                                   "rotor_thrust": motors}},
+                                   "size": hull[1] - hull[0],
+                                   "bbox": ablation.world_box(*hull, d.qpos[:3], d.qpos[3:7])}},
                         [d.time, d.qpos, d.qvel, motors, controller_state(controller), rng.bit_generator.state,
                          [first_touch, impact, lateral_impact, bad_contact, off_pad_contact, crash],
                          vars(settling)],

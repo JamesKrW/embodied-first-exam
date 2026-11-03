@@ -7,10 +7,11 @@ video run exactly as without them.
                       the private diagnostics hidden_success_seen / trial_hidden_success_seen (whether every
                       development case of the graded round / of any round met the success rule). A deployment's
                       feedback is the same as without the switch: it never holds a score or a success flag.
-  RCB_STATE_QUERY=1   privileged state queries: every development episode also records the simulator's true state at
-                      its telemetry times (state-trace.json beside its record); GET /state/entities lists the
-                      entities and fields, POST /state/query answers their values for a completed round. A query runs
-                      no simulation and changes nothing; final.json adds state_queries.
+  RCB_STATE_QUERY=1   privileged state queries: every development episode also records the simulator's state at its
+                      telemetry times (state-trace.json beside its record): poses, velocities, sizes and boxes, the
+                      robot's joints (a legged robot's: its joint encoders' readings, as in the telemetry); GET
+                      /state/entities lists the entities and fields, POST /state/query answers their values for a
+                      completed round. A query runs no simulation and changes nothing; final.json adds state_queries.
   RCB_STATE_OPS=1     more deployments, save and load: the round budget is 3 + RCB_RESET_BUDGET (every deployment
                       starts the development cases afresh, the reset); POST /save_state names a point of a completed
                       development episode (round, case, telemetry time) and POST /load_state makes the next deployment
@@ -45,8 +46,9 @@ QUERY_NOTE = (
     "privileged state (an ablation of this run): GET /state/entities lists the entities {name: {\"kind\", \"fields\": "
     "{field: unit}, \"static\"}} with \"frame\" and \"quaternion_order\"; POST /state/query {\"names\": [...], "
     "\"fields\": [...] (optional), \"round_id\": <completed round, default the latest>, \"case\": <case index, "
-    "default every case of the round>, \"t\": <seconds, or [t0, t1], default every sample>} answers the true "
-    "simulator state of that round's development episodes at their telemetry times: {\"round_id\", \"cases\": "
+    "default every case of the round>, \"t\": <seconds, or [t0, t1], default every sample>} answers the "
+    "simulator state of that round's development episodes at their telemetry times (the table's note says which "
+    "fields are sensor readings): {\"round_id\", \"cases\": "
     "[{\"case\", \"t\": [...], \"state\": {name: {field: value per time (static: one value)}}}], \"state_queries\"}. "
     "It runs no simulation; every query is counted (state_queries)")
 OPS_NOTE = (
@@ -149,6 +151,22 @@ class Hook:
             return self.schedule.pop(0)[1]
         return None
 
+    @staticmethod
+    def body_box(model, body, subtree=False):
+        """(lo, hi) [3] m: the box of a MuJoCo body's geoms in the body's own frame (each geom's own box, geom_aabb, at
+        its pose in the body); subtree: also the geoms of the bodies below it, at their rest pose (qpos0)."""
+        return body_box(model, body, subtree)
+
+    @staticmethod
+    def geom_box(model, geoms):
+        """(lo, hi) [3] m: the box of MuJoCo geoms of one body in that body's own frame."""
+        return _box(_geom_corners(model, geoms))
+
+    @staticmethod
+    def world_box(lo, hi, pos, quat):
+        """[[x, y, z] min, [x, y, z] max] m: the world-axis box around the box (lo, hi) of a frame at pos / quat."""
+        return world_box(lo, hi, pos, quat)
+
     def write(self, folder):
         value = {"t": self.times, "digest": self.digests}
         if self.store:
@@ -159,11 +177,66 @@ class Hook:
         os.replace(tmp, os.path.join(folder, TRACE))
 
 
+# ---------------------------------------------------------------- boxes of MuJoCo geometry (the recorders' size / bbox)
+
+_SIGNS = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)], dtype=float)
+
+
+def _rot(quat):
+    w, x, y, z = np.asarray(quat, dtype=float) / np.linalg.norm(quat)
+    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+
+
+def _geom_corners(model, geoms, pos=(0.0, 0.0, 0.0), rot=np.eye(3)):
+    """The corners of each geom's own box (geom_aabb: centre, half sizes), in its body's frame moved by (pos, rot)."""
+    pts = []
+    for g in geoms:
+        c, h = np.asarray(model.geom_aabb[g][:3]), np.asarray(model.geom_aabb[g][3:])
+        local = np.asarray(model.geom_pos[g]) + (c + _SIGNS * h) @ _rot(model.geom_quat[g]).T
+        pts.append(np.asarray(pos) + local @ np.asarray(rot).T)
+    return np.concatenate(pts) if pts else np.zeros((0, 3))
+
+
+def _box(pts):
+    return (pts.min(0), pts.max(0)) if len(pts) else (np.zeros(3), np.zeros(3))
+
+
+def body_box(model, body, subtree=False):
+    bodies = [b for b in range(model.nbody) if b == body or (subtree and _below(model, b, body))]
+    pts = []
+    for b in bodies:
+        pos, rot = np.zeros(3), np.eye(3)
+        k = b
+        while k != body:        # the rest pose of b in the frame of `body`
+            r = _rot(model.body_quat[k])
+            pos, rot = np.asarray(model.body_pos[k]) + r @ pos, r @ rot
+            k = int(model.body_parentid[k])
+        pts.append(_geom_corners(model, [g for g in range(model.ngeom) if model.geom_bodyid[g] == b], pos, rot))
+    return _box(np.concatenate(pts))
+
+
+def _below(model, b, body):
+    while b > 0:
+        b = int(model.body_parentid[b])
+        if b == body:
+            return True
+    return False
+
+
+def world_box(lo, hi, pos, quat):
+    lo, hi = np.asarray(lo, dtype=float), np.asarray(hi, dtype=float)
+    pts = np.asarray(pos, dtype=float) + ((lo + hi) / 2 + _SIGNS * (hi - lo) / 2) @ _rot(quat).T
+    return [pts.min(0), pts.max(0)]
+
+
 # ---------------------------------------------------------------- the entities a family's rollout records
 
 POSE = {"pos": "m [x, y, z]", "quat": "[w, x, y, z]"}
 BODY = {**POSE, "lin_vel": "m/s [x, y, z]", "ang_vel": "rad/s [x, y, z]", "height_above_ground": "m"}
-JOINTS = {"joint_pos": "{joint: rad}", "joint_vel": "{joint: rad/s}"}
+BOX = {"size": "m [x, y, z] full extents along the body axes", "bbox": "m [[x, y, z] min, [x, y, z] max], world axes"}
+ENCODERS = {"joint_pos": "{joint: rad} (encoder reading)", "joint_vel": "{joint: rad/s} (encoder reading)"}
 
 
 def entities(instance):
@@ -177,46 +250,40 @@ def entities(instance):
     if fam == "go2":
         frame = ("MuJoCo world: z up, the floor at z = 0, the origin on the floor below the robot's start, +x the "
                  "start heading (within 0.025 rad)")
-        add("robot", "robot", {**BODY, **JOINTS}, note="the trunk (base) body; joints without the encoder bias")
-        for leg in ("FL", "FR", "RL", "RR"):
-            add(f"foot_{leg}", "robot_link", {"pos": "m [x, y, z]"})
+        add("robot", "robot", {**BODY, **ENCODERS, **BOX},
+            note="the trunk (base) body; joint_pos / joint_vel: the joint encoders' readings, the telemetry's q / dq "
+                 "at the same time; size / bbox: the trunk body's own geometry")
         if instance["bank"]["adaptation"][0].get("task") == "weave":
             for k in range(4):
-                add(f"pole_{k}", "scene_feature", {"pos": "m [x, y, z] (axis at floor level)", "radius": "m",
-                                                   "height": "m"}, static=True)
+                add(f"pole_{k}", "scene_feature", {"pos": "m [x, y, z] (axis at floor level)", **BOX}, static=True)
     elif fam in ("anycar-drift", "anycar-drift-v3"):
         frame = "the course's MuJoCo world: z up, the ground at z = 0; the coordinates of the course command"
-        add("car", "robot", {**BODY, "joint_pos": "{steering: rad}", "joint_vel": "{wheel spin: rad/s}"},
-            note="the chassis")
+        add("car", "robot", {**BODY, "joint_pos": "{steering: rad}", "joint_vel": "{wheel spin: rad/s}", **BOX},
+            note="the chassis; size / bbox: the car body with its wheels at rest")
         for k in range(2):
-            add(f"parked_car_{k}", "object", {**POSE, "size": "m [x, y, z] full extents of its collision box"},
-                static=True)
-        add("parking_slot", "scene_feature", {"pos": "m [x, y, z] (its centre)", "size": "m [length, width]"},
-            static=True)
-        add("curb", "scene_feature", {"pos": "m [x, y, z] (its centre)", "size": "m [x, y, z] full extents"},
-            static=True)
+            add(f"parked_car_{k}", "object", {**POSE, **BOX}, static=True, note="size / bbox: its collision box")
+        add("parking_slot", "scene_feature", {"pos": "m [x, y, z] (its centre)", **BOX}, static=True,
+            note="the painted bay on the ground: size = [length, width, 0]")
+        add("curb", "scene_feature", {"pos": "m [x, y, z] (its centre)", **BOX}, static=True)
     elif fam == "g1":
         frame = "MuJoCo world: z up, +x the walking direction, the robot starts near the origin"
-        add("robot", "robot", {**BODY, **JOINTS},
-            note="the pelvis (root); height_above_ground is above the terrain under it; joints without bias")
-        for name in ("torso", "left_foot", "right_foot", "left_hand", "right_hand"):
-            add(name, "robot_link", {**POSE, **({"ground_height": "m (terrain height below it)"}
-                                                 if name.endswith("foot") else {})})
-        add("terrain", "scene_feature", {"kind": "flat | slope | rough | steps", "parameters":
-                                         "{slope (rise per m), rough_amplitude m, step_height m, step_width m}"},
-            static=True, note="the course starts level; slope and rough begin at x = 1 m, steps at x = 1 m")
+        add("robot", "robot", {**BODY, **ENCODERS, **BOX},
+            note="the pelvis (root); height_above_ground is above the ground under it; joint_pos / joint_vel: the "
+                 "joint encoders' readings (joint_pos: the telemetry's values at the same time); size / bbox: the "
+                 "pelvis body's own geometry")
     elif fam == "neural-fly":
         frame = "MuJoCo world: z up, the frame of the telemetry's position and target_position"
-        add("drone", "robot", {**BODY, "rotor_thrust": "N [4] (each rotor's realized thrust)"})
+        add("drone", "robot", {**BODY, **BOX})
     elif fam == "landing":
         frame = "MuJoCo world: z up, the floor at z = 0, the frame of the observations' position and pad_position"
-        add("drone", "robot", {**BODY, "rotor_thrust": "N [4] (each rotor's realized thrust)"},
-            note="height_above_ground: the feet's clearance above the floor")
-        add("pad", "scene_feature", {"pos": "m [x, y, z] (its centre)", "radius": "m"}, static=True)
+        add("drone", "robot", {**BODY, **BOX}, note="height_above_ground: the feet's clearance above the floor")
+        add("pad", "scene_feature", {"pos": "m [x, y, z] (its centre, on the floor)", **BOX}, static=True)
     else:
         raise ValueError("no state table for this family")
     return {"frame": frame, "quaternion_order": "wxyz",
-            "note": "true simulator state (no noise, no bias) at the telemetry times of each development episode",
+            "note": "the simulator's state at the telemetry times of each development episode"
+                    + ("; the robot's joint_pos / joint_vel are its joint encoders' readings" if fam in ("go2", "g1")
+                       else ""),
             "entities": ents}
 
 

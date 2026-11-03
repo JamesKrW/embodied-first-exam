@@ -37,7 +37,7 @@ Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state ta
 the table and every item of the layout, the scene frame, read on the main thread between calls) and RCB_STATE_OPS=1 the
 reset (ops_reset)."""
 from __future__ import annotations
-import json, math, os, sys, threading, time, traceback
+import json, math, os, re, sys, threading, time, traceback
 from typing import Callable
 import numpy as np
 
@@ -218,6 +218,29 @@ SPEC = {
 # The ablations' hooks (rcb_limited "ablations"; off unless the task sets the switches).
 # RCB_STATE_QUERY=1: state_table() below (the arms, their links, the table, every item of the layout).
 _ITEM_TYPES = ("Rigid", "Dynamic", "Geometry", "Articulation", "Garment", "Fluid")
+# A layout label that states a role (RoboDojo's "target0", "other1") or groups the items (make_kong's "mahjong<kind>_<k>"
+# next to "other<k>"): every item of such a category is named <category>_<k> instead, k in the order of the items'
+# start positions (x, then y, then z).
+_ROLE_LABEL = re.compile(r"target|other|distract|goal")
+
+
+def _item_names(lm, recs: list) -> dict:
+    """{inst_name: table name} for the layout records whose category has a role label (_ROLE_LABEL)."""
+    cat = lambda r: str(r.get("category") or "item")  # noqa: E731
+    role = {cat(r) for r in recs if _ROLE_LABEL.search(str(r.get("label") or ""))}
+
+    def start(r):
+        try:
+            p, _ = lm.get_instance_pose(0, inst_name=r["inst_name"])
+            return tuple(round(float(x), 3) for x in M._np(p).astype(np.float64).reshape(-1)[:3])
+        except Exception:  # noqa: BLE001
+            return (0.0, 0.0, 0.0)
+    out = {}
+    for c in sorted(role):
+        members = sorted((r for r in recs if cat(r) == c), key=start)
+        for k, r in enumerate(members, 1):
+            out[r["inst_name"]] = f"{re.sub(r'[^A-Za-z0-9]+', '_', c).strip('_').lower() or 'item'}_{k}"
+    return out
 
 
 class _ReadOnce(L.StateTable):
@@ -237,7 +260,8 @@ def state_table() -> _ReadOnce:
     """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: both ARX X5 arms (root pose and
     velocities, the base's height above the ground, every joint with its soft range) and their links, a support arm a task
     has, the table, and every item of the layout (RoboDojo's layout manager: a labelled item by its label, as
-    Session.objects() names it, one without a label by its instance name): a rigid or dynamic item as an object, an
+    Session.objects() names it, one without a label by its instance name; the items of a category whose labels state a
+    role or a grouping by <category>_<k>, _item_names): a rigid or dynamic item as an object, an
     articulated one (a toaster, a laptop, a button) as an articulation with its joint state and ranges, a static geometry
     item (a stand, a holder, a mat) as a scene feature, a garment or a fluid as an object with its points' centroid and
     box. Poses come from the layout manager (get_instance_pose, the scene frame of /spec world), velocities and joints
@@ -305,13 +329,13 @@ def state_table() -> _ReadOnce:
         t.add("table", "scene_feature", {"pos": ("m", lambda: [px, py, top]), "quat": ("1", lambda: [1.0, 0.0, 0.0, 0.0]),
                                          "size": ("m", lambda: [x1 - x0, y1 - y0])},
               note="the table: pos = the centre of its top surface; size = its top's extent along x and y")
+    by_type = {typ: [r for r in (lm.object_records_by_type[typ].layout_records_by_env[0]
+                                 if typ in lm.object_records_by_type else []) if r.get("inst_name")] for typ in _ITEM_TYPES}
+    renamed = _item_names(lm, [r for recs in by_type.values() for r in recs])
     for typ in _ITEM_TYPES:
-        recs = lm.object_records_by_type[typ].layout_records_by_env[0] if typ in lm.object_records_by_type else []
-        for rec in recs:
+        for rec in by_type[typ]:
             inst = rec.get("inst_name")
-            if not inst:
-                continue
-            name = str(rec.get("label") or inst)
+            name = renamed.get(inst) or str(rec.get("label") or inst)
             if name in t._ents:
                 name = inst
             obj = lm.get_scene_object(0, inst)

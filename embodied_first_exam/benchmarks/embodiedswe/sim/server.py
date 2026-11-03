@@ -26,7 +26,8 @@ at the recorder's stride, per-frame depth counted again), checked before anythin
 copy of the frames and the shared layer builds the body once.
 
 Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table (state_table(): the robot, its key
-links, the scene's other rigid objects, articulations and deformables, world frame, read on the main thread between calls);
+links, the scene's other bodies with their poses, velocities, sizes and boxes (articulations also their joints; a body of
+several rigid parts is one entity), world frame, read on the main thread between calls);
 RCB_STATE_OPS=1 serves /reset, /save_state and /load_state (a snapshot of the full simulator state and of this service's
 per-episode state; see "the reset ablation" below)."""
 from __future__ import annotations
@@ -634,6 +635,7 @@ def replay_row(row) -> None:
 # ---------------------------------------------------------------- the ablations (rcb_limited "ablations"; off unless the task
 # sets them). RCB_STATE_QUERY=1: state_table() below.
 STATE_KINDS = ("rigid_object", "articulation", "deformable_object")
+_SIGNS = np.array([[i, j, k] for i in (-1, 1) for j in (-1, 1) for k in (-1, 1)], dtype=np.float64)
 
 
 class _ReadOnce(L.StateTable):
@@ -664,18 +666,103 @@ def _ground_z() -> float | None:
     return None
 
 
+def _rotm(q) -> np.ndarray:
+    """wxyz -> 3x3."""
+    w, x, y, z = np.asarray(q, np.float64) / max(float(np.linalg.norm(q)), 1e-12)
+    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+
+
+def _corners(lo, hi) -> np.ndarray:
+    lo, hi = np.asarray(lo, np.float64), np.asarray(hi, np.float64)
+    return (lo + hi) / 2 + _SIGNS * (hi - lo) / 2
+
+
+def _body_boxes(path: str) -> dict:
+    """{rigid body prim name: (lo, hi) [3] m} of the rigid bodies at or below the prim at `path` (the prim itself when none
+    of them has the rigid-body API): the box of the geometry each body carries (its geometric prims down to the next
+    rigid body, their authored extents), along the body's own axes, in metres (every scale applied: a body's pose carries
+    none). From the USD stage as authored at the start; {} where nothing is found."""
+    try:
+        import omni.usd
+        from pxr import Gf, Usd, UsdGeom, UsdPhysics
+        stage = omni.usd.get_context().get_stage()
+        root = stage.GetPrimAtPath(path)
+        if not root or not root.IsValid():
+            return {}
+        xc = UsdGeom.XformCache(Usd.TimeCode.Default())
+        prims = list(Usd.PrimRange(root, Usd.TraverseInstanceProxies()))
+        bodies = [p for p in prims if p.HasAPI(UsdPhysics.RigidBodyAPI)] or [root]
+        owner = {p.GetPath(): [] for p in bodies}
+        for g in prims:
+            if not g.IsA(UsdGeom.Gprim):
+                continue
+            b = g
+            while b and b.IsValid() and b.GetPath() not in owner and b.GetPath() != root.GetPath():
+                b = b.GetParent()
+            if not b or b.GetPath() not in owner:
+                continue
+            try:
+                bound = UsdGeom.Boundable(g)
+                attr = bound.GetExtentAttr()   # a mesh's authored extent; a shape's from its size / radius / height
+                ext = attr.Get() if g.IsA(UsdGeom.Mesh) and attr.HasAuthoredValue() else None
+                if ext is None or len(ext) != 2:
+                    ext = UsdGeom.Boundable.ComputeExtentFromPlugins(bound, Usd.TimeCode.Default())
+                if ext is None or len(ext) != 2 or any(float(ext[1][i]) < float(ext[0][i]) for i in range(3)):
+                    continue
+                m = xc.GetLocalToWorldTransform(g)
+                owner[b.GetPath()] += [np.array(m.Transform(Gf.Vec3d(*map(float, c)))) for c in _corners(ext[0], ext[1])]
+            except Exception:  # noqa: BLE001
+                continue
+        out = {}
+        for b in bodies:
+            pts = owner[b.GetPath()]
+            if not pts:
+                continue
+            m = xc.GetLocalToWorldTransform(b)
+            axes = np.array([[m[i][j] for j in range(3)] for i in range(3)], np.float64)
+            axes /= np.linalg.norm(axes, axis=1, keepdims=True)          # row i: the body's axis i in the world
+            local = (np.asarray(pts) - np.array(m.ExtractTranslation(), np.float64)) @ axes.T
+            out[b.GetName()] = (local.min(0), local.max(0))
+        return out
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _world_box(parts) -> list:
+    """parts: [(pos, quat, body-frame corners [8, 3])] -> [[x, y, z] min, [x, y, z] max] of all of them, world axes."""
+    pts = np.concatenate([np.asarray(p, np.float64) + c @ _rotm(q).T for p, q, c in parts])
+    return [pts.min(0), pts.max(0)]
+
+
+def _frame_size(parts, pos, quat) -> np.ndarray:
+    """The full extents of parts [(pos, quat, corners)] along the axes of the frame (pos, quat)."""
+    pts = np.concatenate([np.asarray(p, np.float64) + c @ _rotm(q).T for p, q, c in parts])
+    local = (pts - np.asarray(pos, np.float64)) @ _rotm(quat)
+    return local.max(0) - local.min(0)
+
+
 def state_table() -> _ReadOnce:
     """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: the robot (root pose and velocities,
     the root's height above the ground plane, every joint with its range), its key links (Franka: panda_link0..7,
-    panda_hand, the fingertip centre, the fingers; G1: pelvis, torso, head, the wrists, every hand link), and every other
-    rigid object, articulation (joint state and ranges) and deformable object (its nodes' centroid and box) of Isaac Lab's
-    scene, by its get_state names. No grader value, progress or tool-only record is in it. World frame (/spec world).
-    Read from Isaac Lab's data buffers (scene.get_state, as the call checkpoints' state hash reads it, and the robot's
-    body / joint buffers, as proprio reads them) on the main thread, between calls: nothing steps or renders."""
+    panda_hand, the fingertip centre, the fingers; G1: pelvis, torso, head, the wrists, every hand link), and the other
+    bodies of Isaac Lab's scene, by their get_state names: every rigid object (pose, velocities, size, bbox), every
+    articulation (also its joint state and ranges; one without joints is an object), every deformable object (its nodes'
+    centroid and box). A body made of several rigid parts is one entity: the food of a cutting scene (all of its pieces:
+    the centre of mass, the first piece's orientation, the box of all of it) and a coffee machine's fixed housing (its
+    collision parts). Not listed: a body with collision disabled (a marker) and the bodies parked in a scene's off-stage
+    depot (the variants absent from this episode); a scene's one present variant of a family is named by the family. No
+    grader value, progress or tool-only record is in it. World frame (/spec world). Read from Isaac Lab's data buffers
+    (scene.get_state, as the call checkpoints' state hash reads it, and the articulations' body / joint buffers, as
+    proprio reads them) on the main thread, between calls: nothing steps or renders; the geometry (size, the bodies'
+    boxes) is read from the USD stage once, here."""
+    import re
     t = _ReadOnce(frame="the simulator's world frame (/spec world: one environment, its origin at the world origin), z up; the "
                         "frame of every pose, camera extrinsic and ee_pose target of this service",
                   quaternion_order="wxyz",
-                  note="size = the object's local bounding box (its own axes, scale applied), from the USD stage at the start")
+                  note="size = the full extents along the entity's own axes (pos / quat), from the USD geometry at the start, "
+                       "scale applied; bbox = the world-axis box around all of the entity now")
 
     def arr(x):
         return x.detach().to("cpu").double().numpy() if hasattr(x, "detach") else np.asarray(x, np.float64)
@@ -738,27 +825,73 @@ def state_table() -> _ReadOnce:
                   note=f"the fingertip centre (proprio tcp_pose): panda_hand moved {X.FRANKA_TCP_Z} m along its approach axis")
     robot_arts = {id(a) for _, a in arts}
     st0 = env.iscene.get_state(is_relative=False)
-    sizes = {}
-    try:
-        import omni.usd, re
-        from pxr import Usd, UsdGeom
-        stage = omni.usd.get_context().get_stage()
-        bc = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render])
-        for kind in STATE_KINDS:
-            for n, obj in (getattr(env.iscene, kind + "s", None) or {}).items():
-                try:
-                    path = re.sub(r"env_\.\*", "env_0", str(obj.cfg.prim_path).replace("{ENV_REGEX_NS}", "/World/envs/env_0"))
-                    prim = stage.GetPrimAtPath(path)
-                    if prim and prim.IsValid():
-                        r = bc.ComputeLocalBound(prim).ComputeAlignedRange()
-                        sizes[n] = np.asarray(r.GetMax() - r.GetMin(), np.float64)
-                except Exception:  # noqa: BLE001
-                    continue
-    except Exception:  # noqa: BLE001
-        pass
+
+    def prim_path(obj) -> str:
+        return re.sub(r"env_\.\*", "env_0", str(obj.cfg.prim_path).replace("{ENV_REGEX_NS}", "/World/envs/env_0"))
+
+    def pose0(n):
+        rp = arr(((st0.get("rigid_object") or {}).get(n) or {}).get("root_pose")[0])
+        return rp[:3], rp[3:7]
+
+    def mass(obj) -> float:
+        for read in (lambda: obj.data.default_mass, lambda: obj.root_physx_view.get_masses()):
+            try:
+                m = float(arr(read()).reshape(-1)[0])
+                if m > 0 and math.isfinite(m):
+                    return m
+            except Exception:  # noqa: BLE001
+                continue
+        return 1.0
+    rigid = {n: o for n, o in (getattr(env.iscene, "rigid_objects", None) or {}).items() if n in (st0.get("rigid_object") or {})}
+    corners = {}
+    for n, o in rigid.items():
+        bx = _body_boxes(prim_path(o))
+        if len(bx) == 1:
+            corners[n] = _corners(*next(iter(bx.values())))
+
+    # what is not listed: markers (collision disabled) and the variants parked in the scene's off-stage depot
+    scfg = getattr(getattr(env, "scene", None), "cfg", None)
+    park = getattr(scfg, "parking_pos", None)
+    hidden = set()
+    for n, o in rigid.items():
+        cp = getattr(getattr(getattr(o, "cfg", None), "spawn", None), "collision_props", None)
+        if getattr(cp, "collision_enabled", None) is False:
+            hidden.add(n)
+        elif park is not None:
+            p0, _ = pose0(n)
+            if p0[0] >= float(park[0]) - 0.05 and p0[1] >= float(park[1]) - 0.05:
+                hidden.add(n)
+    rename = {}
+    fam = [f[0] for f in (getattr(scfg, "families", None) or ()) if isinstance(f, (tuple, list)) and f and isinstance(f[0], str)
+           and f[0] in rigid]
+    present = [n for n in fam if n not in hidden]
+    if len(fam) > 1 and len(present) == 1:
+        rename[present[0]] = os.path.commonprefix(fam).rstrip("_") or "item"
+
+    # bodies of several rigid parts, one entity each
+    groups = []
+    pieces = sorted((n for n in rigid if re.fullmatch(r"piece_\d+", n) and n not in hidden), key=lambda n: int(n[6:]))
+    if len(pieces) > 1:
+        food = getattr(scfg, "food", None)
+        groups.append((food if isinstance(food, str) and re.fullmatch(r"[a-z][a-z0-9_]*", food) else "food", pieces, "mass",
+                       "the food as one body (all of its parts together): pos = their centre of mass, quat = the first "
+                       "part's orientation, lin_vel = their centre of mass's, ang_vel = the first part's; size = its extents "
+                       "at the start along those axes"))
+    housing = sorted(n for n in rigid if n.startswith("cm_") and n not in hidden)
+    if len(housing) > 1:
+        groups.append(("coffee_machine", ["cm_tank"] + [n for n in housing if n != "cm_tank"] if "cm_tank" in housing
+                       else housing, "box", "the machine's fixed housing as one body (the cover and the START key are their "
+                       "own entities): pos = the centre of its box, quat = its frame"))
+    grouped = {n for _, ms, _, _ in groups for n in ms}
+
+    def rigid_pose(e):
+        return lambda: arr(e()["root_pose"][0])
+
     for kind in STATE_KINDS:
         for n in sorted(st0.get(kind) or {}):
             if n == "robot" or (kind == "articulation" and id((env.iscene.articulations or {}).get(n)) in robot_arts):
+                continue
+            if n in hidden or n in grouped:
                 continue
             e = entry(kind, n)
             if kind == "deformable_object":
@@ -772,16 +905,67 @@ def state_table() -> _ReadOnce:
             fields = {"pos": ("m", lambda e=e: arr(e()["root_pose"][0])[:3]), "quat": ("1", lambda e=e: arr(e()["root_pose"][0])[3:7]),
                       "lin_vel": ("m/s", lambda e=e: arr(e()["root_velocity"][0])[:3]),
                       "ang_vel": ("rad/s", lambda e=e: arr(e()["root_velocity"][0])[3:6])}
-            if n in sizes:
-                fields["size"] = ("m", lambda sz=sizes[n]: sz)
-            if kind == "articulation":
+            out_kind = "object"
+            if kind == "rigid_object":
+                if n in corners:
+                    c = corners[n]
+                    fields["size"] = ("m", lambda c=c: c.max(0) - c.min(0))
+                    fields["bbox"] = ("m", lambda e=e, c=c: _world_box([(arr(e()["root_pose"][0])[:3], arr(e()["root_pose"][0])[3:7], c)]))
+            else:
                 art = env.iscene.articulations[n]
+                bx = _body_boxes(prim_path(art))
+                abn = list(art.body_names)
+                idx = [(i, _corners(*bx[b])) for i, b in enumerate(abn) if b in bx]
+                if idx:
+                    d = art.data
+                    bp, bq = arr(d.body_pos_w[0]), arr(d.body_quat_w[0])
+                    r0 = arr(d.root_pos_w[0]), arr(d.root_quat_w[0])
+                    sz = _frame_size([(bp[i], bq[i], c) for i, c in idx], *r0)
+
+                    def links(art=art, key=n):
+                        return t.memo(("links", key), lambda: (arr(art.data.body_pos_w[0]), arr(art.data.body_quat_w[0])))
+                    fields["size"] = ("m", lambda sz=sz: sz)
+                    fields["bbox"] = ("m", lambda lk=links, idx=idx: _world_box([(lk()[0][i], lk()[1][i], c) for i, c in idx]))
                 jn = list(art.joint_names)
-                lim = arr(art.data.soft_joint_pos_limits[0])
-                fields.update({"joint_pos": ("rad or m", lambda e=e, jn=jn: dict(zip(jn, arr(e()["joint_position"][0])))),
-                               "joint_vel": ("rad/s or m/s", lambda e=e, jn=jn: dict(zip(jn, arr(e()["joint_velocity"][0])))),
-                               "joint_range": ("rad or m", lambda r={j: [float(lim[i, 0]), float(lim[i, 1])] for i, j in enumerate(jn)}: r)})
-            t.add(n, "articulation" if kind == "articulation" else "object", fields)
+                if jn:
+                    out_kind = "articulation"
+                    lim = arr(art.data.soft_joint_pos_limits[0])
+                    fields.update({"joint_pos": ("rad or m", lambda e=e, jn=jn: dict(zip(jn, arr(e()["joint_position"][0])))),
+                                   "joint_vel": ("rad/s or m/s", lambda e=e, jn=jn: dict(zip(jn, arr(e()["joint_velocity"][0])))),
+                                   "joint_range": ("rad or m", lambda r={j: [float(lim[i, 0]), float(lim[i, 1])] for i, j in enumerate(jn)}: r)})
+            t.add(rename.get(n, n), out_kind, fields)
+
+    for name, members, centre, note in groups:
+        if name in t.entities()["entities"]:
+            name = name + "_body"
+        ents = [entry("rigid_object", m) for m in members]
+        cs = [corners.get(m) for m in members]
+        w = np.array([mass(rigid[m]) for m in members], np.float64)
+        w = w / w.sum()
+
+        def poses(ents=ents, key=name):
+            return t.memo(("group", key), lambda: [arr(e()["root_pose"][0]) for e in ents])
+
+        def vels(ents=ents, key=name):
+            return t.memo(("group_v", key), lambda: [arr(e()["root_velocity"][0]) for e in ents])
+
+        def box(ps=poses, cs=cs):
+            parts = [(p[:3], p[3:7], c) for p, c in zip(ps(), cs) if c is not None]
+            return _world_box(parts) if parts else None
+        if centre == "mass":
+            pos = (lambda ps=poses, w=w: np.sum([wi * p[:3] for wi, p in zip(w, ps())], axis=0))
+            lin = (lambda vs=vels, w=w: np.sum([wi * v[:3] for wi, v in zip(w, vs())], axis=0))
+        else:
+            pos = (lambda b=box, ps=poses: ps()[0][:3] if b() is None else (b()[0] + b()[1]) / 2)
+            lin = (lambda vs=vels: vs()[0][:3])
+        fields = {"pos": ("m", pos), "quat": ("1", lambda ps=poses: ps()[0][3:7]), "lin_vel": ("m/s", lin),
+                  "ang_vel": ("rad/s", lambda vs=vels: vs()[0][3:6])}
+        if all(c is not None for c in cs):
+            p0 = [pose0(m) for m in members]
+            sz = _frame_size([(p, q, c) for (p, q), c in zip(p0, cs)], *p0[0])
+            fields["size"] = ("m", lambda sz=sz: sz)
+            fields["bbox"] = ("m", box)
+        t.add(name, "object", fields, note=note)
     return t
 
 

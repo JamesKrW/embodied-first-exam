@@ -167,6 +167,8 @@ def rollout(policy, case, out, asset=None, render=False, ablation=None):
     ]
     if ablation is not None:
         from .ablation import carry, controller_state
+
+        hull = ablation.body_box(model, 1)
     try:
         for k in range(steps):
             t = k * DT
@@ -177,7 +179,8 @@ def rollout(policy, case, out, asset=None, render=False, ablation=None):
                         t,
                         {"drone": {"pos": data.qpos[:3], "quat": data.qpos[3:7], "lin_vel": data.qvel[:3],
                                    "ang_vel": rot @ data.qvel[3:6], "height_above_ground": float(data.qpos[2]),
-                                   "rotor_thrust": vehicle.rotor}},
+                                   "size": hull[1] - hull[0],
+                                   "bbox": ablation.world_box(*hull, data.qpos[:3], data.qpos[3:7])}},
                         [data.time, data.qpos, data.qvel, vehicle.rotor, [vehicle.saturated_steps],
                          controller_state(controller), rng.bit_generator.state, [force_calls, clipped_forces]],
                     )
