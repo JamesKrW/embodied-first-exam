@@ -47,7 +47,11 @@ unfinished = not d.get("finalized")
 infra = bool(d.get("infra_error")) or unfinished
 sim_error = d.get("reason") == "error"
 ok = bool(d.get("success")) and not infra and not sim_error
-write(ok, {"success": int(ok), "progress": 0.0 if infra else num("progress"), "live_success": int(bool(d.get("success"))),
+OPS = {} if "saves" not in d else {
+    "resets": int(num("resets")), "saves": int(num("saves")), "loads": int(num("loads")), "reset_budget": int(num("reset_budget")),
+    "first_success": int(ok and int(num("resets")) + int(num("loads")) == 0),
+    **({k: int(num(k)) for k in ("resets_at_success", "loads_at_success") if k in d} if ok else {})}
+write(ok, {**OPS, "success": int(ok), "progress": 0.0 if infra else num("progress"), "live_success": int(bool(d.get("success"))),
            "graded_by_live": 1, "replays": 0, "finalized": int(not unfinished), "missing_log": 0,
            "n_actions": int(num("n_actions")), "sim_steps": int(num("control_steps")), "physics_steps": int(num("physics_steps")),
            "steps": int(num("steps")), "calls": int(num("calls")), "elapsed_s": num("elapsed_s"),

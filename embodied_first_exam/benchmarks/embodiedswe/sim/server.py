@@ -23,7 +23,10 @@ journal holds the native action rows).
 
 Per call, images are bounded by spec.max_frames_per_call (PROTOCOL §3 "Images per call": the frames really captured,
 at the recorder's stride, per-frame depth counted again), checked before anything runs; the shared Recorder holds one
-copy of the frames and the shared layer builds the body once."""
+copy of the frames and the shared layer builds the body once.
+
+Ablations (off unless the task sets them): RCB_STATE_OPS=1 serves /reset, /save_state and /load_state (a snapshot of the
+full simulator state and of this service's per-episode state; see "the reset ablation" below)."""
 from __future__ import annotations
 import json, math, os, sys, threading, time, traceback
 from typing import Callable
@@ -48,6 +51,7 @@ NATIVE_DIM = {"franka.osc": 8, "bimanual_franka.osc": 16, "g1.pink_ik": 28, "g1.
 LOCK = threading.Lock(); PID_FILE = os.path.join(DATA, "server.pid")
 E = {"ready": False, "step": 0, "calls": 0, "done": False, "reason": None, "success": False, "t0": time.time(), "error": None, "tgt": None}
 EP = L.Episode(DATA, dim=NATIVE_DIM, resume="approx", persist=("tgt", "verdict"))   # the verdict: success stays success through a resume
+OPS = None          # RCB_STATE_OPS: the reset ablation's StateOps (below)
 EP.startup()
 log = EP.log
 
@@ -78,6 +82,31 @@ def make_cameras():
     return CAMS_OBJ.make()
 
 
+# RCB_STATE_OPS: every grasp weld uses up one joint of a pool authored before the simulation starts (a reset or a load
+# with a part held one more), so the reset ablation's pools hold GRASP_POOL_OPS joints per part (8 without it)
+GRASP_POOL_OPS = 256
+
+
+def _grasp_pools_for_ops() -> None:
+    """Before the build: every robobench scene's grasp-weld pool at GRASP_POOL_OPS joints per part."""
+    if R.BENCH_ROOT not in sys.path:
+        sys.path.insert(0, R.BENCH_ROOT)
+    import robobench
+    robobench.discover()
+    from robobench.core.scene import BaseScene
+    from robobench.core.grasp_weld import GraspWeldContract
+
+    def subclasses(c):
+        for s in c.__subclasses__():
+            yield s
+            yield from subclasses(s)
+    for cls in {GraspWeldContract, *subclasses(BaseScene)}:
+        if isinstance(getattr(cls, "GRASP_POOL", None), int):
+            cls.GRASP_POOL = max(int(cls.GRASP_POOL), GRASP_POOL_OPS)
+
+
+if L.STATE_OPS:
+    _grasp_pools_for_ops()
 env, _ = R._build_with_camera(INST, make_cameras)
 grader = R.load_grader(GRADER, PRESET)(env)
 START = R.check_start(env, INST)
@@ -223,6 +252,14 @@ SPEC = {
     "depth": {"modes": list(L.DEPTH_MODES), "default": "none", "kind": "z-depth", "unit": "m", "invalid": 0, "max_m": L.DEPTH_MAX_M,
               "frames_encoding": "uint16 mm, zlib", "noise": L.DEPTH_NOISE},
 }
+if L.STATE_OPS:
+    SPEC["episode"] = ("episodes from the same starting state, POST /reset and /load_state (spec state_ops) begin a new one; an "
+                       "episode ends after the first call at whose end the task is complete (checked after every call; this ends the "
+                       "trial), " + ("when the hand or a finger touches the bread (the tool-only rule: that disqualifies the episode), "
+                       if TOOL else "") + f"when your time is up, on a simulator error, or after {int(R.MAX_STEPS):,} control steps of "
+                       "one episode (a technical cap, reason \"step_guard\"); only the last episode is graded, as it stands then. "
+                       f"Each part's grasp welds: at most {GRASP_POOL_OPS} engagements in the trial (a reset or a load with the part "
+                       "held is one more)")
 L.check_spec(SPEC)
 EP.scene_built()
 
@@ -283,9 +320,11 @@ def dump() -> None:
                    "steps": E["step"], "calls": E["calls"], "control_steps": n, "physics_steps": n * SUBSTEPS,
                    "elapsed_s": round((E.get("t_end") or time.time()) - E["t0"], 1), "reason": E["reason"], "task": PRESET, "protocol": PROTOCOL,
                    "n_actions": n, "success_seen_step": E.get("success_step"), **INSTANCE_CHECK, **EP.final_fields(),
-                   **({"infra_error": 1} if E["reason"] == "infra_error" else {})})
+                   **({"infra_error": 1} if E["reason"] == "infra_error" else {}),
+                   **(OPS.fields(bool(V.get("success")), E["reason"], EP.events(), E.get("t_first"), EP.rows) if OPS is not None else {}),
+                   **({"restore_sha_mismatches": int(E.get("restore_sha_mismatches") or 0)} if OPS is not None else {})})
     write_final()
-    VIDEO.last(ctrl_steps(), frame=last_frame)
+    VIDEO.last(vstep(), frame=last_frame)
 
 
 def finish(reason: str) -> None:
@@ -457,7 +496,7 @@ def native_step(native: np.ndarray) -> None:
 def ctrl_step(target: np.ndarray, rec: L.Recorder) -> bool:
     """One control step towards `target` (a full ee_pose row); journaled. True when the call must stop here."""
     native = RIG.native(target)
-    native_step(native); stop = EP.journal(native); rec.tick(); VIDEO.offer(ctrl_steps())
+    native_step(native); stop = EP.journal(native); rec.tick(); VIDEO.offer(vstep())
     if TOOL is not None and TOOL.touched:
         finish("tool_contact")
     elif ctrl_steps() >= R.MAX_STEPS:
@@ -593,8 +632,6 @@ def replay_row(row) -> None:
 # ---------------------------------------------------------------- the object-pose ablation (rcb_limited "ablations"; off
 # unless the task sets RCB_EXPOSE_OBJECT_POSES=1): every rigid object and articulation of Isaac Lab's scene (its
 # get_state(is_relative=False) keys) but the robot, its root pose in the world frame (spec.world), quaternion wxyz.
-# The unlimited-reset ablation is not offered here (no in-process reset of this scene repeats its GPU PhysX start), so
-# RCB_STATE_OPS=1 makes the layer refuse to start this service.
 POSE_KINDS = ("rigid_object", "articulation")
 
 
@@ -612,17 +649,202 @@ def object_poses() -> dict:
     return {n: L.pose_entry(p[:3], p[3:7]) for n, p in sorted(_root_poses().items())}
 
 
+# ---------------------------------------------------------------- the reset ablation (RCB_STATE_OPS=1; rcb_limited
+# "ablations", off unless the task sets it). reset = load of the snapshot taken at the frozen start, before anything ran.
+# A snapshot (save) is the simulator's full state as robobench and Isaac Lab hold it, plus this service's per-episode state:
+#   - Isaac Lab's scene state (InteractiveScene.get_state: every articulation's root pose / velocity and joint positions /
+#     velocities, every rigid object's root pose / velocity, every deformable's nodal positions / velocities), every
+#     articulation's actuator targets (position, velocity, effort) and every asset's permanent external wrench;
+#   - robobench's own restorable state (BaseEnv.get_states: the scene's mechanics, latches, weld and grasp-weld flags, the
+#     robot's actuator setpoints and its controller's smoothing buffers), restored by BaseEnv.set_states;
+#   - the RNG states (torch, CUDA, numpy, random);
+#   - the grader's recorded state (its history, milestones and latches), the tool-only monitor's record, the graded rows
+#     (the trajectory recorder's actions and states) and the ee_pose target in force.
+# A restore writes all of it, updates the articulations' link poses (no physics step, no render) and checks the state
+# hash (rcb_embodiedswe.state_sha) against the one taken at the save: a mismatch is counted (restore_sha_mismatches).
+# GPU PhysX's solver caches are not part of any snapshot, so the steps after a restore are not bit-identical to the
+# steps after the save (the grasp-weld pools: GRASP_POOL_OPS above). A snapshot is a few MB (the recorded rows; the simulator's state is small). The live video counts the trial's control
+# steps across episodes (vstep).
+VOFF = [0]           # control steps of the trial before the running episode's own (a reset / load restarts ctrl_steps)
+
+
+def vstep() -> int:
+    return VOFF[0] + ctrl_steps()
+
+
+def _is_data(v) -> bool:
+    import torch
+    if v is None or isinstance(v, (bool, int, float, str, torch.Tensor, np.ndarray, np.generic)):
+        return True
+    if isinstance(v, dict):
+        return all(_is_data(k) and _is_data(x) for k, x in v.items())
+    if isinstance(v, (list, tuple, set, frozenset)):
+        return all(_is_data(x) for x in v)
+    return False
+
+
+def _copy(v):
+    """A deep copy of plain state (tensors cloned on their device, arrays copied)."""
+    import torch
+    if isinstance(v, torch.Tensor):
+        return v.detach().clone()
+    if isinstance(v, np.ndarray):
+        return v.copy()
+    if isinstance(v, dict):
+        return {k: _copy(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple, set, frozenset)):
+        return type(v)(_copy(x) for x in v)
+    return v
+
+
+def _data_attrs(obj, names=None, skip=()) -> dict:
+    """The plain-data attributes of `obj` (all of them, or `names`), copied; handles and callables are left out."""
+    keys = names if names is not None else [k for k in vars(obj) if k not in skip]
+    return {k: _copy(getattr(obj, k)) for k in keys if hasattr(obj, k) and _is_data(getattr(obj, k))}
+
+
+def _set_attrs(obj, saved: dict) -> None:
+    for k, v in saved.items():
+        setattr(obj, k, _copy(v))
+
+
+def _assets() -> list:
+    sc = env.iscene
+    return [*(sc.articulations or {}).values(), *(getattr(sc, "rigid_objects", None) or {}).values()]
+
+
+def _wrenches() -> list:
+    out = []
+    for a in _assets():
+        c = getattr(a, "_permanent_wrench_composer", None)
+        if c is None or not hasattr(c, "_composed_force_b_torch"):
+            out.append(None)
+            continue
+        out.append({"active": bool(getattr(c, "_active", False)), "force": c._composed_force_b_torch.clone(),
+                    "torque": c._composed_torque_b_torch.clone()})
+    return out
+
+
+def _rng() -> dict:
+    import random
+    import torch
+    return {"torch": torch.get_rng_state(), "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+            "numpy": np.random.get_state(), "random": random.getstate()}
+
+
+def _set_rng(s: dict) -> None:
+    import random
+    import torch
+    torch.set_rng_state(s["torch"])
+    if s["cuda"] is not None:
+        torch.cuda.set_rng_state_all(s["cuda"])
+    np.random.set_state(s["numpy"]); random.setstate(s["random"])
+
+
+TOOL_KEYS = ("substeps", "touch_substeps", "first_touch_step", "max_force", "touched_links")
+
+
+def ops_snapshot() -> dict:
+    arts = env.iscene.articulations or {}
+    return {"iscene": _copy(env.iscene.get_state(is_relative=False)),
+            "targets": {n: {"pos": a.data.joint_pos_target.clone(), "vel": a.data.joint_vel_target.clone(),
+                            "eff": a.data.joint_effort_target.clone()} for n, a in arts.items()},
+            "wrench": _wrenches(), "robobench": _copy(env.get_states()), "rng": _rng(),
+            "grader": _data_attrs(grader, skip=("env", "scene")),
+            "tool": _data_attrs(TOOL, TOOL_KEYS) if TOOL is not None else None,
+            "traj": {"actions": list(TRAJ.actions), "steps": list(TRAJ.steps), "rows": list(TRAJ.rows), "every": TRAJ.every,
+                     "layout": _copy(TRAJ.layout)},
+            "rig": _data_attrs(RIG, ("last_cmd",)), "tgt": list(E["tgt"]), "sha": R.state_sha(env)}
+
+
+def ops_restore(snap: dict, op: str) -> None:
+    env.iscene.reset_to(_copy(snap["iscene"]), env_ids=None, is_relative=False)
+    for n, a in (env.iscene.articulations or {}).items():
+        t = snap["targets"][n]
+        a.set_joint_position_target(t["pos"].clone()); a.set_joint_velocity_target(t["vel"].clone())
+        a.set_joint_effort_target(t["eff"].clone())
+    env.set_states(_copy(snap["robobench"]))              # robobench's mechanics and the robot's setpoints and controller
+    for a, w in zip(_assets(), snap["wrench"]):
+        c = getattr(a, "_permanent_wrench_composer", None)
+        if w is not None and c is not None:
+            c._composed_force_b_torch.copy_(w["force"]); c._composed_torque_b_torch.copy_(w["torque"]); c._active = w["active"]
+    env.iscene.write_data_to_sim()
+    pv = env.sim.physics_sim_view
+    if pv is not None:
+        pv.update_articulations_kinematic()               # the links' poses from the restored joints (no physics step)
+    env.sim.forward()
+    _set_rng(snap["rng"])
+    _set_attrs(grader, snap["grader"])
+    if TOOL is not None and snap["tool"] is not None:
+        _set_attrs(TOOL, snap["tool"])
+    tr = snap["traj"]
+    TRAJ.actions, TRAJ.steps, TRAJ.rows, TRAJ.every, TRAJ.layout = (list(tr["actions"]), list(tr["steps"]), list(tr["rows"]),
+                                                                    tr["every"], _copy(tr["layout"]))
+    _set_attrs(RIG, snap["rig"])
+    E["tgt"] = list(snap["tgt"])
+    _R["step"] = -1                                       # the cameras show the restored state at the next grab
+    ok = R.state_sha(env) == snap["sha"]
+    if not ok:
+        E["restore_sha_mismatches"] = int(E.get("restore_sha_mismatches") or 0) + 1
+    if E.get("ready"):                                    # (not while a resume replays the journal)
+        log({"ev": "state_restore", "op": op, "sha_match": ok})
+
+
+def _new_episode() -> None:
+    """The ended episode's record (episode.json, trajectory.npz, the video's end frame) is not the new episode's."""
+    for k in ("success_step", "verdict", "dumped"):
+        E.pop(k, None)
+    for f in ("episode.json", "trajectory.npz"):
+        try:
+            os.remove(os.path.join(DATA, f))
+        except OSError:
+            pass
+    VIDEO.truncate(vstep())              # removes only last.jpg / last.json: no frame lies past the trial's step
+
+
+def ops_reset() -> None:
+    VOFF[0] += ctrl_steps()
+    ops_restore(S0, "reset")
+    _new_episode()
+
+
+def ops_save():
+    return ops_snapshot()
+
+
+def ops_observe(meta: dict):
+    """The first frames after a reset or a load. The op has already run, so a view that /observe would refuse (an
+    empty camera list, an unknown camera, a bad video option) gets the default view instead of failing the new episode."""
+    meta = {**meta, "seconds": 0}
+    try:
+        parse_observe(meta)
+    except Exception:  # noqa: BLE001
+        meta = {"seconds": 0}
+    return do_observe(meta)
+
+
+def ops_load(snap) -> None:
+    VOFF[0] += ctrl_steps() - len(snap["traj"]["actions"])
+    ops_restore(snap, "load")
+    _new_episode()
+
+
 E["tgt"] = [float(v) for v in RIG.hold()]
 TRAJ.frame()
 VIDEO.offer(0)
+S0 = ops_snapshot() if L.STATE_OPS else None      # the frozen start, before anything ran (a reset loads it)
+if L.STATE_OPS:
+    OPS = L.StateOps(budget=max(0, int(os.environ.get("RCB_RESET_BUDGET") or 0)), reset=ops_reset, save=ops_save, load=ops_load)
 resumed = EP.begin(state=E, step=replay_row, state_sha=lambda: R.state_sha(env), proprio=proprio_row, spec=SPEC, on_end=end_from_signal,
                    start_event={"task": PRESET, "seed": int(INST["seed"]), "cameras": CAMS, "kinematics_dev_m": round(KIN_DEV, 6),
-                                **{k: v for k, v in INSTANCE_CHECK.items()}})
+                                **{k: v for k, v in INSTANCE_CHECK.items()}},
+                   **({"ops": OPS} if OPS is not None else {}))
 if resumed:
-    VIDEO.truncate(ctrl_steps())
+    VIDEO.truncate(vstep())
 E["ready"] = True; write_final()
 open(PID_FILE, "w").write(str(os.getpid()))
 print(f"{PROTOCOL} sim ready: {PRESET} (startup {EP.n_startups}, resumes {EP.resumes})", flush=True)
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("infra_error" if isinstance(exc, InfraError) else "error"), log=log, episode=EP, state_sha=lambda: R.state_sha(env), proprio=proprio_row,
-                  **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {})))
+                  **({"object_poses": object_poses, "object_pose_spec": POSE_SPEC} if L.OBJECT_POSES else {}),
+                  **({"state_ops": OPS, "observe_now": ops_observe} if OPS is not None else {})))
