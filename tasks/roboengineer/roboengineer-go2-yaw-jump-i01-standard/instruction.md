@@ -16,6 +16,18 @@ The selected policy is tested on 10 disjoint cases in two fresh processes. Binar
 ## Modeling limitations
 A simulated port of published quadruped performance tasks, not a hardware calibration; MuJoCo contacts differ from other simulators.
 
+## This run: no success signal
+
+This run adds an explicit end to adaptation. This section overrides anything above that says only sealing ends it.
+
+- No response tells you whether a policy succeeds or how it scores: a deployment returns its noisy telemetry and frames
+  only, as described above, and `/spec` says `"success_signal": "hidden"`.
+- You decide when you are done: send `POST /finish` with `{"round_id": <a completed round>, "summary": "..."}` (both
+  optional) on the same base URL as your other calls (in Python: `Client().finish(round_id, summary)`). That round, or without one the latest
+  completed round, is the graded policy, evaluated on the held-out cases as described above. After `/finish` every call
+  is refused (409). Sealing a round ends adaptation the same way.
+- If you do neither, the latest round completed before your time is up is graded, as described above.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

@@ -48,7 +48,34 @@ def validate(family, policy):
     return json.dumps(check(policy), sort_keys=True, allow_nan=False).encode()
 
 
-def run(family, policy, case, out, render, asset=None):
+def run(family, policy, case, out, render, asset=None, ablation=None):
+    """ablation (absent from a plain request): {"schedule": [[t, policy path], ...], "store_states": bool} of the
+    service's ablations (ablation.py); the rollout then also writes state-trace.json."""
+    if ablation is not None:
+        from .ablation import Hook
+
+        hook = Hook(ablation["schedule"], ablation["store_states"])
+        if family not in ("anycar-drift", "anycar-drift-v3", "go2", "g1", "neural-fly"):
+            raise ValueError("No ablation hook for this family")
+        if family == "neural-fly":
+            from .fly import rollout
+
+            record = rollout(json.loads(Path(policy).read_text()), case, Path(out), asset, render, ablation=hook)
+        elif family == "g1":
+            from sim2realbench.g1.evaluation import rollout
+
+            record = rollout(policy, case, Path(out), render, ablation=hook)
+            (Path(out) / "record.json").write_text(json.dumps(record, allow_nan=False))
+        else:
+            if family == "anycar-drift-v3":
+                from .anycar_drift_v3 import rollout
+            elif family == "anycar-drift":
+                from .anycar_drift import rollout
+            else:
+                from .go2 import rollout
+            record = rollout(policy, case, Path(out), render, ablation=hook)
+        hook.write(str(out))
+        return record
     out = Path(out)
     if family == "neural-fly":
         from .fly import rollout
