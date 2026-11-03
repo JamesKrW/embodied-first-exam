@@ -2,15 +2,17 @@
 state table, and the no-success-signal edits.
 
 Your team's frame (spec frame: you attack the goal at x = +5, defend x = -5, y to the left facing +x, z up). Every
-robot: its trunk's pose and velocity and its leg joints; the ball (a free body). Straight from the simulator's MuJoCo
+robot: its trunk's pose and velocity, its leg joints and its whole body's extents and box; the ball (a free body)
+with its box; both goals (posts, bar, net) as boxes. Straight from the simulator's MuJoCo
 data, turned from the world into your team's frame (sport soccer.py to_team: a 180 degree turn for team B)."""
 from __future__ import annotations
 
 from . import _mj
 
 HIDE_KEYS = ("shootout",)
-ROBOT = {**_mj.POSE, **_mj.JOINTS}
-BALL = {"pos": "m", "quat": "wxyz", "lin_vel": "m/s", "ang_vel": "rad/s"}
+ROBOT = {**_mj.POSE, **_mj.JOINTS, **_mj.BOX}
+BALL = {"pos": "m", "quat": "wxyz", "lin_vel": "m/s", "ang_vel": "rad/s", **_mj.BOX}
+GOAL_PARTS = ("post_", "bar_", "net_", "goal_")          # the venue's goal geoms (posts, bar, net, floor)
 
 
 def hide(obj):
@@ -35,22 +37,24 @@ def _robots(seat):
 
 def entities(m, seat):
     team, mine, theirs = _robots(seat)
-    ents = {"ball": {"kind": "ball", "fields": dict(BALL)}}
+    ents = {"ball": {"kind": "object", "fields": dict(BALL)}}
     for r in mine:
         ents[f"robot_{r[1:]}"] = {"kind": "robot", "fields": dict(ROBOT),
-                                  "what": f"your robot {r[1:]}: its trunk and its leg joints"}
+                                  "note": f"your robot {r[1:]}: its trunk and its leg joints"}
     for r in theirs:
-        ents[f"opponent_{r[1:]}"] = {"kind": "opponent", "fields": dict(ROBOT),
-                                     "what": f"the opponent's robot {r[1:]}: its trunk and its leg joints"}
+        ents[f"opponent_{r[1:]}"] = {"kind": "robot", "fields": dict(ROBOT),
+                                     "note": f"the opponent's robot {r[1:]}: its trunk and its leg joints"}
+    ents["own_goal"] = {"kind": "scene_feature", "fields": dict(_mj.GOAL), "note": "posts, bar and net"}
+    ents["opponent_goal"] = {"kind": "scene_feature", "fields": dict(_mj.GOAL), "note": "posts, bar and net"}
     return {"frame": "your team's frame (you attack the goal at x = +5 and defend x = -5; y to the left facing +x; z "
                      "up)", "quaternion_order": "wxyz", "entities": ents}
 
 
 def _robot(model, data, r, turned):
     js = [n for n in _mj.joint_names(model, rf"^{r}:")]
-    out = {**_mj.body(model, data, f"{r}:Trunk"), **_mj.joints(model, data, js)}
-    out["joint_pos"] = {k.split(":", 1)[1]: v for k, v in out["joint_pos"].items()}
-    out["joint_vel"] = {k.split(":", 1)[1]: v for k, v in out["joint_vel"].items()}
+    out = {**_mj.body(model, data, f"{r}:Trunk"), **_mj.joints(model, data, js),
+           **_mj.body_box(model, data, f"{r}:Trunk", subtree=True)}
+    _mj.strip(out, sep=":")
     return _mj.turn(out) if turned else out
 
 
@@ -63,8 +67,10 @@ def read(m, seat, names):
     out = {}
     for n in names:
         if n == "ball":
-            b = _mj.free_joint(model, data, "ball")
+            b = {**_mj.free_joint(model, data, "ball"), **_mj.free_box(model, data, "ball")}
             out[n] = _mj.turn(b) if turned else b
+        elif n in ("own_goal", "opponent_goal"):
+            out[n] = _mj.goals(model, data, lambda g: g.startswith(GOAL_PARTS), turned)[n]
         elif n in by:
             out[n] = _robot(model, data, by[n], turned)
     return out
