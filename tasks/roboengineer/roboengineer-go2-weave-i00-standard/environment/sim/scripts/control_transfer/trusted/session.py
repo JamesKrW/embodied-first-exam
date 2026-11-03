@@ -1,10 +1,11 @@
 """Persistent bounded adaptation, strict feedback projection, and fresh-process held-out replay."""
 
-import hashlib, json, os, shutil, subprocess, sys, time, uuid
+import hashlib, json, math, os, shutil, subprocess, sys, time, uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from .adapter import validate, feedback
 from .runtime_limits import runtime_limits
+from . import ablation as A
 
 
 def digest(value):
@@ -57,6 +58,9 @@ class Session:
                 "deadline": None,
                 "infra_error": False,
             }
+        if A.ANY:   # the ablations' own record (ablation.py); a plain session's state.json never has it
+            self.state.setdefault("ablation", A.initial_state())
+        self.max_rounds = A.STANDARD_ROUNDS + A.RESET_BUDGET
         self.persist()
 
     def close(self, cutoff=None):
@@ -97,16 +101,24 @@ class Session:
         if s["deadline"] is None:
             s["deadline"] = time.time() + self.wall
             self.persist()
+        if A.ANY and s["ablation"]["finished"] is not None:
+            return {"error": "Session finished"}
         if (self.root / "cutoff.json").exists() or s["sealed"] or s["infra_error"] or time.time() > s["deadline"]:
+            if A.STATE_QUERY and op in ("state_entities", "state_query"):
+                return {"error": "Session finished"}
             raise ValueError("Closed")
         if op == "describe" and args == {}:
+            if A.ANY:
+                return self.ablation_describe()
             return {
                 **self.instance["public"],
                 "remaining_rounds": 3 - len(s["rounds"]),
                 "time_left_s": max(0, s["deadline"] - time.time()),
             }
+        if A.ANY and op in ("finish", "state_entities", "state_query", "save_state", "load_state"):
+            return self.ablation_call(op, args)
         if op == "deploy" and set(args) == {"policy", "diagnosis"}:
-            if len(s["rounds"]) >= 3 or not isinstance(args["diagnosis"], str) or len(args["diagnosis"]) > 2000:
+            if len(s["rounds"]) >= self.max_rounds or not isinstance(args["diagnosis"], str) or len(args["diagnosis"]) > 2000:
                 raise ValueError("Deployment budget")
             raw = validate(self.family, args["policy"])
             i = len(s["rounds"])
@@ -121,6 +133,14 @@ class Session:
                 "diagnosis": args["diagnosis"],
                 "started_at": time.time(),
             }
+            cases = list(enumerate(self.instance["bank"]["adaptation"]))
+            start = None
+            if A.ANY:
+                start, s["ablation"]["pending"] = s["ablation"]["pending"], None   # a load arms one deployment
+                if start is not None:
+                    cases = [cases[start["case"]]]
+                    row["start"] = {k: start[k] for k in ("handle", "case", "t")}
+                row["schedule"] = (start["schedule"] if start else []) + [[start["t"] if start else 0.0, i]]
             s["rounds"].append(row)
             self.persist()
             self.audit(
@@ -133,18 +153,23 @@ class Session:
             )
             try:
                 observations = []
-                for j, case in enumerate(self.instance["bank"]["adaptation"]):
+                for j, case in cases:
                     if self.stopping:   # the agent's time is up: no simulation for this round after the cutoff
                         raise RuntimeError("cutoff")
                     target = folder / f"case-{j}"
-                    record = self.episode(policy, case, target, self.render)
+                    if A.ANY:
+                        record = self.ablation_episode(row, case, target)
+                    else:
+                        record = self.episode(policy, case, target, self.render)
                     observations.append(feedback(self.family, record, target, sampling=self.limits))
                 result = {
                     "round_id": i,
                     "policy_sha256": row["policy_sha256"],
                     "feedback": observations,
-                    "remaining_rounds": 3 - len(s["rounds"]),
+                    "remaining_rounds": self.max_rounds - len(s["rounds"]),
                 }
+                if A.ANY and start is not None:
+                    result.update(cases=[start["case"]], start=row["start"], load_verified=row["load_verified"])
                 atomic(folder / "agent-view.json", result)   # before the round counts as completed (`result` reads it)
                 row.update(status="completed", completed_at=time.time())
                 self.persist()
@@ -182,12 +207,14 @@ class Session:
             if row["status"] != "completed" or row["completed_at"] > s["deadline"]:
                 raise ValueError("Ineligible")
             s.update(sealed=True, selected=i, summary=args["summary"])
+            if A.HIDE_SUCCESS:   # a seal ends adaptation as /finish does
+                s["ablation"].update(finished=time.time(), ended_by="seal")
             self.persist()
             self.audit({"operation": "seal", "round": i, "summary": args["summary"]})
             return {"sealed": True, "round_id": i}
         raise ValueError("Unknown operation")
 
-    def episode(self, policy, case, out, render, track=True):
+    def episode(self, policy, case, out, render, track=True, ablation=None):
         request = {
             "family": self.family,
             "policy": str(policy.resolve()),
@@ -195,6 +222,7 @@ class Session:
             "out": str(out.resolve()),
             "render": render,
             "asset": self.instance.get("private_asset"),
+            **({"ablation": ablation} if ablation is not None else {}),
         }
         request_path = out.with_suffix(".request.json")
         atomic(request_path, request)
@@ -303,6 +331,8 @@ class Session:
             final["infra_error"] = True
             self.audit({"operation": "finalize", "status": "infrastructure_error"})
         final["evidence_sha256"] = digest(final["episodes"])
+        if A.ANY:
+            final.update(self.ablation_fields(final, selected))
         final["graded_by"] = "live"   # the sidecar's own evaluation of the selected policy; no replay of the agent's actions
         final["video_source"] = "render"   # replay.mp4: a rendered run after the verdict (video.json)
         atomic(final_path, final)
@@ -352,3 +382,187 @@ class Session:
             status["error"] = type(error).__name__
         finally:
             atomic(self.root / "video.json", {**status, "done": True})
+
+    # ------------------------------------------------------------ the ablations (ablation.py; only with a switch on)
+
+    def ablation_describe(self):
+        s = self.state
+        out = {
+            **self.instance["public"],
+            "remaining_rounds": self.max_rounds - len(s["rounds"]),
+            "time_left_s": max(0, s["deadline"] - time.time()),
+        }
+        if A.STATE_OPS:
+            out.update(max_rounds=self.max_rounds, state_ops=A.OPS_NOTE.format(rounds=self.max_rounds))
+        if A.STATE_QUERY:
+            out["state_query"] = A.QUERY_NOTE
+        if A.HIDE_SUCCESS:
+            out.update(success_signal="hidden", finish=A.FINISH_NOTE)
+        return out
+
+    def _policy(self, round_id):
+        return self.root / f"round-{round_id}" / "policy"
+
+    def _trace(self, round_id, case):
+        return json.loads((self.root / f"round-{round_id}" / f"case-{case}" / A.TRACE).read_text())
+
+    def ablation_episode(self, row, case, target):
+        """One development episode of a round: its policy schedule (a load: the saved path, then this round's policy),
+        recording the true state (state queries) and the state digests (save / load)."""
+        if not (A.STATE_QUERY or A.STATE_OPS):
+            return self.episode(self._policy(row["id"]), case, target, self.render)
+        schedule = row["schedule"]
+        later = [[t, str(self._policy(rid).resolve())] for t, rid in schedule[1:]]
+        record = self.episode(self._policy(schedule[0][1]), case, target, self.render,
+                              ablation={"schedule": later, "store_states": A.STATE_QUERY})
+        start = row.get("start")
+        if start is not None:
+            trace = json.loads((target / A.TRACE).read_text())
+            hit = [d for t, d in zip(trace["t"], trace["digest"]) if abs(t - start["t"]) < 1e-6]
+            handle = next(h for h in self.state["ablation"]["handles"] + [self.state["ablation"].get("_loaded") or {}]
+                          if h.get("handle") == start["handle"])
+            row["load_verified"] = bool(hit) and hit[0] == handle["digest"]
+            if not row["load_verified"]:
+                self.audit({"operation": "load_state", "round": row["id"], "status": "state_digest_mismatch"})
+        return record
+
+    def _completed(self):
+        """{round id: [its case indices]} of the completed rounds."""
+        n = len(self.instance["bank"]["adaptation"])
+        return {r["id"]: ([r["start"]["case"]] if r.get("start") else list(range(n)))
+                for r in self.state["rounds"] if r["status"] == "completed"}
+
+    def ablation_call(self, op, args):
+        s = self.state
+        ab = s["ablation"]
+        if op == "finish" and A.HIDE_SUCCESS:
+            if set(args) - {"round_id", "summary"}:
+                raise ValueError("Finish fields")
+            summary = args.get("summary", "")
+            if not isinstance(summary, str) or len(summary) > 2000:
+                raise ValueError("Summary")
+            eligible = [r for r in s["rounds"] if r["status"] == "completed" and r["completed_at"] <= s["deadline"]]
+            if "round_id" in args:
+                i = args["round_id"]
+                if type(i) is not int or i not in [r["id"] for r in eligible]:
+                    raise ValueError("Selection")
+            else:
+                i = eligible[-1]["id"] if eligible else None
+            s.update(sealed=True, selected=i, summary=summary)
+            ab.update(finished=time.time(), ended_by="finish")
+            self.persist()
+            self.audit({"operation": "finish", "round": i, "summary": summary})
+            return {"ok": True, "done": True, "reason": "finished", "round_id": i}
+        if op == "state_entities" and A.STATE_QUERY and args == {}:
+            return {**A.entities(self.instance), "rounds": list(self._completed())}
+        if op == "state_query" and A.STATE_QUERY:
+            table = A.entities(self.instance)
+            rounds = self._completed()
+            p, error = A.plan(table, args, rounds)
+            if error is not None:
+                return error
+            result = A.answer(table, p, {c: self._trace(p["round_id"], c) for c in p["cases"]})
+            ab["state_queries"] += 1
+            self.persist()
+            self.audit({"operation": "state_query", "round": p["round_id"], "cases": p["cases"],
+                        "names": sorted(p["names"]), "t": p["t"]})
+            return {**result, "state_queries": ab["state_queries"]}
+        if op == "save_state" and A.STATE_OPS:
+            rounds = self._completed()
+            if set(args) != {"round_id", "case", "t"}:
+                return {"error": "save_state takes round_id, case and t", "rounds": list(rounds)}
+            i, case, t = args["round_id"], args["case"], args["t"]
+            if type(i) is not int or i not in rounds:
+                return {"error": "unknown round_id (a completed round)", "rounds": list(rounds)}
+            if type(case) is not int or case not in rounds[i]:
+                return {"error": "unknown case", "cases": rounds[i]}
+            if type(t) not in (int, float) or not math.isfinite(t):
+                return {"error": "t is a time in seconds"}
+            trace = self._trace(i, case)
+            at = [k for k, x in enumerate(trace["t"]) if x <= t + 1e-9]
+            if not at:
+                return {"error": "no telemetry sample at or before t", "first_t": trace["t"][0] if trace["t"] else None}
+            k = at[-1]
+            point = trace["t"][k]
+            row = s["rounds"][i]
+            name = f"s{ab['next_handle']}"
+            entry = {"handle": name, "round_id": i, "case": case, "t": point, "digest": trace["digest"][k],
+                     "schedule": [seg for seg in row["schedule"] if seg[0] < point - 1e-9]}
+            ab["next_handle"] += 1
+            ab["saves"] += 1
+            ab["handles"] = (ab["handles"] + [entry])[-A.MAX_HANDLES:]
+            self.persist()
+            self.audit({"operation": "save_state", "handle": name, "round": i, "case": case, "t": point})
+            return {"handle": name, "round_id": i, "case": case, "t": point, "saves": ab["saves"]}
+        if op == "load_state" and A.STATE_OPS:
+            if set(args) != {"handle"}:
+                return {"error": "load_state takes handle (null cancels)", "handles": [h["handle"] for h in ab["handles"]]}
+            if args["handle"] is None:
+                ab["pending"] = None
+                self.persist()
+                return {"loaded": None, "next_deployment": "every development case from its start"}
+            entry = next((h for h in ab["handles"] if h["handle"] == args["handle"]), None)
+            if entry is None:
+                return {"error": "unknown handle", "handles": [h["handle"] for h in ab["handles"]]}
+            ab["handles"] = [h for h in ab["handles"] if h is not entry] + [entry]   # most recently used last
+            ab["pending"] = entry
+            ab["_loaded"] = entry   # the digest check of the next deployment needs it even after the LRU drops it
+            ab["loads"] += 1
+            self.persist()
+            self.audit({"operation": "load_state", "handle": entry["handle"]})
+            return {"loaded": entry["handle"], "case": entry["case"], "t": entry["t"], "loads": ab["loads"],
+                    "next_deployment": f"case {entry['case']} from t = {entry['t']} s, the deployed policy from there"}
+        raise ValueError("Unknown operation")
+
+    def ablation_fields(self, final, selected):
+        """final.json's ablation fields (diagnostics and counts; the verdict never reads them)."""
+        s = self.state
+        ab = s["ablation"]
+        t0 = (s["deadline"] or time.time()) - self.wall
+        out = {}
+        if A.HIDE_SUCCESS:
+            ok = []
+            for r in s["rounds"]:
+                if r["status"] != "completed":
+                    continue
+                try:
+                    cases = self._completed()[r["id"]]
+                    if all(json.loads((self.root / f"round-{r['id']}" / f"case-{c}" / "record.json").read_text())
+                           ["metrics"]["success"] for c in cases):
+                        ok.append(r["id"])
+                except (OSError, ValueError, KeyError):
+                    pass
+            out.update(
+                success_signal="hidden",
+                ended_by="finish" if ab["ended_by"] in ("finish", "seal") or s["sealed"] else "timeout",
+                finish_time_s=None if ab["finished"] is None else round(ab["finished"] - t0, 3),
+                hidden_success_seen=None if selected is None else selected["id"] in ok,
+                trial_hidden_success_seen=bool(ok),
+            )
+        if A.STATE_QUERY:
+            out["state_queries"] = ab["state_queries"]
+        if A.STATE_OPS:
+            rounds = s["rounds"]
+            n = len(rounds)
+            out.update(
+                rounds=n, round_budget=self.max_rounds, reset_budget=A.RESET_BUDGET,
+                resets=max(0, n - A.STANDARD_ROUNDS), saves=ab["saves"], loads=ab["loads"], development_episodes=n,
+                development_episodes_log=[{"episode": r["id"], "began": "load" if r.get("start") else "start",
+                                           "cases": ([r["start"]["case"]] if r.get("start") else
+                                                     list(range(len(self.instance["bank"]["adaptation"])))),
+                                           **({"from": r["start"]} if r.get("start") else {}),
+                                           "t_start_s": round(r["started_at"] - t0, 3),
+                                           "t_end_s": round(r["completed_at"] - t0, 3) if r.get("completed_at") else None,
+                                           "ended": r["status"]} for r in rounds],
+                load_mismatches=[r["id"] for r in rounds if r.get("load_verified") is False],
+            )
+            if selected is not None:
+                loaded = sum(1 for r in rounds if r["id"] <= selected["id"] and r.get("start"))
+                first = final["success"] and selected["id"] < A.STANDARD_ROUNDS and loaded == 0
+                if final["success"]:
+                    out.update(resets_at_success=max(0, selected["id"] + 1 - A.STANDARD_ROUNDS),
+                               loads_at_success=loaded)
+            else:
+                first = False
+            out["first_success"] = int(bool(first))
+        return out

@@ -76,8 +76,22 @@ def verdict(data, instance_path):
         return empty
 
 
+ABLATION_COUNTS = ("state_queries", "resets", "reset_budget", "saves", "loads", "first_success", "resets_at_success",
+                   "loads_at_success")
+
+
+def ablation_counts(data):
+    """The ablations' counts in final.json (none in a plain run), copied as numbers; they never change the verdict."""
+    try:
+        f = json.loads((Path(data) / "final.json").read_text())
+    except (OSError, ValueError):
+        return {}
+    return {k: int(f[k]) for k in ABLATION_COUNTS if isinstance(f, dict) and type(f.get(k)) in (int, bool)}
+
+
 def main():
     result = verdict(os.environ.get("RCB_DATA", "/data"), "/tests/instance.json")
+    result.update(ablation_counts(os.environ.get("RCB_DATA", "/data")))
     log = Path(os.environ.get("RCB_VERIFIER_LOG_DIR", "/logs/verifier"))
     log.mkdir(parents=True, exist_ok=True)
     (log / "reward.txt").write_text(str(result["success"]) + "\n")
