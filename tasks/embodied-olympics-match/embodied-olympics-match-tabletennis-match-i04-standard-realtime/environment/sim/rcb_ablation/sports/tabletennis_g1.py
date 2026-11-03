@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from . import _mj
 
-ROBOT = {**_mj.POSE, **_mj.JOINTS}
-BALL = {"pos": "m", "quat": "wxyz", "lin_vel": "m/s", "ang_vel": "rad/s (the ball's spin)"}
-FEATURE = {"pos": "m", "size": "m (full extents)"}
+ROBOT = {**_mj.POSE, **_mj.JOINTS, **_mj.BOX}
+LINK = {**_mj.POSE, **_mj.BOX}
+BALL = {"pos": "m", "quat": "wxyz", "lin_vel": "m/s", "ang_vel": "rad/s (the ball's spin)", **_mj.BOX}
+FEATURE = {"pos": "m", **_mj.BOX}
 
 
 def _side(seat):
@@ -18,29 +19,23 @@ def _side(seat):
 
 def entities(m, seat):
     ents = {"robot": {"kind": "robot", "fields": dict(ROBOT),
-                      "what": "your G1: its pelvis (the floating base) and its joints (names without the side prefix)"},
-            "paddle": {"kind": "robot_link", "fields": dict(_mj.POSE), "what": "your paddle's blade centre"},
-            "ball": {"kind": "ball", "fields": dict(BALL)},
+                      "note": "your G1: its pelvis (the floating base) and its joints (names without the side prefix); "
+                              "size / bbox: the whole robot"},
+            "paddle": {"kind": "robot_link", "fields": dict(LINK), "note": "your paddle's blade centre"},
+            "ball": {"kind": "object", "fields": dict(BALL)},
             "table": {"kind": "scene_feature", "fields": dict(FEATURE)},
             "net": {"kind": "scene_feature", "fields": dict(FEATURE)},
-            "opponent": {"kind": "opponent", "fields": dict(ROBOT), "what": "the opponent's G1: pelvis and joints"},
-            "opponent_paddle": {"kind": "opponent_link", "fields": dict(_mj.POSE)}}
+            "opponent": {"kind": "robot", "fields": dict(ROBOT), "note": "the opponent's G1: pelvis and joints"},
+            "opponent_paddle": {"kind": "object", "fields": dict(LINK), "note": "the opponent's paddle"}}
     return {"frame": "your own frame (the observation's: x to your right, y towards the opponent, z up)",
             "quaternion_order": "wxyz", "entities": ents}
 
 
 def _robot(model, data, side):
     js = _mj.joint_names(model, rf"^{side}_")
-    out = {**_mj.body(model, data, f"{side}_pelvis"), **_mj.joints(model, data, js)}
-    out["joint_pos"] = {k[2:]: v for k, v in out["joint_pos"].items()}
-    out["joint_vel"] = {k[2:]: v for k, v in out["joint_vel"].items()}
-    return out
-
-
-def _feature(model, data, geom):
-    import mujoco as mj
-    g = mj.mj_name2id(model, mj.mjtObj.mjOBJ_GEOM, geom)
-    return {} if g < 0 else {"pos": _mj.r(data.geom_xpos[g]), "size": _mj.r(2 * model.geom_size[g])}
+    out = {**_mj.body(model, data, f"{side}_pelvis"), **_mj.joints(model, data, js),
+           **_mj.body_box(model, data, f"{side}_pelvis", subtree=True)}
+    return _mj.strip(out, prefix_len=2)
 
 
 def read(m, seat, names):
@@ -53,17 +48,17 @@ def read(m, seat, names):
         if n == "robot":
             v = _robot(model, data, me)
         elif n == "paddle":
-            v = _mj.site(model, data, f"{me}_hand_center")
+            v = {**_mj.site(model, data, f"{me}_hand_center"), **_mj.site_box(model, data, f"{me}_hand_center")}
         elif n == "ball":
-            v = _mj.free_joint(model, data, "ball")
+            v = {**_mj.free_joint(model, data, "ball"), **_mj.free_box(model, data, "ball")}
         elif n == "table":
-            v = _feature(model, data, "geom_table")
+            v = _mj.geom_box(model, data, "geom_table")
         elif n == "net":
-            v = _feature(model, data, "geom_net")
+            v = _mj.geom_box(model, data, "geom_net")
         elif n == "opponent":
             v = _robot(model, data, them)
         elif n == "opponent_paddle":
-            v = _mj.site(model, data, f"{them}_hand_center")
+            v = {**_mj.site(model, data, f"{them}_hand_center"), **_mj.site_box(model, data, f"{them}_hand_center")}
         else:
             continue
         out[n] = _mj.turn(v) if me == "B" else v
