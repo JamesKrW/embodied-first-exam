@@ -255,7 +255,10 @@ def state_table() -> _ReadOnce:
     def v(x):
         return M._np(x).astype(np.float64).reshape(-1)
 
-    gi = (getattr(lm, "ground_info", None) or {}).get(0) or {}
+    def env0(info):         # RoboDojo's LayoutManager keeps ground_info / table_info per environment: a list
+        return (info[0] if isinstance(info, (list, tuple)) and info else {}) or {}
+
+    gi = env0(getattr(lm, "ground_info", None))
     ground_z = float(gi["pos"][2]) if gi.get("pos") is not None else None
     for idx, robot in enumerate(rm.robot_list):
         key = rm.robot_key[idx]
@@ -297,7 +300,7 @@ def state_table() -> _ReadOnce:
                 "pos": ("m", lambda i=i, bd=bodies: bd()[0][i]), "quat": ("1", lambda i=i, bd=bodies: bd()[1][i]),
                 "lin_vel": ("m/s", lambda i=i, bd=bodies: bd()[2][i]), "ang_vel": ("rad/s", lambda i=i, bd=bodies: bd()[3][i])},
                 note=f"link {b} of {robot.arm_name}" + (" (the end-effector frame: ee_pose, proprio tcp_pose)" if b.endswith("link6") else ""))
-    ti = (getattr(lm, "table_info", None) or {}).get(0) or {}
+    ti = env0(getattr(lm, "table_info", None))
     if ti.get("pos") is not None and ti.get("size") is not None:
         x0, y0, x1, y1 = (float(c) for c in ti["size"])
         px, py, pz = (float(c) for c in ti["pos"])
