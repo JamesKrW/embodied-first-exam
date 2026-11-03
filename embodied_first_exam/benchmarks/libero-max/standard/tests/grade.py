@@ -39,6 +39,18 @@ def write(ok: bool, out: dict) -> None:
     print(json.dumps(out))
 
 
+def state_ops_fields(d: dict, ok: bool) -> dict:
+    """The reset + save/load ablation's record (RCB_STATE_OPS=1; {} without it, final.json then has no `saves`):
+    saves, loads, first_success, and for a success resets_at_success / loads_at_success. Numbers only."""
+    if "saves" not in d:
+        return {}
+    out = {k: int(d.get(k) or 0) for k in ("saves", "loads")}
+    out["first_success"] = int(bool(d.get("first_success")) and ok)
+    if ok:
+        out.update({k: int(d[k]) for k in ("resets_at_success", "loads_at_success") if k in d})
+    return out
+
+
 def main() -> None:
     path = os.path.join(DATA, "final.json")
     if not os.path.exists(path):
@@ -67,7 +79,7 @@ def main() -> None:
                "calls": int(d.get("calls") or 0), "rows": int(d.get("rows") or 0), "resets": int(d.get("resets") or 0),
                "reset_budget": int(d.get("reset_budget") or 0),
                "sim_startups": int(d.get("sim_startups") or 0), "elapsed_s": float(d.get("elapsed_s") or 0.0),
-               "video_rendered": int(bool(d.get("video")))}
+               "video_rendered": int(bool(d.get("video"))), **state_ops_fields(d, ok)}
     except Exception:  # noqa: BLE001 -- an unreadable final.json is the grader's failure, not the agent's
         traceback.print_exc()
         write(False, {**BLANK, "infra_error": 1, "grader_error": 1})

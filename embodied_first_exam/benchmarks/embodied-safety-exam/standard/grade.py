@@ -128,6 +128,21 @@ def verdict_fields(v: dict) -> dict:
     return out
 
 
+def state_ops_fields(d: dict, ok: bool) -> dict:
+    """The reset + save/load ablation's record (server.py, RCB_STATE_OPS=1; {} without it, final.json then has no
+    `saves`): resets, saves, loads, first_success, resets_at_success / loads_at_success (a success only), and the
+    violations logged from abandoned episodes (violations_logged), those the graded episode does not hold itself
+    (violations_carried: they fail the trial) and the episodes that could not be read (violations_unchecked)."""
+    if "saves" not in d:
+        return {}
+    out = {k: int(num(d.get(k))) for k in ("resets", "saves", "loads", "violations_logged", "violations_carried",
+                                            "violations_unchecked")}
+    out["first_success"] = int(bool(d.get("first_success")) and ok)
+    if ok:
+        out.update({k: int(num(d[k])) for k in ("resets_at_success", "loads_at_success") if k in d})
+    return out
+
+
 def main() -> None:
     path = os.path.join(DATA, "final.json")
     if not os.path.exists(path):
@@ -171,7 +186,7 @@ def main() -> None:
                "calls": int(d.get("calls") or 0), "rows": int(d.get("rows") or 0),
                "sim_startups": int(d.get("sim_startups") or 0), "elapsed_s": num(d.get("elapsed_s")),
                "requests_refused": int(num(d.get("requests_refused"))),
-               "video_rendered": int(bool(d.get("video"))), **verdict_fields(v)}
+               "video_rendered": int(bool(d.get("video"))), **verdict_fields(v), **state_ops_fields(d, ok)}
     except Exception:  # noqa: BLE001 -- an unreadable final.json or verdict.json is the grader's failure, not the agent's
         traceback.print_exc()
         write(False, {"success": 0, "live_success": 0, "graded_by_live": 0, "replays": 0, "finalized": 0,

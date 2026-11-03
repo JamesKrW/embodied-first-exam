@@ -24,8 +24,19 @@ Settings come from environment/docker-compose.yaml:
 
 Ablation (off unless the task sets it; nothing here runs without it): with rcb_service.OBJECT_POSES, object_poses() gives
 the privileged twin's objects (Session.state()["objects"]: the scene's movable objects, its names; no fixture), position and
-orientation only (Session.entity_pose), in the world frame of /spec "frames"; quaternions w x y z. No save_state(): one
-episode per process, so no reset either.
+orientation only (Session.entity_pose), in the world frame of /spec "frames"; quaternions w x y z.
+
+Ablation (off unless the task sets RCB_STATE_OPS=1 and a reset budget; build() returns LiberoMax itself without it):
+/reset, /save_state and /load_state. LIBERO-MAX builds one simulator per process (lmx_tool: a second build in the same
+process may differ), so under the switch the simulator lives in a worker process (`_worker`, one LiberoMax in it) and
+`LiberoMaxOps` is the Sim the service holds, forwarding every call to the current worker:
+  - a reset starts a new worker, a fresh build at the frozen start (the service checks its start state hash);
+  - a save keeps the path (the journal rows from the frozen start) and its state hash; nothing live;
+  - a load starts a new worker and runs the saved path in it from the frozen start: the physics, the controller, the
+    case's event (whether and when it fired, what it changed: an object moved, the visual theme, the camera) and the
+    task's goal state come back exactly as they were; the state hash is checked, else the load fails (a simulator error);
+  - the worker it replaces is stopped once the new one stands; a worker that dies takes the service down with it
+    (os.abort), so the sidecar restarts and resumes as after a crash of the in-process simulator.
 """
 
 from __future__ import annotations
@@ -249,15 +260,198 @@ class LiberoMax:
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ---------------------------------------------------------------- the reset + save/load ablation (rcb_service.STATE_OPS)
+WORKER_START_S = float(os.environ.get("RCB_WORKER_START_S") or 600)   # a scene build in a worker: at most this long
+STATIC = ("instance", "start_sha", "task_text", "episode", "hw", "control_dt", "max_control_steps", "cameras",
+          "depth_cameras", "raw_dim", "lower", "upper", "out_max", "proprio_layout")
+
+
+def _worker(conn, instance: str, kw: dict) -> None:
+    """A worker process: one LiberoMax (one simulator) driven by (op, args) messages; every answer is ("ok", value) or
+    ("err", text). Ops: "attrs" (the static attributes), "call" (a LiberoMax method), "targets", "replay" (journal
+    rows from the frozen start: the state hash), "state" ("entities" or "query" of the state table, when it has one)."""
+    try:
+        sim = LiberoMax(instance, **kw)
+    except BaseException as exc:  # noqa: BLE001 -- the parent raises it
+        conn.send(("err", repr(exc)[:1000]))
+        return
+    table = None
+    conn.send(("ok", None))
+    while True:
+        try:
+            op, args = conn.recv()
+        except (EOFError, OSError):
+            return
+        try:
+            if op == "attrs":
+                out = {k: getattr(sim, k) for k in STATIC}
+            elif op == "call":
+                name, a, k = args
+                out = getattr(sim, name)(*a, **k)
+            elif op == "targets":
+                out = sim.s.targets.copy()
+            elif op == "replay":
+                for row in args:
+                    sim.step(np.asarray(row, dtype=np.float64))
+                out = sim.state_sha()
+            elif op == "state":
+                if table is None:
+                    table = sim.state_table()
+                out = table.entities() if args[0] == "entities" else table.query(args[1])
+            else:
+                raise ValueError(f"unknown op {op!r}")
+        except BaseException as exc:  # noqa: BLE001 -- a refusal or a simulator error: the parent raises it
+            conn.send(("err", f"{type(exc).__name__}: {exc}"[:1000]))
+            continue
+        conn.send(("ok", out))
+
+
+class _Worker:
+    def __init__(self, instance: str, kw: dict):
+        import multiprocessing as mp  # noqa: PLC0415
+        ctx = mp.get_context("spawn")
+        self.conn, child = ctx.Pipe()
+        self.proc = ctx.Process(target=_worker, args=(child, instance, kw), daemon=True)
+        self.proc.start()
+        child.close()
+        if not self.conn.poll(WORKER_START_S):
+            self.stop()
+            raise RuntimeError(f"the simulator worker did not start in {WORKER_START_S:g} s")
+        self._answer()
+
+    def _answer(self):
+        try:
+            tag, out = self.conn.recv()
+        except (EOFError, OSError):
+            # The worker died (a native crash): the service dies with it, as it would with the simulator in-process
+            # (the sidecar restarts and resumes; the crash record names the call the service was serving).
+            print("[worker] the simulator worker died", file=sys.stderr, flush=True)
+            os.abort()
+        if tag == "err":
+            raise RuntimeError(out)
+        return out
+
+    def ask(self, op: str, args=None):
+        self.conn.send((op, args))
+        return self._answer()
+
+    def call(self, name: str, *a, **k):
+        return self.ask("call", (name, a, k))
+
+    def stop(self) -> None:
+        with contextlib.suppress(Exception):
+            self.conn.close()
+        if self.proc.is_alive():
+            self.proc.kill()
+        self.proc.join(30)
+
+
+class _RemoteSession:
+    """What LiberoMax's own methods read off its Session, from the worker."""
+
+    def __init__(self, ops: "LiberoMaxOps"):
+        self.ops = ops
+
+    @property
+    def targets(self) -> np.ndarray:
+        return self.ops.w.ask("targets")
+
+
+class _RemoteTable:
+    """The state-query ablation's table (rcb_service.STATE_QUERY), the current worker's."""
+
+    def __init__(self, ops: "LiberoMaxOps"):
+        self.ops = ops
+
+    def entities(self) -> dict:
+        return self.ops.w.ask("state", ("entities", None))
+
+    def query(self, plan: dict) -> dict:
+        return self.ops.w.ask("state", ("query", plan))
+
+
+class LiberoMaxOps:
+    """LiberoMax with its simulator in a worker process, for /reset, /save_state and /load_state (rcb_service.STATE_OPS);
+    see the module's docstring. The Sim contract's calls go to the current worker; clip, to_sim, interpolable,
+    save_trajectory and render_video are LiberoMax's own, run here."""
+
+    def __init__(self, instance: str, **kw):
+        self._kw = dict(kw)
+        self.instance = instance
+        self.w = _Worker(instance, self._kw)
+        for k, v in self.w.ask("attrs").items():
+            setattr(self, k, v)
+        self.s = _RemoteSession(self)
+        self._live_sha: str | None = None
+        self._path: list = []            # the journal rows run in the current worker since the frozen start
+
+    clip, to_sim, interpolable, save_trajectory, render_video = (
+        LiberoMax.clip, LiberoMax.to_sim, LiberoMax.interpolable, LiberoMax.save_trajectory, LiberoMax.render_video)
+
+    def calibrations(self) -> dict:
+        return self.w.call("calibrations")
+
+    def spec(self) -> dict:
+        return self.w.call("spec")
+
+    def images(self, cameras: list[str], depth: bool) -> tuple[dict, dict]:
+        return self.w.call("images", list(cameras), bool(depth))
+
+    def proprio(self) -> np.ndarray:
+        return self.w.call("proprio")
+
+    def command(self, type: str) -> np.ndarray:
+        return self.w.call("command", type)
+
+    def hold(self) -> tuple[str, np.ndarray]:
+        return self.w.call("hold")
+
+    def step(self, row: np.ndarray) -> tuple[bool, bool, dict]:
+        out = self.w.call("step", np.asarray(row, dtype=np.float64))
+        self._path.append(np.array(row, dtype=np.float64))
+        return out
+
+    def state_sha(self) -> str:
+        return self.w.call("state_sha")
+
+    def state_table(self):
+        return _RemoteTable(self)
+
+    def live_verdict(self, rows: np.ndarray, success: bool) -> dict:
+        out = self.w.call("live_verdict", rows, success)
+        self._live_sha = self.w.call("state_sha")
+        return out
+
+    def _replace(self, w: _Worker, path: list) -> None:
+        old, self.w, self._path = self.w, w, path
+        old.stop()
+
+    def reset(self) -> None:
+        self._replace(_Worker(self.instance, self._kw), [])
+
+    def save_state(self) -> dict:
+        return {"rows": np.asarray(self._path, dtype=np.float64).reshape(-1, self.raw_dim), "sha": self.state_sha()}
+
+    def load_state(self, snap: dict) -> None:
+        w = _Worker(self.instance, self._kw)
+        try:
+            got = w.ask("replay", snap["rows"])
+        except BaseException:
+            w.stop()
+            raise
+        if got != snap["sha"]:
+            w.stop()
+            raise RuntimeError(f"load_state: the saved path rebuilt {got[:12]}, not the saved state {snap['sha'][:12]}")
+        self._replace(w, [np.array(r) for r in snap["rows"]])
+
+
 def build() -> LiberoMax:
     env = os.environ.get
-    return LiberoMax(
-        env("RCB_INSTANCE", "/srv/instance.json"),
-        task_text=env("RCB_TASK_TEXT", ""),
-        episode=env("RCB_EPISODE", ""),
-        image_hw=int(env("RCB_IMAGE_HW") or 256),
-        max_control_steps=int(env("RCB_MAX_CONTROL_STEPS") or 9000),
-    )
+    kw = dict(task_text=env("RCB_TASK_TEXT", ""), episode=env("RCB_EPISODE", ""),
+              image_hw=int(env("RCB_IMAGE_HW") or 256), max_control_steps=int(env("RCB_MAX_CONTROL_STEPS") or 9000))
+    if rcb_service.STATE_OPS and int(env("RCB_RESET_BUDGET") or 0):
+        return LiberoMaxOps(env("RCB_INSTANCE", "/srv/instance.json"), **kw)
+    return LiberoMax(env("RCB_INSTANCE", "/srv/instance.json"), **kw)
 
 
 if __name__ == "__main__":
