@@ -2,7 +2,7 @@
 # Everything task-specific is copied here; no reference controller or recorded rollout is in the image.
 FROM ghcr.io/mll-lab-nu/efe:pandadyn-0.2.0
 COPY instance.json /app/instance.json
-COPY --from=ghcr.io/mll-lab-nu/efe:pandadyn-files-0.4.0-stateq-pose@sha256:4e9d40bf1b8bbc179d2129ed11cfec8623f7eec354645e7a56af73456a8c83b3 /privileged/environment/rcb_pandadyn.py /opt/tools/rcb_pandadyn.py
+COPY --from=ghcr.io/mll-lab-nu/efe:pandadyn-files-0.4.0-stateq@sha256:0e3040f17793b580799dc932a9438e070f7d5f6769305b381fb2505403224126 /privileged/environment/rcb_pandadyn.py /opt/tools/rcb_pandadyn.py
 ENV PYTHONPATH=/opt/tools:/opt/pandadyn
 # OPENBLAS_CORETYPE: this task's start depends on the BLAS kernel (tasks/pandadyn/README.md "Determinism")
 ENV OPENBLAS_CORETYPE=Haswell

@@ -515,9 +515,9 @@ def state_table() -> StateTable:
         o = get()
         named.add(id(o))
         if hasattr(o, "get_qpos"):
-            t.add(name, "articulation", {**_pose_fields(get), **_joint_fields(get)}, note="an articulated object of the scene")
+            t.add(name, "articulation", {**_pose_fields(get), **_joint_fields(get)}, note="a task object")
         else:
-            t.add(name, "object", _pose_fields(get), note="an object of the scene")
+            t.add(name, "object", _pose_fields(get), note="a task object")
     robot_arts = {id(ROBOT.left_entity), id(ROBOT.right_entity)}
     seen = {}
     for a in S._raw_scene.get_all_actors():
@@ -527,7 +527,7 @@ def state_table() -> StateTable:
         if id(a) in named or c is None or getattr(c, "kinematic", False) or type(c).__name__ != "PhysxRigidDynamicComponent":
             continue
         t.add(n if k == 0 else f"{n}_{k}", "object", _pose_fields(lambda n=n, k=k: _scene_item("actor", n, k)),
-              note="an object of the scene")
+              note="a free body of the scene")
     seen = {}
     for a in S._raw_scene.get_all_articulations():
         n = a.get_name() or "articulation"

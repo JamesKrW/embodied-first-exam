@@ -24,7 +24,7 @@ instance is checked when the service builds it: a scene whose start state does n
 Ablations (off unless the task sets them; nothing changes when off): RCB_STATE_OPS=1, POST /reset, /save_state and
 /load_state (the hooks below); RCB_STATE_QUERY=1, GET /state/entities and POST /state/query on state_table(): the
 privileged state in MuJoCo's world frame (quaternions w x y z): the robot's trunk pose, velocity and height above the
-ground, every joint, the IMU site and the feet, and the ground (its position and extents). A query reads a scratch copy of
+ground, every joint, the IMU site and the feet, and the ground (plane or height field). A query reads a scratch copy of
 the live state (MjRead), under the service lock between calls; it takes no control step."""
 
 import copy
@@ -804,7 +804,7 @@ def state_table():
     """The state-query ablation's table (RCB_STATE_QUERY=1), built once after the scene, in MuJoCo's world frame: the
     quadruped (`robot`: its trunk's pose, world-frame velocity and height above the ground straight below it, by a ray
     cast that skips the robot's own geoms; every leg joint with its range), its IMU site and feet (robot_link), and the
-    ground (`floor`: its position and full extents). The scene has no object. Read by MjRead (a scratch
+    ground (`floor`: a plane or the rough terrain's height field). The scene has no object. Read by MjRead (a scratch
     copy of the live state, positions and velocities recomputed there)."""
     R = MjRead(mujoco, lambda: S.model, lambda: S.data).refresh()
     m = R.m
@@ -825,15 +825,12 @@ def state_table():
         sid = m.site(f).id
         t.add(f if f.startswith("foot") else f"foot_{f}", "robot_link", mj_site_fields(R, sid), note=f"the foot site {f!r}")
     g = int(S._floor)
-    if int(m.geom_type[g]) == int(mujoco.mjtGeom.mjGEOM_HFIELD):
-        hx, hy, top, base = (float(v) for v in m.hfield_size[int(m.geom_dataid[g])])
-        size = [2 * hx, 2 * hy, top + base]
-    else:
-        size = [2 * float(m.geom_size[g][0]), 2 * float(m.geom_size[g][1]), 0.0]
+    kind = "hfield" if int(m.geom_type[g]) == int(mujoco.mjtGeom.mjGEOM_HFIELD) else "plane"
+    size = m.hfield_size[int(m.geom_dataid[g])].copy() if kind == "hfield" else m.geom_size[g].copy()
     t.add("floor", "scene_feature",
-          {"pos": ("m", lambda: R.d.geom_xpos[g].copy()),
-           "size": ("m (full extents along x, y and z of the ground geom's frame; 0: unbounded or flat)",
-                    lambda: size)},
+          {"pos": ("m", lambda: R.d.geom_xpos[g].copy()), "type": ("plane or hfield", lambda: kind),
+           "size": ("m (plane: half-sizes x, y and grid spacing; hfield: half-sizes x, y, the top's height, the base's "
+                    "depth)", lambda: size)},
           note="the ground geom `floor`")
     return t
 

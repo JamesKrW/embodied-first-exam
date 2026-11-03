@@ -43,8 +43,8 @@ Differences from the RoboTwin service, all from the simulator:
   journal. When it is missing or does not play, finalize.sh renders one in a video-only pass after the verdict.
 
 Ablations (off unless the task sets them): RCB_STATE_QUERY=1 serves the state table (state_table(): the R1Pro, its key
-links and the task's BDDL scope objects that exist at the episode's start, no substance; world frame, read between calls on
-the request thread) and RCB_STATE_OPS=1 reset / save / load (ops_*)."""
+links and the task's BDDL scope objects, world frame, read between calls on the request thread) and RCB_STATE_OPS=1 reset /
+save / load (ops_*)."""
 from __future__ import annotations
 import json, math, os, sys, threading, time, traceback
 import numpy as np
@@ -665,7 +665,7 @@ REPLAY = {"skipped": 0}
 
 
 # ---------------------------------------------------------------- ablations (rcb_limited "ablations"; off unless the task sets them)
-# RCB_STATE_QUERY=1: state_table() below (the robot, its key links, the task's BDDL scope objects present at the start).
+# RCB_STATE_QUERY=1: state_table() below (the robot, its key links, the task's BDDL scope objects).
 # RCB_STATE_OPS=1: reset = Session.reset() (ev.reset + og.sim.load_state of the frozen start; approximate in-process);
 # save / load = og.sim.dump_state(serialized=True) / load_state (approximate: PhysX's solver and contact caches are not
 # in it) plus the session's per-episode state (the success and fall windows, the latches, the last action, the recorded
@@ -773,16 +773,30 @@ def _f64(x) -> np.ndarray:
     return M._np(x).astype(np.float64).reshape(-1)
 
 
+def _future_names() -> set:
+    """The task's BDDL future objects and substances (`(future x)` in its initial conditions: what a transition rule
+    creates); none of them is in the state table."""
+    task = S.env.task
+    out = set(getattr(task, "future_obj_instances", None) or ())
+    for c in getattr(task, "activity_initial_conditions", None) or ():
+        body = getattr(c, "body", None)
+        if body and len(body) > 1 and body[0] == "future":
+            out.add(str(body[1]))
+    for name, ent in S._scope().items():          # an object not in the scene at the start: one a rule creates
+        if not bool(getattr(ent, "is_system", False)) and getattr(ent, "wrapped_obj", ent) is None:
+            out.add(name)
+    return out
+
+
 def state_table() -> _ReadOnce:
     """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: the R1Pro (base pose, world
     velocities, height of its base above the floor, every joint), its key links (base footprint, torso, head camera
     link, both end-effector frames, both fingertip centres and the four finger links) and every BDDL scope object of
-    the task that exists at the episode's start, by its BDDL name (Session.objects(), the privileged twin's names): an
-    articulated one (a cabinet, a fridge, an oven) as an articulation with its joint state and ranges, a fixed body
-    without joints (a floor, a fixed table) as a scene feature, every other one as an object. Substances (particle
-    systems) and objects a transition rule creates later are not in it. An object a transition rule removes keeps its
-    entity: it reads the last values the table read (at the latest its start values) with zero velocities. Built at the
-    start state, before a resume replays its journal, so the entities and their fields are the start's. Every
+    the task by its BDDL name (Session.objects(), the privileged twin's names): an articulated one (a cabinet, a fridge,
+    an oven) as an articulation with its joint state and ranges, a fixed body without joints (a floor, a fixed table)
+    as a scene feature, every other one as an object; a substance (a particle system) as an object with its particles'
+    centroid and bounding box. An object or substance the task's BDDL declares as future (one a transition rule creates)
+    is not in it; one a transition rule removes reads null once it is gone. Every
     read is OmniGibson's getters of the live PhysX state, on the thread that serves the requests (the one that steps
     Isaac), between calls: nothing steps or renders."""
     r = S.robot
@@ -852,89 +866,104 @@ def state_table() -> _ReadOnce:
         ent = scope.get(name)
         return getattr(ent, "wrapped_obj", ent) if ent is not None else None
 
-    def _zero(v):
-        return {k: 0.0 for k in v} if isinstance(v, dict) else np.zeros_like(v)
-
-    def kept(key, name, o, fn, zero=()):
-        """A group of an object's fields, read once per query by fn(o) -> {field: value} while `o` is the scope entry's
-        object; once a transition rule removed it (OmniGibson clears the entry), the last values read, `zero` zeroed. A
-        failed read of a present object answers its last values too. Seeded here, at the episode's start: the fields it
-        gives are the entity's fields for the whole episode."""
-        last = {}
-
+    def obj_read(name):
         def read():
-            if live(name) is o:
+            o = live(name)
+            if o is None or not hasattr(o, "get_position_orientation"):
+                return None
+            try:
+                p, q = o.get_position_orientation()
+                out = {"pos": _f64(p), "quat": _f64(q)}
+            except Exception:  # noqa: BLE001 -- removed by a transition rule
+                return None
+            for k, fn in (("lin_vel", "get_linear_velocity"), ("ang_vel", "get_angular_velocity")):
                 try:
-                    v = fn(o)
+                    out[k] = _f64(getattr(o, fn)())
                 except Exception:  # noqa: BLE001
-                    v = None
-                if v is not None and all(x is not None for x in v.values()):
-                    last.clear(); last.update(v)
-                    return v
-                return dict(last)
-            return {k: (_zero(x) if k in zero else x) for k, x in last.items()}
-        read()
-        return (lambda: t.memo(key, read)), set(last)
+                    out[k] = None
+            try:
+                lo, hi = o.aabb
+                out["bbox"] = [_f64(lo), _f64(hi)]
+            except Exception:  # noqa: BLE001
+                out["bbox"] = None
+            return out
+        return lambda: t.memo(f"obj.{name}", read)
 
-    def pose_vel(o):
-        p, q = o.get_position_orientation()
-        return {"pos": _f64(p), "quat": _f64(q), "lin_vel": _f64(o.get_linear_velocity()),
-                "ang_vel": _f64(o.get_angular_velocity())}
-
-    def bbox_of(o):
-        lo, hi = o.aabb
-        return {"bbox": [_f64(lo), _f64(hi)]}
-
-    def size_of(o):
-        return {"size": _f64(o.native_bbox) * _f64(o.scale)}
-
-    def joints_of(o):
-        names = list(o.joints)
-        return {"joint_pos": dict(zip(names, _f64(o.get_joint_positions()))),
-                "joint_vel": dict(zip(names, _f64(o.get_joint_velocities())))}
+    def size_of(name):
+        def read():
+            o = live(name)
+            try:
+                return _f64(o.native_bbox) * _f64(o.scale)
+            except Exception:  # noqa: BLE001
+                return None
+        return lambda: t.memo(f"size.{name}", read)
 
     def field(get, k):
-        return lambda: get()[k]
+        return lambda: (get() or {}).get(k)
 
+    def joints_of(name):
+        def read():
+            o = live(name)
+            try:
+                return list(o.joints), _f64(o.get_joint_positions()), _f64(o.get_joint_velocities())
+            except Exception:  # noqa: BLE001
+                return None
+        return lambda: t.memo(f"joints.{name}", read)
+
+    def particles(name):
+        def read():
+            sysm = live(name)
+            if sysm is None or not hasattr(sysm, "get_particles_position_orientation"):
+                return None
+            try:
+                p = M._np(sysm.get_particles_position_orientation()[0]).astype(np.float64).reshape(-1, 3)
+            except Exception:  # noqa: BLE001 -- the system holds no particles (or does not exist yet)
+                return None
+            if not len(p):
+                return None
+            return {"pos": p.mean(0), "bbox": [p.min(0), p.max(0)]}
+        return lambda: t.memo(f"particles.{name}", read)
+
+    future = _future_names()
+    log({"ev": "state_table_future", "dropped": sorted(n for n in scope if n in future)})
     for name in sorted(scope):
-        if name.startswith("agent"):
+        if name.startswith("agent") or name in future:
             continue
         o = live(name)
-        if o is None or o is r:           # an object a transition rule creates later, an uninitialized substance
+        if o is r:
             continue
-        if bool(getattr(scope.get(name), "is_system", False)) or not hasattr(o, "get_position_orientation"):
-            continue                      # a substance (particle system)
-        cat = getattr(o, "category", None)
+        if bool(getattr(scope.get(name), "is_system", False)) or (
+                o is not None and not hasattr(o, "get_position_orientation") and hasattr(o, "get_particles_position_orientation")):
+            g = particles(name)
+            t.add(name, "object", {"pos": ("m", field(g, "pos")), "bbox": ("m", field(g, "bbox"))},
+                  note="a substance (particle system): the centroid and the axis-aligned box of its particles; null when it holds none")
+            continue
+        g = obj_read(name)
+        cat = getattr(o, "category", None) if o is not None else None
+        fields = {"pos": ("m", field(g, "pos")), "quat": ("1", field(g, "quat")), "bbox": ("m", field(g, "bbox")),
+                  "size": ("m", size_of(name))}
         try:
-            n_dof = int(getattr(o, "n_dof", 0) or 0)
-            fixed = bool(getattr(o, "fixed_base", False))
+            n_dof = int(getattr(o, "n_dof", 0) or 0) if o is not None else 0
+            fixed = bool(getattr(o, "fixed_base", False)) if o is not None else False
         except Exception:  # noqa: BLE001
             n_dof, fixed = 0, False
-        kind = "articulation" if n_dof > 0 else "scene_feature" if fixed else "object"
-        units = {"pos": "m", "quat": "1", "bbox": "m", "size": "m", "lin_vel": "m/s", "ang_vel": "rad/s",
-                 "joint_pos": "rad or m", "joint_vel": "rad/s or m/s"}
-        want = ["pos", "quat", "bbox", "size"] + (["lin_vel", "ang_vel"] if kind != "scene_feature" else []) + \
-               (["joint_pos", "joint_vel"] if kind == "articulation" else [])
-        fields = {}
-        for gk, fn, zero in (("pose", pose_vel, ("lin_vel", "ang_vel")), ("bbox", bbox_of, ()), ("size", size_of, ()),
-                             ("joints", joints_of, ("joint_vel",)) if kind == "articulation" else (None, None, ())):
-            if gk is None:
-                continue
-            g, have = kept(f"{gk}.{name}", name, o, fn, zero)
-            for k in want:
-                if k in have:
-                    fields[k] = (units[k], field(g, k))
-        if kind == "articulation":
+        if n_dof > 0:
+            jg = joints_of(name)
             try:
                 rng = {j: [float(jp.lower_limit), float(jp.upper_limit)] for j, jp in o.joints.items()}
-                fields["joint_range"] = ("rad or m", lambda rng=rng: rng)
             except Exception:  # noqa: BLE001
-                pass
-        if not {"pos", "quat"} <= set(fields):
-            log({"ev": "state_table_skip", "entity": name, "why": "no pose at the start"})
-            continue
-        t.add(name, kind, {k: fields[k] for k in (*want, "joint_range") if k in fields},
-              note=f"category {cat}" if cat else None)
+                rng = {}
+            fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel")),
+                           "joint_pos": ("rad or m", lambda jg=jg: dict(zip(jg()[0], jg()[1])) if jg() else None),
+                           "joint_vel": ("rad/s or m/s", lambda jg=jg: dict(zip(jg()[0], jg()[2])) if jg() else None),
+                           "joint_range": ("rad or m", lambda rng=rng: rng)})
+            kind = "articulation"
+        elif fixed:
+            kind = "scene_feature"
+        else:
+            fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel"))})
+            kind = "object"
+        t.add(name, kind, fields, note=f"category {cat}" if cat else None)
     return t
 
 
@@ -956,7 +985,6 @@ def replay_row(row) -> None:
 L.check_spec(SPEC)                      # before the episode starts: a bad /spec must not cost a resume
 EP.scene_built()                        # the scene and everything the service needs exist: the startup watchdog stands down
 S.record_start()                        # the trajectory: a resume's journal replay is recorded too
-TABLE = state_table() if L.STATE_QUERY else None   # at the start state, before a resume's journal replay
 resumed = EP.begin(state=E, step=replay_row, state_sha=S.state_sha, proprio=proprio_row, spec=SPEC,
                    start_event={"task": TASK, "instance_id": S.instance_id, "cameras": CAMS}, on_end=_end_from_signal,
                    **({"ops": OPS} if OPS is not None else {}))
@@ -986,7 +1014,7 @@ HTTPD["serving"] = True
 L.serve(L.Service(spec=SPEC, lock=LOCK, state=E, submit=do_submit, observe=do_observe, kinematics=do_kinematics, status=status,
                   on_submit_error=lambda exc: finish("error"), log=log, episode=EP, state_sha=S.state_sha, proprio=proprio_row,
                   **({"state_ops": OPS} if OPS is not None else {}),
-                  state_table=TABLE))
+                  state_table=state_table() if L.STATE_QUERY else None))
 # the end signal stopped the loop (_end_from_signal): the agent's phase is over
 with LOCK:
     try:

@@ -144,7 +144,7 @@ WORKDIR /app
 # their paths under /srv the files it shares with other tasks, from pinned files-only images (images/<name>/
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:maniguard-files-0.5.0-stateq-pose@sha256:901a032fd86856f8156dd713d3fffe3ddcdc5bcad982a5f1995238df97f3feb8 \
+COPY --from=ghcr.io/mll-lab-nu/efe:maniguard-files-0.5.0-stateq@sha256:dbeb9245e2e3d937d4b67be3dfbb4f43832aa912d46d64c96618eb900d343272 \
      /sim/finalize.sh \
      /sim/live_video.py \
      /privileged/environment/rcb_maniguard.py \
