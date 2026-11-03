@@ -21,12 +21,14 @@ services:
     volumes:
       - rcb_observe:/run/rcb-observe:ro   # rcb-monitor
     working_dir: /srv
-    command: python3 /srv/core/launch.py
+    command: python3 /srv/rcb_ablation/launch.py   # the ablation's layer around core/launch.py
     cpus: 6
     mem_limit: 6g
     pids_limit: 1024
     cap_drop: [NET_RAW]
     environment:
+      RCB_STATE_OPS: "1"   # the ablation (docs/ablations.md)
+      RCB_RESET_BUDGET: "1000"   # the ablation (docs/ablations.md)
       RCB_DATA: "/data"
       MUJOCO_GL: "osmesa"
       PYOPENGL_PLATFORM: "osmesa"
