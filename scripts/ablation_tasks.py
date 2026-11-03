@@ -7,7 +7,7 @@
 reset: compose `sim` environment: RCB_RESET_BUDGET default -> 1000 (added when absent), RCB_STATE_OPS "1";
        instruction: every stated "<N> resets" -> 1000, and the section RESET_HEAD before `## External material`.
 query: compose `sim` environment: RCB_STATE_QUERY "1"; instruction: the section QUERY_HEAD.
-both:  both, the reset section first. Idempotent; a section or switch of an earlier form (OLD_HEADS,
+both:  both. Idempotent; a section or switch of an earlier form (OLD_HEADS,
        RCB_EXPOSE_OBJECT_POSES) is replaced.
 """
 from __future__ import annotations

@@ -8,7 +8,7 @@ one runs on its own branch:
 |---|---|---|---|
 | `ablation/unlimited-reset` | `RCB_STATE_OPS: "1"`, `RCB_RESET_BUDGET` 1000 | `## This run: unlimited resets, save and load` | `codex-gpt6_astra_resetinf-high` |
 | `ablation/object-pose` | `RCB_STATE_QUERY: "1"` | `## This run: privileged state queries` | `codex-gpt6_astra_objpose-high` |
-| `ablation/object-pose-unlimited-reset` | both | both, the reset section first | `codex-gpt6_astra_objpose_resetinf-high` |
+| `ablation/object-pose-unlimited-reset` | both | both sections | `codex-gpt6_astra_objpose_resetinf-high` |
 
 - **Base run**: `codex-gpt6_astra-high`, with the same task contents except the switches and the instruction section.
 - **Run metadata** (`base_run`, `ablation`, `setting`): the reset run is labelled "reset + save/load", the query run
