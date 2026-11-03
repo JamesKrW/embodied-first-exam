@@ -236,7 +236,10 @@ def run(
     render=False,
     start_y=0.0,
     start_yaw=0.0,
+    ablation=None,
 ):
+    """ablation (None: the plain run): a hook of the service's ablations; it gets the true state at each telemetry time
+    (record) and may hand a later policy to take over at a control step (switch)."""
     canonical = validate(policy)
     v = DriftVehicle(course, plant, friction, brake_torque)
     v.reset(course.get("start_x", -3.0), -course["radius"] + start_y, start_yaw)
@@ -256,9 +259,42 @@ def run(
         video.detail.elevation = -55
     rows = []
     monitor.step(v)
+    if ablation is not None:
+        from .ablation import carry, controller_state
+
+        m = v.model
+        static = {f"parked_car_{k}": {"pos": v.data.xpos[m.body(f"parked{k}").id],
+                                      "quat": v.data.xquat[m.body(f"parked{k}").id],
+                                      "size": 2 * m.geom_size[m.geom(f"barrier_parked{k}").id]} for k in range(2)}
+        static["parking_slot"] = {"pos": [course["park_x"], course["park_y"], 0.0],
+                                  "size": [course["slot_length"], course["slot_width"]]}
+        static["curb"] = {"pos": v.data.geom_xpos[m.geom("barrier_curb").id],
+                          "size": 2 * m.geom_size[m.geom("barrier_curb").id]}
+        wheel_names = ("fl", "fr", "bl", "br")
     try:
         diverged = False
         for i in range(round(HORIZON / DT) + 1):
+            if ablation is not None:
+                d = v.data
+                if i % 5 == 0:
+                    rot = d.xmat[1].reshape(3, 3)
+                    ablation.record(
+                        i * DT,
+                        {"car": {"pos": d.qpos[:3], "quat": d.qpos[3:7], "lin_vel": d.qvel[:3],
+                                 "ang_vel": rot @ d.qvel[3:6], "height_above_ground": float(d.qpos[2]),
+                                 "joint_pos": {"steering": float(d.joint("steering").qpos[0])},
+                                 "joint_vel": {w: float(d.joint(w + "_spin").qvel[0]) for w in wheel_names}}},
+                        [d.time, d.qpos, d.qvel, d.act, d.ctrl, v.applied, list(v.brake_queue), np.ravel(list(v.buffer)),
+                         v.model.dof_frictionloss[v.rear_dofs],
+                         controller_state(controller), rng.bit_generator.state, vars(monitor).get("gate")],
+                        static,
+                    )
+                later = ablation.switch(i * DT)
+                if later is not None:   # a load: the next policy takes over with this controller's run-time state
+                    new_policy = json.loads(Path(later).read_text())
+                    canonical = validate(new_policy)
+                    controller = carry(controller, Controller(policy, course), Controller(new_policy, course))
+                    policy = new_policy
             obs = v.state() + rng.normal(0, NOISE)
             action = controller.step(obs)
             if i % 5 == 0:
@@ -297,7 +333,7 @@ def run(
     return record
 
 
-def rollout(policy_path, case, out, render=True):
+def rollout(policy_path, case, out, render=True, ablation=None):
     p = json.loads(Path(policy_path).read_text())
     c, y, yaw = episode_parameters(case["episode_seed"])
     rng = np.random.default_rng(case["plant_seed"] + 520000)
@@ -312,6 +348,7 @@ def rollout(policy_path, case, out, render=True):
         render,
         y,
         yaw,
+        **({"ablation": ablation} if ablation is not None else {}),
     )
 
 

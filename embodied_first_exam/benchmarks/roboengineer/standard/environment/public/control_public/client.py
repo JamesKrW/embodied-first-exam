@@ -25,7 +25,7 @@ class Client:
             int(p.name.split("-", 1)[0]) for p in self.out.glob("*.request.json") if p.name.split("-", 1)[0].isdigit()
         ]
         index = max(indices, default=-1) + 1
-        prefix = self.out / f"{index:03d}-{operation}"
+        prefix = self.out / f"{index:03d}-{operation.replace('/', '_')}"
         prefix.with_suffix(".request.json").write_bytes(request)
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_s) as response:
@@ -64,6 +64,34 @@ class Client:
     def result(self, round_id):
         """The stored response of a completed deployment round (when a deploy response was lost); runs nothing."""
         return self.call("result", {"round_id": round_id})
+
+
+    # The ablations' calls (a run that offers them says so in its instruction and in /spec; elsewhere they are 404).
+    def finish(self, round_id=None, summary=None):
+        """No-success-signal runs: end adaptation; the given round (else the latest completed one) is graded."""
+        args = {k: v for k, v in (("round_id", round_id), ("summary", summary)) if v is not None}
+        return self.call("finish", args)
+
+    def state_entities(self):
+        """State-query runs: the entities and fields /state/query answers."""
+        with urllib.request.urlopen(self.url + "/state/entities", timeout=self.timeout_s) as response:
+            return json.loads(response.read())
+
+    def state_query(self, names, fields=None, round_id=None, case=None, t=None):
+        """State-query runs: the true state of a completed round's development episodes at their telemetry times."""
+        args = {"names": list(names)}
+        for k, v in (("fields", fields), ("round_id", round_id), ("case", case), ("t", t)):
+            if v is not None:
+                args[k] = list(v) if k == "fields" else v
+        return self.call("state/query", args)
+
+    def save_state(self, round_id, case, t):
+        """Save/load runs: a handle for the state of a development episode at its telemetry time at or before t."""
+        return self.call("save_state", {"round_id": round_id, "case": case, "t": t})
+
+    def load_state(self, handle):
+        """Save/load runs: the next deploy() runs that case from the saved state (None cancels)."""
+        return self.call("load_state", {"handle": handle})
 
 
 def artifact(path):

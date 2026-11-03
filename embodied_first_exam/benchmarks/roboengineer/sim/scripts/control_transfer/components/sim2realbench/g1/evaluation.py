@@ -5,11 +5,11 @@ from .deploy import rollout as run
 from .terrain import make_spec
 
 
-def rollout(policy_path, case, out, render):
+def rollout(policy_path, case, out, render, ablation=None):
     allowed = {"plant_seed", "episode_seed", "terrain", "duration", "speed"}
     if not isinstance(case, dict) or set(case) != allowed:
         raise ValueError("Invalid trusted G1 case")
-    return run(policy_path, out=out, render=render, **case)
+    return run(policy_path, out=out, render=render, **case, **({"ablation": ablation} if ablation is not None else {}))
 
 
 __all__ = ["make_spec", "rollout", "validate"]
