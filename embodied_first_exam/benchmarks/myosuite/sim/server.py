@@ -855,13 +855,12 @@ def end_from_signal() -> None:
 # mass, its own joints; its key links (pelvis, torso, head, feet; wrist, fingertips; the prosthesis's palm and
 # fingertips). The task's objects: the bodies the task's observation dict reads (obs_dict obj_* / curr_obj_*, object1 /
 # object2, ball), every body moved by a joint that is not the body's own; the opponent and the goalkeeper (mocap
-# bodies: pose only). Scene features: the markers the instruction describes (the start and goal pillars), the world's
-# named geoms (floor, terrain with its heights, goal, arena). Goal markers (the baoding targets, the translucent target
-# object) are not listed.
+# bodies: pose only). Scene features: the markers the instruction describes (the baoding targets, the translucent
+# target object, the start and goal pillars), the world's named geoms (floor, terrain with its heights, goal, arena).
 # Read off a private copy of the live state (forward kinematics there): the live simulator is never written.
 OBJECT_LABELS = {"baoding": ("object1", "object2"), "soccer": ("ball",)}
-MARKER_BODIES = ("start", "goal")                  # the markers the instructions describe (bimanual's pillars)
-GOAL_BODIES = ("target",)                          # goal markers (the reorient tasks' target pose): not listed
+MARKER_BODIES = ("target", "start", "goal")        # the markers the instructions describe (die / object, pillars)
+MARKER_SITES = {"baoding": {"target1_site": "target1", "target2_site": "target2"}}   # where each ball should be now
 
 
 def _object_bodies() -> dict:
@@ -1233,8 +1232,6 @@ def state_table() -> _MirrorTable:
         geoms = [g for g in range(m.ngeom) if rootid[m.geom_bodyid[g]] == b and M.tangible(g)]
         f = {"pos": (U_POS, lambda b=b: M.d.xpos[b]), "quat": (U_QUAT, lambda b=b: M.d.xquat[b]),
              "bbox": (U_BOX, lambda g=geoms: M.box(g))}
-        if m.body(b).name in GOAL_BODIES:
-            continue
         if m.body(b).name in MARKER_BODIES:
             t.put(m.body(b).name, "scene_feature", f, "a marker the instruction describes")
         elif m.body_mocapid[b] >= 0:
@@ -1242,6 +1239,10 @@ def state_table() -> _MirrorTable:
             t.put(m.body(b).name, "object", f, "moved by the scene (a mocap body)")
         elif geoms and m.body(b).name:
             t.put(m.body(b).name, "scene_feature", f)
+    for site, label in MARKER_SITES.get(TASK, {}).items():
+        if (i := sid(site)) >= 0:
+            t.put(label, "scene_feature", {"pos": (U_POS, lambda i=i: M.d.site_xpos[i])},
+                  "a marker the instruction describes")
     _mj_scene(t, np.ones(m.nbody, bool))           # the world body's named geoms
     return t
 

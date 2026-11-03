@@ -640,7 +640,7 @@ def state_table() -> CasaStateTable:
         except Exception:  # noqa: BLE001 -- a fixture without its own body (merged into the room)
             continue
         jids = [j for j in range(m.njnt) if m.joint(j).name.startswith(prefix) and int(m.jnt_type[j]) in hinge_slide]
-        note = None                    # not the task's word for it (ep_meta fixture_refs): only which fixtures are listed
+        note = f"the task refers to it as {', '.join(refs[n])}" if n in refs else None
         if jids:
             t.add(n, "articulation", {**t.body(b), **t.joints(jids)}, note=note)
         elif n in refs:

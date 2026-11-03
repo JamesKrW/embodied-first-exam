@@ -4,7 +4,7 @@
 # the agent container cannot influence the verdict.
 FROM ghcr.io/mll-lab-nu/efe:robowits-0.1.1
 COPY instance.json test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:robowits-files-0.4.0-stateq-leakfix@sha256:1982a1c8dcdc15f74afdcc2fd504ce4d84997ef865f8d25c0ebbe077bf3712a5 /privileged/tests/grade.py /privileged/tests/rcb_robowits.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:robowits-files-0.4.0-stateq@sha256:c97b8eae087ca3a5fdebeb8d9f1f24ba7861b9d4f1db7a682e008852c15e2671 /privileged/tests/grade.py /privileged/tests/rcb_robowits.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests QD_OFFLINE_CACHE=0
 WORKDIR /tests

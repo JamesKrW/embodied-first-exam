@@ -1,0 +1,7 @@
+{
+ "image": "ghcr.io/mll-lab-nu/efe:robocasa365-leakfix-files-0.1.0@sha256:3b767e38180d1406673de3442bf8fa1e2751c5e79e4ff2f9ab6fff50dce500c7",
+ "source": "embodied_first_exam/benchmarks/robocasa365/leakfix",
+ "files": {
+  "sim/server_casa.py": "43ff12e1497cf1e22602b1fe1618a8bbace496c39bf33e203cc6dbf7f56d539c"
+ }
+}
