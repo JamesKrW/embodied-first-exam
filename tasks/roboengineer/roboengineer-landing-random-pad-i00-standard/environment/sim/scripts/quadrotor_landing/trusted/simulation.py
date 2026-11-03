@@ -58,7 +58,10 @@ def rollout(
     initial_position=None,
     pad_position=None,
     reference_time_s=None,
+    ablation=None,
 ):
+    """ablation (None: the plain rollout): a hook of the service's ablations; it gets the true state at each observation
+    time (record) and may hand a later policy to take over at a control step (switch)."""
     policy = validate(policy)
     rng = np.random.default_rng(seed)
     sampled_initial, sampled_pad = sample_task(rng)
@@ -145,9 +148,31 @@ def rollout(
             ],
             stdin=subprocess.PIPE,
         )
+    if ablation is not None:
+        from .ablation import carry, controller_state
+
+        static = {"pad": {"pos": pad_position, "radius": PAD_RADIUS}}
     try:
         for k in range(round(HORIZON / DT)):
             t = k * DT
+            if ablation is not None:
+                if k % 5 == 0:
+                    rot = d.xmat[1].reshape(3, 3)
+                    ablation.record(
+                        t,
+                        {"drone": {"pos": d.qpos[:3], "quat": d.qpos[3:7], "lin_vel": d.qvel[:3],
+                                   "ang_vel": rot @ d.qvel[3:6], "height_above_ground": float(d.qpos[2] - CLEARANCE),
+                                   "rotor_thrust": motors}},
+                        [d.time, d.qpos, d.qvel, motors, controller_state(controller), rng.bit_generator.state,
+                         [first_touch, impact, lateral_impact, bad_contact, off_pad_contact, crash],
+                         vars(settling)],
+                        static,
+                    )
+                later = ablation.switch(t)
+                if later is not None:   # a load: the next policy takes over with this controller's run-time state
+                    new_policy = validate(json.loads(Path(later).read_text()))
+                    controller = carry(controller, Controller(policy), Controller(new_policy))
+                    policy = new_policy
             force = plant.force(d.qpos[:3], d.qvel[:3], d.qpos[3:7], np.sqrt(motors / CT)) if plant else np.zeros(3)
             d.xfrc_applied[1, :3] = force
             d.ctrl[:] = motors

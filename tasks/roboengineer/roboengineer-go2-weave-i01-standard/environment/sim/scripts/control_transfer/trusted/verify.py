@@ -141,9 +141,23 @@ def verdict(data, instance, diagnostics=None):
         return reject(exc)
 
 
+ABLATION_COUNTS = ("state_queries", "resets", "reset_budget", "saves", "loads", "first_success", "resets_at_success",
+                   "loads_at_success")
+
+
+def ablation_counts(data):
+    """The ablations' counts in final.json (none in a plain run), copied as numbers; they never change the verdict."""
+    try:
+        f = json.loads((Path(data) / "final.json").read_text())
+    except (OSError, ValueError):
+        return {}
+    return {k: int(f[k]) for k in ABLATION_COUNTS if isinstance(f, dict) and type(f.get(k)) in (int, bool)}
+
+
 if __name__ == "__main__":
     diagnostics = {}
     result = verdict(os.environ.get("RCB_DATA", "/data"), "/tests/instance.json", diagnostics)
+    result.update(ablation_counts(os.environ.get("RCB_DATA", "/data")))
     out = Path("/logs/verifier")
     out.mkdir(parents=True, exist_ok=True)
     (out / "reward.json").write_text(json.dumps(result))
