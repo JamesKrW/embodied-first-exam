@@ -1,0 +1,7 @@
+{
+ "image": "ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-leakfix-files-0.1.0@sha256:6efc7065a2f3cf422f1fbd084a70b900e88bab2ba92a5bc1fd7d6618456f33f2",
+ "source": "embodied_first_exam/benchmarks/embodied-olympics-fun/leakfix",
+ "files": {
+  "standard/server.py": "39160074058ed06db2a41d6dffbaae8d9720d19523c6b90dd855d4c020056105"
+ }
+}

@@ -30,10 +30,12 @@ WORKDIR /app
 # their paths under /srv the files it shares with other tasks, from pinned files-only images (images/<name>/
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:behavior-files-0.4.0-stateq-leakfix@sha256:82ae2c44aace6087963389bc28b0249f8b4e0b9a1ca4ede6d31459b59846aa93 \
+COPY --from=ghcr.io/mll-lab-nu/efe:behavior-files-0.4.0-stateq@sha256:174a83413347eb1de70c4eacf3e496ad9a95945f017c2aa22b15488f838bd419 \
      /sim/finalize.sh \
      /r1pro_primitives_eval.yaml \
      /rcb_behavior.py \
+     /srv/
+COPY --from=ghcr.io/mll-lab-nu/efe:behavior-leakfix-files-0.1.0@sha256:a0308946b9ee4fd67e40b498bc891892de154d6eaa3fe0f75be5dba045e84bc3 \
      /sim/server.py \
      /srv/
 COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 \

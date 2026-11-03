@@ -4,12 +4,14 @@
 FROM ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-0.2.1
 COPY . /srv/
 COPY --from=ghcr.io/mll-lab-nu/efe:standard-files-0.4.0-stateq@sha256:07fbf9e22ea11efd3398ef74d888ee7544410c1e07ff49e3fc5b8606b9acfe38 /rcb1.py /srv/rcb1.py
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-leakfix@sha256:3e1155ad84686bd7c43941fbb0dd61c674700ab098c2af8331b841e37b066444 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e \
      /rcb_rfo.py \
      /standard/rcb_service.py \
+     /srv/
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-leakfix-files-0.1.0@sha256:6efc7065a2f3cf422f1fbd084a70b900e88bab2ba92a5bc1fd7d6618456f33f2 \
      /standard/server.py \
      /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq-leakfix@sha256:3e1155ad84686bd7c43941fbb0dd61c674700ab098c2af8331b841e37b066444 \
+COPY --from=ghcr.io/mll-lab-nu/efe:embodied-olympics-fun-files-0.4.0-stateq@sha256:c654ec3d09c37a620596306893bcefd00de74a4ab76057a257a94a5603708f1e \
      /rfo/__init__.py \
      /rfo/looks.py \
      /rfo/realhand.py \

@@ -773,21 +773,6 @@ def _f64(x) -> np.ndarray:
     return M._np(x).astype(np.float64).reshape(-1)
 
 
-def _future_names() -> set:
-    """The task's BDDL future objects and substances (`(future x)` in its initial conditions: what a transition rule
-    creates); none of them is in the state table."""
-    task = S.env.task
-    out = set(getattr(task, "future_obj_instances", None) or ())
-    for c in getattr(task, "activity_initial_conditions", None) or ():
-        body = getattr(c, "body", None)
-        if body and len(body) > 1 and body[0] == "future":
-            out.add(str(body[1]))
-    for name, ent in S._scope().items():          # an object not in the scene at the start: one a rule creates
-        if not bool(getattr(ent, "is_system", False)) and getattr(ent, "wrapped_obj", ent) is None:
-            out.add(name)
-    return out
-
-
 def state_table() -> _ReadOnce:
     """The state-query ablation's table (RCB_STATE_QUERY=1), built once the scene is: the R1Pro (base pose, world
     velocities, height of its base above the floor, every joint), its key links (base footprint, torso, head camera
@@ -795,8 +780,7 @@ def state_table() -> _ReadOnce:
     the task by its BDDL name (Session.objects(), the privileged twin's names): an articulated one (a cabinet, a fridge,
     an oven) as an articulation with its joint state and ranges, a fixed body without joints (a floor, a fixed table)
     as a scene feature, every other one as an object; a substance (a particle system) as an object with its particles'
-    centroid and bounding box. An object or substance the task's BDDL declares as future (one a transition rule creates)
-    is not in it; one a transition rule removes reads null once it is gone. Every
+    centroid and bounding box. An object a transition rule creates or removes reads null while it does not exist. Every
     read is OmniGibson's getters of the live PhysX state, on the thread that serves the requests (the one that steps
     Isaac), between calls: nothing steps or renders."""
     r = S.robot
@@ -924,10 +908,8 @@ def state_table() -> _ReadOnce:
             return {"pos": p.mean(0), "bbox": [p.min(0), p.max(0)]}
         return lambda: t.memo(f"particles.{name}", read)
 
-    future = _future_names()
-    log({"ev": "state_table_future", "dropped": sorted(n for n in scope if n in future)})
     for name in sorted(scope):
-        if name.startswith("agent") or name in future:
+        if name.startswith("agent"):
             continue
         o = live(name)
         if o is r:
@@ -963,7 +945,7 @@ def state_table() -> _ReadOnce:
         else:
             fields.update({"lin_vel": ("m/s", field(g, "lin_vel")), "ang_vel": ("rad/s", field(g, "ang_vel"))})
             kind = "object"
-        t.add(name, kind, fields, note=f"category {cat}" if cat else None)
+        t.add(name, kind, fields, note=f"category {cat}" if cat else "not in the scene at the start (a transition rule may create it)")
     return t
 
 

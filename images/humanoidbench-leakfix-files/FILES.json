@@ -1,0 +1,7 @@
+{
+ "image": "ghcr.io/mll-lab-nu/efe:humanoidbench-leakfix-files-0.1.0@sha256:9a18496a7bf7195440fd1b41215d5bf65c421bd4d074cdf36deaf02e9f177f18",
+ "source": "embodied_first_exam/benchmarks/humanoidbench/leakfix",
+ "files": {
+  "sim/server.py": "1090b7e934b2a1f13433ab802ae3cb47234879cd3f3999620707004ce0041eb2"
+ }
+}
