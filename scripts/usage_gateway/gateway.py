@@ -65,11 +65,16 @@ full, and the limit almost never binds. The refusal avoids 429 and
 
 One resend, ChatGPT's random 400 (RETRY_400): since 2026-11-01 the ChatGPT backend answers a small share of
 well-formed POST /backend-api/codex/responses requests with HTTP 400 ({"detail":"Bad Request"}); Codex does not retry a
-400 and ends its turn, so the trial ends there. The gateway sends the identical request (the same bytes and headers)
-once more; the agent gets the second answer, whatever it is (a second 400 too, unchanged). If the resend cannot reach
-the upstream, the agent gets the first 400. Both attempts are in usage.jsonl: the first with "retried": true, "attempt":
-1, the second with "attempt": 2 and "retry_of_status": 400; totals.json counts "retried_400". Nothing in a request is
-changed, so this is still forwarding unchanged. --no-retry-400 turns it off; --retry-400 HOST/PATH adds an upstream.
+400 and ends its turn, so the trial ends there. The 400s cluster on zstd bodies whose decoded JSON is just over a
+multiple of 128 KiB, so the gateway sends the request once more without the compression: the JSON exactly as the agent
+compressed it (the decoded bytes), the same headers but no Content-Encoding and the Content-Length of those bytes
+("retry_mode": "uncompressed"). A body that was not zstd, or that the gateway could not decode, goes again as it was
+sent, the same bytes and headers ("retry_mode": "identical"). The agent gets the second answer, whatever it is (a second
+400 too, unchanged). If the resend cannot reach the upstream, the agent gets the first 400. Both attempts are in
+usage.jsonl: the first with "retried": true, "attempt": 1, the second with "attempt": 2 and "retry_of_status": 400; both
+carry "retry_mode", and an uncompressed resend "decompressed_bytes" (its request_bytes); totals.json counts
+"retried_400" and "retried_400_uncompressed". The model request itself is not changed. --no-retry-400 turns it off;
+--retry-400 HOST/PATH adds an upstream.
 
 Token counts are normalized the way Harbor counts them: input = everything the model read (Anthropic: input +
 cache_read + cache_creation; OpenAI: input_tokens, which include cached ones), output = output_tokens (reasoning
@@ -115,7 +120,7 @@ HARNESS_PROBES: set[tuple] = set()     # api_paths.json harness_probes: (METHOD,
 MAX_BODY = 256 << 20                   # a request body larger than this, as sent or decoded, is not read (and so not
                                        # forwarded): the largest recorded one is 31 MB
 HTTP_PROVIDER = "http"         # the provider whose list a --http-host upstream gets
-# (upstream host, path) whose HTTP 400 is sent once more, unchanged (module doc "One resend"); --retry-400 / --no-retry-400
+# (upstream host, path) whose HTTP 400 is sent once more (module doc "One resend"); --retry-400 / --no-retry-400
 RETRY_400: set[tuple[str, str]] = {("chatgpt.com", "/backend-api/codex/responses")}
 
 
@@ -352,6 +357,22 @@ def _unzstd(body: bytes) -> bytes:
     return data
 
 
+def resend_body(body: bytes, encodings: list, text: str | None, hdrs: dict) -> tuple[bytes, dict, str]:
+    """(body, headers, retry_mode) of the one resend of a 400 (module doc "One resend"): a zstd body that was decoded
+    goes as its decoded bytes, without Content-Encoding and with their Content-Length ("uncompressed"); anything else,
+    and a zstd body that does not decode now, goes as it was sent ("identical")."""
+    if text is not None and len(encodings) == 1 and encodings[0].lower().strip() == "zstd":
+        try:
+            plain = _unzstd(body)
+        except Exception:  # noqa: BLE001 -- not decodable after all: the identical resend
+            plain = None
+        if plain is not None:
+            h = {k: v for k, v in hdrs.items() if k.lower() not in ("content-encoding", "content-length")}
+            h["Content-Length"] = str(len(plain))
+            return plain, h, "uncompressed"
+    return body, hdrs, "identical"
+
+
 def _quiet(f, *a) -> None:
     try:
         f(*a)
@@ -523,6 +544,8 @@ def tally(tot: dict, rec: dict) -> None:
         tot["requests"] += 1
         if rec.get("retried"):                     # an answer the gateway did not pass on: the request went again
             tot["retried_400"] = tot.get("retried_400", 0) + 1
+            if rec.get("retry_mode") == "uncompressed":
+                tot["retried_400_uncompressed"] = tot.get("retried_400_uncompressed", 0) + 1
         if u:
             for k in ("input", "cached", "output"):
                 tot[k] += u.get(k, 0)
@@ -718,32 +741,38 @@ class Handler(BaseHTTPRequestHandler):
             hdrs["Content-Length"] = str(len(body))
         acc, chunks, client_gone = {}, [], False
 
-        def send():
+        def send(data: bytes, headers: dict):
             conn = (http.client.HTTPConnection if m is plain else http.client.HTTPSConnection)(host, timeout=ARGS.timeout)
-            conn.request(self.command, path, body=body or None, headers=hdrs)
+            conn.request(self.command, path, body=data or None, headers=headers)
             return conn.getresponse()
-        attempt = {}
+        attempt, sent, sent_hdrs = {}, body, None
         try:
-            r = send()
+            r = send(body, hdrs)
             if r.status == 400 and self.command == "POST" and (host.lower(), path.split("?")[0]) in RETRY_400:
                 first, first_headers = r.read(1 << 20), r.getheaders()     # a 400 is small (ChatGPT: 24 bytes)
                 r.close()
                 trial = trial or TRIALS.lookup(ip)
+                sent, h2, mode = resend_body(body, encodings, text, hdrs)
+                mode_rec = {"retry_mode": mode, **({"decompressed_bytes": len(sent)} if mode == "uncompressed" else {})}
+                if mode == "uncompressed":            # the raw log shows the headers the resend went with
+                    sent_hdrs = {k: v for k, v in self.headers.items() if k.lower() not in ("content-encoding", "content-length")}
+                    sent_hdrs["Content-Length"] = str(len(sent))
                 record(trial, {"ts": round(t0, 3), "dur_s": round(time.time() - t0, 2), "client_ip": ip, "host": host,
                                "method": self.command, "path": path.split("?")[0], "status": 400, "model": None,
                                "usage": {}, "usage_raw": {}, "request_bytes": len(body), "response_bytes": len(first),
-                               "client_gone": False, "retried": True, "attempt": 1,
+                               "client_gone": False, "retried": True, "attempt": 1, **mode_rec,
                                "session": {k.lower(): v for k, v in self.headers.items() if "session" in k.lower()}},
                        self._raw(host, path, body, text, how, 400, first_headers, first))
-                log(f"upstream {host[:253]}: HTTP 400 on {path.split('?')[0][:200]}, sent once more unchanged")
-                t0, attempt = time.time(), {"attempt": 2, "retry_of_status": 400}
+                log(f"upstream {host[:253]}: HTTP 400 on {path.split('?')[0][:200]}, sent once more ({mode}, "
+                    f"{len(sent)} bytes)")
+                t0, attempt = time.time(), {"attempt": 2, "retry_of_status": 400, **mode_rec}
                 try:
-                    r = send()
+                    r = send(sent, h2)
                 except Exception as exc:  # noqa: BLE001 -- the resend did not get through: the agent gets the first 400
                     log(f"upstream {host[:253]}: resend {type(exc).__name__}; the first 400 goes to the agent")
                     record(trial, {"ts": round(t0, 3), "dur_s": round(time.time() - t0, 2), "client_ip": ip, "host": host,
                                    "method": self.command, "path": path.split("?")[0], "status": 502, "model": None,
-                                   "usage": {}, "usage_raw": {}, "request_bytes": len(body), "response_bytes": 0,
+                                   "usage": {}, "usage_raw": {}, "request_bytes": len(sent), "response_bytes": 0,
                                    "client_gone": False, "forwarded": False, "upstream_failure": f"unreachable: {type(exc).__name__}",
                                    **attempt, "passed_on": "attempt 1"}, None)
                     self.send_response(400)
@@ -801,7 +830,7 @@ class Handler(BaseHTTPRequestHandler):
         rec = {"ts": round(t0, 3), "dur_s": round(time.time() - t0, 2), "client_ip": ip, "host": host,
                "method": self.command, "path": path.split("?")[0], "status": r.status, "model": acc.get("model"),
                "usage": normalize(acc.get("raw") or {}), "usage_raw": acc.get("raw") or {},
-               "request_bytes": len(body), "response_bytes": len(resp), "client_gone": client_gone,
+               "request_bytes": len(sent), "response_bytes": len(resp), "client_gone": client_gone,
                "session": {k.lower(): v for k, v in self.headers.items() if "session" in k.lower()}, **attempt}
         if broken:                                  # what was billed until then counts (the usage parsed so far)
             rec["upstream_failure"] = f"stream broken off: {broken}"
@@ -812,14 +841,17 @@ class Handler(BaseHTTPRequestHandler):
             rec["server_tools"] = tools
         if unchecked:
             rec["body_unchecked"] = True
-        record(trial, rec, self._raw(host, path, body, text, how, r.status, r.getheaders(), resp))
+        if attempt:
+            log(f"upstream {host[:253]}: the resend ({attempt['retry_mode']}) got HTTP {r.status}")
+        record(trial, rec, self._raw(host, path, body, text, how, r.status, r.getheaders(), resp, sent_hdrs))
 
-    def _raw(self, host, path, body, text, how, status, headers, resp) -> dict | None:
+    def _raw(self, host, path, body, text, how, status, headers, resp, req_headers=None) -> dict | None:
         """The raw log's record of one request and its answer (--raw), credentials removed."""
         if not ARGS.raw:
             return None
         return {"request": {"method": self.command, "host": host, "path": path,
-                            "headers": {k: v for k, v in self.headers.items() if k.lower() not in SECRET},
+                            "headers": {k: v for k, v in (req_headers or dict(self.headers.items())).items()
+                                        if k.lower() not in SECRET},
                             "body": text if text is not None else base64.b64encode(body).decode(), "body_as": how},
                 "response": {"status": status, "headers": {k: v for k, v in headers if k.lower() not in SECRET},
                              "body": resp.decode("utf-8", "replace")}}
@@ -842,7 +874,7 @@ def main() -> int:
     p.add_argument("--server-tools", choices=("refuse", "record"), default="refuse",
                    help="a model request that asks the provider to run a tool (api_paths.json): refuse it (default) or only record it")
     p.add_argument("--retry-400", action="append", default=[], metavar="HOST/PATH",
-                   help="another upstream host (or --http-host host:port) and path whose HTTP 400 is sent once more, unchanged (repeatable)")
+                   help="another upstream host (or --http-host host:port) and path whose HTTP 400 is sent once more (repeatable)")
     p.add_argument("--no-retry-400", action="store_true", help="pass every 400 on at once (no resend, module doc)")
     p.add_argument("--budget-input", type=int, default=10_000_000_000, help="per-trial input tokens, cached included; 0 = no limit")
     p.add_argument("--budget-output", type=int, default=10_000_000_000, help="per-trial output tokens; 0 = no limit")
