@@ -218,6 +218,13 @@ section `## This run: no success signal` (`scripts/ablation_tasks.py`). With it 
   `hidden_success()`, `finished()`, `hide_fields()`, `Service(finish=..., hidden_keys=...)`; `toy_server.py` is the
   reference adapter); tests `embodied_first_exam/standard/v2_1/hide_selftest.py` and
   `embodied_first_exam/standard/hide_selftest.py`.
+- The Embodied Olympics match tasks run their own match service, not an eai-standard one: their ablation dirs come
+  from `scripts/ablation_eomatch.py apply nosignal` (a layer around the unchanged match core, switched on by the same
+  `RCB_HIDE_SUCCESS`). There the success is winning the match, so nothing is evaluated at `/finish`: every reply but
+  `/spec` leaves out the score, the points', rallies' and phrases' results, who scored a goal and the winner; the
+  match's end by its rules (phase `over`) stays visible; `POST /finish` ends the agent's session at once and the match
+  is decided as at the session's end (before the start a no-show, during the match abandoned, a valid loss; after the
+  match its result stands). `final.json` adds `success_signal`, `finished`, `finish_time_s` and `ended_by`.
 
 ## Part 2 — `eai-standard/2.2`: capabilities added to 2.1
 
