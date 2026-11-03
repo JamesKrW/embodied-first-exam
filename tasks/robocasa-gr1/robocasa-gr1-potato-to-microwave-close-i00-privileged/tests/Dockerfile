@@ -2,7 +2,7 @@
 # only the declared artifacts (/app/output/) arrive from the agent.
 FROM ghcr.io/mll-lab-nu/efe:robocasa-gr1-0.1.0
 COPY test.sh instance.npz /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:robocasa-files-0.4.0-stateq@sha256:ec81fd1e6376a82856ab44faeb904821ec114b1c31a6ad6552c5f689cf3cb7bf /privileged/environment/casa_tool.py /privileged/tests/grade.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:robocasa-files-0.4.0-stateq-leakfix@sha256:5919830dca5c3e9a4402da5961dc4db5ae4d9f96dde823bf229550ccfa821e40 /privileged/environment/casa_tool.py /privileged/tests/grade.py /tests/
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests
 WORKDIR /tests
