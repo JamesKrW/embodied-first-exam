@@ -22,12 +22,13 @@ services:
     command: python /srv/rcb_ese_rt.py                  # server.py's adapter under rcb_realtime.py's clock
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
       RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_INSTANCE: /srv/instance.json
       RCB_DATA: /data
       RCB_WALL_CLOCK_S: "3600"
       RCB_STARTUP_TIMEOUT_S: "300"                      # the scene builds in a few seconds
-      RCB_RESET_BUDGET: "0"                             # Embodied Safety Exam grades one episode: no reset
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
       # Knob: ${NAME:-default} takes NAME from the shell that runs harbor; results under another setting are reported apart.
       RCB_SLOWDOWN: "${RCB_SLOWDOWN:-1}"                # 1: real time (official); S: one step every S x control_dt s
       PYTHONPATH: /srv
