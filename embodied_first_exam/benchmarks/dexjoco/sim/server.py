@@ -28,8 +28,7 @@ Ablations (off unless the task sets them; nothing changes when off): RCB_STATE_O
 privileged state in DexJoCo's world frame (quaternions w x y z): each arm's base pose, velocity and height above the
 floor and every arm and hand joint, the tcp sites, the Allegro palms and fingertips, and the task's objects as
 Session.objects() names them (bodies with pose, velocity, size, bbox and their inner joints; joints as articulations;
-sites and geoms with their poses; not the visual-only regions that mark where something should go, GOAL_REGIONS) plus
-every other free body. A query reads a scratch copy of the live state (MjRead),
+sites and geoms with their poses) plus every other free body. A query reads a scratch copy of the live state (MjRead),
 under the service lock between calls; it takes no control step."""
 
 import copy
@@ -935,17 +934,13 @@ def _top(m, b: int) -> int:
     return b
 
 
-# Session.objects() entries that are visual-only markers of where something should go (not in the state table).
-GOAL_REGIONS = {"target_region"}
-
-
 def state_table():
     """The state-query ablation's table (RCB_STATE_QUERY=1), built once after the scene, in DexJoCo's world frame (the
     frame of /kinematics and proprio tcp_pose). Robots: each Panda + Allegro (`robot`, or `right_arm` / `left_arm`): its
     fixed base's pose, velocity and height above the floor, every arm and hand joint with its range; links: each tcp
     (the attachment site the controller tracks), the Allegro's palm and fingertips; the task's objects as
     Session.objects() names them (bodies: pose, velocity, size, bbox and the joints inside them; joints: articulations;
-    sites and geoms: their poses, a geom also its size and bbox) except GOAL_REGIONS, and every other free body. Read by MjRead (a scratch
+    sites and geoms: their poses, a geom also its size and bbox), and every other free body. Read by MjRead (a scratch
     copy of the live state)."""
     R = MjRead(mujoco, MD, D).refresh()
     m = MD
@@ -974,12 +969,6 @@ def state_table():
             movable |= R.subtree(int(m.jnt_bodyid[j]))
     have = set()
     for oname, (kind, ref) in M.OBJECTS.get(TASK, {}).items():
-        if oname in GOAL_REGIONS:
-            if kind == "geom":                          # a marker on a body of its own: not a free body of the scene
-                gb = int(m.geom_bodyid[m.geom(ref).id])
-                if not any(m.geom_contype[g] or m.geom_conaffinity[g] for g in R.body_geoms(gb)):
-                    have.add(gb)
-            continue
         if kind == "body":
             b = m.body(ref).id
             inner = [j for j in range(m.njnt) if int(m.jnt_bodyid[j]) in R.subtree(b) and int(m.jnt_type[j]) in (2, 3)]

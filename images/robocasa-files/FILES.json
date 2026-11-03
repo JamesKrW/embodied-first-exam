@@ -1,11 +1,11 @@
 {
- "image": "ghcr.io/mll-lab-nu/efe:robocasa-files-0.4.0-stateq-leakfix@sha256:5919830dca5c3e9a4402da5961dc4db5ae4d9f96dde823bf229550ccfa821e40",
+ "image": "ghcr.io/mll-lab-nu/efe:robocasa-files-0.4.0-stateq@sha256:ec81fd1e6376a82856ab44faeb904821ec114b1c31a6ad6552c5f689cf3cb7bf",
  "source": "embodied_first_exam/benchmarks/robocasa",
  "files": {
   "privileged/environment/casa_tool.py": "e9f0fa9a8cc6c5892d417b6294b2c525066058231e2a8950156ca33c0c0b2d7e",
   "privileged/tests/grade.py": "d95b3790e6b9f6562ffe7745cfea7434d38296b583a4f569829ad89dc9b79fe1",
   "sim/finalize.sh": "5d962167951ecc53bf38fe3f2e0636ddeff12c967dc82e0218836a152a811595",
-  "sim/server_casa.py": "43ff12e1497cf1e22602b1fe1618a8bbace496c39bf33e203cc6dbf7f56d539c",
+  "sim/server_casa.py": "80b6da7f6dc94cee3f0357cce1520e5f4f5f942512791cd2b15ef0fd46658eb4",
   "standard/tests/grade.py": "28c7a973c746089e6cd58bcc0448fc2148f749e7f657ef254f83155bd39df26f"
  }
 }
