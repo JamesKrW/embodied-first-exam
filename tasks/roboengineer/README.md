@@ -100,6 +100,36 @@ package name in #329.
   same limit from the agent's first request. Neural Landing freezes its per-case reference search before the agent
   starts (the sidecar's health check gates the agent; this time is not the agent's).
 
+## Ablations (docs/ablations.md)
+
+The ablation branches run the core set's roboEngineer tasks with the same switches as every other benchmark (the
+`sim` service's `RCB_HIDE_SUCCESS`, `RCB_STATE_QUERY`, `RCB_STATE_OPS` + `RCB_RESET_BUDGET`; all off by default, and
+off means the routes are 404 and every record is byte for byte the plain one), mapped onto the policy interface.
+`scripts/ablation_tasks.py` writes the task dirs, with the section texts of `scripts/ablation_roboengineer.py`.
+All three act on the development rounds only: the graded evaluation (the selected policy on every held-out case from
+its start, in two fresh processes) is the plain one.
+
+- **No success signal**: a development deployment already returns only noisy telemetry and frames (no score, no
+  success, no metric; the public nominal tools have none either). The run adds `POST /finish` (`round_id`, `summary`;
+  the graded round; then every call 409), `/spec` and `/describe` say `"success_signal": "hidden"`, and `final.json`
+  records `ended_by` (`finish`: a finish or a seal; else `timeout`) and `finish_time_s`. Telemetry that stops at a crash or a fall stays (it
+  is the robot's own observation); the evaluator's per-case metrics in `round-N/` stay private.
+- **Privileged state queries**: `GET /state/entities` and `POST /state/query` (`names`, `fields`, `round_id`, `case`,
+  `t`) read the true simulator state (no sensor noise or bias) of a completed round's development episodes at their
+  telemetry times: the robot (base pose, world-frame velocities, height above the ground, joints), its links (Go2 and
+  G1 feet, G1 torso and hands), the scene (weave poles, the parking slot, parked cars and curb, the G1 terrain, the
+  landing pad), rotor thrusts (drones). Never: scores, success, grader latches, the hidden plant parameters, the wind,
+  anything about the held-out bank. `state_queries` is counted.
+- **Unlimited resets + save/load**: a deployment is already a reset of every development case; the budget becomes
+  3 + `RCB_RESET_BUDGET` rounds (`resets` = rounds beyond 3). `POST /save_state` (`round_id`, `case`, `t`) names a
+  completed episode's state at a telemetry time; `POST /load_state` makes the next deployment run that case from there
+  with the new policy (the controller's run-time state carried over). The simulation is deterministic on the CPU, so a
+  load re-simulates the saved prefix with the saved round's policy and switches policy at `t`; a digest of the full
+  simulator state (MuJoCo state, controller, actuator queues, random generator) at every sample checks it
+  (`load_verified`, `load_mismatches`). `final.json` adds `rounds`, `saves`, `loads`, `development_episodes(_log)`,
+  `first_success` (the graded round needed no extra round and no load) and, on a success, `resets_at_success` /
+  `loads_at_success`; the verifier copies the counts into `reward.json`.
+
 ## Images
 
 The evaluators (`control-transfer-<version>`, `quadrotor-landing-<version>`) are `BUILD_ONLY` (licence-restricted evaluator assets; see the marker files) in the private package; the agents' bases (`-nominal`, `-train`: public assets only) and the files image are public. All are built from their directories:

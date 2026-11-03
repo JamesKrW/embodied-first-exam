@@ -7,7 +7,7 @@ from ..control_public.go2_data import validate as validate
 from .go2_spec import TASKS as TASKS, make_spec as make_spec
 
 
-def rollout(policy_path, case, out, render=True):
+def rollout(policy_path, case, out, render=True, ablation=None):
     from ..components.quadrupedbench.simulation import rollout as run
 
     with Path(policy_path).open("rb") as artifact:
@@ -16,4 +16,4 @@ def rollout(policy_path, case, out, render=True):
         raise ValueError("Policy size limit")
     policy = json.loads(raw)
     validate(policy)
-    return run(policy, case, out, render)
+    return run(policy, case, out, render, **({"ablation": ablation} if ablation is not None else {}))
