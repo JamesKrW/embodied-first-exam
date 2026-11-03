@@ -1,0 +1,7 @@
+{
+ "image": "ghcr.io/mll-lab-nu/efe:behavior-leakfix-files-0.1.0@sha256:a0308946b9ee4fd67e40b498bc891892de154d6eaa3fe0f75be5dba045e84bc3",
+ "source": "embodied_first_exam/benchmarks/behavior-1k/leakfix",
+ "files": {
+  "sim/server.py": "c2f2916f846f5ca044c2f883554a25182e251a3383355d51deb4a105661af7ec"
+ }
+}

@@ -24,7 +24,7 @@ Ablations (off unless the task sets them; nothing here runs without them):
                             palms, feet, a real hand's fingertips); every free body of the venue (balls, implements,
                             cones, props; a rope as one chain); every jointed fixture (ball machines, gates, nets, the
                             board, the bag) with its joints; the field's static geometry (lines, mats, pits, beams,
-                            bars, water) as scene features, decoration and painted goal markings left out. World frame, read off a private copy of
+                            bars, water) as scene features, decoration left out. World frame, read off a private copy of
                             the live state (forward kinematics there): the live simulator is never written. Never the
                             referee's state.
   rcb_service.STATE_OPS     save_state() / load_state(): the episode's sim rows since the frozen start, re-run from a
@@ -359,12 +359,6 @@ def _mj_scene(t: _MirrorTable, robot: np.ndarray, skip_name=lambda n: False, cha
     return free_mask
 
 
-# Painted goal markings (a target court, a service box, a target on the wall, a strike zone's drawn frame, a centre
-# zone, a distance or end mark, a landing disc, the landing zone's lines) are not in the table; the court's lines,
-# hoops, goals, nets, bars and the hole are.
-_GOAL_MARKING = re.compile(r"^(?:target\w*|service_box\w*|zone\w*|mark\d*|mark_line|far_end_mark|field_mark|knoll_line|"
-                           r"landing_end_line)$")
-
 DEPTH_CAMERAS = ("head_left",)      # the G1's head depth camera (Intel RealSense D435i)
 DEPTH_MAX_M = 10.0
 
@@ -514,7 +508,7 @@ class RoboFun:
         _mj_robot(t, "robot", r.pelvis, robot, skip, joints, links, extra={
             "held": ("{side: the name of the body that hand grips, or null}", lambda: dict(w.held))},
             note=f"{self.facts['model']}: pos / quat / velocities are the pelvis's")
-        skip |= _mj_scene(t, robot, skip_name=lambda n: n.startswith("rfo_") or bool(_GOAL_MARKING.match(n)))
+        skip |= _mj_scene(t, robot, skip_name=lambda n: n.startswith("rfo_"))
         return t
 
     @staticmethod

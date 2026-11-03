@@ -23,8 +23,8 @@ Ablations (off unless the task sets them; nothing here runs without them):
                             centre of mass, every joint) and its key links (pelvis, torso, head, hands, feet, the
                             fingertips of a hand that has them); the task's free bodies (objects); its jointed bodies
                             (the door and its hatch: articulations, with joint ranges); its static bodies (barriers,
-                            each hurdle, shelves, tables) and the floor as scene features; bodies that only show a
-                            goal (manip-cube's target orientation, bookshelf's ghost copies) are not in it. MuJoCo's world frame, read off a private copy of the live state (forward
+                            each hurdle, shelves, tables, the targets the instruction shows) and the floor as scene
+                            features. MuJoCo's world frame, read off a private copy of the live state (forward
                             kinematics there): the live simulator is never written.
   rcb_service.STATE_OPS     save_state() / load_state(): every array of MuJoCo's data (derived quantities included), the
                             model arrays tasks write (body_pos, body_quat, geom_rgba), the task's own state (vars(task),
@@ -215,12 +215,6 @@ class _Mirror:
     def joint_range(self, j: int):
         m = self.m
         return [float(m.jnt_range[j][0]), float(m.jnt_range[j][1])] if m.jnt_limited[j] else None
-
-
-def _goal_marker(name: str) -> bool:
-    """A body that only shows a goal (manip-cube's target orientation, bookshelf's ghost copy of each item where it
-    goes): not in the table."""
-    return name == "target_cube" or name.endswith("_vision")
 
 
 class _MirrorTable(rcb_service.StateTable):
@@ -641,7 +635,7 @@ class HumanoidBench:
                     links[f"{side}_{f}distal"] = ("body", bid(f"{side}_{f}distal"))
         _mj_robot(t, "robot", pelvis, robot, skip, {j: m.joint(j).id for j in self.joints}, links,
                   note="the H1: pos / quat / velocities are the pelvis's")
-        skip |= _mj_scene(t, robot, skip_name=_goal_marker, expand=("hurdle_array",))
+        skip |= _mj_scene(t, robot, expand=("hurdle_array",))
         return t
 
     def _shared(self) -> dict:
