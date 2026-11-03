@@ -64,20 +64,24 @@ counters, visual-only goal markers.
 - `final.json` also has `episodes_log`: per episode, when it began (start / reset / load), its agent-clock start and
   end, its control steps, and how it ended.
 
+
+
 ## Embodied Olympics match
 
 The match tasks (one agent seat against a scripted opponent or a built-in learned seat) run their own match service
 (Embodied Olympics core 0.2; table tennis G1: core 0.5), not an eai-standard one. Their ablation dirs come from
-`scripts/ablation_eomatch.py apply query|reset|both <task dirs>` (then `normalize`): the `sim` service runs
+`scripts/ablation_eomatch.py apply nosignal|query|reset|both <task dirs>` (then `normalize`): the `sim` service runs
 `python3 /srv/rcb_ablation/launch.py`, a layer (`scripts/ablation_eomatch/rcb_ablation/`, copied into the task's
 `environment/sim/`) around the unchanged core that adds the calls when its switch is set (with none set it serves what
-the core serves), and `tests/rcb_ablation_reward.py` adds the counts below to `reward.json`. The task set is the 13
-core match tasks minus the ones in the table.
+the core serves), and `tests/rcb_ablation_reward.py` adds the counts below to `reward.json`. Every ablation has the 13
+core match tasks.
 
-| Ablation | Not in it | What the layer does |
-|---|---|---|
-| state queries (`RCB_STATE_QUERY`) | fencing (no physical state between phrases) | the player's own frame: its robot (base or pelvis, joints), paddle / racket / rods, the opponent (its robot, player or rods), the ball or shuttle, table and net; read under the world's lock, no step |
-| reset + save/load (`RCB_STATE_OPS`) | table tennis G1 (the opponent's program runs in its own process: no exact snapshot) | reset: the instance built again; save: a copy of the whole match (world, scripted opponent, built-in seat players, generators, score, clocks), exact (a copy and its original agree on the state digest after further steps); load: a copy of it, as a new episode. After either the world is frozen until `start` / `ready` (at most the review timeout); a turn match resumes at once, its chess clock restored. A loss by the rules is held at its end (the agent may reset or load); a win ends the run. The graded episode is the last one; `episode.<n>.jsonl` keeps the earlier ones. |
+| Ablation | What the layer does |
+|---|---|
+| no success signal (`RCB_HIDE_SUCCESS`) | every reply but `/spec` leaves out the score, a point's, rally's or phrase's result, who scored a goal, the black card and the winner; `POST /finish` ends the agent's session, decided as the session's end is: before the start a no-show, during the match abandoned (a valid loss), after the match its result stands. The match's end by its rules (phase `over`) stays visible. |
+| state queries (`RCB_STATE_QUERY`) | in the player's own frame, every physical body of the match: its robot (base or pelvis pose, joints), paddle / racket / rods / blade, the opponent (its robot, player, paddle, rods or blade), the ball or shuttle, and the table, net, court, goals, playfield or piste; the eai-standard state table's kinds (`robot`, `robot_link`, `object`, `articulation`, `scene_feature`) and fields only (`pos`, `quat`, `lin_vel`, `ang_vel`, `joint_pos`, `joint_vel`, `joint_range`, `size`, `bbox`). Velocities are the current ones (a drawn opponent's: a backward difference). The fencing bout (phrases measured in MuJoCo, fenced at once) gives the on-guard layout it stands in between phrases. No score, phase, clock, referee state, opponent target, plan or strategy. Read under the world's lock, no step. |
+| reset + save/load (`RCB_STATE_OPS`) | reset: the instance built again; save: a copy of the whole match (world, scripted opponent, built-in seat players, generators, score, clocks), exact (a copy and its original agree on the state digest after further steps); load: a copy of it, as a new episode. Table tennis G1's opponent program runs in a process of its own (core 0.5 platform seat): its whole state is pickled there after every observation already sent (its replies received first), restored on a load (checked: the restored program's canonical state hash and its own digest equal the save's) and built new on a reset; the commands it sent that are not yet in effect are part of the save. After either the world is frozen until `start` / `ready` (at most the review timeout); a turn match resumes with its chess clock. A loss by the rules is held at its end (the agent may reset or load); a win ends the run. The graded episode is the last one; `episode.<n>.jsonl` keeps the earlier ones. |
 
 `final.json` / `reward.json` add `resets`, `saves`, `loads`, `episodes`, `first_success`, `resets_at_success`,
-`loads_at_success` (reset runs) and `state_queries` (query runs).
+`loads_at_success` (reset runs), `state_queries` (query runs), and `success_signal`, `ended_by`, `finished` (no
+success signal).

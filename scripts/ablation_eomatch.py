@@ -39,10 +39,6 @@ LAUNCH_NEW = "command: python3 /srv/rcb_ablation/launch.py   # the ablation's la
 SWITCHES = {"nosignal": {"RCB_HIDE_SUCCESS": "1"}, "query": {"RCB_STATE_QUERY": "1"},
             "reset": {"RCB_STATE_OPS": "1", "RCB_RESET_BUDGET": str(BUDGET)},
             "both": {"RCB_STATE_QUERY": "1", "RCB_STATE_OPS": "1", "RCB_RESET_BUDGET": str(BUDGET)}}
-# out of an ablation, with the reason (docs/ablations.md)
-NOT_IN = {"query": {"fencing": "no physical state between phrases"},
-          "reset": {"tabletennisg1": "the opponent's program runs in its own process (no exact snapshot)"}}
-NOT_IN["both"] = {**NOT_IN["query"], **NOT_IN["reset"]}
 
 NOSIGNAL_HEAD = "## This run: no success signal"
 NOSIGNAL_TEXT = """{head}
@@ -67,18 +63,21 @@ This run lets you query the simulator's state. This section overrides anything a
 camera images, the service's replies and this document, or that the simulator's state is never given.
 
 - `GET http://localhost:8000/$SEAT/state/entities` lists what you can query:
-  `{{"frame": ..., "quaternion_order": ..., "entities": {{name: {{"kind": ..., "fields": {{field: unit}}}}}}}}`. The
-  kinds are `robot` (your robot), `robot_link` (your paddle, racket or rods), `opponent` and `opponent_link` (the
-  opponent's robot, player, paddle or rods), `ball` (the ball or the shuttle) and `scene_feature` (the table, the net).
-  The list is fixed for the run.
+  `{{"frame": ..., "quaternion_order": ..., "entities": {{name: {{"kind": ..., "fields": {{field: unit}}, "note"?}}}}}}`.
+  The kinds are `robot` (your robot, and the opponent's when it is one), `robot_link` (your paddle, racket, rods or
+  blade), `object` (the ball or the shuttle, the opponent's paddle, racket or blade, a scripted opponent that is only
+  drawn), `articulation` (the opponent's rods) and `scene_feature` (the table, net, court, goals, playfield, piste and
+  its lines); `note` says what an entity is. The list is fixed for the run.
 - `POST http://localhost:8000/$SEAT/state/query` with `{{"names": ["ball", ...], "fields": ["pos"]}}` answers JSON
   `{{"state": {{name: {{field: value}}}}, "control_steps": ..., "sim_time_s": ..., "state_queries": ...}}` with the
-  current values from the simulator. `fields` is optional. The fields and their units are in the list (`pos` m,
-  `quat`, `lin_vel` m/s, `ang_vel` rad/s, `joint_pos` / `joint_vel` {{joint: value}}, ...), all in the frame `frame`
-  names (your own frame, as in the observation). An unknown name or field is a 400 that lists the valid ones.
-- A query only reads: no control step, the clock neither advances nor pauses (the world keeps moving in real time).
+  current values from the simulator. `fields` is optional. The fields and their units are in the list: `pos` m,
+  `quat`, `lin_vel` m/s, `ang_vel` rad/s, `joint_pos` / `joint_vel` / `joint_range` {{joint: value}}, `size` (the
+  full extents along the body's own axes, m) and `bbox` (its axis-aligned box, `[[x, y, z] min, [x, y, z] max]`, m),
+  all in the frame `frame` names (your own frame, as in the observation). An unknown name or field is a 400 that
+  lists the valid ones.{between}
+- A query only reads: no control step, the clock neither advances nor pauses ({clock}).
   It is served until the match is over (409 after). Queries are counted and recorded; they do not change the grading.
-- Nothing else changes: no answer holds the score, a point's result or the opponent's plan.
+- Nothing else changes: no answer holds the score, a point's result or the opponent's plan or strategy.
 
 """
 RESET_HEAD = "## This run: unlimited resets, save and load"
@@ -130,14 +129,6 @@ TEST_LINE = "python /tests/rcb_ablation_reward.py 2>> /logs/verifier/grade.log  
 DOCKER_LINE = "COPY rcb_ablation_reward.py /tests/rcb_ablation_reward.py"
 
 
-def family(d: pathlib.Path) -> str:
-    return d.name.removeprefix(f"{BENCH}-").split("-")[0]
-
-
-def excluded(mode: str, d: pathlib.Path) -> str | None:
-    return NOT_IN.get(mode, {}).get(family(d))
-
-
 def _compose(text: str, mode: str) -> str:
     lines = text.split("\n")
     sim = next(i for i, ln in enumerate(lines) if re.match(r"^  sim:\s*(#.*)?$", ln))
@@ -158,6 +149,9 @@ def _compose(text: str, mode: str) -> str:
 AFTER_REALTIME = ("After a reset or a load the world is frozen until you send `game start` (or `game ready`), at most\n"
                   "  `timing.review_timeout_s` of real time; then it runs on.")
 AFTER_TURN = "After a reset or a load the bout resumes at once, on the turn it had, with your clock as it was."
+CLOCK = {False: "the world keeps moving in real time", True: "your turn's clock keeps running"}
+BETWEEN = {False: "", True: ("\n- A phrase is fenced at once, inside the act that completes it; between phrases the fencers "
+                              "stand on\n  guard, and a query gives that layout.")}
 
 
 def _instruction(text: str, mode: str, turn: bool) -> str:
@@ -166,7 +160,8 @@ def _instruction(text: str, mode: str, turn: bool) -> str:
         if head in text:
             continue
         i = text.index("## External material")
-        text = text[:i] + body.format(head=head, budget=BUDGET, after=after) + text[i:]
+        text = text[:i] + body.format(head=head, budget=BUDGET, after=after, clock=CLOCK[turn],
+                                      between=BETWEEN[turn]) + text[i:]
     return text
 
 
@@ -237,7 +232,7 @@ def core(mode: str) -> list[pathlib.Path]:
     for t in cs.get("task", []):
         if t["task"].startswith(f"{BENCH}-") and t.get("default_mode") in ("standard", "standard-realtime"):
             d = ROOT / "tasks" / BENCH / f"{t['task']}-{t['default_mode']}"
-            if d.is_dir() and not excluded(mode, d):
+            if d.is_dir():
                 out.append(d)
     return out
 
@@ -253,11 +248,6 @@ def main(argv):
         return 0
     rc = 0
     for d in dirs:
-        why = excluded(mode, d)
-        if why:
-            print(f"{d.name}: not in this ablation ({why})")
-            rc = 1
-            continue
         if cmd == "apply":
             print(f"{d.name}: {'changed' if apply(d, mode) else 'unchanged'}")
         else:
