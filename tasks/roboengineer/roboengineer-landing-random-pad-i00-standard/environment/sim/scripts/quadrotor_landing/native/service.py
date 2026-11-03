@@ -25,6 +25,31 @@ def parse(raw):
 
 
 PROTOCOL = "eai-policy/1.0"
+from ..trusted import ablation as A   # noqa: E402  (the ablation switches; nothing changes when they are off)
+
+# the ablations' routes (trusted/ablation.py), served only with their switch on
+ABLATION_POST = {"/finish": "finish"} if A.HIDE_SUCCESS else {}
+ABLATION_POST.update({"/state/query": "state_query"} if A.STATE_QUERY else {})
+ABLATION_POST.update({"/save_state": "save_state", "/load_state": "load_state"} if A.STATE_OPS else {})
+
+
+def spec_body():
+    body = {"protocol": PROTOCOL, "task_type": "policy", "operations": ["describe", "deploy", "seal"]}
+    body["operations"] += [op for op in ("finish", "state_query", "save_state", "load_state")
+                           if op in ABLATION_POST.values()]
+    if A.HIDE_SUCCESS:
+        body.update(success_signal="hidden", finish=A.FINISH_NOTE)
+    if A.STATE_QUERY:
+        body["state_query"] = A.QUERY_NOTE
+    if A.STATE_OPS:
+        rounds = A.STANDARD_ROUNDS + A.RESET_BUDGET
+        body.update(budget={"rounds": rounds, "reset": A.RESET_BUDGET}, state_ops=A.OPS_NOTE.format(rounds=rounds))
+    return body
+
+
+def ablation_code(result):
+    """The HTTP status of an answer with a switch on: 409 after /finish (or, for the state routes, after the end)."""
+    return 409 if result.get("error") == "Session finished" else 400 if "error" in result else 200
 
 
 def atomic_json(path, value):
@@ -93,6 +118,9 @@ class Runtime:
             return {"error": "Evaluator busy"}
         try:
             if self.stop.is_set() or self.cutoff_path.exists() or (self.root / "final.json").exists():
+                if A.ANY and (operation in ABLATION_POST.values() or operation == "state_entities" or (
+                        A.HIDE_SUCCESS and self.session.state["ablation"]["finished"] is not None)):
+                    return {"error": "Session finished"}
                 return {"error": "Session closed"}
             state = self.session.state
             if state["native_started_at"] is None:
@@ -138,6 +166,11 @@ class Runtime:
                 final["infra_error"] = True
                 # Trusted artifact only; no traceback or privileged diagnostics on the public socket.
                 final["error"] = type(error).__name__
+            if A.ANY:
+                try:
+                    final.update(self.session.ablation_fields(final, chosen if "chosen" in locals() else None))
+                except Exception as error:   # the counts are evidence for people, never part of the verdict
+                    final["ablation_error"] = type(error).__name__
             atomic_json(self.root / "final.json", final)
 
     def watch(self):
@@ -214,8 +247,15 @@ def handler(runtime):
                 self.reply(200, {"ready": True})
             elif self.path == "/spec":
                 self.reply(
-                    200, {"protocol": PROTOCOL, "task_type": "policy", "operations": ["describe", "deploy", "seal"]}
+                    200, spec_body() if A.ANY else
+                    {"protocol": PROTOCOL, "task_type": "policy", "operations": ["describe", "deploy", "seal"]}
                 )
+            elif A.STATE_QUERY and self.path == "/state/entities":
+                try:
+                    result = runtime.call("state_entities", {})
+                    self.reply(ablation_code(result), result)
+                except Exception:
+                    self.reply(503, {"error": "Evaluator unavailable"})
             else:
                 runtime.session.audit({"operation": "http", "path": self.path[:256], "outcome": "rejected"})
                 self.reply(404, {"error": "Unknown route"})
@@ -227,6 +267,8 @@ def handler(runtime):
         do_PUT = do_DELETE = do_PATCH = do_HEAD = do_OPTIONS = do_TRACE = do_CONNECT = unknown   # every non-protocol path is 404 (PROTOCOL H.3)
 
         def do_POST(self):
+            if A.ANY and self.path in ABLATION_POST:
+                return self.ablation_post()
             if self.path not in ("/describe", "/deploy", "/seal"):
                 return self.unknown()
             try:
@@ -235,7 +277,20 @@ def handler(runtime):
                     raise ValueError("Invalid body")
                 args = parse(self.rfile.read(size))
                 result = runtime.call(self.path[1:], args)
-                self.reply(400 if "error" in result else 200, result)
+                self.reply(ablation_code(result) if A.ANY else 400 if "error" in result else 200, result)
+            except (ValueError, TypeError, json.JSONDecodeError):
+                runtime.session.audit({"operation": "http", "path": self.path[:256], "outcome": "rejected"})
+                self.reply(400, {"error": "Request rejected"})
+            except Exception:
+                self.reply(503, {"error": "Evaluator unavailable"})
+
+        def ablation_post(self):
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if self.headers.get("Transfer-Encoding") or not 0 < size <= 8192:
+                    raise ValueError("Invalid body")
+                result = runtime.call(ABLATION_POST[self.path], parse(self.rfile.read(size)))
+                self.reply(ablation_code(result), result)
             except (ValueError, TypeError, json.JSONDecodeError):
                 runtime.session.audit({"operation": "http", "path": self.path[:256], "outcome": "rejected"})
                 self.reply(400, {"error": "Request rejected"})
