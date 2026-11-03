@@ -208,7 +208,9 @@ def score(states, spec):
     return result
 
 
-def rollout(policy, case, out, render=True, nominal=False):
+def rollout(policy, case, out, render=True, nominal=False, ablation=None):
+    """ablation (None: the plain rollout): a hook of the service's ablations; it gets the true state at each telemetry
+    time (record) and may hand a later policy segment to take over at a control update (switch)."""
     policy = json.loads(validate(policy))
     asset_hash = verify()
     spec = episode(case)
@@ -264,9 +266,26 @@ def rollout(policy, case, out, render=True, nominal=False):
     diverged = False
     bad_warnings = (mujoco.mjtWarning.mjWARN_BADQPOS, mujoco.mjtWarning.mjWARN_BADQVEL, mujoco.mjtWarning.mjWARN_BADQACC)
     warning_base = [data.warning[w].number for w in bad_warnings]   # cumulative counters: only new warnings count
+    if ablation is not None:
+        feet_ids = [model.geom(n).id for n in ("FL", "FR", "RL", "RR")]
+        static = {f"pole_{k}": {"pos": [x, y, 0.0], "radius": 0.045, "height": 0.72}
+                  for k, (x, y) in enumerate(spec["poles"])} if spec["task"] == "weave" else {}
     try:
         for step in range(round(spec["duration"] / 0.002)):
             t = step * 0.002
+            if ablation is not None and step % 25 == 0:
+                rot = data.xmat[base].reshape(3, 3)
+                ablation.record(
+                    t,
+                    {"robot": {"pos": data.qpos[:3], "quat": data.qpos[3:7], "lin_vel": data.qvel[:3],
+                               "ang_vel": rot @ data.qvel[3:6], "height_above_ground": float(data.qpos[2]),
+                               "joint_pos": dict(zip(JOINT_NAMES, data.qpos[qp].tolist())),
+                               "joint_vel": dict(zip(JOINT_NAMES, data.qvel[qv].tolist()))},
+                     **{f"foot_{n}": {"pos": data.geom_xpos[g]} for n, g in zip(("FL", "FR", "RL", "RR"), feet_ids)}},
+                    [data.time, data.qpos, data.qvel, applied, qtarget, feedforward, [yaw_prev, yaw_total],
+                     rng.bit_generator.state],
+                    static,
+                )
             rpy = rpy_from_quat(data.qpos[3:7])
             yaw_total += angle(rpy[2] - yaw_prev)
             yaw_prev = float(rpy[2])
@@ -277,6 +296,11 @@ def rollout(policy, case, out, render=True, nominal=False):
             obs = np.concatenate([q, dq, imu, omega])
             if step % 10 == 0:
                 c = command(t, spec)
+                if ablation is not None:
+                    later = ablation.switch(t)
+                    if later is not None:   # a load: the next policy takes over (the controller has no run-time state)
+                        policy = json.loads(validate(json.loads(Path(later).read_text())))
+                        ctrl = Controller(policy)
                 qtarget, feedforward = ctrl.targets(t, spec["task"], obs, c)
             demand = ctrl.kp * (qtarget - q) - ctrl.kd * dq + feedforward
             if not policy["enabled"]:
