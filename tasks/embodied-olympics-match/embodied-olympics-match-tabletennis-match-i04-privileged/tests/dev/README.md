@@ -84,11 +84,11 @@ and a writable scratch directory. Only
 legal commands can influence the official world. The world continues at S=10
 while your program computes; original point reviews freeze it. There is no extra
 step mode in this release evaluator. Program load limit is 30s, each input/response
-exchange 5s, review 300s. The match ends as in embodied-olympics-match-tabletennis-match-i04-standard-realtime: when it is over, or, unfinished
+exchange 5s, review 300s. The match ends as in embodied-olympics-match-tabletennis-match-i04-realtime: when it is over, or, unfinished
 and not won, at that task's cutoff (7200 s of wall time). The program has 2 GiB address space, 7200 CPU seconds and
 at most 256 processes and threads; when the match ends every process of its user is killed. Development gets the
 task's overall agent resource budget. No model/API calls are available in formal evaluation. The verdict of this live
-match depends on the verifier host's speed (as in embodied-olympics-match-tabletennis-match-i04-standard-realtime); the verifier's CPUs are pinned.
+match depends on the verifier host's speed (as in embodied-olympics-match-tabletennis-match-i04-realtime); the verifier's CPUs are pinned.
 
 `reward.json` distinguishes valid deterministic losses from wins; success requires
 a complete original-referee win and a matching fresh-process journal replay. Missing,
@@ -99,7 +99,7 @@ in a fresh process and draws `/logs/verifier/replay.mp4` with the sport's specta
 spectators only: nothing reads it back, and a failed render only leaves no video (`/logs/verifier/video.json` says
 why). The verifier's timeout includes 1800 s for it.
 
-Level 4 / seed 34 is the frozen instance of `embodied-olympics-match-tabletennis-match-i04-standard-realtime`, this task's
+Level 4 / seed 34 is the frozen instance of `embodied-olympics-match-tabletennis-match-i04-realtime`, this task's
 camera-only twin. Full simulator/truth access changes the
 setting relative to camera-only standard; fixed-instance solving is not a claim
 of generalization. Image build and Harbor oracle/nop validation must be recorded

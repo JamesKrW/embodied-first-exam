@@ -1,4 +1,4 @@
-"""Foosball (sports/foosball): the privileged twin of embodied-olympics-match-foosball-match-i01-standard-realtime
+"""Foosball (sports/foosball): the privileged twin of embodied-olympics-match-foosball-match-i01-realtime
 (level 3, seed 7, S = 20, 14400 s).
 
 The twin's rules, referee, scripted red team, rod motors and S = 20 clock are unchanged; only the information (the

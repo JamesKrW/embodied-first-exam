@@ -1,7 +1,7 @@
 # Full-simulator table tennis on a Unitree G1: develop a program against the BOSS (level 4)
 
 Win one complete match from seat `A` against the platform's G1 at level 4 of four (the BOSS), seed 4: the same frozen
-instance as `embodied-olympics-match-tabletennisg1-matchgpu-i01-standard-realtime` (its standard-realtime twin; there you see only camera images and the world runs in real time).
+instance as `embodied-olympics-match-tabletennisg1-matchgpu-i01-realtime` (its realtime twin; there you see only camera images and the world runs in real time).
 Both robots are Unitree G1 humanoids (29 joints within Unitree's URDF limits and motor torque-speed curves, joint
 sensors' noise, self-collision, falls), each holding a real racket. The rules, the referee, the opponent and the
 joint-level interface are unchanged: one game to 5 points (lead by 2 from 4:4, the first to 7 wins), the ITTF service

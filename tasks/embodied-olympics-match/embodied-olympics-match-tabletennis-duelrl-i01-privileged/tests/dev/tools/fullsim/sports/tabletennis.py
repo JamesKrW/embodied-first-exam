@@ -1,5 +1,5 @@
 """Table tennis duel against the built-in RL opponent: the privileged twin of
-embodied-olympics-match-tabletennis-duelrl-i01-standard-realtime (seat B builtin_players:RLOpponentV2, seed 8, S = 10,
+embodied-olympics-match-tabletennis-duelrl-i01-realtime (seat B builtin_players:RLOpponentV2, seed 8, S = 10,
 7200 s).
 
 The twin's rules, referee, built-in seat B, action layer and S = 10 clock are unchanged; only the information (the full

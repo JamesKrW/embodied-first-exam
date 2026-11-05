@@ -1,6 +1,6 @@
 # Table tennis (G1) · Fixed opponent · Engineer track
 
-**Standard mode: the world waits for you.** Wherever this document speaks of the world running in real time ("never waits", computation that costs game time, wall seconds per control step), it describes this task's standard-realtime twin; here the Timing section's lockstep rule holds. A match you leave standing never ends, and it is lost when your session ends (abandoned).
+**Standard mode: the world waits for you.** Wherever this document speaks of the world running in real time ("never waits", computation that costs game time, wall seconds per control step), it describes this task's realtime twin; here the Timing section's lockstep rule holds. A match you leave standing never ends, and it is lost when your session ends (abandoned).
 
 ## 1. Goal
 You control a legged humanoid (Unitree G1, 29 DOF) in a Table tennis (G1) match from seat `A`. Your opponent is a G1 driven by the platform at level 4 of four (L1-L4; `game spec` names it).

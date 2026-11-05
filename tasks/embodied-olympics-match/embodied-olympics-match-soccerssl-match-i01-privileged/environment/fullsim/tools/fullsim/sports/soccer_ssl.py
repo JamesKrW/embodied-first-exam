@@ -1,5 +1,5 @@
 """Wheeled robot soccer 5 v 5 (RoboCup SSL Division B, sports/soccer_ssl): the privileged twin of the exported
-standard-realtime match embodied-olympics-match-soccerssl-match-i01-standard-realtime (level 4: the RL-trained yellow team, seed 7, S = 10,
+realtime match embodied-olympics-match-soccerssl-match-i01-realtime (level 4: the RL-trained yellow team, seed 7, S = 10,
 14400 s).
 
 The twin's rules, referee, scripted yellow team, skill layer and S = 10 clock are unchanged; only the information (the

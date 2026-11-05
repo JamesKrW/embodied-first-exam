@@ -1,6 +1,6 @@
 # Full-simulator program task: badminton, level 5, seed 1034
 
-The development source at `/opt/fullsim` is complete and CPU-only: the frozen simulator of `embodied-olympics-match-badminton-match-i04-standard-realtime` (this task's
+The development source at `/opt/fullsim` is complete and CPU-only: the frozen simulator of `embodied-olympics-match-badminton-match-i04-realtime` (this task's
 camera-only twin), its referee and its scripted opponent. No GPU, renderer or simulator service is needed. Run the
 commands inside the task's agent container from `/app`.
 

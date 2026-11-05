@@ -15,7 +15,7 @@
 Wheeled robot soccer 5 v 5 (RoboCup SSL Division B) against the opponent team at level 4 (the reinforcement-learned tier), program play: wheeled robot soccer 5 v 5 under the RoboCup Small Size League rules (Division B): ten omnidirectional SSL robots after TIGERs Mannheim's v2020 (kicker, chip kicker, dribbler; their real speed, acceleration, kick and dribbler limits) and an orange golf ball on the 9 x 6 m field, two halves of 300 s of playing time, a shoot-out when level, an automatic referee for every rule an SSL auto-referee judges; you command your robots with three skills (move to a pose, optionally by a time and at a speed; kick flat or chipped along the robot's heading, now or the moment the ball reaches it; spin the dribbler) and see the game through the four overhead cameras of the shared vision, 40 ms late; in the `match` format you command the blue team against a scripted team, in the `duel` format another player commands the yellow team, in the `team` format each robot has its own player.
 
 ## Difficulty
-Frozen development instance: seed 7, level 4, in lockstep (its standard-realtime twin: S = 10). Not one of
+Frozen development instance: seed 7, level 4, in lockstep (its realtime twin: S = 10). Not one of
 the sport's official (hidden) seeds, so results here are previews, not official Embodied Olympics results.
 
 ## Reference solution
@@ -48,4 +48,4 @@ Source: Embodied Olympics task `soccer_ssl-match-wallclock-program-standard`, re
 opponent, the observation, the review between points and the grader are ours, unchanged; only the seat is
 unmetered (Harbor records the model's usage) and the instance is frozen.
 
-Standard twin of `embodied-olympics-match-soccerssl-match-i01-standard-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).
+Standard twin of `embodied-olympics-match-soccerssl-match-i01-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).

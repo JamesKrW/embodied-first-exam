@@ -1,6 +1,6 @@
 # Full-simulator program task: table tennis at the low level, level 1, seed 22
 
-The development source at `/opt/fullsim` is complete and CPU-only: the frozen simulator of `embodied-olympics-match-tabletennis-matchlow-i01-standard-realtime` (this task's
+The development source at `/opt/fullsim` is complete and CPU-only: the frozen simulator of `embodied-olympics-match-tabletennis-matchlow-i01-realtime` (this task's
 camera-only twin), its referee and its scripted opponent. No GPU, renderer or simulator service is needed. Run the
 commands inside the task's agent container from `/app`.
 

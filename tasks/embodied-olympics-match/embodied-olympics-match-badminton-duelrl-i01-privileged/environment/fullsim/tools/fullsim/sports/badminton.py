@@ -1,5 +1,5 @@
 """Badminton duel against the built-in RL opponent: the privileged twin of
-embodied-olympics-match-badminton-duelrl-i01-standard-realtime (seat B builtin_players:RLOpponent, seed 1001, S = 20,
+embodied-olympics-match-badminton-duelrl-i01-realtime (seat B builtin_players:RLOpponent, seed 1001, S = 20,
 14400 s).
 
 The twin's rules, referee, built-in seat B, action layer and S = 20 clock are unchanged; only the information (the full

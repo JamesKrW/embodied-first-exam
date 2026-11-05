@@ -1,7 +1,7 @@
 # Full-simulator table tennis: develop a program against L4
 
 Win one complete match against the frozen sport's scripted L4 opponent, seed 34: the same frozen instance
-as `embodied-olympics-match-tabletennis-match-i04-standard-realtime` (its standard-realtime twin; there you see only camera images).
+as `embodied-olympics-match-tabletennis-match-i04-realtime` (its realtime twin; there you see only camera images).
 The original Franka Panda, high-level actions, serve laws, limits, scoring and opponent are unchanged.
 First to five, win by two from 4:4, cap seven. Full simulator development is allowed; no video is required.
 
@@ -27,7 +27,7 @@ or logs. Formal full-state snapshots are read-only values, not a mutable
 world object. Formal reset and score rollback are not allowed. The original realtime clock runs at S=10 even
 while your program computes; point reviews freeze the world under the existing rules. One response per observation,
 one action at a time. See `config["spec"]` and the README for the policy execution, load, review and call limits.
-The match ends as in `embodied-olympics-match-tabletennis-match-i04-standard-realtime`: when it is over, or at that task's cutoff (7200 s of wall
+The match ends as in `embodied-olympics-match-tabletennis-match-i04-realtime`: when it is over, or at that task's cutoff (7200 s of wall
 time), where an unfinished match is not won; a program error does not win either. The platform records the executed
 actions and replays that trusted journal in a fresh process. Success requires a completed win,
 valid original referee result and matching hashes/scores/steps/outcome. The generated trajectory is evidence,

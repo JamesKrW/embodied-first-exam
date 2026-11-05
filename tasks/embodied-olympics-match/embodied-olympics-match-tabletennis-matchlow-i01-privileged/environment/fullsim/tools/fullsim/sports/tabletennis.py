@@ -1,5 +1,5 @@
 """The privileged twin of the exported table-tennis match at the LOW level
-(embodied-olympics-match-tabletennis-matchlow-i01-standard-realtime: the agent's own skill in the loop).
+(embodied-olympics-match-tabletennis-matchlow-i01-realtime: the agent's own skill in the loop).
 
 Adapter of the generic full-simulator setting (tools/fullsim): the frozen sport (sports/tabletennis, its `match`
 format against the scripted opponent), its frozen instance (level 1, seed 22, S = 10, cutoff 7200 s), and the declared

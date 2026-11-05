@@ -1,5 +1,5 @@
 """Humanoid robot soccer 2 v 2 at the joint level, the CPU resource tier: the privileged twin of
-embodied-olympics-match-soccer-jointcpu-i01-standard-realtime (coach format, level 5 = the learned joint-level team, seed 101, S = 10, 14400 s).
+embodied-olympics-match-soccer-jointcpu-i01-realtime (coach format, level 5 = the learned joint-level team, seed 101, S = 10, 14400 s).
 
 The twin's rules, referee, opponent, joint-level action layer and S = 10 clock are unchanged; the twin's observation
 already holds the ball's and every robot's truth (RCB_SOCCER_FULLSTATE), the privileged setting adds the whole MuJoCo

@@ -17,7 +17,7 @@ Robot badminton against the scripted opponent (level 5), program play: robot sin
 **Opponent level 5.** Level 5 is a tier of this exported task only (the sport's own levels 1-3 are described under Rules): the level 2 opponent (reach 0.85 m, level 2's attacks, 0.25 s to spare on its shots except its kills) with a reaction of 0.22 s (level 2: 0.25 s, level 3: 0.20 s), level 3's walk back after its own stroke (2 m/s instead of 0.6 m/s) and level 3's kills, in 90 % of its attacks (level 2: 50 %). Like every level it predicts the shuttle's flight exactly; its base and arm obey the same limits as yours. `game spec` match.opponent_level is 5.
 
 ## Difficulty
-Frozen development instance: seed 1034, level 5, in lockstep (its standard-realtime twin: S = 20). Not one of
+Frozen development instance: seed 1034, level 5, in lockstep (its realtime twin: S = 20). Not one of
 the sport's official (hidden) seeds, so results here are previews, not official Embodied Olympics results.
 
 ## Reference solution
@@ -50,4 +50,4 @@ Source: Embodied Olympics task `badminton-match-wallclock-program-standard`, rev
 opponent, the observation, the review between points and the grader are ours, unchanged; only the seat is
 unmetered (Harbor records the model's usage) and the instance is frozen.
 
-Standard twin of `embodied-olympics-match-badminton-match-i04-standard-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).
+Standard twin of `embodied-olympics-match-badminton-match-i04-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).

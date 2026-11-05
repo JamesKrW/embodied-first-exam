@@ -1,7 +1,7 @@
 # Full-simulator badminton at the low level: develop a program against level 2
 
 Win one complete match against the frozen sport's scripted level-2 opponent, seed 8: the same frozen
-instance as `embodied-olympics-match-badminton-matchlow-i01-standard-realtime` (its standard-realtime twin; there you see only camera images). The robot, the actions,
+instance as `embodied-olympics-match-badminton-matchlow-i01-realtime` (its realtime twin; there you see only camera images). The robot, the actions,
 the rules, the limits and the opponent are unchanged; the world runs at 1/20 of real speed.
 
 The low level: the twin's skill in the loop without its plumbing. Your program returns the robot's low-level commands (traj / move / toss / none) itself; there is no act skill and no skill server (what the twin's skill computes, your program computes). The toolkit is under `sports/badminton/seat/`.
@@ -28,7 +28,7 @@ There is no formal reset. The original realtime clock runs at S = 20 while your 
 review (after a point, a goal or another stoppage) freezes the world (at most 300 s). The formal match
 has 7200 s of wall time.
 The service replays the trusted journal once in a fresh process; success is a complete win by the original referee
-with a matching replay. The match runs on the wall clock, so, as in the standard-realtime twin, the verifier's speed
+with a matching replay. The match runs on the wall clock, so, as in the realtime twin, the verifier's speed
 matters: it runs on 4 pinned CPUs. This fixed instance does not measure generalization to other instances.
 
 ## External material

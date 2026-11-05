@@ -67,4 +67,4 @@ the grader are ours, unchanged; the seat is unmetered (Harbor records the model'
 session is the hub's 4 h (v5 had 9 h with 30 min reviews). The agent image is the v5 seat image, prebuilt
 (built by the pilot; `environment/Dockerfile` pins it by digest).
 
-Standard twin of `embodied-olympics-match-soccer-jointgpu-i01-standard-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).
+Standard twin of `embodied-olympics-match-soccer-jointgpu-i01-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).

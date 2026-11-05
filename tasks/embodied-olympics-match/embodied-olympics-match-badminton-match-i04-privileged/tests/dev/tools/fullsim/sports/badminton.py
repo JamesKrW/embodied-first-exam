@@ -1,4 +1,4 @@
-"""Badminton singles: the privileged twin of embodied-olympics-match-badminton-match-i04-standard-realtime (level 5,
+"""Badminton singles: the privileged twin of embodied-olympics-match-badminton-match-i04-realtime (level 5,
 the strongest tier, seed 1034, S = 20). The task's own adapter of the generic full-simulator setting (tools/fullsim);
 the shared one names the earlier twins' instances. Nothing of sports/badminton changes (PROTOCOL H.7)."""
 

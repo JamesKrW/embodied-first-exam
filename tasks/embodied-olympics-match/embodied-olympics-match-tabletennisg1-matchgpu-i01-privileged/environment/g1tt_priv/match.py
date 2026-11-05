@@ -21,7 +21,7 @@ from pathlib import Path
 SIM = Path(os.environ.get("G1TT_SIM", Path(__file__).resolve().parents[2]))   # the sim tree (core/, sport/)
 CALL_LIMIT_S = 0.5           # one program call: an answer later than this is no command at that step
 BUDGET_S = 1800.0            # all the program's calls of one match: past this, no command for the rest of it
-ENV = {                      # the frozen instance's sim settings (the standard-realtime twin's compose environment)
+ENV = {                      # the frozen instance's sim settings (the realtime twin's compose environment)
     "RO_PLUGIN": str(SIM / "sport/plugin.py"), "RO_SPORT": "tabletennis_g1", "RO_FORMAT": "match", "RO_SEATS": "A",
     "RO_FIRST": "A", "RO_SLOWDOWN": "1", "RO_RENDERER": "mujoco", "RCB_ACTION_LEVEL": "low", "RCB_PLAY": "program",
     "RCB_ACT_RULE": "program", "RO_CAMERA_PROCS": "2", "RO_CAMERA_WORKERS": "4", "RO_PNG_LEVEL": "1",

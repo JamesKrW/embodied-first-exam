@@ -1,7 +1,7 @@
 # Full-simulator soccer_ssl: develop a program against level 4
 
 Win one complete match against the frozen sport's scripted level-4 opponent, seed 7: the same frozen
-instance as `embodied-olympics-match-soccerssl-match-i01-standard-realtime` (its standard-realtime twin; there you see only camera images). The robot, the actions,
+instance as `embodied-olympics-match-soccerssl-match-i01-realtime` (its realtime twin; there you see only camera images). The robot, the actions,
 the rules, the limits and the opponent are unchanged; the world runs at 1/10 of real speed.
 
 ## Development and deliverable
@@ -26,7 +26,7 @@ There is no formal reset. The original realtime clock runs at S = 10 while your 
 review (after a point, a goal or another stoppage) freezes the world (at most 600 s). The formal match
 has 13500 s of wall time.
 The service replays the trusted journal once in a fresh process; success is a complete win by the original referee
-with a matching replay. The match runs on the wall clock, so, as in the standard-realtime twin, the verifier's speed
+with a matching replay. The match runs on the wall clock, so, as in the realtime twin, the verifier's speed
 matters: it runs on 4 pinned CPUs. This fixed instance does not measure generalization to other instances.
 
 ## External material

@@ -12,7 +12,7 @@
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0@sha256:99255569bf68bcf27f4e4867b58bad55c1d54fe73281920882e97c310836b6c7` |
 
 ## Task
-The privileged twin of `embodied-olympics-match-tabletennis-matchlow-i01-standard-realtime`: table tennis (ITTF, one game to 5) at the LOW level: a Franka Panda with a paddle on an x-y rail base, driven by your own joint-level commands (no hit skill), against the scripted opponent; level 1, seed 22, S = 10.
+The privileged twin of `embodied-olympics-match-tabletennis-matchlow-i01-realtime`: table tennis (ITTF, one game to 5) at the LOW level: a Franka Panda with a paddle on an x-y rail base, driven by your own joint-level commands (no hit skill), against the scripted opponent; level 1, seed 22, S = 10.
 
 ## Difficulty
 Same frozen sport and instance as the twin; full-simulator development and the full state instead of camera images.
@@ -24,7 +24,7 @@ Same frozen sport and instance as the twin; full-simulator development and the f
 Separate verifier without network; root-owned trusted source, the program as nobody (a process limit; every process
 of nobody is ended with kill(-1) before the verdict, and a survivor is the program's 0, never a retry), the original
 realtime service on the wall clock at S = 10 (the verdict depends on the host's speed, as in the
-standard-realtime twin: the verifier runs on 4 pinned CPUs, part of the configuration key), one
+realtime twin: the verifier runs on 4 pinned CPUs, part of the configuration key), one
 fresh journal replay, then the replay video (replay.mp4) from the record.
 
 ## Resources

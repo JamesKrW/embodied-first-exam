@@ -12,7 +12,7 @@
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0@sha256:99255569bf68bcf27f4e4867b58bad55c1d54fe73281920882e97c310836b6c7` |
 
 ## Task
-The privileged twin of `embodied-olympics-match-badminton-match-i04-standard-realtime`: singles badminton on a 0.4-scale court (BWF Laws, one game to 11): Franka Panda with a racket on a gantry base against the scripted opponent; level 5, seed 1034, S = 20.
+The privileged twin of `embodied-olympics-match-badminton-match-i04-realtime`: singles badminton on a 0.4-scale court (BWF Laws, one game to 11): Franka Panda with a racket on a gantry base against the scripted opponent; level 5, seed 1034, S = 20.
 
 ## Difficulty
 Same frozen sport and instance as the twin; full-simulator development and the full state instead of camera images.
@@ -25,7 +25,7 @@ state).
 Separate verifier without network; root-owned trusted source, the program as nobody (a process limit; every process
 of nobody is ended with kill(-1) before the verdict, and a survivor is the program's 0, never a retry), the original
 realtime service on the wall clock at S = 20 (the verdict depends on the host's speed, as in the
-standard-realtime twin: the verifier runs on 4 pinned CPUs, part of the configuration key), one
+realtime twin: the verifier runs on 4 pinned CPUs, part of the configuration key), one
 fresh journal replay, then the replay video (replay.mp4) from the record.
 
 ## Resources

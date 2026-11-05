@@ -107,7 +107,7 @@ the pad against the touched meshes, rendered to 240 x 320 RGB with a Taxim look-
   agent's rows stop after `max_rows` - 60 control steps (holds included), the final hold brings the episode to at most
   `max_control_steps`, and its recorded trajectory (the rows before that final hold, which a replay's settle repeats)
   stays within `max_rows`, so the privileged CLI replays it.
-- Modes: privileged and standard. No standard-realtime twins: the tasks are static (nothing moves until the robot moves
+- Modes: privileged and standard. No realtime twins: the tasks are static (nothing moves until the robot moves
   it), and the simulator steps at 1-23 control steps per second, below the 60 Hz control rate a real-time clock would
   need it to keep.
 

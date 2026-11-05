@@ -1,5 +1,5 @@
 """Badminton singles at the LOW level: the privileged twin of
-embodied-olympics-match-badminton-matchlow-i01-standard-realtime (the agent's own act skill in the loop; level 2, seed 8,
+embodied-olympics-match-badminton-matchlow-i01-realtime (the agent's own act skill in the loop; level 2, seed 8,
 S = 20, 14400 s). The task's own adapter of the generic full-simulator setting (tools/fullsim). The robot, its limits,
 the low-level command set and the opponent are the twin's; only the skill-server plumbing (RCB_SKILL_INLOOP_*: the
 simulator calling the agent's act.py over TCP) is replaced: the program returns the low-level commands itself

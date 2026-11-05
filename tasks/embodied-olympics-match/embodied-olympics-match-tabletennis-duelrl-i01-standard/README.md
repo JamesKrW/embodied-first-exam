@@ -15,7 +15,7 @@
 Table tennis against a built-in opponent player (seat B, builtin_players:RLOpponentV2), program play: robot table tennis in a continuous world slowed by a factor S (MuJoCo Franka Panda + paddle on an x-y rail base behind the end line, both held to the real robot's limits: the Panda's joint velocity, acceleration, jerk, torque and torque rate, the rail's speed, acceleration and jerk; DeepMind ball and table model), seen only through two cameras of four frames each; one game to 5 points (lead by 2 from 4:4, at 6:6 the next point wins); the players' robots serve by the ITTF service laws (a toss device on the robot projects the ball at least 16 cm up from a point you choose behind your end line, you strike it as it falls; 2 serves each, from 4:4 one each); format match: you against a scripted opponent (level 1-4; you serve first), format duel: two players.
 
 ## Difficulty
-Frozen development instance: seed 8, a built-in opponent, in lockstep (its standard-realtime twin: S = 10). Not one of
+Frozen development instance: seed 8, a built-in opponent, in lockstep (its realtime twin: S = 10). Not one of
 the sport's official (hidden) seeds, so results here are previews, not official Embodied Olympics results.
 
 ## Reference solution
@@ -48,4 +48,4 @@ Source: Embodied Olympics task `tabletennis-duel-wallclock-program-standard`, re
 opponent, the observation, the review between points and the grader are ours, unchanged; only the seat is
 unmetered (Harbor records the model's usage) and the instance is frozen.
 
-Standard twin of `embodied-olympics-match-tabletennis-duelrl-i01-standard-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).
+Standard twin of `embodied-olympics-match-tabletennis-duelrl-i01-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).

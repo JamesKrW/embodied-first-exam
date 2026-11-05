@@ -12,10 +12,10 @@
 | Base image | `ghcr.io/mll-lab-nu/efe:embodied-olympics-match-0.1.0@sha256:99255569bf68bcf27f4e4867b58bad55c1d54fe73281920882e97c310836b6c7` |
 
 ## Task
-Win one complete match against the frozen sport's scripted L4 opponent, seed 34: the same frozen instance as `embodied-olympics-match-tabletennis-match-i04-standard-realtime` (its standard-realtime twin; there you see only camera images).
+Win one complete match against the frozen sport's scripted L4 opponent, seed 34: the same frozen instance as `embodied-olympics-match-tabletennis-match-i04-realtime` (its realtime twin; there you see only camera images).
 
 ## Difficulty
-Same frozen sport and instance as `embodied-olympics-match-tabletennis-match-i04-standard-realtime`: scripted level 4, seed 34; full-simulator
+Same frozen sport and instance as `embodied-olympics-match-tabletennis-match-i04-realtime`: scripted level 4, seed 34; full-simulator
 development and the full state instead of camera images.
 
 ## Reference solution
@@ -27,7 +27,7 @@ Separate no-network verifier; root-owned trusted source (unreadable to the progr
 public read-only copy of the full simulator (`/opt/dev`), the original core clock at S = 10, one fresh-process journal
 replay (the original service's own) that must agree with the live match, then the replay video (`replay.mp4`, after
 the verdict). The match ends as in the twin: over, or unfinished at 7200 s. The verdict of this live,
-closed-loop match depends on the verifier host's speed, as for the standard-realtime twin: the verifier's CPUs are
+closed-loop match depends on the verifier host's speed, as for the realtime twin: the verifier's CPUs are
 pinned (4, minimum = cap). If any process of the program's user survives the end of the match, the trial
 is the program's 0 (never a win, never a retry).
 

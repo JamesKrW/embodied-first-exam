@@ -15,7 +15,7 @@
 Foosball against the scripted opponent (level 3), program play: table football on a physical table: you drive the four motorised rods of one team (goalkeeper rod with 3 figures, 2-rod 2, 5-rod 5, 3-rod 3) by slide and angle targets that the motors follow along a speed- and acceleration-limited path, and see the table only through an overhead camera; one game to 5 goals under the ITSF rules (opening sequence, possession time limits per rod, no spinning); in the `match` format the other team is a scripted computer team, in the `duel` format another player.
 
 ## Difficulty
-Frozen development instance: seed 7, level 3, in lockstep (its standard-realtime twin: S = 20). Not one of
+Frozen development instance: seed 7, level 3, in lockstep (its realtime twin: S = 20). Not one of
 the sport's official (hidden) seeds, so results here are previews, not official Embodied Olympics results.
 
 ## Reference solution
@@ -48,4 +48,4 @@ Source: Embodied Olympics task `foosball-match-wallclock-program-standard`, revi
 opponent, the observation, the review between points and the grader are ours, unchanged; only the seat is
 unmetered (Harbor records the model's usage) and the instance is frozen.
 
-Standard twin of `embodied-olympics-match-foosball-match-i01-standard-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).
+Standard twin of `embodied-olympics-match-foosball-match-i01-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).

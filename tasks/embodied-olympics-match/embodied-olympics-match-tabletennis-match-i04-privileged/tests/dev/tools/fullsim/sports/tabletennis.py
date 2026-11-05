@@ -1,4 +1,4 @@
-"""The privileged twin of the exported table-tennis match (embodied-olympics-match-tabletennis-match-i04-standard-realtime).
+"""The privileged twin of the exported table-tennis match (embodied-olympics-match-tabletennis-match-i04-realtime).
 
 Adapter of the generic full-simulator setting (tools/fullsim): the frozen sport (sports/tabletennis, its `match`
 format against the scripted opponent), its frozen instance (level 4, seed 34, S = 10, cutoff 7200 s), and the declared

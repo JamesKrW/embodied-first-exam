@@ -1,6 +1,6 @@
 # Full-simulator program task: table tennis duel, seed 8, seat B the built-in RL opponent
 
-The development source at `/opt/fullsim` is complete and CPU-only: the frozen simulator of `embodied-olympics-match-tabletennis-duelrl-i01-standard-realtime` (this task's
+The development source at `/opt/fullsim` is complete and CPU-only: the frozen simulator of `embodied-olympics-match-tabletennis-duelrl-i01-realtime` (this task's
 camera-only twin), its referee and its built-in RL opponent (seat B). No GPU, renderer or simulator service is needed. Run the
 commands inside the task's agent container from `/app`.
 

@@ -13,7 +13,7 @@
 
 ## Task
 Win one complete match against the platform's G1 at level 4 (the BOSS), seed 4: the same frozen instance as
-`embodied-olympics-match-tabletennisg1-matchcpu-i01-standard-realtime` and its standard twin, with the full simulator in development and the full state (the ball's true state, both
+`embodied-olympics-match-tabletennisg1-matchcpu-i01-realtime` and its standard twin, with the full simulator in development and the full state (the ball's true state, both
 robots) in every view. The benchmark README (G1 table tennis) has the port and the oracle runs.
 
 ## Difficulty

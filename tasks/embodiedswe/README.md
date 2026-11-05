@@ -10,7 +10,7 @@ packing-egg-carton, packing-tool-packing, puzzle-stack-blocks) and five in privi
 assembly-pc-gpu-ram, puzzle-coffee, puzzle-spatula, puzzle-syringe-bimanual).
 Each is in privileged mode (`task_type = "policy"`) and, as `<task>-standard`, in standard mode
 (`task_type = "trajectory"`, "Standard mode" below);
-all 24 scenes are static, so there is no standard-realtime mode.
+all 24 scenes are static, so there is no realtime mode.
 
 | Task | Preset | Robot |
 |---|---|---|

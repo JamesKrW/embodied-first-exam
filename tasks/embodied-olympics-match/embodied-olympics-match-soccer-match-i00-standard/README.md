@@ -15,7 +15,7 @@
 Robot soccer 2 v 2 against the scripted opponent (level 2), program play: robot soccer 2 v 2 under the RoboCup Humanoid Soccer League rules: four simulated Booster T1 humanoids (lower bodies on the released walking policy, held to the real robot's joint limits) and one ball on a boarded 10 x 7 m pitch with two goals, two halves of 5 minutes of game time, a penalty shoot-out when level; each robot takes a walk velocity command, stand or a swing-leg kick, and you see the game only through your robots' head cameras; in the `match` format you command both robots of team A against a scripted team, in the `duel` format another player commands team B, in the `team` format each robot has its own player and teammates talk only through the team channel, in the `team_match` format each robot of team A has its own player against the scripted team; `match_overhead` and `duel_overhead` are match and duel seen through fixed overhead cameras instead of the head cameras.
 
 ## Difficulty
-Frozen development instance: seed 7, level 2, in lockstep (its standard-realtime twin: S = 5). Not one of
+Frozen development instance: seed 7, level 2, in lockstep (its realtime twin: S = 5). Not one of
 the sport's official (hidden) seeds, so results here are previews, not official Embodied Olympics results.
 
 ## Reference solution
@@ -48,4 +48,4 @@ Source: Embodied Olympics task `soccer-match-wallclock-program-standard`, revisi
 opponent, the observation, the review between points and the grader are ours, unchanged; only the seat is
 unmetered (Harbor records the model's usage) and the instance is frozen.
 
-Standard twin of `embodied-olympics-match-soccer-match-i00-standard-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).
+Standard twin of `embodied-olympics-match-soccer-match-i00-realtime`: the same export, the world in lockstep (`environment/sim/core/lockstep.py`; `eai-standard-lockstep/1.0` in tasks/embodied-olympics-match/README.md).
