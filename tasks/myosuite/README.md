@@ -1,8 +1,8 @@
 # MyoSuite
 
 Twenty-two [MyoSuite](https://github.com/MyoHub/myosuite) tasks (2.12.2, Apache-2.0) on MuJoCo 3.6.0, CPU only, in both
-modes: 44 task directories, `tasks/myosuite/myosuite-<family>-i00-{privileged,standard}`, and one standard-realtime twin
-(`tasks/myosuite/myosuite-table-tennis-i00-standard-realtime`: table_tennis is the benchmark's one dynamic family). The robot is a musculoskeletal model of a
+modes: 44 task directories, `tasks/myosuite/myosuite-<family>-i00-{privileged,standard}`, and one realtime twin
+(`tasks/myosuite/myosuite-table-tennis-i00-realtime`: table_tennis is the benchmark's one dynamic family). The robot is a musculoskeletal model of a
 human body: the MyoHand (forearm and hand, 39 muscles), the MyoArm (34 or 63 muscles), MyoSuite's torso-and-arm table
 tennis player, the MyoArm next to a prosthetic MPL arm, and the MyoLegs (with or without a prosthetic leg). The main
 command is **one excitation per muscle** (a few families add non-muscle actuators: a positioned wrist, a sliding pelvis,
@@ -108,8 +108,12 @@ locomotion challenges and by hand_pose); elbow and finger pose / reach (near-dup
 - **Privileged:** `rcb_myosuite.Session` in the agent's container: reset, the task's observation dict, MuJoCo model and
   data, actuator descriptions and moment arms, rendering, recording and self-replay. Deliverable
   `/app/output/trajectory.npz`, `(T, nu)` actuator commands, one row per control step. `tests/grade.py` checks the
-  file (readable, `(T, nu)` for this instance's `nu`, at most 1,000,000 rows, finite: otherwise `bad_trajectory`, the
-  agent's 0) before it replays it; a replay process that then gives no result (out of time, killed, not started) is
+  file (readable, `(T, nu)` for this instance's `nu`, finite, at most the family's row limit, which its instruction
+  states: 360 s of replay at the family's stated rate, 108,000 rows for table tennis and MyoDex airplane to 864,000 for
+  pen twirl, and no `.npz` entry larger than those rows unpack to; otherwise `bad_trajectory`, the agent's 0) before it
+  replays it. Each of the two grading replays may take 780 s (the longest legal trajectory at half its family's stated
+  rate, plus the start), so both fit in the verifier's 1800 s; the video replay runs after the verdict only in the time
+  left (none when under 60 s remain). A replay process that then gives no result (out of time, killed, not started) is
   `replay_failed` with `grader_error = 1` and `infra_error = 1`, never the agent's 0, and every `reward.json` carries
   `infra_error`.
 - **Standard (`eai-standard/2.2`):** the shared layer of `embodied_first_exam/standard/` and the adapter
@@ -249,8 +253,8 @@ that score 0; an apple_lift trajectory that leaves the apple on the table scores
 - Determinism of set 3 before building: three replays in one process and one in a fresh process gave the same final
   state for random action sequences in every family.
 
-## Standard-realtime (`eai-standard/2.3`)
-The dynamic families (PROTOCOL §2: each task's `[metadata] dynamics`) get a `-standard-realtime` twin. In MyoSuite that is **table_tennis** only (the ball is served at 5.6 m/s at reset;
+## Realtime (`eai-standard/2.3`)
+The dynamic families (PROTOCOL §2: each task's `[metadata] dynamics`) get a `-realtime` twin. In MyoSuite that is **table_tennis** only (the ball is served at 5.6 m/s at reset;
 every other family's objects start at rest, and chase_tag's opponent stands still in its frozen instance).
 - **Service.** The shared realtime layer of HumanoidBench, BiGym 2.0 and Embodied Olympics - Fun, unchanged
   (`rcb_realtime.py` and `rcb_client.py` from `embodied_first_exam/standard/realtime/`; `rcb_service.py` and `grade.py`,
@@ -271,12 +275,12 @@ every other family's objects start at rest, and chase_tag's opponent stands stil
   out; PROTOCOL §2's S = ceil(1.5 / 2.08) = 1. At S = 1 a
   controller at the control rate (`cameras=[]`) with a camera image every 0.25 s ran 11 episodes (10 resets) with no
   stall and a largest lag of 0.23 s. An episode that does nothing ends after 121 control steps (1.21 s): the serve
-  passes. The reset budget is the mode's default, 10; a reset takes about 1 s (MyoSuite's env reset).
+  passes. The reset budget is 10 (this benchmark's choice; the mode's default is 0); a reset takes about 1 s (MyoSuite's env reset).
 - **Checked at S = 1**: a successful privileged episode (82 rows) planned from step 0 in one `submit(..., at=0)`
   succeeds live (no stall), and streamed one row per call too; nop (no request) ends `timeout`, not graded a success.
   The cutoff is the standard twin's (3600 s).
 
-## Grading (standard and standard-realtime)
+## Grading (standard and realtime)
 The verdict is the live episode's (PROTOCOL H.4): `success` = the last episode
 the sim service ran ended in success under the task's rule, as `Session.step` applied it to the steps it executed. The
 rule's windows are part of that predicate, so nothing is left for a replay to add: `hold` families end in success only
@@ -291,7 +295,7 @@ only after the whole reference with the on-track share, the final step and the w
   nothing and decides nothing; a render that fails or runs out of the hook's time (`RCB_COLLECT_BUDGET_S` = 1800 s,
   less the end of the episode, less a minute) loses only the video (`video` = false), never infra and never a 0.
   `tests/grade.py`: pass iff `graded_by` = `live`, `success`, and no infrastructure flag.
-- **Standard-realtime** (the twin's `environment/sim/`): the shared layer writes the same fields from the adapter's step() and
+- **Realtime** (the twin's `environment/sim/`): the shared layer writes the same fields from the adapter's step() and
   renders the video from the trajectory after the verdict; `server.py` has no `verify()` and no `live_verdict()` (no
   extra window to apply). The collect hook waits 300 s for the verdict and for the video until 870 s.
 - **Start state.** At a fresh episode's start the service compares the built scene's state hash with the frozen
@@ -307,8 +311,13 @@ only after the whole reference with the on-track share, the final step and the w
   GPU is for the agent's images.
 
 ## Files
-Each task directory carries its tooling (`rcb_myosuite.py`), its frozen instance (`instance.npz`) and, where the family
-has one, its reference solution (`solution/`); the standard-realtime twin's service is its `environment/sim/server.py`.
+Each task directory carries its frozen instance (`instance.npz`: the privileged task's `environment/` and `tests/`, a
+standard or realtime twin's `environment/sim/`) and, where the family has one, its reference solution (`solution/`); a
+standard twin also carries its service settings (`environment/sim/task.json`), the realtime twin its own service
+(`environment/sim/server.py`). The shared code (the tool `rcb_myosuite.py`, the graders, the standard service
+`server.py` with `video.py`, `finalize.sh`, the realtime twin's `rcb_service.py` and `task.json`) is in
+`embodied_first_exam/benchmarks/myosuite/`; the task Dockerfiles copy it by digest from the files-only image
+`efe:myosuite-files-<images/myosuite-files/VERSION>` (`images/myosuite-files/FILES.json`). Base image:
 `images/myosuite/` (Dockerfile, VERSION). The task directories are the deliverable; the tooling that built them is kept
 outside this repository.
 

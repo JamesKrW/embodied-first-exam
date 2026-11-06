@@ -1,4 +1,4 @@
-# Embodied First Exam — Task Protocol v2.1
+# Embodied First Exam — Task Protocol v2.3
 
 This is the task protocol of Embodied First Exam (EFE; [repository](https://github.com/mll-lab-nu/embodied-first-exam),
 [site](https://www.embodied-first-exam.ai), [how to contribute](https://www.embodied-first-exam.ai/contribute/)). It is
@@ -56,8 +56,9 @@ configuration (`config_key`; running.md "Results").
 |---|---|---|
 | Modes offered (§3): any subset; a task without its privileged twin says why in its README Twin row | the task directories it ships | — |
 | Cutoff: the agent's wall-clock time, decided by the task's author | `[agent] timeout_sec` (a whole number of seconds) | 3600 s; at most 14400 s; equal in a task's privileged and standard versions (H.7) |
-| Reset budget N (standard modes) | the `sim` service's `RCB_RESET_BUDGET` default (`/spec.budget.reset`), the instruction | standard 0; standard-realtime 10 |
-| Slowdown S (standard-realtime) | the `sim` service's `RCB_SLOWDOWN` default (`/spec.timing.slowdown`), the instruction (`S = <S>`) | S = 1 when the service's real-time factor is ≥ 3, else ⌈1.5 / RTF⌉ |
+| Reset budget N (standard modes) | the `sim` service's `RCB_RESET_BUDGET` default (`/spec.budget.reset`), the instruction | 0 in both standard and realtime (a task that grants resets declares its own N) |
+| Agent-ended episode and its step limit (standard mode, optional, §3) | the `sim` service's `RCB_AGENT_END` and `RCB_STEP_LIMIT` (`/spec.success_signal`, `/spec.budget.steps`), the instruction's `## Episode end` (rendered by `normalize`) | off: the service ends the episode, no step limit |
+| Slowdown S (realtime) | the `sim` service's `RCB_SLOWDOWN` default (`/spec.timing.slowdown`), the instruction (`S = <S>`) | S = 1 when the service's real-time factor is ≥ 3, else ⌈1.5 / RTF⌉ |
 | Observation and action extensions | `/spec`, the instruction, the benchmark doc | the `eai-standard` core |
 | Grading kind | the instruction, the frozen instance, `reward.json` (`replays`, `graded_by_live`) | privileged: two fresh replays, or one by the task's choice; standard modes: the live episode (H.4) |
 | Seeds | `[metadata] instance_seed` (the default seed); `[metadata.seeds]` `allowed` (list, `{from, to}`, `"any"`), `oracle`, `build`, only where they differ from the defaults | the default seed only (`allowed` = `oracle` = [the default seed], `oracle` = [] without a reference solution; `build = "frozen"`) |
@@ -78,10 +79,22 @@ infrastructure, a reference implementation, one benchmark using it, CI support t
 - **standard** (`-standard`; `eai-standard/2.1`, `2.2`, `2.4`): robot as a service. The simulator runs
   in a `sim` sidecar the agent cannot open; the agent sends actions and receives images and proprioception through the
   shipped client (`rcb_client.py`, `rcb1.py`); resets within the declared budget; no step caps, the wall clock is the
-  only hard budget. Graded by the live episode the sidecar ran (H.4).
-- **standard-realtime** (`-standard-realtime`; `eai-standard/2.3`): standard mode on a clock that does not stop: once
+  only hard budget (unless the task's episodes are agent-ended with a step limit, below). Graded by the live episode the
+  sidecar ran (H.4).
+- **realtime** (`-realtime`; `eai-standard/2.3`): standard mode on a clock that does not stop: once
   an episode starts the robot runs at 1/S of real speed whatever the agent does, holds its last targets while the agent
   thinks, and is driven by a program in the agent's own container.
+- **Agent-ended episodes** (optional; standard mode, `eai-standard/2.2` services; any task may opt in, standard_mode.md
+  "Optional agent-ended episodes"). The service never tells the agent whether it has succeeded and a success does not
+  end the episode; the agent ends it with `POST /finish`. A task may add a step limit, a number of its own control steps
+  stated in its instruction. The episode ends at whichever comes first: `/finish`, the step limit, the agent's time
+  limit (its cutoff, §2), its token budget (the run's, running.md "Official runs"), the agent's own exit, or the task's
+  failure rule or a simulator error as without the feature. The verdict is the task's success rule on the state at that
+  end, with the task's settle or hold window run from there; a success reached and undone is 0, a success the task
+  latches as an event stays. The instruction states the three limits with their values (`## Episode end`, rendered by
+  `normalize` from the task's step limit and the run's token budget; the time limit is `## Time limit`). `final.json`
+  records `ended_by` (`finish`, `step_limit`, `session_end`: the time limit, the token budget or the agent's exit, which
+  the runner's record tells apart; `failed`, `error`) and the counters (`steps_used`, `finish_time_s`).
 - A benchmark with its own runtime may export tasks that keep it (`metadata.protocol` = its own, listed in
   `ci_checks/benchmarks/<bench>/exported.toml`); they are plain Harbor tasks, Appendix H applies to them unchanged, and their results
   are reported apart.
@@ -98,7 +111,7 @@ filming at the budget instead: the motion goes on, its last frame is always take
 sent, not the budget. Building a response holds the captured frames plus one response body (the frames are written
 once into it, a part the response drops is let go of first, and per-frame depth is compressed only while it
 still fits), and the service's memory cap covers the largest
-response the budget allows (§6). In standard-realtime mode the pending watches and the answers not yet sent count
+response the budget allows (§6). In realtime mode the pending watches and the answers not yet sent count
 against one budget together: a watch that would exceed it, or that would make more than 8 watches and unsent answers
 outstanding, is refused (429, nothing ran); a submit or an observation of the present (no watch) is never refused for its
 images: past the budget its answer comes without its frames and `meta["frames_skipped"]` is set.
@@ -114,7 +127,7 @@ images: past the budget its answer comes without its frames and `meta["frames_sk
 | A simulator error is a failure: an episode that ended in `error`, or in which the simulator raised an error on the agent's actions, scores 0 (`success = 0`, `sim_error = 1`) whatever it had reached before, and is the agent's result, not an infrastructure failure (unless the service records `infra_error = 1`: the agent had not acted yet) | `check-live-verdict.py` |
 | `nop` scores 0; with `oracle = "full"` the oracle scores 1 on every seed in `seeds.oracle` (`/validate`); a task without an oracle gets a human review (a positive example, the predicate, `nop` 0, determinism; recorded in the PR) | the `validated` marker (§2) |
 | Results report success with cost (tokens, money, turns, wall clock, simulation steps) per mode and per comparable configuration, and in the standard modes the first-attempt success (`first_success`, the no-reset performance) beside the graded result; run id `<harness>-<model>-<effort>`; not committed to the repository | running.md |
-| The core set: the tasks listed in [`core_set.toml`](../core_set.toml), one entry per task (`task`, the task dir name without its mode suffix) with its `default_mode`. The headline statistics are computed on the core tasks in their default mode; the same tasks may be run in another mode (`--privileged` / `--standard` / `--standard-realtime`), reported apart. Two sets run: `core` (`harbor run -d embodied-first-exam`) and `all`, every task dir (`harbor run -d embodied-first-exam@all`; `-p tasks/<benchmark>` narrows either to one benchmark). Each result records `set` (`core` / `excluded`) as a marker, never part of the configuration. Listing a task changes none of its files | `task_conventions.py core-set --check` |
+| The core set: the tasks listed in [`core_set.toml`](../core_set.toml), one entry per task (`task`, the task dir name without its mode suffix) with its `default_mode`. The headline statistics are computed on the core tasks in their default mode; the same tasks may be run in another mode (`--privileged` / `--standard` / `--realtime`), reported apart. Two sets run: `core` (`harbor run -d embodied-first-exam`) and `all`, every task dir (`harbor run -d embodied-first-exam@all`; `-p tasks/<benchmark>` narrows either to one benchmark). Each result records `set` (`core` / `excluded`) as a marker, never part of the configuration. Listing a task changes none of its files | `task_conventions.py core-set --check` |
 
 ## 5. Instructions and information
 
@@ -224,7 +237,10 @@ fields: running.md "Resources".
 
 ## 7. Versions
 
-This text is **v2.1**; like the wire protocol's, its minor versions only add (a recommended field, evidence). A
+This text is **v2.3** (2.3 renamed the third mode `standard-realtime` to `realtime`, its task directories
+`<base>-realtime`, with no other change to the mode, and made its default reset budget 0 as in standard mode; 2.2 added
+the optional agent-ended episodes of §3); like the wire protocol's, its minor versions otherwise
+only add (a recommended field, an optional feature, evidence). A
 result's `config.json` records `protocol_version`: `PROTOCOL_VERSION` in `scripts/task_conventions.py` of the checkout
 that writes the result (`"legacy"` for a trial of another version of the task), one of the keys results are compared
 by (`CONFIG_KEYS`, running.md "Results"). The wire protocol's versions:
@@ -234,7 +250,7 @@ bounds; shared layer `embodied_first_exam/standard/`), 2.3 (2.2 + realtime), 2.4
 an issue, then one pull request updating standard_mode.md, the reference implementation and an example task.
 In this version a task declares its open egress only as `[agent] network_mode = "public"`, its reset budget and S only
 in its `sim` service, and its default seed as `[metadata] instance_seed`; CI fails a task.toml with `[metadata] network`
-(H.6), and a standard-realtime task's with `[metadata]` `reset_budget` or `slowdown`, and warns on these and `mode`
+(H.6), and a realtime task's with `[metadata]` `reset_budget` or `slowdown`, and warns on these and `mode`
 elsewhere; `normalize` rewrites such a task into this form.
 
 ## Appendix H. Invariants (binding)
@@ -269,7 +285,7 @@ recorded demonstrations and policies trained for the task are scrubbed from imag
 the README and `tasks/<benchmark>/README.md`. *CI:* `check-agent-pointers.py`, each benchmark's `ci_checks/benchmarks/<bench>/invariant-*`
 hooks; images are reviewed when built ([leakage.md](leakage.md)).
 
-**H.3 Standard trust boundary** (standard and standard-realtime). The simulator, the scene, the frozen instance, the
+**H.3 Standard trust boundary** (standard and realtime). The simulator, the scene, the frozen instance, the
 seed and the success predicate run in the `sim` sidecar; the agent's image holds no simulator or simulation code
 (`environment/Dockerfile` copies nothing from `sim/`, no `.` or wildcard). The agent reaches the service only through
 the protocol's endpoints; every other path is 404 (no `/state`, no `/success`). The service exposes no object poses,
@@ -279,7 +295,7 @@ agent's controller runs in the agent's own container; no agent code runs next to
 `check-standard-agent-image.sh`, `check-verifier-isolation.sh` (topology, ports); the service's `/spec` checks; review.
 
 **H.4 Trusted verdict.** The verdict comes only from a trusted source. Privileged: a replay, in a fresh process, of
-the agent's deliverable from the frozen initial state, in the verifier. Standard and standard-realtime: the sim
+the agent's deliverable from the frozen initial state, in the verifier. Standard and realtime: the sim
 sidecar's record of the live episode (`final.json`, its `success`), judged by the service on the episode it ran, from a
 frozen initial state it checked when the episode began (and after every reset), and the verifier transcribes the
 record; no replay decides it, and nothing the verifier renders afterwards (a video) does. What keeps that record
@@ -294,10 +310,12 @@ a trial is never rewritten (a later re-grade keeps the original beside it). The 
 sidecar grades against and the one the trial ran from are byte-identical copies.
 *CI:* `check-verifier-isolation.sh` (evidence and collect hook from a sidecar), `check-instance-copies.sh`.
 
-**H.5 Infrastructure retry.** Infrastructure failures allow at most one full retry with the same instance, seed, and
-configuration, clearing all agent and environment state. If that retry also fails, follow the default failure-handling
-behavior; no further retries. Normal task failures do not qualify. (At most two runs of a task under one run id; the
-voided attempt is moved aside and never counted. The rule is the runner's: `scripts/retry_policy.py`, running.md.)
+**H.5 Infrastructure rerun.** An attempt that failed for infrastructure reasons, with positive evidence of it (a model
+API or account error, a usage limit, a host or launch that died, the verifier's `infra_error` / `grader_error`), is
+void: it is moved aside, never counted, and the task may be rerun with the same instance, seed, and configuration,
+clearing all agent and environment state, until an attempt gives a result. A graded failure (the agent's 0, its cutoff,
+its token budget, its own end) is a result and is never rerun; nor is a success. (The rule is the runner's:
+`scripts/retry_policy.py`, running.md.)
 *CI:* `scripts/tests/test_retry_policy.py`, `scripts/tests/test_runner_results.py`.
 
 **H.6 Egress.** During the agent phase the agent's container, and every service in its network namespace, reaches only
@@ -308,10 +326,13 @@ host list). The runner applies what the task declares; open-network results are 
 The verifier has no network (`[verifier] network_mode = "no-network"` in every task, written by `normalize`; no service
 of `tests/docker-compose.yaml` with a network setting other than `none`). *CI:* `check-verifier-isolation.sh`.
 
-**H.7 Comparable twins.** Where a task ships both a privileged and a standard (or standard-realtime) version, they
+**H.7 Comparable twins.** Where a task ships both a privileged and a standard (or realtime) version, they
 share one frozen instance (byte-identical copies), one success rule and the same seeds (`instance_seed`, and
 `[metadata.seeds]` `allowed` and `build`), and the privileged and standard versions have the same cutoff (`same_cutoff_as` in the mode registry).
 *CI:* `check-twins.py`, `check-instance-copies.sh`.
+One success rule is not one length rule: where a privileged deliverable has an action or time limit its standard twin
+does not, the suite's `tasks/<benchmark>/README.md` states both, and cross-mode comparisons of those twins are read
+with that in mind.
 
 **H.8 DIGEST.** `tasks/<benchmark>/<task>/DIGEST` is the digest Harbor publishes the task under (`sha256:<hex>` over the relative
 path and content hash of `task.toml`, `instruction.md`, `README.md` and every file under `environment/`, `tests/`,

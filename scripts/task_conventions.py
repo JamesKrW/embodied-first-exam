@@ -107,9 +107,10 @@ BENCHMARK_TABLE = [
     ("autobio-", "AutoBio", "autobio"),
     ("abc-sim-", "ABC Sim", "abc-sim"),
     ("embodiedswe-", "EmbodiedSWE", "embodiedswe"),
+    ("humanclaw-", "HumanCLAW", "humanclaw"),  # find / navigate / sit with a simulated human body (HumanClawBench)
 ]
 BENCHMARKS = [(p, label) for p, label, _ in BENCHMARK_TABLE]   # (directory prefix, label): the first matching prefix wins
-# Modes (PROTOCOL §3): a benchmark ships any subset of the modes. A standard or standard-realtime
+# Modes (PROTOCOL §3): a benchmark ships any subset of the modes. A standard or realtime
 # task without a privileged twin says why in its README's Twin row ("— (none: ...)"), the task's own declaration:
 # no_twin_reason() reads it back, so no list of such tasks is kept here.
 # Embodied Olympics' exported tasks (PROTOCOL §3) have a cutoff note of their own (CUTOFF_NOTE_TASK below): the
@@ -148,7 +149,7 @@ MODE_REGISTRY = {
     "standard": {"short": "S", "section": "§3", "sidecar": True, "limit_scope": "agent",
                  "protocols": ("eai-standard/2.1", "eai-standard/2.2", "eai-standard/2.4"),
                  "twin": "privileged", "same_cutoff_as": "privileged"},   # one cutoff for both modes (Appendix H.7)
-    "standard-realtime": {"short": "RT", "section": "§3", "sidecar": True, "limit_scope": "agent",
+    "realtime": {"short": "RT", "section": "§3", "sidecar": True, "limit_scope": "agent",
                           "protocols": ("eai-standard/2.3",), "twin": "privileged", "same_cutoff_as": None},
 }
 MODES = tuple(MODE_REGISTRY)
@@ -164,7 +165,7 @@ DROP_ROWS = {"simulator / robot", "family / instance", "base image"}   # header 
 # PROTOCOL §6: the resource caps of every task, as rules (scripts/task_resources.toml); normalize writes them where
 # Harbor and docker read them (normalize_resources, images/monitor/rcb_monitor/inject.py)
 RESOURCES_FILE = Path(__file__).resolve().parent / "task_resources.toml"
-# PROTOCOL §2: a standard-realtime task's slowdown S is its sim service's `RCB_SLOWDOWN` default
+# PROTOCOL §2: a realtime task's slowdown S is its sim service's `RCB_SLOWDOWN` default
 # (environment/docker-compose.yaml), its reset budget the `RCB_RESET_BUDGET` default there; task.toml keeps no copy of
 # either (ci_checks/check-realtime.py)
 SLOWDOWN_RE = re.compile(r'RCB_SLOWDOWN:\s*"?\$\{RCB_SLOWDOWN:-([0-9.]+)\}"?')
@@ -227,14 +228,12 @@ _CUTOFF_CLOCK = (" Your session started when you received this task. `/run/rcb-l
                  "seconds, gives the time left on this limit (`time_left_s`) and its end (`deadline_utc`), counted from a "
                  "little before your session started, so it never gives you more time than you have: read it (or run "
                  "`date`) before you decide that time is short, never guess.")
-# Agents that keep a simulator open as an interactive REPL send each command with Codex's
-# write_stdin(yield_time_ms=30000); Codex 0.160.1 returns from a write to a still-running process only when the
-# yield is over (196 of 196 such calls in one recorded RoboARC trial took 30.0 s; ~98 min of a 3 h budget), and has no
-# config knob to cap it (background_terminal_max_timeout caps only empty polls). Harness-neutral advice, same text for
-# every agent; no duration in it (ci_checks/check-cutoffs.py).
+# A tool call that writes to a still-running process can return only when its wait is over, even when the answer is
+# printed at once (one recorded trial lost ~98 min of a 3 h budget that way). Harness-neutral advice, same text for
+# every agent, naming no harness or tool parameter; no duration in it (ci_checks/check-cutoffs.py).
 _CUTOFF_WAITS = (" Waiting counts too: a tool call that sends input to a process that keeps running (an interactive "
-                 "interpreter, a simulator loop, a server) can wait for the whole wait or yield time you give it (for "
-                 "example Codex's `yield_time_ms`) even when the answer is printed at once, so give such calls a short "
+                 "interpreter, a simulator loop, a server) can wait for the whole wait or yield time you give it even "
+                 "when the answer is printed at once, so give such calls a short "
                  "wait and poll again if the output is not complete, or run one-shot scripts that exit when they are "
                  "done.")
 CUTOFF_NOTE = {
@@ -248,7 +247,7 @@ CUTOFF_NOTE = {
                  "it never runs out before your time does: your real time left is `time_left_s` minus the time you "
                  "spent before that request. Plan by it." + _CUTOFF_CLOCK + _CUTOFF_WAITS + _CUTOFF_CLOSE),
 }
-CUTOFF_NOTE["standard-realtime"] = CUTOFF_NOTE["standard"]
+CUTOFF_NOTE["realtime"] = CUTOFF_NOTE["standard"]
 assert set(CUTOFF_NOTE) == set(MODE_REGISTRY), "every mode of MODE_REGISTRY needs its CUTOFF_NOTE (PROTOCOL §5)"
 # A benchmark whose service counts the limit its own way has a note of its own (PROTOCOL §5).
 CUTOFF_NOTE_OWN = {}   # (benchmark label, mode) -> its note
@@ -287,7 +286,7 @@ def replace_words(s: str) -> str:
 
 
 # PROTOCOL §1, §3: each mode of MODE_REGISTRY is the whole suffix of its task directories. A mode is recognised by
-# its complete suffix only, longest first: `-standard-realtime` is never `-standard` (it does not end in it).
+# its complete suffix only, longest first: `-realtime` is never `-standard` (it does not end in it).
 MODES_LONGEST_FIRST = tuple(sorted(MODES, key=len, reverse=True))
 
 
@@ -305,7 +304,7 @@ def mode_of(task: Path) -> str:
 
 
 def base_of(task: Path) -> str:
-    """The name without its mode suffix (`-privileged`, `-standard`, `-standard-realtime`, ...; PROTOCOL §1)."""
+    """The name without its mode suffix (`-privileged`, `-standard`, `-realtime`, ...; PROTOCOL §1)."""
     mode = mode_suffix(task.name)
     return task.name[: -len(mode) - 1] if mode else task.name
 
@@ -907,7 +906,7 @@ def bench_has_mode(bench: str, mode: str) -> bool:
 
 
 def no_twin_reason(task: Path) -> str | None:
-    """Why a standard or standard-realtime task has no privileged twin `<base>-privileged` (PROTOCOL §3), as its
+    """Why a standard or realtime task has no privileged twin `<base>-privileged` (PROTOCOL §3), as its
     README's Twin row says it; None for a privileged task and for one that names its twin. The reason is the task's own
     declaration: its README's Twin row ("— (none: ...)"), kept by every render (the committed task's row when a
     task is rendered into a scratch directory); a benchmark without a privileged mode gets the generic reason. Whether
@@ -924,6 +923,92 @@ def no_twin_reason(task: Path) -> str | None:
     if bench and not bench_has_mode(bench, twin):
         return f"— (none: {bench} has no {twin} mode, PROTOCOL §2)"
     return None
+
+
+# PROTOCOL §3 "Agent-ended episodes" (optional, standard mode): a task opts in in its sim service's environment
+# (`RCB_AGENT_END: "1"`, and `RCB_STEP_LIMIT: "<N>"` for a step limit; embodied_first_exam/standard/agent_end/). Its
+# instruction then has `## Episode end` before `## External material`, rendered here (render_agent_end): what the agent
+# sees and does, what is graded, and the limits, of which only the step limit is the task's number. The token budget is
+# the official runs' (docs/protocol/running.md "Official runs"; scripts/run_agent_batch.sh TOKEN_BUDGET_IN / _OUT).
+AGENT_END_HEADING = "## Episode end"
+AGENT_END_RE = re.compile(r'^\s*RCB_AGENT_END:\s*"?1"?\s*(?:#.*)?$', re.M)
+STEP_LIMIT_RE = re.compile(r'^\s*RCB_STEP_LIMIT:\s*"?([0-9]+)"?\s*(?:#.*)?$', re.M)
+TOKEN_BUDGET = (10_000_000_000, 10_000_000_000)   # input, output tokens per trial: running.md "Official runs"
+AGENT_END_INTRO = (
+    "You end this task's episode, not a success. This section overrides anything above, and anything in `/spec`, that "
+    "says a success ends the episode, that `meta[\"reason\"]` can be `\"success\"`, or that a success refuses later calls "
+    "or resets.")
+AGENT_END_BULLETS = (
+    "The robot never tells you whether you have succeeded: reaching the goal changes no response, status, error or "
+    "counter, and the episode does not end there.",
+    "You decide when you are done: send `POST /finish` with an empty JSON body (`{}`) to the service, on the same base "
+    "URL as your other calls (`http://sim:8000` or `http://localhost:8000`; in Python, for example "
+    "`requests.post(base + \"/finish\", json={})`). The state at that moment is graded with the task's success rule (with "
+    "the task's settle or hold time described above, run from that state). After `/finish` every call is refused (409).",
+    "If you do not call it, the state when your session ends (you stop, or your time or token budget runs out) is graded.",
+    "A success reached earlier and then undone does not count: only the state at the end is graded. An event the task "
+    "records once it happens (for example a scored goal or a completed stage sequence) stays part of that state, also "
+    "when one of the task's failure rules ends the episode after it. Resets work as described above, within the budget, "
+    "and only the episode that ends with `/finish` or at the end of your session is graded.",
+    "The episode still ends on its own on a simulator error, at the task's step limit or technical step cap (graded as "
+    "it stands), and where the task's own rules end it as a failure (for example a fall), as described above.")
+AGENT_END_LIMITS = "**Limits.** The episode ends at whichever of these comes first, and the state at that moment is graded as above:"
+AGENT_END_STEP = (
+    "the step limit: **{n:,} steps**{unit}. `meta[\"control_steps\"]` counts the steps used so far; `meta[\"steps_left\"]` "
+    "and `/status` `steps_left` give what is left, `spec[\"max_control_steps\"]` the limit ({n}). At the {nth} step the "
+    "episode ends by itself (`meta[\"done\"]`, `meta[\"reason\"]` = `\"step_limit\"`; a chunk that reaches it stops "
+    "there); after it every `/submit` and `/finish` is refused (409). This overrides anything above, and anything in "
+    "`/spec`, that says there is no step budget, that the time limit is your only budget, or that the episode is capped "
+    "at another number of steps;")
+AGENT_END_TIME = "the time limit (`## Time limit`; `meta[\"time_left_s\"]` is the service's count of what is left);"
+AGENT_END_TOKENS = ("the token budget: {tin:,} input and {tout:,} output tokens of your model for the session (cached "
+                    "input counts in full, output includes reasoning): past it every model request is refused and your "
+                    "session ends;")
+AGENT_END_FINISH = "your `POST /finish`."
+# what one step is, in a benchmark's own terms (the limit's unit): (benchmark label) -> text after the number
+AGENT_END_STEP_UNIT = {
+    "RoboDojo": (
+        ", RoboDojo's own limit for this task (RoboDojo's evaluation ends a policy's episode after that many actions "
+        "[step_lim]). One step is one 25 Hz action: 1/25 s of simulated time (RoboDojo's 14-D action, run over 10 physics "
+        "steps), the unit RoboDojo's evaluator counts. Every call that moves simulated time on uses steps: a "
+        "`joint_position` row with `dt` = k/25 s uses k steps (dt = 0.04: one step per row); an `ee_pose` row uses as many "
+        "steps as its move takes at 0.25 m/s (at least one); `get_obs(seconds=s)` holds the robot for s x 25 steps. "
+        "`get_obs()` without `seconds`, `/spec`, `/status` and `/kinematics` use none"),
+}
+
+
+def agent_end_of(task: Path) -> dict | None:
+    """A standard-mode task's agent-ended episode (PROTOCOL §3): {"step_limit": N or None}, None when it does not opt
+    in (its sim service's RCB_AGENT_END, RCB_STEP_LIMIT)."""
+    if not MODE_REGISTRY.get(mode_of(task), {}).get("sidecar"):
+        return None
+    c = read_text(task / "environment/docker-compose.yaml") or ""
+    if not AGENT_END_RE.search(c):
+        return None
+    m = STEP_LIMIT_RE.search(c)
+    return {"step_limit": int(m.group(1)) if m else None}
+
+
+def _ordinal(n: int) -> str:
+    return f"{n:,}" + ("th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th"))
+
+
+def render_agent_end(task: Path) -> str | None:
+    """instruction.md's `## Episode end` for a task that opts in (agent_end_of), else None; wrapped at 120 columns."""
+    import textwrap
+    ae = agent_end_of(task)
+    if ae is None:
+        return None
+    n = ae["step_limit"]
+    def wrap(t: str, first: str = "", rest: str = "") -> str:      # never inside a code span
+        t = re.sub(r"`[^`]*`", lambda m: m.group(0).replace(" ", "\0"), t)
+        return textwrap.fill(t, 120, initial_indent=first, subsequent_indent=rest, break_long_words=False,
+                             break_on_hyphens=False).replace("\0", " ")
+    limits = ([AGENT_END_STEP.format(n=n, nth=_ordinal(n), unit=AGENT_END_STEP_UNIT.get(bench_of(task), ""))] if n else []) \
+        + [AGENT_END_TIME, AGENT_END_TOKENS.format(tin=TOKEN_BUDGET[0], tout=TOKEN_BUDGET[1]), AGENT_END_FINISH]
+    return (AGENT_END_HEADING + "\n" + wrap(AGENT_END_INTRO) + "\n\n"
+            + "\n".join(wrap(b, "- ", "  ") for b in AGENT_END_BULLETS) + "\n\n"
+            + wrap(AGENT_END_LIMITS) + "\n" + "\n".join(wrap(b, "- ", "  ") for b in limits) + "\n")
 
 
 def render_cutoff(sec: int, mode: str, bench: str = "", name: str = "") -> str:
@@ -991,7 +1076,8 @@ def set_wall_clock(compose: str, sec: int, name: str = "") -> str:
 
 
 def normalize_instruction(task: Path) -> None:
-    """instruction.md ends with three sections normalize renders, each replacing an earlier one: `## External material`
+    """instruction.md ends with three sections normalize renders, each replacing an earlier one (a task with an
+    agent-ended episode, PROTOCOL §3, has `## Episode end` rendered before them: render_agent_end): `## External material`
     (PROTOCOL §5), `## Resources`, the caps of the agent's own container (§6, render_resources) and, last, `## Time
     limit` rendered from the task's `[agent] timeout_sec` (§2; left out when it has no usable number): the last thing
     the agent reads."""
@@ -1002,9 +1088,10 @@ def normalize_instruction(task: Path) -> None:
     sec = cutoff_for(task)
     if sec is not None:
         s = strip_cutoff(s)
-    for heading in (EXTERNAL_HEADING, RESOURCES_HEADING, *OLD_RESOURCES_HEADINGS):
+    for heading in (AGENT_END_HEADING, EXTERNAL_HEADING, RESOURCES_HEADING, *OLD_RESOURCES_HEADINGS):
         s = re.sub(rf"(?ms)^{re.escape(heading)}[ \t]*(?:\n.*?)?(?=^## |\Z)", "", s)
-    s = s.rstrip() + "\n\n" + render_external(task) + "\n" + render_resources(task)
+    ae = render_agent_end(task)
+    s = s.rstrip() + "\n\n" + (ae + "\n" if ae else "") + render_external(task) + "\n" + render_resources(task)
     if sec is not None:
         s += "\n" + render_cutoff(sec, mode_of(task), bench_of(task), task.name)
     write_if_changed(p, s)
@@ -1343,10 +1430,10 @@ def normalize_dynamics(task: Path) -> None:
 
 
 def realtime_of(task: Path) -> tuple[float, int | None] | None:
-    """A standard-realtime task's (slowdown S, reset budget) as its sim service starts by default: the `RCB_SLOWDOWN`
-    and `RCB_RESET_BUDGET` defaults in environment/docker-compose.yaml (PROTOCOL §2). None: not a standard-realtime task,
+    """A realtime task's (slowdown S, reset budget) as its sim service starts by default: the `RCB_SLOWDOWN`
+    and `RCB_RESET_BUDGET` defaults in environment/docker-compose.yaml (PROTOCOL §2). None: not a realtime task,
     or a service without `RCB_SLOWDOWN` (ci_checks/check-realtime.py fails a 2.3 one)."""
-    if mode_of(task) != "standard-realtime":
+    if mode_of(task) != "realtime":
         return None
     c = read_text(task / "environment/docker-compose.yaml") or ""
     m, r = SLOWDOWN_RE.search(c) or OWN_SLOWDOWN_RE.search(c), RESET_DECL_RE.search(c)
@@ -1370,7 +1457,7 @@ def slowdown_text(S: float) -> str:
 # PROTOCOL §2: the settings a task declares, and the effective configuration of a trial, recorded with every result
 # so that results are ranked only within one comparable configuration (docs/protocol/running.md "Results"). Standard
 # library only: scripts/write_task_results.py, scripts/dataset_manifest.py and a runner's scheduler read these.
-PROTOCOL_VERSION = "2.1"                         # docs/protocol/README.md
+PROTOCOL_VERSION = "2.3"                         # docs/protocol/README.md
 
 
 def metadata_of(task: Path) -> dict:
@@ -1394,7 +1481,7 @@ def reset_budget_of(task: Path) -> int | None:
 
 
 def slowdown_of(task: Path) -> float | None:
-    """A standard-realtime task's slowdown S, its sim service's default (realtime_of); None otherwise."""
+    """A realtime task's slowdown S, its sim service's default (realtime_of); None otherwise."""
     rt = realtime_of(task)
     return rt[0] if rt is not None else None
 
@@ -1518,6 +1605,11 @@ BEFORE_YOU_RUN = {
     "YAMLab": ("Before you run", "", f"Builds its image ({ISAAC}): about 25 min, 60 GB free disk."),
     "LabUtopia": ("Before you run", "",
                   f"Builds its image ({ISAAC}; LabUtopia's assets are CC BY-NC 4.0): about 25 min, 90 GB free disk."),
+    "HumanCLAW": ("Before you run",
+                  "Without access to the organization's packages: request access to the gated Hugging Face dataset "
+                  "`HumanCLAW/HumanCLAW-HSSD`, accept the `hssd/hssd-hab` terms, export `HF_TOKEN` and build its "
+                  "image once (HSSD is CC BY-NC 4.0; the body model and motion weights carry SMPL-X / AMASS research "
+                  "terms): about 30 min, 40 GB free disk.", ""),
     "AutoBio": ("Before you run", "",
                 "Builds its image from AutoBio's repository, which states no licence (CPU only): a few minutes, 3 GB free disk."),
 }
@@ -1621,7 +1713,7 @@ def readme_quick_start(tasks_dir: Path | None = None) -> str:
               "uv tool install embodied-first-exam --with-executables-from harbor"),
         "### 2. Run", "",
         block(f"# the core set: {core} tasks, each in its default mode", f"{d} {m}"),
-        block(f"# the core tasks in another mode: --privileged ({priv} tasks), --standard, --standard-realtime",
+        block(f"# the core tasks in another mode: --privileged ({priv} tasks), --standard, --realtime",
               f"{d} --privileged {m}"),
         block(f"# every task: {len(dirs)} task dirs ({bases} tasks in their modes, {benches} benchmarks)",
               f"{d}@all {m}"),
@@ -1663,7 +1755,7 @@ def taxonomy_protocol_row(tasks_dir: Path | None = None) -> str:
             note = PROTOCOL_NOTES.get(proto)
             vals.append(f"`{proto}` ({(note + ': ') if note else ''}{', '.join(names)})")
         parts.append(f"{m[0].upper() + m[1:]}: " + " · ".join(vals))
-    return ("| `protocol` | standard and standard-realtime modes only; the benchmarks that serve each value (generated: "
+    return ("| `protocol` | standard and realtime modes only; the benchmarks that serve each value (generated: "
             "`python3 scripts/task_conventions.py taxonomy --write`). " + ". ".join(parts) + ". The `eai-standard` "
             "versions are specified in [protocol/standard_mode.md](protocol/standard_mode.md); a benchmark's own runtime "
             "names its protocol (PROTOCOL §3) |")
