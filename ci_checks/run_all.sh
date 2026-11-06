@@ -90,6 +90,7 @@ fi
 pargs=""; [ $explicit -eq 1 ] && pargs="$targs"
 add bash ci_checks/check-tooling-identity.sh                # shared sources (PROTOCOL §1); the eai-standard/2.2 layer = embodied_first_exam/standard/
 add bash ci_checks/check-standard-client.sh                 # standard agent + verifier images: the pinned client base and pins
+add python3 ci_checks/check-recipe-copies.py               # base-image recipes inside other images' recipes: byte-identical to their source
 # PROTOCOL §6: the caps of every container ([environment], the compose files, x-gpu-memory-gb), the rules of
 # scripts/task_resources.toml applied, and the instruction's and README's `## Resources` rendered from them
 add python3 ci_checks/check-resources.py"$pargs"
@@ -98,7 +99,7 @@ add python3 ci_checks/check-resources.py"$pargs"
 # the limit (the twins' equal number is an invariant: check-twins.py). Per task: a scoped run checks its benchmarks' tasks only
 add python3 ci_checks/check-cutoffs.py"$targs"
 add python3 ci_checks/check-seeds.py"$pargs"
-# PROTOCOL §2: a standard-realtime task states its slowdown S (its sim service's default, the instruction) and allows resets
+# PROTOCOL §2: a realtime task states its slowdown S (its sim service's default, the instruction) and allows resets
 add python3 ci_checks/check-realtime.py"$pargs"
 # PROTOCOL §4: every task renders a video and the runner can collect it; a declared video time bound is not
 # shorter than the verdict replay's (privileged)

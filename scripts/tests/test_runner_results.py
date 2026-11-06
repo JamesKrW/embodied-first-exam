@@ -29,6 +29,7 @@ TASK = "robotwin_2_0_stack_blocks_two-standard"          # any task of the repos
 BIG = "behavior-boxing-food-after-dinner-i00"             # its standard twin's sidecar caps are 12 CPUs
 HB = "humanoidbench-loco-walk-i00-privileged"            # [environment] cpus = 16
 SMALL = "robotwin_2_0_stack_blocks_two"                  # caps of at most 8
+RESETS = "dexhand-assemble-hamburger-i00-standard"       # a standard task with a reset budget (20)
 fails = []
 
 
@@ -111,8 +112,8 @@ def test_results():
         check("EnvironmentStartTimeoutError" in line and "no reward.json" in line, f"the reason names Harbor's exception: {line}")
 
 
-UNVALIDATED = "humanoidbench-loco-walk-i00-standard-realtime"   # oracle = "none": ranked with validated tasks, marked
-VALIDATED_RT = "humanoidbench-loco-sit-simple-i00-standard-realtime"   # oracle = "full", the same configuration as UNVALIDATED
+UNVALIDATED = "humanoidbench-loco-walk-i00-realtime"   # oracle = "none": ranked with validated tasks, marked
+VALIDATED_RT = "humanoidbench-loco-sit-simple-i00-realtime"   # oracle = "full", the same configuration as UNVALIDATED
 WTR = [sys.executable, str(ROOT / "scripts/write_task_results.py")]
 
 
@@ -136,8 +137,8 @@ def write(jobs: Path, job: str, out: Path) -> subprocess.CompletedProcess:
 
 def test_config_and_attempts():
     """PROTOCOL v2.1 / docs/protocol/running.md: every result records its effective configuration (config.json); an infrastructure
-    failure (not a result) is voided and never counted, one retry replaces it, a voided attempt never replaces a counted
-    one, more than 2 attempts of one task x run id are flagged; a trial of another task version is legacy."""
+    failure (not a result) is voided and never counted, a rerun replaces it, a voided attempt never replaces a counted
+    one, an attempt after a result is flagged; a trial of another task version is legacy."""
     infra = {"success": 0, "infra_error": 1}
     with tempfile.TemporaryDirectory() as td:
         td = Path(td); jobs, out = td / "jobs", td / "out"
@@ -156,7 +157,7 @@ def test_config_and_attempts():
         att = json.loads((res / "attempts.json").read_text())["attempts"]
         check([a["counted"] for a in att] == [False, True], f"attempts.json: the infra attempt is counted: {att}")
         check(f"| configuration | protocol {tc.PROTOCOL_VERSION}, standard" in (res / "README.md").read_text(), "README has no configuration row")
-        # a later infrastructure failure of the same task x run id never replaces the counted result, and a third attempt is flagged
+        # a later infrastructure failure of the same task x run id never replaces the counted result, and an attempt after a result is flagged
         make_trial(jobs, "b", "t3", TASK, "2026-10-14T03:00:00Z", infra, {"task_checksum": dg})
         r = write(jobs, "b", out)
         cfg = json.loads((res / "config.json").read_text())
@@ -208,24 +209,27 @@ def test_config_and_attempts():
 
 def test_first_attempt():
     """PROTOCOL §4: the standard modes report the first-attempt (no-reset) result beside the graded one: reward.json's
-    first_success, else the graded success when no reset was made; the first attempt's video is published next to the
-    graded one; privileged results and infrastructure failures carry none."""
+    first_success; else, on a task whose reset budget is 0, the graded success (no reset could be made, whatever the
+    service counts as `resets`); else the graded success when no reset was made (no `resets`: unknown). The first
+    attempt's video is published next to the graded one; privileged results and infrastructure failures carry none."""
     with tempfile.TemporaryDirectory() as td:
         td = Path(td); jobs, out = td / "jobs", td / "out"
-        cases = {"j1": ({"success": 1, "resets": 0}, 1), "j2": ({"success": 1, "resets": 2}, 0),
-                 "j3": ({"success": 1, "resets": 2, "first_success": 0}, 0), "j4": ({"success": 0, "resets": 0}, 0),
-                 "j5": ({"success": 1}, None), "j6": ({"success": 0, "infra_error": 1, "resets": 0}, None)}
-        for job, (reward, want) in cases.items():
-            t = make_trial(jobs, job, "f1", f"{SMALL}-standard", "2026-10-14T01:00:00Z", reward)
+        small, rst = f"{SMALL}-standard", RESETS                     # reset budget 0 / a task that grants resets
+        cases = {"j1": (rst, {"success": 1, "resets": 0}, 1), "j2": (rst, {"success": 1, "resets": 2}, 0),
+                 "j3": (rst, {"success": 1, "resets": 2, "first_success": 0}, 0), "j4": (rst, {"success": 0, "resets": 0}, 0),
+                 "j5": (rst, {"success": 1}, None), "j6": (rst, {"success": 0, "infra_error": 1, "resets": 0}, None),
+                 "j7": (small, {"success": 1}, 1), "j8": (small, {"success": 0}, 0), "j9": (small, {"success": 1, "resets": 1}, 1)}
+        for job, (task, reward, want) in cases.items():
+            t = make_trial(jobs, job, "f1", task, "2026-10-14T01:00:00Z", reward)
             if job == "j2":
                 (t / "verifier/replay.first.mp4").write_bytes(b"mp4")
             res = out / job
             write(jobs, job, res)
-            cfg = json.loads((res / f"{SMALL}-standard" / "codex-x-high" / "config.json").read_text())
-            check(cfg.get("first_success") == want, f"{job} {reward}: first_success {cfg.get('first_success')!r}, want {want!r}")
-            readme = (res / f"{SMALL}-standard" / "codex-x-high" / "README.md").read_text()
+            cfg = json.loads((res / task / "codex-x-high" / "config.json").read_text())
+            check(cfg.get("first_success") == want, f"{job} {task} {reward}: first_success {cfg.get('first_success')!r}, want {want!r}")
+            readme = (res / task / "codex-x-high" / "README.md").read_text()
             check(("| first attempt (no reset) |" in readme) == (want is not None), f"{job}: first-attempt row: {readme[:400]}")
-        check((out / "j2" / f"{SMALL}-standard" / "codex-x-high" / "replay.first.mp4").exists(), "replay.first.mp4 not published")
+        check((out / "j2" / rst / "codex-x-high" / "replay.first.mp4").exists(), "replay.first.mp4 not published")
         make_trial(jobs, "p1", "f1", f"{SMALL}-privileged", "2026-10-14T01:00:00Z", {"success": 1, "resets": 0})
         write(jobs, "p1", out / "p1")
         cfg = json.loads((out / "p1" / f"{SMALL}-privileged" / "codex-x-high" / "config.json").read_text())
@@ -247,8 +251,8 @@ def test_summary_grouping():
         make_trial(jobs, "bx-standard-a", "t1", TASK, "2026-10-14T01:00:00Z", {"success": 0, "infra_error": 1})
         make_trial(jobs, "bx-standard-a", "t2", TASK, "2026-10-14T02:00:00Z", {"success": 1})
         make_trial(jobs, "bx-privileged-a", "p1", f"{SMALL}-privileged", "2026-10-14T01:00:00Z", {"success": 0})
-        make_trial(jobs, "bx-standard-realtime-b", "r1", UNVALIDATED, "2026-10-14T01:00:00Z", {"success": 1})
-        make_trial(jobs, "bx-standard-realtime-b", "r2", VALIDATED_RT, "2026-10-14T01:00:00Z", {"success": 0})
+        make_trial(jobs, "bx-realtime-b", "r1", UNVALIDATED, "2026-10-14T01:00:00Z", {"success": 1})
+        make_trial(jobs, "bx-realtime-b", "r2", VALIDATED_RT, "2026-10-14T01:00:00Z", {"success": 0})
         # a core set naming the fixed tasks here (the real list changes over time); test_core_set covers the marking
         sys.path.insert(0, str(ROOT / "scripts"))
         import task_conventions as tc
@@ -260,7 +264,7 @@ def test_summary_grouping():
         check(r.returncode == 0, f"summary failed: {r.stderr[-800:]}")
         out = r.stdout
         check("## Unvalidated" not in out and out.count(f"\n## protocol {tc.PROTOCOL_VERSION}, ") == 3, f"not one table per configuration:\n{out}")
-        rt = out[out.index("standard-realtime, "):]
+        rt = out[out.index("realtime, "):]
         check(f"| {UNVALIDATED} (unvalidated) |" in rt and f"| {VALIDATED_RT} |" in rt,
               f"the unvalidated task is not ranked (marked) with the validated one of its configuration:\n{out}")
         check("Success (results only): 1 / 2 (validated tasks: 0 / 1); 0 voided." in rt, f"the shared table's rate:\n{out}")
@@ -336,7 +340,7 @@ def test_benchmarks():
     bad = tc.check_benchmarks()
     check(not bad, f"benchmark labels: {bad[:5]}")
     check(tc.bench_of(Path("embodied-olympics-fun-sprint-i00")) == "Embodied Olympics - Fun"
-          and tc.bench_of(Path("embodied-olympics-match-tabletennis-match-i04-standard-realtime")) == "Embodied Olympics - Match"
+          and tc.bench_of(Path("embodied-olympics-match-tabletennis-match-i04-realtime")) == "Embodied Olympics - Match"
           and tc.bench_of(Path("roboolympics-sprint-i00-standard")) == ""
           and tc.bench_of(Path("robocasa-gr1-x-i00-standard")) == "RoboCasa-GR1", "bench_of: the first matching prefix")
     with tempfile.TemporaryDirectory() as td:
