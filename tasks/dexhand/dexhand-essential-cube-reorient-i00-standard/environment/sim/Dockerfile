@@ -3,7 +3,7 @@
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
 FROM ghcr.io/mll-lab-nu/efe:dexhand-0.2.0@sha256:0d42994b83d95ab5301c592b35586550c9ee426490115e4b43f3b8cf8cc43350
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.5.0@sha256:ceea7a90b9c905345ca0a18a598fd56c600a9ccdcb633339f0d92b3e7577ca09 \
+COPY --from=ghcr.io/mll-lab-nu/efe:dexhand-files-0.6.0@sha256:49ff72dda0fb0bab7d234dd47c18da73bcb843d8da55bf77746e018a1072b095 \
      /privileged/environment/checker.py \
      /privileged/environment/essential.py \
      /privileged/environment/essential_articulated.py \
