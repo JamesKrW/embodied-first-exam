@@ -2,7 +2,7 @@
 
 You control two simulated **Franka Panda** arms (`panda-0` on the left, `panda-1` on the right; each with its standard hand and the task's tool where it has one) **as if it were real hardware**: the simulator (ManiSkill 3 / SAPIEN, rigid-body physics at
 1000 Hz) runs in a service you cannot open, and you reach it only through a client. You get one client, one episode at a
-time and 3 resets.
+time and 1000 resets.
 **Task:** A low-friction puck is already sliding across the table toward the left arm when the episode starts. The two Pandas each hold a paddle and must hit the same puck in turn: left, right, left, right. After each of the first three hits the puck must pass through a different gap in a row of posts standing across the table between the arms. First it goes toward the right arm through the gap at the -y end. Then it goes back toward the left arm through the gap at the +y end, next to a side rail. Then it goes toward the right arm again through the middle gap. The right arm's final hit must send the puck across a goal line in front of a backstop wall on the right arm's side.
 
 ## Scene
@@ -57,7 +57,7 @@ most 1.05 x 13 m/s² and 1.05 x 25 rad/s²; motor torques at most (87, 87, 87, 8
 
 ## Rules (real-robot rules)
 - **Episodes and resets.** The first episode starts when the service comes up. An episode ends on success, on a failure,
-  when your time is up, or on a simulator error. You have **3 resets** (`spec()["budget"]["reset"]`, which is
+  when your time is up, or on a simulator error. You have **1000 resets** (`spec()["budget"]["reset"]`, which is
   authoritative: if it says 0, there is no reset and the one episode is the run). `r.reset()` puts the robot and the scene
   back on the same frozen starting state (the scene is rebuilt, about a second; no robot time passes) and starts a new
   episode, either abandoning the running episode or after one has ended; it returns the start's frames and
@@ -134,6 +134,57 @@ calibration in `spec()["cameras"]` (`intrinsic_cv`, `extrinsic_cv`, `cam2world_g
   (the hand TCP, between the fingertips), `joint_vel`, `gripper_opening`, `joint_effort` (motor torques), `tool_pose` (the
   task tool's frame), `target` (the targets in force). The arms are listed panda-0 first.
 - Control runs at 100 Hz (10 ms per row), physics at 1000 Hz.
+
+## This run: unlimited resets, save and load
+
+This run changes the reset budget and adds two calls. This section overrides anything above, and anything in `/spec`,
+that says there is no reset, one episode only, or fewer resets.
+
+- You have 1000 resets (`spec()["budget"]["reset"]` is 1000): in practice as many as your time allows.
+- `POST /reset` on the same base URL as your other calls (`http://sim:8000` or `http://localhost:8000`), with a JSON body
+  such as `{"cameras": []}` (in Python, for example `requests.post(base + "/reset", json={"cameras": []})`; the
+  client's `_post("/reset", {"cameras": []}, [], 60)` where it has no `reset()`). It abandons the running episode, or
+  follows one that has ended (a failure or a fall included), and starts a new episode from the same starting state.
+  The answer carries the new episode's first frames; `meta` and `GET /status` add `episode`, `resets_left`, `saves`,
+  `loads` and `control_steps_total`.
+- Where `/spec` has `state_ops`, two more calls exist (its text is the full rule):
+  - `POST /save_state` with `{}` stores the current state in the service and answers JSON
+    `{"handle": "s1", "step": ...}`. The handle is all you get, never the state's contents.
+  - `POST /load_state` with `{"handle": "s1", "cameras": []}` restores a state saved earlier in this run and starts a
+    new episode there; it answers as `/reset` does. At most 32 handles are kept (the least recently used one is
+    dropped). Saves and loads do not use up resets.
+  Where `/spec` has no `state_ops`, this task offers resets only.
+- Your time keeps running across resets and loads (in standard-realtime the robot's clock pauses after a reset or a
+  load until your next command).
+- Only the last episode is graded: from the starting state, or for a loaded episode the path that led to the saved
+  state followed by what you did after the load. The success rule is checked again from your next command on. A
+  success still ends the run: no reset, save or load after it.
+
+## This run: privileged state queries
+
+This run lets you query the simulator's state. This section overrides anything above, and anything in `/spec`, that
+says object poses or the scene's state are never given.
+
+- `GET /state/entities` (on the same base URL as your other calls) lists what you can query:
+  `{"frame": ..., "quaternion_order": ..., "entities": {name: {"kind": ..., "fields": {field: unit}}}}`. The
+  kinds are `robot` (the robot's base or root), `robot_link` (a hand, a foot, an end effector), `object`,
+  `articulation` (a door, a drawer, a faucet: its joints) and `scene_feature` (a zone, a line, a hazard, a canvas
+  region). The list is fixed for the run.
+- `POST /state/query` with `{"names": ["robot", ...], "fields": ["pos", "quat"]}` answers JSON
+  `{"state": {name: {field: value}}, "control_steps": ..., "sim_time_s": ..., "state_queries": ...}` with the
+  current values. `fields` is optional: without it you get every field of each name. In Python:
+  `requests.post(base + "/state/query", json={"names": ["robot"]}).json()["state"]`.
+  - The usual fields: `pos` [x, y, z] m, `quat` (in `quaternion_order`), `lin_vel` m/s, `ang_vel` rad/s,
+    `height_above_ground` m, `joint_pos` / `joint_vel` {joint: value}, `size` [3] m (full extents), and `bbox`
+    [[min x, y, z], [max x, y, z]] m. A task may add its own; each field's unit is in the list.
+  - All values are in the world frame that `frame` describes.
+  - A field that an entity does not have is left out of its entry.
+  - An unknown name or field is a 400 that lists the valid ones.
+- A query only reads. It takes no control step, and it does not advance or pause the clock. In standard-realtime it
+  answers at the current simulation time while the robot keeps moving. It is served while the episode runs (409 after
+  the episode ended). Queries are counted and recorded; they do not change the grading.
+- Nothing else changes: the goal, the success rule and its thresholds are not given, and no answer says whether the
+  task is done.
 
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
