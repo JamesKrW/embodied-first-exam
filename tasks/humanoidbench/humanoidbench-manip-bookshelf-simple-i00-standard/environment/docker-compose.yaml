@@ -21,6 +21,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
       RCB_TASK: bookshelf_simple
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "Put each of the five red-tinted objects (the other seven are grey) onto its place on the bookshelf, shown as a translucent copy of it in the same colour, one at a time, palest first and darkest last."
@@ -28,7 +29,7 @@ services:
       RCB_WALL_CLOCK_S: "3600.0"
       # Knobs: ${NAME:-default} takes NAME from the shell that runs harbor. The defaults are the standard
       # configuration; results under other settings are reported separately.
-      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-50}"       # HumanoidBench standard: 50 resets (tasks/humanoidbench/README.md); 0: one episode
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
       RCB_OBS_PROPRIO: "${RCB_OBS_PROPRIO:-1}"          # 1: + joint angles/velocities; 0: images only
       RCB_OBS_IMU: "${RCB_OBS_IMU:-1}"                  # 1: + pelvis IMU (angular velocity, gravity direction)
       RCB_OBS_ROOM_CAMERA: "${RCB_OBS_ROOM_CAMERA:-1}"  # 1: + room_camera, fixed in the room

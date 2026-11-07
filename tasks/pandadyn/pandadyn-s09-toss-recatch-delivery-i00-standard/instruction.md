@@ -2,7 +2,7 @@
 
 You control one simulated **Franka Panda** arm (7 joints, its standard hand, and the task's tool where it has one) **as if it were real hardware**: the simulator (ManiSkill 3 / SAPIEN, rigid-body physics at
 1000 Hz) runs in a service you cannot open, and you reach it only through a client. You get one client, one episode at a
-time and 3 resets.
+time and 1000 resets.
 **Task:** A ball is thrown high into the air when the episode starts and comes down near the robot. Catch it in the shallow cup the Panda holds, which has one open side. Bring the cup to a launch region and toss the ball straight up out of the cup with a real throw: it must leave the cup floor while rising. Move the cup sideways and catch the ball again. Finally, release it into an open box that slides back and forth along a rail, where it must settle while the box is moving.
 
 ## Scene
@@ -58,7 +58,7 @@ most 1.05 x 13 m/s² and 1.05 x 25 rad/s²; motor torques at most (87, 87, 87, 8
 
 ## Rules (real-robot rules)
 - **Episodes and resets.** The first episode starts when the service comes up. An episode ends on success, on a failure,
-  when your time is up, or on a simulator error. You have **3 resets** (`spec()["budget"]["reset"]`, which is
+  when your time is up, or on a simulator error. You have **1000 resets** (`spec()["budget"]["reset"]`, which is
   authoritative: if it says 0, there is no reset and the one episode is the run). `r.reset()` puts the robot and the scene
   back on the same frozen starting state (the scene is rebuilt, about a second; no robot time passes) and starts a new
   episode, either abandoning the running episode or after one has ended; it returns the start's frames and
@@ -135,6 +135,31 @@ calibration in `spec()["cameras"]` (`intrinsic_cv`, `extrinsic_cv`, `cam2world_g
   (the hand TCP, between the fingertips), `joint_vel`, `gripper_opening`, `joint_effort` (motor torques), `tool_pose` (the
   task tool's frame), `target` (the targets in force). The arms are listed panda-0 first.
 - Control runs at 100 Hz (10 ms per row), physics at 1000 Hz.
+
+## This run: unlimited resets, save and load
+
+This run changes the reset budget and adds two calls. This section overrides anything above, and anything in `/spec`,
+that says there is no reset, one episode only, or fewer resets.
+
+- You have 1000 resets (`spec()["budget"]["reset"]` is 1000): in practice as many as your time allows.
+- `POST /reset` on the same base URL as your other calls (`http://sim:8000` or `http://localhost:8000`), with a JSON body
+  such as `{"cameras": []}` (in Python, for example `requests.post(base + "/reset", json={"cameras": []})`; the
+  client's `_post("/reset", {"cameras": []}, [], 60)` where it has no `reset()`). It abandons the running episode, or
+  follows one that has ended (a failure or a fall included), and starts a new episode from the same starting state.
+  The answer carries the new episode's first frames; `meta` and `GET /status` add `episode`, `resets_left`, `saves`,
+  `loads` and `control_steps_total`.
+- Where `/spec` has `state_ops`, two more calls exist (its text is the full rule):
+  - `POST /save_state` with `{}` stores the current state in the service and answers JSON
+    `{"handle": "s1", "step": ...}`. The handle is all you get, never the state's contents.
+  - `POST /load_state` with `{"handle": "s1", "cameras": []}` restores a state saved earlier in this run and starts a
+    new episode there; it answers as `/reset` does. At most 32 handles are kept (the least recently used one is
+    dropped). Saves and loads do not use up resets.
+  Where `/spec` has no `state_ops`, this task offers resets only.
+- Your time keeps running across resets and loads (in standard-realtime the robot's clock pauses after a reset or a
+  load until your next command).
+- Only the last episode is graded: from the starting state, or for a loaded episode the path that led to the saved
+  state followed by what you did after the load. The success rule is checked again from your next command on. A
+  success still ends the run: no reset, save or load after it.
 
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.

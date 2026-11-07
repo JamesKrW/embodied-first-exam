@@ -27,6 +27,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6          # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_STATE_OPS: "1"   # the reset ablation: /reset, /save_state, /load_state and their record
       RCB_INSTANCE: /srv/instance.json
       RCB_TEXTS: /srv/texts.json
       RCB_DATA: /data
@@ -34,7 +35,7 @@ services:
       RCB_STARTUP_TIMEOUT_S: "600"
       PYTHONPATH: /srv:/opt/pandadyn
       RCB_SESSION_LOG: ""           # the sidecar's own Session must not write the agent-side interaction log
-      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-3}"        # 3 resets, as in the standard-realtime twins (tasks/pandadyn/README.md, "Reset budget"); 0: one episode
+      RCB_RESET_BUDGET: "${RCB_RESET_BUDGET:-1000}"   # the unlimited-reset ablation
     deploy:
       resources:
         reservations:
