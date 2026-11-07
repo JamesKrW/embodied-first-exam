@@ -21,6 +21,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_TASK: room
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "Six loose objects — a chair, a trophy, a pair of headphones, two packages and a snow globe — are scattered around the room (the table and the bookshelf are fixed). Tidy up: gather them together, so they end up close to one another rather than spread out."

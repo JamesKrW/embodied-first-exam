@@ -21,6 +21,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_STATE_QUERY: "1"   # the state-query ablation (/state/entities, /state/query)
       RCB_TASK: powerlift
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "Lift the dumbbell from the floor to overhead — close to two metres up — and hold it there."

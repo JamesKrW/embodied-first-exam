@@ -92,6 +92,32 @@ commands one end of that servo's range, `spec()["action_types"]["joint_position"
 and the scale is linear, so 0 is mid-range, not 0 rad. A constant action commands joint *targets*, not a pose:
 whether the robot stays there depends on whether that pose is stable under gravity and contact.
 
+## This run: privileged state queries
+
+This run lets you query the simulator's state. This section overrides anything above, and anything in `/spec`, that
+says object poses or the scene's state are never given.
+
+- `GET /state/entities` (on the same base URL as your other calls) lists what you can query:
+  `{"frame": ..., "quaternion_order": ..., "entities": {name: {"kind": ..., "fields": {field: unit}}}}`. The
+  kinds are `robot` (the robot's base or root), `robot_link` (a hand, a foot, an end effector), `object`,
+  `articulation` (a door, a drawer, a faucet: its joints) and `scene_feature` (a zone, a line, a hazard, a canvas
+  region). The list is fixed for the run.
+- `POST /state/query` with `{"names": ["robot", ...], "fields": ["pos", "quat"]}` answers JSON
+  `{"state": {name: {field: value}}, "control_steps": ..., "sim_time_s": ..., "state_queries": ...}` with the
+  current values. `fields` is optional: without it you get every field of each name. In Python:
+  `requests.post(base + "/state/query", json={"names": ["robot"]}).json()["state"]`.
+  - The usual fields: `pos` [x, y, z] m, `quat` (in `quaternion_order`), `lin_vel` m/s, `ang_vel` rad/s,
+    `height_above_ground` m, `joint_pos` / `joint_vel` {joint: value}, `size` [3] m (full extents), and `bbox`
+    [[min x, y, z], [max x, y, z]] m. A task may add its own; each field's unit is in the list.
+  - All values are in the world frame that `frame` describes.
+  - A field that an entity does not have is left out of its entry.
+  - An unknown name or field is a 400 that lists the valid ones.
+- A query only reads. It takes no control step, and it does not advance or pause the clock. In standard-realtime it
+  answers at the current simulation time while the robot keeps moving. It is served while the episode runs (409 after
+  the episode ended). Queries are counted and recorded; they do not change the grading.
+- Nothing else changes: the goal, the success rule and its thresholds are not given, and no answer says whether the
+  task is done.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 
