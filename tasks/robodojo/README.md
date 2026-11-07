@@ -58,17 +58,24 @@ The task directories are the deliverable; the tooling that built them is kept ou
 RoboDojo's reward manager for the task, unchanged: its `run_reward()` check list (registered at the start of every episode,
 as RoboDojo's evaluator does), evaluated after every action; stages count in order, at most one per action; a failed
 query ends the episode as a failure. The episode ends at the first action where every stage has passed. No task of the 54
-registers an end-of-episode check: RoboDojo's per-task `step_lim` only ends a policy's episode in its evaluation, so it is
-not applied here (no step caps); a technical cap ends an episode after 15,000 actions (10 min of simulated
-time; reason `step_guard`, standard mode's `spec.max_control_steps`), the most a trajectory may hold. The instructions
-give RoboDojo's limit for reference.
+registers an end-of-episode check: RoboDojo's per-task `step_lim` only ends a policy's episode in its evaluation.
+
+Standard mode grades as RoboDojo's evaluation does: its tasks' episodes are agent-ended (PROTOCOL §3 "Agent-ended
+episodes"; `RCB_AGENT_END`, and `RCB_STEP_LIMIT` = the task's `step_lim`, in each sim service). RoboDojo's evaluator never
+shows a policy the reward; it ends the episode at the first action where the reward reaches 1 or after `step_lim` actions
+(one step = one 14-D action at 25 Hz, the unit of `take_action_cnt`). Here the agent sees no success either, the episode
+ends after `step_lim` steps (or at the agent's `/finish`, its time limit or token budget, or a failed check), and the
+verdict is RoboDojo's: whether the reward reached 1 in the episode (RoboDojo's stages are latched, so this equals its
+"success within `step_lim` actions"). Privileged mode applies no step limit; a technical cap ends an episode after 15,000
+actions (10 min of simulated time; reason `step_guard`), the most a trajectory may hold.
 
 ## Oracle
 None: RoboDojo releases no expert or planner script, and its training demonstrations (Hugging Face, `data/`) record no
 initial state or layout, so none replays on a frozen layout. Every task is `oracle = "none"` and needs human review
 (CONTRIBUTING.md; the review is in pull request #142). Model trials gave positive examples (privileged
 `general_pickup`, `deposit_coin`, `match_and_pick_from_conveyor`, `stack_blocks_by_language`; standard
-`general_pickup`); the screening table below lists the bases solved by the screening runs.
+`general_pickup` and `align_blocks`, each within its 200-step limit: 106 and 190 steps); the screening table below lists
+the bases solved by the screening runs.
 
 ## Tooling (`rcb_robodojo.py`)
 `Session(task, instance=...)` builds RoboDojo's own evaluator environment (`src/eval_client/eval_env.py`: one env, the

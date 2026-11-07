@@ -1,7 +1,7 @@
 # Full-simulator soccer: develop a program against level 2
 
 Win one complete match against the frozen sport's scripted level-2 opponent, seed 7: the same frozen
-instance as `embodied-olympics-match-soccer-match-i00-standard-realtime` (its standard-realtime twin; there you see only camera images). The robot, the actions,
+instance as `embodied-olympics-match-soccer-match-i00-realtime` (its realtime twin; there you see only camera images). The robot, the actions,
 the rules, the limits and the opponent are unchanged; the world runs at 1/5 of real speed.
 
 ## Development and deliverable
@@ -26,7 +26,7 @@ There is no formal reset. The original realtime clock runs at S = 5 while your p
 review (after a point, a goal or another stoppage) freezes the world (at most 600 s). The formal match
 has 4800 s of wall time.
 The service replays the trusted journal once in a fresh process; success is a complete win by the original referee
-with a matching replay. The match runs on the wall clock, so, as in the standard-realtime twin, the verifier's speed
+with a matching replay. The match runs on the wall clock, so, as in the realtime twin, the verifier's speed
 matters: it runs on 6 pinned CPUs. This fixed instance does not measure generalization to other instances.
 
 ## External material
@@ -38,4 +38,4 @@ Your container: **6 CPUs**, **9 GiB of memory**, **1024 processes and threads** 
 ## Time limit
 You have 7200 seconds to complete this task. Do not cheat by using online solutions or hints specific to this task.
 
-This is wall-clock time from the start of your session; the time a simulator takes to start counts. When it is up you are stopped without warning and only what is in `/app/output/` at that moment is graded, so save a deliverable as soon as you have one and overwrite it whenever you have a better one. Your session started when you received this task. `/run/rcb-limits/usage.json`, rewritten every few seconds, gives the time left on this limit (`time_left_s`) and its end (`deadline_utc`), counted from a little before your session started, so it never gives you more time than you have: read it (or run `date`) before you decide that time is short, never guess. Waiting counts too: a tool call that sends input to a process that keeps running (an interactive interpreter, a simulator loop, a server) can wait for the whole wait or yield time you give it (for example Codex's `yield_time_ms`) even when the answer is printed at once, so give such calls a short wait and poll again if the output is not complete, or run one-shot scripts that exit when they are done. Installing packages is not cheating (`## External material` above).
+This is wall-clock time from the start of your session; the time a simulator takes to start counts. When it is up you are stopped without warning and only what is in `/app/output/` at that moment is graded, so save a deliverable as soon as you have one and overwrite it whenever you have a better one. Your session started when you received this task. `/run/rcb-limits/usage.json`, rewritten every few seconds, gives the time left on this limit (`time_left_s`) and its end (`deadline_utc`), counted from a little before your session started, so it never gives you more time than you have: read it (or run `date`) before you decide that time is short, never guess. Waiting counts too: a tool call that sends input to a process that keeps running (an interactive interpreter, a simulator loop, a server) can wait for the whole wait or yield time you give it even when the answer is printed at once, so give such calls a short wait and poll again if the output is not complete, or run one-shot scripts that exit when they are done. Installing packages is not cheating (`## External material` above).

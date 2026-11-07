@@ -128,7 +128,7 @@ checkpoint (step count + state hash) per completed call; when the service dies m
 (`restart: on-failure:N`) and it resumes the same episode from the journal, the call in flight lost as a whole
 (`spec.on_service_error` tells the agent to check `GET /status` before continuing). This is how the shipped services
 behave by default (details: §13), not a rule: what the protocol says about a trial that failed
-for infrastructure reasons is the runner's single full retry (PROTOCOL Appendix H.5, [running.md](running.md)). A
+for infrastructure reasons is the runner's rerun (PROTOCOL Appendix H.5, [running.md](running.md)). A
 verdict already written is never overwritten. A scene build that hangs is killed by a startup watchdog
 (`RCB_STARTUP_TIMEOUT_S`; each service has its own default, and each task sets the value its build needs, §13.3). A host
 on which the frozen instance does not rebuild to its stored initial state reports `reason = instance_mismatch` with
@@ -179,13 +179,41 @@ mujoco-playground.md, kinder.md, humanoidbench.md, metaworldplus.md, robocasa.md
 
 ### Optional reset capability
 Each task declares its own budget N (PROTOCOL §2): the `RCB_RESET_BUDGET` default of its `sim` service, served as
-`/spec.budget.reset` and stated in its instruction (templates: 0 in standard mode, 10 in standard-realtime mode). Any
+`/spec.budget.reset` and stated in its instruction (templates: 0 in both standard and realtime mode). Any
 2.x service may implement the capability; which ones do is in their benchmarks' docs. With N > 0, `/spec.budget.reset =
 N`, `/spec.reset` describes it, and `POST /reset` (RCB1 or JSON `{cameras, video}`, no physics) abandons the running
 episode and starts a new one from the same frozen state, `N` times in all; `/status` and `meta` add `episode`,
 `resets_left` and `control_steps_total`. After a success or once the agent's time is up, `/reset` returns 409, as it does
 when the budget is spent. Only the last episode is graded. With N = 0 (or no declaration) `/reset` is 404. The reset
 budget is part of a result's configuration: results with different budgets are not ranked together (running.md).
+
+### Optional agent-ended episodes
+PROTOCOL §3 "Agent-ended episodes" (an optional task feature). A task opts in in its `sim` service's environment:
+`RCB_AGENT_END: "1"`, and `RCB_STEP_LIMIT: "<N>"` for a step limit (what one step is: the service's `/spec` and the
+task's instruction). The wire:
+- `/spec.success_signal` says the success is hidden; with a step limit `/spec.budget.steps = /spec.max_control_steps = N`,
+  and every `meta` and `/status` add `step_limit` and `steps_left`.
+- No answer depends on the task's success: no `done` / `reason = "success"`, no 409, no early end of a chunk and no
+  per-call work caused by it, `resets_left` and `/reset` as before a success, no success or progress field of the
+  service's own (stages reached, a settled-check counter) in `meta` or `/status`.
+- `POST /finish` (JSON `{}`) ends the episode (`reason = "finished"`) and answers `{"ok": true, ...}` with `/status`'s
+  fields; after it every call but `GET /spec` and `GET /status` is a 409. Without the feature it is a 404.
+- At the step limit the episode ends by itself (`reason = "step_limit"`; the chunk stops at that step); then `/submit`
+  and `/finish` are 409, `/observe` still answers.
+- The collect hook's signal at the end of the agent's session ends the episode with `reason = "timeout"`.
+- The verdict: the task's own rule on the state the episode ended in, with its settle or hold window run from there on
+  the live simulator (a hold window counts the steps already held). A success reached and then undone is 0. A success
+  the task latches as an event (a referee's call, a completed stage sequence) is part of the state: the task's failure
+  rules keep running after it and still end the episode, but do not take it away. A simulator error is judged as
+  without the feature.
+- `final.json` adds `success_signal = "hidden"`, `ended_by` (`finish`, `step_limit`, `session_end`, `failed`: the
+  task's own failure rule, `error`), `hidden_success_seen`, `hidden_success_first_step`, `trial_hidden_success_seen`,
+  `finish_time_s` and, with a step limit, `step_limit` and `steps_used`; `reward.json` adds `ended_finish`,
+  `ended_step_limit`, `ended_session_end` (evidence only). Which limit ended a session (`session_end`) is the runner's
+  record: Harbor's `AgentTimeoutError` for the time limit, the gateway's `budget_stop` for the token budget.
+- Implementation for the 2.2 layer: `embodied_first_exam/standard/agent_end/rcb_agent_end.py` (`Service`, `serve`,
+  `hidden_success`, `final_fields`, `steps_left`; files-only image `agent-end-files`); an adapter without `finish()`
+  refuses to start with the feature on; tests `agent_end_selftest.py`.
 
 ## Part 2 — `eai-standard/2.2`: capabilities added to 2.1
 
@@ -369,7 +397,7 @@ helpers: `rcb_limited.frames_per_call`, `check_frames`, `Recorder(max_images=...
 ### 13. Crash recovery (the shared layer's default behaviour)
 The shared layer (`rcb_limited.Episode`; adapters call it as `toy_server.py` does) resumes a crashed service in the same
 episode. This is an implementation of the reference services, not a rule (PROTOCOL Appendix H.5 is the
-runner's single full retry of an infrastructure-failed trial; running.md).
+runner's rerun of an infrastructure-failed trial; running.md).
 - **Journal and checkpoints.** Every executed control step (the exact row given to the simulator's step) is appended to
   `journal.f64` (float64 rows). After every completed call the journal is flushed and a checkpoint is logged in
   `episode.jsonl`: call count, rows, control steps, the state hash, the robot's proprio row, and the adapter's `persist`
@@ -471,10 +499,10 @@ In the benchmarks' docs.
 spellings (`eai-standard/2.`, `rcb-limited/2.`); 2.1 clients work against a 2.2 service (they get float16 per-frame depth
 for `include_depth` and ignore the new parts and keys).
 
-## Part 3 — Standard-realtime mode: `eai-standard/2.3`
+## Part 3 — Realtime mode: `eai-standard/2.3`
 
-Time does not stop. The wire protocol of the standard-realtime mode, served by
-standard-realtime tasks only (directories ending in `-standard-realtime`, `protocol = "eai-standard/2.3"`); the shared implementation
+Time does not stop. The wire protocol of the realtime mode, served by
+realtime tasks only (directories ending in `-realtime`, `protocol = "eai-standard/2.3"`); the shared implementation
 is `embodied_first_exam/standard/realtime/rcb_realtime.py`, which other benchmarks' realtime services use unchanged. 2.3
 is 2.2 plus the realtime capability below; every 2.2 addition stays optional, so a 2.1 service with this capability is a
 2.3 service. Same endpoints, RCB1 frames and grading as 2.1. `/spec.timing` declares it: `realtime: true`, `slowdown` S
@@ -559,7 +587,7 @@ means "required of a service that reports 2.4" (what a 2.4 client may rely on).
 - Every earlier addition stays an optional capability. That covers 2.2's depth, `frame_time_s`, extrinsics,
   `POST /kinematics` and the per-call wall bound, and 2.3's realtime capability (Part 3). So a 2.2 service that adds the
   operations capability is a 2.4 service.
-- Standard-mode tasks may declare `protocol = "eai-standard/2.4"`. Standard-realtime tasks stay on 2.3.
+- Standard-mode tasks may declare `protocol = "eai-standard/2.4"`. Realtime tasks stay on 2.3.
 - Everything in Parts 1 and 2 holds unchanged: four endpoints (plus `/kinematics`, `/reset` within a declared budget and
   the one below), RCB1, and grading by the live episode.
 - `/spec.protocol` is `eai-standard/2.4`.

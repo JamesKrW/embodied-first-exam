@@ -1,12 +1,11 @@
 """Standard-mode verifier: reads what the sim service (which the agent could not touch) wrote: /data/final.json (the
 LIVE episode's result and the crash-recovery fields), /data/trajectory.npz, /data/live.mp4. The trial is graded by its
-live episode (owner 2026-10-17; no grading replay): success = the live episode's success (RoboDojo's
+live episode (no grading replay): success = the live episode's success (RoboDojo's
 check passed at an action of the episode the agent ran) and no infrastructure failure. The same rule for every task; a
-task whose physics does not replay bit for bit (instance.json "determinism": "verdict", `determinism_verdict_mode`) was
-graded so before, with a replay recorded that no longer runs. Until 2026-10-17 the other tasks were graded by
-`live_success` and the success of one fresh-process replay. Numeric-only reward.json; a reward is written whatever final.json holds.
+task whose physics does not replay bit for bit (instance.json "determinism": "verdict", `determinism_verdict_mode`) is
+graded the same way. Numeric-only reward.json; a reward is written whatever final.json holds.
 
-infra_error = 1 (no verdict on the agent, PROTOCOL §2.6): final.json is missing (the service never came up, or its
+infra_error = 1 (no verdict on the agent, PROTOCOL §4, H.5): final.json is missing (the service never came up, or its
 container was gone when the collect hook ran), unreadable, or not finalized (the collect hook did not finish); or the
 service or the hook reported one: a give-up after crashes between calls (`sim_crashed`), a failed resume, the frozen
 instance not rebuilt at the episode's start (`instance_mismatch`, before the agent was served), the episode never ended
@@ -47,9 +46,15 @@ write(ok, {"success": int(ok), "live_success": int(bool(d.get("success"))), "gra
            "sim_error": int(d.get("reason") == "error"),   # a simulator error during the agent's calls: the agent's 0
            "instance_mismatch": int(bool(d.get("instance_mismatch"))), "instance_exact": int(bool(d.get("instance_exact"))),
            "grader_error": 0,
-           # an infrastructure failure, not the agent's (PROTOCOL §2.6): see the module docstring
+           # an infrastructure failure, not the agent's (PROTOCOL §4, H.5): see the module docstring
            "infra_error": int(infra), "gave_up": int(bool(d.get("gave_up"))),
            "sim_crashed_on_call": int(d.get("reason") == "sim_crashed_on_call"),
            "sim_startups": int(num("sim_startups")), "resumes": int(num("resumes")),
            "resume_state_mismatch": int(num("resume_state_mismatch")), "resume_max_tcp_dev_m": num("resume_max_tcp_dev_m"),
-           "resume_max_joint_dev": num("resume_max_joint_dev")})
+           "resume_max_joint_dev": num("resume_max_joint_dev"),
+           # an agent-ended episode's record (PROTOCOL §3: final.json success_signal / ended_by, step_limit / steps_used)
+           **({"ended_finish": int(d.get("ended_by") == "finish"), "ended_step_limit": int(d.get("ended_by") == "step_limit"),
+               "ended_session_end": int(d.get("ended_by") == "session_end"),
+               "hidden_success_seen": int(bool(d.get("hidden_success_seen")))}
+              if d.get("success_signal") == "hidden" else {}),
+           **({"step_limit": int(num("step_limit")), "steps_used": int(num("steps_used"))} if d.get("step_limit") else {})})

@@ -1,8 +1,8 @@
 # RoboCasa365
 
 50 of [RoboCasa365](https://github.com/robocasa/robocasa)'s kitchen tasks (robocasa 1.0.1) with a mobile manipulator
-(Franka Panda on an Omron mobile base), each on one frozen instance, in both modes: 100 tasks; and one standard-realtime twin:
-`tasks/robocasa365/robocasa365-turn-on-toaster-oven-i00-standard-realtime`, the benchmark's one dynamic task.
+(Franka Panda on an Omron mobile base), each on one frozen instance, in both modes: 100 tasks; and one realtime twin:
+`tasks/robocasa365/robocasa365-turn-on-toaster-oven-i00-realtime`, the benchmark's one dynamic task.
 
 ## Quick start
 ```bash
@@ -30,13 +30,14 @@ docker build -f images/robocasa365/Dockerfile -t ghcr.io/mll-lab-nu/efe:robocasa
 ```
 
 ## Scope and selection rule
-PR #4 accepted 256 RoboCasa365 families with a demonstration-based reference (63 atomic, 193 composite; the 109 others
+The candidates are the 256 RoboCasa365 families with a demonstration-based reference validated in this repository's pull
+request #4 (PR #4: closed without merging; commit ad3c510, fetchable as `refs/pull/4/head`) (63 atomic, 193 composite; the 109 others
 have no official demonstration at the pinned commit or no validated reference). This benchmark takes 50 of them
 (deterministically): the slots are shared between atomic and composite tasks in proportion to their
 sizes (12 atomic, 38 composite; the group is the module the environment class lives in); within a group, families are
 taken in the order of the SHA-256 of their environment name, skipping any whose reference does not verify with this
 benchmark's tooling, until the group's slots are filled. One candidate was skipped:
-`OrganizeMugsByHandle` (its reference does not reach success when replayed with MuJoCo's mesh cache off (every build cold); PR #4 had accepted it with the cache on).
+`OrganizeMugsByHandle` (its reference does not reach success when replayed with MuJoCo's mesh cache off, as every build here is).
 
 - Atomic (12): PickPlaceSinkToCounter, PickPlaceCabinetToCounter, CloseDrawer, TurnOnMicrowave, CloseOven, TurnOnStove, TurnOnToasterOven, OpenDishwasher, TurnOffMicrowave, PackDessert, TurnOnSinkFaucet, CloseStandMixerHead.
 - Composite (38): RetrieveMeat, DrainVeggies, SanitizePrepCuttingBoard, AssembleCookingArray, ClearSink, CookieDoughPrep, DisplayMeatVariety, CandleCleanup, DivideBasins, BeverageSorting, StockingBreakfastFoods, BreadAndCheese, DeliverBrewedCoffee, PortionInTupperware, OvenBroilFish, MakeIceLemonade, TongBuffetSetup, AddLemonToFish, MicrowaveDefrostMeat, MealPrepStaging, MakeLoadedPotato, PrepForSanitizing, SeasoningSpiceSetup, PrepMarinatingMeat, PreRinseStation, SetUpCuttingStation, DessertUpgrade, SweetenCoffee, CerealAndBowl, SearingMeat, ThawInSink, ScrubBowl, PlateSteakMeal, DrinkwareConsolidation, ReheatMeal, ClearFoodWaste, ChooseMeasuringCup, OrganizeCoffeeCondiments.
@@ -52,8 +53,7 @@ benchmark's tooling, until the group's slots are filled. One candidate was skipp
   base and torso feedback for some). In standard mode the type is `joint_position` (its arm channels are joint
   targets; the base and torso stay velocity-controlled).
 - **Success.** The environment's own `_check_success` on the state after the last action (PROTOCOL §3), and not
-  already at the start. PR #4 graded RoboCasa365 by "success at any step"; here every reference succeeds on its final
-  state (none had to be cut). The check runs twice per control step and once at reset everywhere. In
+  already at the start. Every reference succeeds on its final state. The check runs twice per control step and once at reset everywhere. In
   1 task (PlateSteakMeal) the success does not survive 10 more still steps; its instructions (both modes) and README
   say so. Both instructions also state, per task, what `_check_success` requires beyond the task's sentence
   (`envs.SUCCESS`: releasing and moving the gripper away, distance thresholds, timers, joint thresholds), since the
@@ -78,8 +78,8 @@ replayed, the start checked against the frozen instance (`RCB_INSTANCE_SHA`, `RC
 each task's `environment/docker-compose.yaml`, a mismatch is infrastructure), the video one render pass after the
 verdict; the hook's budget; request validation; the camera calibration is the rendered viewpoint).
 
-## Standard-realtime (`eai-standard/2.3`)
-The dynamic tasks (PROTOCOL §2: each task's `[metadata] dynamics`) get a `-standard-realtime` twin. In RoboCasa365 that is **TurnOnToasterOven** only: once set, the oven's timer knob turns back
+## Realtime (`eai-standard/2.3`)
+The dynamic tasks (PROTOCOL §2: each task's `[metadata] dynamics`) get a `-realtime` twin. In RoboCasa365 that is **TurnOnToasterOven** only: once set, the oven's timer knob turns back
 by itself (`ToasterOven.update_state`: 1/3000 of its range per simulated second, on `sim.data.time`, so a replay repeats
 it bit for bit). The toaster ovens and electric kettles of other tasks move by themselves too, but no other task uses them.
 - **Service.** The shared realtime layer of HumanoidBench, BiGym 2.0 and Embodied Olympics - Fun, unchanged
@@ -148,7 +148,7 @@ Argon `antigravity_cli-gemini_4_argon-high`; DeepSeek V4.1 Flash `dsh-deepseek_v
 
 By directory: 70 easy, 6 hard, 25 unverified, 0 pending.
 
-| base | privileged | standard | standard-realtime |
+| base | privileged | standard | realtime |
 |---|---|---|---|
 | `robocasa365-add-lemon-to-fish-i00` | easy: Astra, Opus, Sol 6.1, Sol, Gemini 4 Argon | easy: Astra, Opus, Sol 6.1 | — |
 | `robocasa365-assemble-cooking-array-i00` | easy: Astra, Opus, Sol 6.1, Sol, Gemini 4 Argon | hard (only Astra) | — |

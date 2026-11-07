@@ -10,10 +10,10 @@ effective_config: protocol version, mode, cutoff, reset budget, slowdown S, seed
 result (`success`, `fail` or `not_a_result` with the reason), whether it is counted and, in the standard modes, the
 first-attempt result `first_success` (PROTOCOL §4: the no-reset performance, reported beside the graded one). Results are ranked only within
 one comparable configuration (task_conventions.config_key), validated and unvalidated tasks together.
-attempts.json: every trial of this task x run id seen so far. docs/protocol/running.md "Infrastructure retry": an infrastructure failure
-(not a result) allows at most one full retry with the same instance, seed and configuration; the voided attempt is never
-counted, an agent's own failure is never retried, and more than 2 attempts of one task x run id is flagged
-(`attempts_over_cap`)."""
+attempts.json: every trial of this task x run id seen so far. docs/protocol/running.md "Infrastructure failures": an
+infrastructure failure (not a result) is void and may be rerun with the same instance, seed and configuration; the voided
+attempt is never counted, a result (the agent's failure or a success) is never rerun, and an attempt after a result is
+flagged (`attempts_over_cap`)."""
 import json, pathlib, shutil, sys, glob, datetime as dt
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import account_failure_check  # noqa: E402
@@ -21,7 +21,6 @@ import task_conventions as tc  # noqa: E402
 import retry_policy as rp  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MAX_ATTEMPTS = 1 + rp.MAX_INFRA_RETRIES   # PROTOCOL Appendix H.5: the first attempt and at most one retry after an infrastructure failure
 OUTCOME = {"not_a_result": "infra_failure", "success": "success"}   # anything else: the agent's failure (a result)
 OVERRIDES = ("RCB_RESET_BUDGET", "RCB_SLOWDOWN")   # run-time overrides of a task's declared settings (PROTOCOL §2)
 
@@ -85,19 +84,26 @@ def classify(trial, r, rw):
     # the verifier never graded, or that Harbor or the model account ended (not_a_result). A verdict of success with no
     # infrastructure flag stands; over the token budget is the agent's failure unless the verifier flagged infrastructure.
     infra = bool(rw.get("infra_error") or rw.get("grader_error"))
-    ok = rw.get("success") == 1 and not over and not infra
+    # an agent-ended episode (PROTOCOL §3; reward.json ended_session_end) is graded on the state its session ended in, the
+    # token budget's end included: over the budget it is not failed on top
+    fails = over and "ended_session_end" not in rw
+    ok = rw.get("success") == 1 and not fails and not infra
     why = None if ok or (over and not infra) else not_a_result(trial, r, rw)
     return ("success" if ok else "not_a_result" if why else "fail"), why, over
 
 
-def first_success(rw, mode):
+def first_success(rw, mode, reset_budget=None):
     """The first attempt's result in the standard modes (PROTOCOL §4): reward.json's first_success; a verifier that does
-    not write it: the graded success when no reset was made, else 0 (a success ends the trial); None when reward.json
-    says neither (privileged mode, no verdict, no `resets`)."""
+    not write it: the graded success when the trial's reset budget (its effective configuration) is 0, as no reset
+    could be made (whatever a service counts as `resets`), else the graded success when no reset was made, else 0 (a
+    success ends the trial). None when none of these is known (privileged mode, no verdict, no `resets` and a reset
+    budget other than 0 or unknown)."""
     if mode == "privileged" or not rw or rw.get("infra_error") or rw.get("grader_error"):
         return None
     if rw.get("first_success") is not None:
         return int(bool(rw["first_success"]))
+    if type(reset_budget) is int and reset_budget == 0:
+        return int(rw.get("success") == 1)
     if rw.get("resets") is None:
         return None
     return int(rw.get("success") == 1 and int(rw.get("resets") or 0) == 0)
@@ -183,8 +189,8 @@ def main(argv):
         rule = rp.check_attempts([{"outcome": OUTCOME.get(a["status"], "agent_failure")} for a in led])
         over_cap = bool(rule)
         if over_cap:
-            print(f"WARN {task} / {slug}: {len(led)} attempts break the retry rule (PROTOCOL Appendix H.5, at most "
-                  f"{MAX_ATTEMPTS}: one retry after an infrastructure failure): {'; '.join(rule)}")
+            print(f"WARN {task} / {slug}: {len(led)} attempts break the rerun rule (PROTOCOL Appendix H.5: reruns only "
+                  f"after an infrastructure failure): {'; '.join(rule)}")
         counted = [a for a in led if a["counted"]]
         if status == "not_a_result" and counted:
             # a voided attempt never replaces a counted one: it is recorded in attempts.json only
@@ -193,19 +199,19 @@ def main(argv):
         cfg = trial_config(trial, task, r)
         cfg.update({"run_id": slug, "job": job, "trial": trial.name, "result": status, "not_a_result_reason": why,
                     "counted": status != "not_a_result", "attempts": len(led), "attempts_over_cap": over_cap,
-                    "first_success": first_success(rw, mode)})
+                    "first_success": first_success(rw, mode, cfg.get("reset_budget"))})
         (out / "config.json").write_text(json.dumps(cfg, indent=1) + "\n")
         for f in ("replay.mp4", "replay.last.png", "replay.first.mp4", "replay.first.last.png"):
             if (trial / "verifier" / f).exists(): shutil.copy(trial / "verifier" / f, out / f)
         ok = status == "success"
         lines = [f"# {label} — {task}\n",
-                 f"Run: Harbor job `{job}`, trial `{trial.name}`, {(r.get('started_at') or '')[:10]}. Mode: **{ {'standard': 'standard (robot as a service)', 'standard-realtime': 'standard-realtime (robot as a service, time does not stop)'}.get(mode, 'privileged')}**.\n",
+                 f"Run: Harbor job `{job}`, trial `{trial.name}`, {(r.get('started_at') or '')[:10]}. Mode: **{ {'standard': 'standard (robot as a service)', 'realtime': 'realtime (robot as a service, time does not stop)'}.get(mode, 'privileged')}**.\n",
                  "| | |", "|---|---|",
                  f"| result | {'**1 (success)**' if ok else NOT_A_RESULT.format(why) if why else '**0**' + (' — over the token budget' if over else ' — no trajectory handed in' if rw.get('missing_trajectory') else '')} |",
                  f"| configuration | {tc.config_label(cfg)}; seed {cfg.get('seed')} ({cfg.get('seed_source')}); "
                  f"{'validated' if cfg.get('validated') is True else 'unvalidated' if cfg.get('validated') is False else 'legacy'}"
                  f"{'; not in the core set (docs/core_set.toml)' if cfg.get('set') not in (None, '', 'core') else ''} (`config.json`) |",
-                 f"| attempts | {len(led)}" + (f" — **over the cap of {MAX_ATTEMPTS}**" if over_cap else "") + " |",
+                 f"| attempts | {len(led)}" + (" — **breaks the rerun rule (PROTOCOL H.5)**" if over_cap else "") + " |",
                  *([f"| first attempt (no reset) | {cfg['first_success']}; resets {rw.get('resets')} |"]
                    if cfg["first_success"] is not None else []),
                  f"| agent time | {span(r.get('agent_execution') or {})} s |",

@@ -2,6 +2,7 @@
 
 <p align="center">
   <a href="https://www.embodied-first-exam.ai"><img src="https://img.shields.io/badge/Website-embodied--first--exam.ai-2f4f4f" alt="Website"></a>
+  <a href="https://github.com/mll-lab-nu/embodied-first-exam/blob/main/docs/arxiv.pdf"><img src="https://img.shields.io/badge/arXiv-paper-b31b1b?logo=arxiv&logoColor=white" alt="arXiv"></a>
   <a href="https://discord.gg/AhC6utNyfk"><img src="https://img.shields.io/badge/Discord-join-5865f2?logo=discord&logoColor=white" alt="Discord"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-b8a133" alt="License: MIT"></a>
   <a href="docs/assets/wechat.jpg"><img src="https://img.shields.io/badge/WeChat-group-07c160?logo=wechat&logoColor=white" alt="WeChat group"></a>
@@ -26,7 +27,7 @@
   <a href="https://www.embodied-first-exam.ai/suite/?id=ispatialgym"><img src="docs/assets/suites/ispatialgym.gif" alt="iSpatialGym" title="iSpatialGym" width="32%"></a>
 </p>
 
-<p align="center"><b>Our nine original suites:</b> <b>RoboPaint</b> · <b>RoboARC</b> · <b>RoboDynamicExam</b> · <b>Embodied Olympics - Fun</b> · <b>Embodied Olympics - Match</b> · <b>DexHandExam</b> · <b>RoboEngineer</b> · <b>Embodied Safety Exam</b> · <b>iSpatialGym</b><br><a href="https://huggingface.co/datasets/MLL-Lab/embodied-exam-media/resolve/main/site/blog/efe-intro.mp4"><b>▶ Watch the intro video</b></a></p>
+<p align="center"><b>Our nine original suites:</b> <b>RoboPaint</b> · <b>RoboARC</b> · <b>RoboDynamicExam</b> · <b>Embodied Olympics - Fun</b> · <b>Embodied Olympics - Match</b> · <b>DexHandExam</b> · <b>RoboEngineer</b> · <b>Embodied Safety Exam</b> · <b>iSpatialGym</b><br><a href="https://huggingface.co/datasets/MLL-Lab/embodied-exam-data/resolve/main/site/blog/efe-intro.mp4"><b>▶ Watch the intro video</b></a></p>
 
 ## News
 
@@ -88,7 +89,7 @@ Nine of the suites were written for this exam:
 ### Before you run
 
 - **Host:** Linux x86_64 with git, [uv](https://docs.astral.sh/uv/) (it fetches a Python 3.12-3.14 for Harbor if needed) and Docker Engine with Compose v2 and BuildKit (the `buildx` plugin). Without Docker, e.g. on a Slurm cluster: rootless podman with `-e podman` ([docs/protocol/running.md](docs/protocol/running.md#without-docker-rootless-podman-eg-a-slurm-cluster)).
-- **GPU:** the NVIDIA driver and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for every task that uses a GPU. An RTX-class GPU (with RT cores; not A100 or H100): AM-Bench, BEHAVIOR-1K, EmbodiedSWE, iSpatialGym, LabUtopia, ManiGuard, RoboARC, RoboDojo, RoboLab, YAMLab. Any NVIDIA GPU: ABC Sim, BiGym 2.0, DexToolBench, MolmoSpaces, Panda Dynamic Scenes, RoboPaint, RoboTwin 2.0, RoboWits. Some tasks: Embodied Olympics - Fun, Embodied Olympics - Match, HumanoidBench, KinDER, MuJoCo Playground, MyoSuite, roboEngineer. No GPU: AutoBio, DexHand, DexJoCo, Embodied Safety Exam, LIBERO-MAX, MetaWorld+, RoboCasa, RoboCasa-GR1, RoboCasa365, VLABench.
+- **GPU:** the NVIDIA driver and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for every task that uses a GPU. An RTX-class GPU (with RT cores; not A100 or H100): AM-Bench, BEHAVIOR-1K, EmbodiedSWE, iSpatialGym, LabUtopia, ManiGuard, RoboARC, RoboDojo, RoboLab, YAMLab. Any NVIDIA GPU: ABC Sim, BiGym 2.0, DexToolBench, HumanCLAW, MolmoSpaces, Panda Dynamic Scenes, RoboPaint, RoboTwin 2.0, RoboWits. Some tasks: Embodied Olympics - Fun, Embodied Olympics - Match, HumanoidBench, KinDER, MuJoCo Playground, MyoSuite, roboEngineer. No GPU: AutoBio, DexHand, DexJoCo, Embodied Safety Exam, LIBERO-MAX, MetaWorld+, RoboCasa, RoboCasa-GR1, RoboCasa365, VLABench.
 - **Disk:** a benchmark's public images take 1-30 GB, pulled on its first run; a benchmark that builds its image needs the free disk its row below states.
 - **API keys** for the agent's model in `.env` (step 1), or a subscription (step 3).
 
@@ -99,6 +100,7 @@ These benchmarks need a step by hand, or build their image on their first run be
 | [AM-Bench](tasks/ambench/README.md#before-you-run) | - | Builds its image (accepts NVIDIA's Isaac Sim terms): about 25 min, 60 GB free disk. |
 | [AutoBio](tasks/autobio/README.md#before-you-run) | - | Builds its image from AutoBio's repository, which states no licence (CPU only): a few minutes, 3 GB free disk. |
 | [BEHAVIOR-1K](tasks/behavior-1k/README.md#before-you-run) | Download the BEHAVIOR dataset (its downloader asks you to accept the BEHAVIOR Data Bundle licence; about 32 GB, 40 GB on disk) and export `RCB_BEHAVIOR_DATA`. | Builds its image (accepts NVIDIA's Isaac Sim terms): about 20 min, 30 GB free disk. |
+| [HumanCLAW](tasks/humanclaw/README.md#before-you-run) | Without access to the organization's packages: request access to the gated Hugging Face dataset `HumanCLAW/HumanCLAW-HSSD`, accept the `hssd/hssd-hab` terms, export `HF_TOKEN` and build its image once (HSSD is CC BY-NC 4.0; the body model and motion weights carry SMPL-X / AMASS research terms): about 30 min, 40 GB free disk. | - |
 | [iSpatialGym](tasks/ispatialgym/README.md#before-you-run) | The BEHAVIOR-1K dataset, `RCB_BEHAVIOR_DATA` (the same directory). | Builds its image (accepts NVIDIA's Isaac Sim terms): about 20 min, 31 GB free disk. |
 | [LabUtopia](tasks/labutopia/README.md#before-you-run) | - | Builds its image (accepts NVIDIA's Isaac Sim terms; LabUtopia's assets are CC BY-NC 4.0): about 25 min, 90 GB free disk. |
 | [LIBERO-MAX](tasks/libero-max/README.md#task-definition) | A CPU with AVX-512 (Intel Ice Lake or newer Xeon, AMD Zen 4 or newer). | - |
@@ -131,17 +133,17 @@ uv tool install embodied-first-exam --with-executables-from harbor
 ### 2. Run
 
 ```bash
-# the core set: 455 tasks, each in its default mode
+# the core set: 456 tasks, each in its default mode
 harbor run -d embodied-first-exam -a codex -m openai/gpt-6-astra
 ```
 
 ```bash
-# the core tasks in another mode: --privileged (379 tasks), --standard, --standard-realtime
+# the core tasks in another mode: --privileged (391 tasks), --standard, --realtime
 harbor run -d embodied-first-exam --privileged -a codex -m openai/gpt-6-astra
 ```
 
 ```bash
-# every task: 2260 task dirs (1154 tasks in their modes, 35 benchmarks)
+# every task: 2398 task dirs (1211 tasks in their modes, 36 benchmarks)
 harbor run -d embodied-first-exam@all -a codex -m openai/gpt-6-astra
 ```
 
@@ -214,8 +216,8 @@ upstream experts and the contents of the base images keep their own licenses.
 ```bibtex
 @misc{embodiedfirstexam2026,
   title        = {Embodied First Exam},
-  author       = {Kangrui Wang*§ and Qineng Wang*§ and Changhe Chen*§ and Pingyue Zhang*§ and Chi Gui*§ and Feishi Wang§ and Canyu Chen§ and Wenli Xiao§ and Xiaoyu Huang§ and Tonghe Zhang§ and Linjie Li§ and Zihan Wang and Minyeong Kim and Yiyou Sun and Mingkai Deng and Jinyu Hou and Eric P. Xing and Han Liu and Qi Zhu and Huaxiu Yao and Zhiwen Fan and Yuejiang Liu and Dawn Song and Pieter Abbeel and Li Fei-Fei and Jiajun Wu and Yuke Zhu and Guanya Shi† and Ruohan Zhang† and Manling Li†},
+  author       = {Kangrui Wang and Qineng Wang and Changhe Chen and Pingyue Zhang and Chi Gui and Feishi Wang and Canyu Chen and Wenli Xiao and Xiaoyu Huang and Tonghe Zhang and Linjie Li and Zihan Wang and Minyeong Kim and Yiyou Sun and Mingkai Deng and Jinyu Hou and Qi Zhu and Han Liu and Eric P. Xing and Huaxiu Yao and Zhiwen Fan and Yuejiang Liu and Dawn Song and Pieter Abbeel and Li Fei-Fei and Jiajun Wu and Yuke Zhu and Guanya Shi and Ruohan Zhang and Manling Li},
   year         = {2026},
-  url          = {https://www.embodied-first-exam.ai}
+  url          = {https://github.com/mll-lab-nu/embodied-first-exam/blob/main/docs/arxiv.pdf}
 }
 ```
