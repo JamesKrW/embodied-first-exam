@@ -21,6 +21,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_TASK: balance_hard
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "Stand on the balance board and stay on it, upright and still, for the whole episode."

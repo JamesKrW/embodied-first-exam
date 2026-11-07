@@ -21,6 +21,7 @@ services:
     command: python /srv/server.py
     restart: on-failure:6                               # a crash resumes the same episode, never a reset (rcb_service.py)
     environment:
+      RCB_HIDE_SUCCESS: "1"                            # the no-success-signal ablation (standard_mode.md)
       RCB_TASK: cube
       RCB_INSTANCE: /srv/instance.npz
       RCB_TASK_TEXT: "A cube starts just above and in front of each palm. Rotate both cubes, without dropping them, to the goal orientation: that of the translucent cube with the same faces floating above and between the hands."
