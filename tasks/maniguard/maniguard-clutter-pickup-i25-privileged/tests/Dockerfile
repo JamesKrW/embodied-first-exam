@@ -143,7 +143,7 @@ WORKDIR /app
 # artifacts (/app/output/), so a patched monitor, goal check or interpreter in the agent container cannot change the verdict.
 FROM maniguard-base
 COPY test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:maniguard-files-0.6.0@sha256:1ec09331e2234842a5f426997b0032048f7b4ff220e2311fa947df7218bb9b39 /privileged/environment/rcb_maniguard.py /privileged/tests/grade.py /tests/
+COPY --from=ghcr.io/mll-lab-nu/efe:maniguard-files-0.6.2@sha256:ad4872b721d186e15784b82f23315ab059cd06c304e4efb388ee5acaa3247da1 /privileged/environment/rcb_maniguard.py /privileged/tests/grade.py /tests/
 COPY instance /tests/instance
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests

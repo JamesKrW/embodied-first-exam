@@ -143,7 +143,7 @@ WORKDIR /app
 # environment/docker-compose.yaml mounts the host's copy ($RCB_MANIGUARD_DATA, tasks/maniguard/README.md).
 FROM maniguard-base
 COPY instance /app/instance
-COPY --from=ghcr.io/mll-lab-nu/efe:maniguard-files-0.6.0@sha256:1ec09331e2234842a5f426997b0032048f7b4ff220e2311fa947df7218bb9b39 /privileged/environment/rcb_maniguard.py /opt/tools/rcb_maniguard.py
+COPY --from=ghcr.io/mll-lab-nu/efe:maniguard-files-0.6.2@sha256:ad4872b721d186e15784b82f23315ab059cd06c304e4efb388ee5acaa3247da1 /privileged/environment/rcb_maniguard.py /opt/tools/rcb_maniguard.py
 ENV PYTHONPATH=/opt/tools
 RUN mkdir -p /app/output
 WORKDIR /app
