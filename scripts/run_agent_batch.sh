@@ -147,7 +147,7 @@ mkdir -p "$JOBS/.plan"
 python3 - "$R" "$JOBS/.plan/$batch.json" "$batch" "$RUN_ID" "$SEQ" "$MODES" "${tasks[@]}" <<'PY'
 import json, os, pathlib, sys
 repo, out, batch, run_id, seq, modes, *tasks = sys.argv[1:]
-name = lambda m, t: {"standard": f"{t}-standard", "limited": f"{t}-standard", "standard-realtime": f"{t}-standard-realtime"}.get(m, f"{t}-privileged")
+name = lambda m, t: {"standard": f"{t}-standard", "limited": f"{t}-standard", "standard-realtime": f"{t}-standard-realtime", "realtime": f"{t}-realtime"}.get(m, f"{t}-privileged")
 jobs = [{"job": f"{batch}-{m}-{t}" if seq == "1" else f"{batch}-{m}", "task": name(m, t), "mode": m}
         for t in tasks for m in modes.split() if any(pathlib.Path(repo).glob(f"tasks/*/{name(m, t)}/task.toml"))]   # tasks/<benchmark folder>/<task>/
 tmp = pathlib.Path(f"{out}.{os.getpid()}")
@@ -454,6 +454,7 @@ name() {  # <mode> <base> -> task dir name: <base>-privileged / <base>-standard 
   case "$1" in
     standard|limited) echo "$2-standard" ;;
     standard-realtime) echo "$2-standard-realtime" ;;
+    realtime) echo "$2-realtime" ;;   # the pool's job mode of a realtime test (its <base>-realtime copy, board 0447)
     *) echo "$2-privileged" ;;
   esac
 }
@@ -486,7 +487,7 @@ else
   for m in $MODES; do
     inc=(); for t in "${tasks[@]}"; do [ -d "$(src_of "$(name "$m" "$t")")" ] && inc+=(-i "$(name "$m" "$t")"); done
     [ ${#inc[@]} -eq 0 ] && continue
-    n="$N_P"; case "$m" in standard|limited|standard-realtime) n="$N_S" ;; esac   # sidecar modes
+    n="$N_P"; case "$m" in standard|limited|standard-realtime|realtime) n="$N_S" ;; esac   # sidecar modes
     (wait_for "$m"; run_job "$batch-$m" "$n" "${inc[@]}") &
     pids+=($!)
   done
