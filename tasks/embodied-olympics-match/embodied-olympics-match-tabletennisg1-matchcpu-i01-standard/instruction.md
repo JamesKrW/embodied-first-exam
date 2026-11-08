@@ -122,6 +122,49 @@ You are free to develop, train, experiment and adapt inside your seat. Not allow
 - Development: `/opt/practice/README.md` · `game practice` · `/opt/ro/toolkit.toml` · `/opt/ro/g1_robot_only.xml` · `/opt/robot/lib/bodies/gpu/README.md`
 Before you develop or deploy your programs, read `game spec` and `game rules`.
 
+## This run: unlimited resets, save and load
+
+This run lets you restart the match and go back to a saved moment. This section overrides anything above that says
+there is one match only, or that a lost match ends your run.
+
+- `POST http://localhost:8000/$SEAT/reset` with `{}`: the match from its start again (the same instance: the world,
+  the opponent, the score and the clocks), as a new episode. You have 1000 resets (`budget.reset` in `/spec`).
+- `POST http://localhost:8000/$SEAT/save_state` with `{}` answers `{"handle": "s1", "step": ...}`: the whole match
+  now (the world, the opponent with its own internal state, the random generators, the score, the game clock) kept in
+  the service; the handle is all you get. `POST http://localhost:8000/$SEAT/load_state` with `{"handle": "s1"}` goes
+  back to it exactly, as a new episode. At most 32 handles are kept (the least recently used is dropped). Saves and
+  loads do not use up resets.
+- After a reset or a load the world is frozen until you send `game start` (or `game ready`), at most
+  `timing.review_timeout_s` of real time; then it advances again, only while you let it (`game wait`,
+  your acts), as before. The task's time limit keeps running.
+- A match you lose by its rules (the opponent wins it, a missed review, the clock) is held at its end: `/status` shows
+  phase `over`, and you may still reset or load. A match you win ends the run: no reset, save or load after it.
+- Only the last episode is graded, with the task's rules: from the start, or for a loaded episode the play that led
+  to the saved moment followed by what came after the load. If your session ends during a match, that match is
+  abandoned (success 0); a held loss stays a loss. `final.json` records `resets`, `saves`, `loads` and `episodes`.
+
+## This run: privileged state queries
+
+This run lets you query the simulator's state. This section overrides anything above that says to use only the
+camera images, the service's replies and this document, or that the simulator's state is never given.
+
+- `GET http://localhost:8000/$SEAT/state/entities` lists what you can query:
+  `{"frame": ..., "quaternion_order": ..., "entities": {name: {"kind": ..., "fields": {field: unit}, "note"?}}}`.
+  The kinds are `robot` (your robot, and the opponent's when it is one), `robot_link` (your paddle, racket, rods or
+  blade), `object` (the ball or the shuttle, the opponent's paddle, racket or blade, a scripted opponent that is only
+  drawn), `articulation` (the opponent's rods) and `scene_feature` (the table, net, court, goals, playfield, piste and
+  its lines); `note` says what an entity is. The list is fixed for the run.
+- `POST http://localhost:8000/$SEAT/state/query` with `{"names": ["ball", ...], "fields": ["pos"]}` answers JSON
+  `{"state": {name: {field: value}}, "control_steps": ..., "sim_time_s": ..., "state_queries": ...}` with the
+  current values from the simulator. `fields` is optional. The fields and their units are in the list: `pos` m,
+  `quat`, `lin_vel` m/s, `ang_vel` rad/s, `joint_pos` / `joint_vel` / `joint_range` {joint: value}, `size` (the
+  full extents along the body's own axes, m) and `bbox` (its axis-aligned box, `[[x, y, z] min, [x, y, z] max]`, m),
+  all in the frame `frame` names (your own frame, as in the observation). An unknown name or field is a 400 that
+  lists the valid ones.
+- A query only reads: no control step, the clock neither advances nor pauses (the world stands still during it, as between your calls).
+  It is served until the match is over (409 after). Queries are counted and recorded; they do not change the grading.
+- Nothing else changes: no answer holds the score, a point's result or the opponent's plan or strategy.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 
