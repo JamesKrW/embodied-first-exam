@@ -73,6 +73,28 @@ Everything you need is in `game spec`: the world frame, the release point, the c
 `focal_px`, `principal_point_px`; pinhole: u = cx + f * x_right / depth, v = cy - f * y_up / depth) and the
 execution scatter. The physics engine is MuJoCo 3.3.7 (2 ms physics steps, 20 ms control steps; four Booster T1 lower bodies on the released walking policy, a model-based swing kick and an in-walk kick, a ball calibrated to FIFA turf (bounce, rolling deceleration), the real T1's leg torques, torque-speed envelope and walking-command rate; robot-robot, robot-ball, goal and board contacts).
 
+## This run: privileged state queries
+
+This run lets you query the simulator's state. This section overrides anything above that says to use only the
+camera images, the service's replies and this document, or that the simulator's state is never given.
+
+- `GET http://localhost:8000/$SEAT/state/entities` lists what you can query:
+  `{"frame": ..., "quaternion_order": ..., "entities": {name: {"kind": ..., "fields": {field: unit}, "note"?}}}`.
+  The kinds are `robot` (your robot, and the opponent's when it is one), `robot_link` (your paddle, racket, rods or
+  blade), `object` (the ball or the shuttle, the opponent's paddle, racket or blade, a scripted opponent that is only
+  drawn), `articulation` (the opponent's rods) and `scene_feature` (the table, net, court, goals, playfield, piste and
+  its lines); `note` says what an entity is. The list is fixed for the run.
+- `POST http://localhost:8000/$SEAT/state/query` with `{"names": ["ball", ...], "fields": ["pos"]}` answers JSON
+  `{"state": {name: {field: value}}, "control_steps": ..., "sim_time_s": ..., "state_queries": ...}` with the
+  current values from the simulator. `fields` is optional. The fields and their units are in the list: `pos` m,
+  `quat`, `lin_vel` m/s, `ang_vel` rad/s, `joint_pos` / `joint_vel` / `joint_range` {joint: value}, `size` (the
+  full extents along the body's own axes, m) and `bbox` (its axis-aligned box, `[[x, y, z] min, [x, y, z] max]`, m),
+  all in the frame `frame` names (your own frame, as in the observation). An unknown name or field is a 400 that
+  lists the valid ones.
+- A query only reads: no control step, the clock neither advances nor pauses (the world stands still during it, as between your calls).
+  It is served until the match is over (409 after). Queries are counted and recorded; they do not change the grading.
+- Nothing else changes: no answer holds the score, a point's result or the opponent's plan or strategy.
+
 ## External material
 You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
 

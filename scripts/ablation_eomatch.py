@@ -11,7 +11,9 @@ ablation's calls when its switches are set:
 
 Per task dir (idempotent):
   - environment/docker-compose.yaml: the `sim` service's command `python3 /srv/rcb_ablation/launch.py` (core/launch.py
-    unchanged, its match service started as `python -m rcb_ablation.serve`) and the switches first in its environment;
+    unchanged, its match service started as `python -m rcb_ablation.serve`), or in a standard task dir (`python3 -m
+    core.lockstep`) `python3 /srv/rcb_ablation/lockstep.py` (core/lockstep.py unchanged, its service class with the
+    ablation's routes), and the switches first in its environment;
   - environment/sim/rcb_ablation/: the layer (the sim image's `COPY . /srv/` takes it);
   - tests/rcb_ablation_reward.py, run by tests/test.sh after fexam_reward.py: the ablation's counts from final.json
     into reward.json (numbers only; the success is the grader's);
@@ -36,6 +38,15 @@ BENCH = "embodied-olympics-match"
 BUDGET = 1000
 LAUNCH_OLD = "command: python3 /srv/core/launch.py"
 LAUNCH_NEW = "command: python3 /srv/rcb_ablation/launch.py   # the ablation's layer around core/launch.py"
+LOCKSTEP_OLD = "command: python3 -m core.lockstep"
+LOCKSTEP_NEW = "command: python3 /srv/rcb_ablation/lockstep.py   # the ablation's layer around core/lockstep.py"
+COMMANDS = {LAUNCH_OLD: LAUNCH_NEW, LOCKSTEP_OLD: LOCKSTEP_NEW,
+            'command: ["python3", "-m", "core.lockstep"]': LOCKSTEP_NEW}         # (table tennis G1: the list form)
+
+
+def _command(line: str) -> str:
+    """A compose line without its trailing comment."""
+    return re.sub(r"\s+#.*$", "", line.strip())
 SWITCHES = {"nosignal": {"RCB_HIDE_SUCCESS": "1"}, "query": {"RCB_STATE_QUERY": "1"},
             "reset": {"RCB_STATE_OPS": "1", "RCB_RESET_BUDGET": str(BUDGET)},
             "both": {"RCB_STATE_QUERY": "1", "RCB_STATE_OPS": "1", "RCB_RESET_BUDGET": str(BUDGET)}}
@@ -135,10 +146,10 @@ def _compose(text: str, mode: str) -> str:
     end = next((i for i in range(sim + 1, len(lines)) if re.match(r"^  \S", lines[i]) or re.match(r"^\S", lines[i])),
                len(lines))
     for i in range(sim + 1, end):
-        if lines[i].strip() == LAUNCH_OLD:
-            lines[i] = lines[i].replace(LAUNCH_OLD, LAUNCH_NEW)
-    if not any(ln.strip() == LAUNCH_NEW for ln in lines[sim + 1:end]):
-        raise RuntimeError("the sim service has no `command: python3 /srv/core/launch.py`")
+        if _command(lines[i]) in COMMANDS:
+            lines[i] = lines[i][:len(lines[i]) - len(lines[i].lstrip())] + COMMANDS[_command(lines[i])]
+    if not any(ln.strip() in COMMANDS.values() for ln in lines[sim + 1:end]):
+        raise RuntimeError("the sim service has no `command: python3 /srv/core/launch.py` or `python3 -m core.lockstep`")
     env = next(i for i in range(sim + 1, end) if re.match(r"^    environment:\s*(#.*)?$", lines[i]))
     have = {m.group(1) for ln in lines[env + 1:end] if (m := re.match(r"^      (\w+):", ln))}
     add = [f'      {k}: "{v}"   # the ablation (docs/ablations.md)' for k, v in SWITCHES[mode].items() if k not in have]
@@ -148,21 +159,32 @@ def _compose(text: str, mode: str) -> str:
 
 AFTER_REALTIME = ("After a reset or a load the world is frozen until you send `game start` (or `game ready`), at most\n"
                   "  `timing.review_timeout_s` of real time; then it runs on.")
+AFTER_LOCKSTEP = ("After a reset or a load the world is frozen until you send `game start` (or `game ready`), at most\n"
+                  "  `timing.review_timeout_s` of real time; then it advances again, only while you let it (`game wait`,\n"
+                  "  your acts), as before.")
 AFTER_TURN = "After a reset or a load the bout resumes at once, on the turn it had, with your clock as it was."
-CLOCK = {False: "the world keeps moving in real time", True: "your turn's clock keeps running"}
+CLOCK = {False: "the world keeps moving in real time", True: "your turn's clock keeps running",
+         "lockstep": "the world stands still during it, as between your calls"}
 BETWEEN = {False: "", True: ("\n- A phrase is fenced at once, inside the act that completes it; between phrases the fencers "
                               "stand on\n  guard, and a query gives that layout.")}
 
 
-def _instruction(text: str, mode: str, turn: bool) -> str:
-    after = AFTER_TURN if turn else AFTER_REALTIME
+def _instruction(text: str, mode: str, turn: bool, lockstep: bool = False) -> str:
+    after = AFTER_TURN if turn else AFTER_LOCKSTEP if lockstep else AFTER_REALTIME
+    clock = CLOCK["lockstep" if lockstep and not turn else turn]
     for head, body in SECTIONS[mode]:
         if head in text:
             continue
         i = text.index("## External material")
-        text = text[:i] + body.format(head=head, budget=BUDGET, after=after, clock=CLOCK[turn],
+        text = text[:i] + body.format(head=head, budget=BUDGET, after=after, clock=clock,
                                       between=BETWEEN[turn]) + text[i:]
     return text
+
+
+def _lockstep(compose: str) -> bool:
+    """A standard task dir: its sim runs core/lockstep.py."""
+    return LOCKSTEP_NEW in compose or any(_command(ln) in (LOCKSTEP_OLD, 'command: ["python3", "-m", "core.lockstep"]')
+                                          for ln in compose.split("\n"))
 
 
 def _turn(compose: str) -> bool:
@@ -195,7 +217,8 @@ def apply(d: pathlib.Path, mode: str) -> bool:
             raise RuntimeError(f"{d.name}: tests/Dockerfile has no `RUN chmod +x /tests/test.sh`")
         (tests / "Dockerfile").write_text(df)
     ins = d / "instruction.md"
-    ins.write_text(_instruction(ins.read_text(), mode, _turn(comp.read_text())))
+    ct = comp.read_text()
+    ins.write_text(_instruction(ins.read_text(), mode, _turn(ct), _lockstep(ct)))
     return snapshot(d) != before
 
 
@@ -206,7 +229,7 @@ def snapshot(d: pathlib.Path) -> dict:
 def check(d: pathlib.Path, mode: str) -> list[str]:
     bad = []
     comp = (d / "environment" / "docker-compose.yaml").read_text()
-    if LAUNCH_NEW not in comp:
+    if LAUNCH_NEW not in comp and LOCKSTEP_NEW not in comp:
         bad.append("compose: the sim command")
     bad += [f"compose: {k}" for k in SWITCHES[mode] if not re.search(rf'^      {k}: "', comp, re.M)]
     others = {k for m, s in SWITCHES.items() for k in s} - set(SWITCHES[mode])
