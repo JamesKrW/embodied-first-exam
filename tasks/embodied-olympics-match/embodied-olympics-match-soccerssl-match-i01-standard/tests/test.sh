@@ -6,3 +6,4 @@ trap 'p=$(command -v python3 || command -v python); "$p" /tests/rcb_limits.py ve
 p=$(command -v python3 || command -v python); "$p" /tests/rcb_limits.py sanitize /app/output || true   # untrusted agent files (PROTOCOL H.1)
 python /tests/grade.py 2> /logs/verifier/grade.log
 python /tests/fexam_reward.py 2>> /logs/verifier/grade.log
+python /tests/rcb_ablation_reward.py 2>> /logs/verifier/grade.log   # the ablation's counts
