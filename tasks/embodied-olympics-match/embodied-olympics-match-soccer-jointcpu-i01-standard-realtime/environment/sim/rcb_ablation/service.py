@@ -27,6 +27,17 @@ replies received first (rcb_ablation/platform_ops.py, rcb_ablation/worker.py), a
 yet in effect; a load restores both and checks them (the reply's `verified`: the match's state digest and the program's
 canonical state hash equal to the save's); a reset builds a new program. The seats' frame streams start empty, and the frozen world
 after a reset or load runs on when its window (the review window) is over. GET /over stays false while a loss is held.
+
+Memory (rcb_ablation/snapcopy.py): a save shares the match's MuJoCo models (their meshes and constants) instead of
+copying them, so a handle holds the match's state only; each save keeps snapcopy.model_key() of the models it shares
+and a load or reset whose model has changed since (none of the sports changes one while it runs) is refused (409);
+from such a change on, a save copies everything as before. A reset is a copy of the frozen start kept when the service
+starts (the same state a new build of the same seed gives: the service checks the digest) and shares its model too,
+so one model serves every episode of the run.
+
+Standard mode (core/lockstep.py, rcb_ablation/lockstep.py): the same service on the lockstep class; the world advances
+only while the agent lets it, also after a reset or a load (frozen until start or ready, at most the review window,
+as in real time).
 """
 from __future__ import annotations
 
@@ -73,6 +84,8 @@ class _Abl:
         self.reporter = False
         self.verified: dict = {}            # the last load's checks (a core from 0.5 on)
         self.table = None
+        self.share = True                   # saves share the match's MuJoCo models (snapcopy.py)
+        self.start = None                   # the frozen start: {"m", "models", "digest"} (a reset copies it)
 
 
 def _now(svc) -> float:
@@ -81,12 +94,32 @@ def _now(svc) -> float:
 
 def make(Base):
     turn = Base.protocol == "turn"
+    lockstep = "lockstep" in str(getattr(Base, "protocol_id", ""))      # standard mode (core/lockstep.py)
 
     class Ablation(Base):
         def __init__(self, *a, **kw):
             self.abl = _Abl()
             super().__init__(*a, **kw)
             self.abl_sport = sports.module(self.sport.name)
+            if OPS:
+                self.abl_keep_start()
+
+        def abl_keep_start(self):
+            """The frozen start, before any call: a reset restores a copy of it (its models shared)."""
+            try:
+                models = []
+                m, _ = snapcopy.snap(self.m, models=models)
+                fresh = self.sport.build(self.cfg)          # a new build of the same seed: the same state
+                same = fresh.state_digest() == self.m.state_digest() == m.state_digest()
+                del fresh
+            except Exception:  # noqa: BLE001
+                return
+            if same:
+                self.abl.start = {"m": m, "models": [(x, snapcopy.model_key(x)) for x in models],
+                                  "digest": self.m.state_digest()}
+
+        def abl_models_ok(self, pairs) -> bool:
+            return all(snapcopy.model_key(x) == k for x, k in pairs)
 
         # ------------------------------------------------------------------ routes
         def routes(self, post):
@@ -132,7 +165,8 @@ def make(Base):
                     "after": ("after a reset or a load the match resumes at once, on the turn it had (your clock "
                               "as it was)" if turn else
                               "after a reset or a load the world is frozen until you send start (or ready), at most "
-                              f"{self.abl_window():g} s of real time; then it runs on"),
+                              f"{self.abl_window():g} s of real time; then it runs on"
+                              + (" (advancing only while you let it, as always in this mode)" if lockstep else "")),
                     "max_handles": MAX_HANDLES, "resets": BUDGET,
                     "end": "a match you lose (or forfeit by the rules) is held at its end: you may reset or load; "
                            "a match you win ends the run"}
@@ -333,7 +367,14 @@ def make(Base):
                     return bad
                 if self.abl.resets >= BUDGET:
                     return 409, {"error": "no resets left", "resets_left": 0}
-                m = self.sport.build(self.cfg)
+                st = self.abl.start
+                m = None
+                if st is not None and self.abl.share and self.abl_models_ok(st["models"]):
+                    m, _ = snapcopy.snap(st["m"], models=[])
+                    if m.state_digest() != st["digest"]:
+                        m = None
+                if m is None:
+                    m = self.sport.build(self.cfg)
                 if hasattr(self.m, "camera_model"):          # the service tells its match the camera model
                     try:
                         m.camera_model = self.m.camera_model
@@ -353,10 +394,19 @@ def make(Base):
                 t = time.monotonic()
                 ps = getattr(self, "pseats", None)
                 programs = platform_ops.save(ps) if ps else {}     # the platform opponent's program, in its process
-                m, shared = snapcopy.snap(self.m)
+                models = [] if self.abl.share else None
+                m, shared = snapcopy.snap(self.m, models=models)
+                keys = [(x, snapcopy.model_key(x)) for x in models] if models is not None else None
+                if keys is not None and self.abl.start is not None:
+                    before = {id(x): k for x, k in self.abl.start["models"]}
+                    if any(id(x) in before and before[id(x)] != k for x, k in keys):
+                        self.abl.share = False          # a model changed while the match ran: copy everything
+                        m, shared = snapcopy.snap(self.m)
+                        keys = None
                 sched = getattr(self, "sched", None) if NEW else None
                 snap = {"m": m, "k": self.m.k, "digest": self.m.state_digest(), "rows": copy.deepcopy(self.ep.commands),
-                        "scheduled": copy.deepcopy(getattr(self, "scheduled", [])), "players": self.abl_save_players(),
+                        "scheduled": copy.deepcopy(getattr(self, "scheduled", [])),
+                        "players": self.abl_save_players(keys), "models": keys,
                         "programs": programs,
                         "sched": {"platform_pending": copy.deepcopy(sched.platform_pending),
                                   "platform_seq": sched.platform_seq,
@@ -386,7 +436,13 @@ def make(Base):
                                           f"{MAX_HANDLES} kept)", "handles": list(self.abl.handles)}
                 snap = self.abl.handles.pop(h)
                 self.abl.handles[h] = snap                   # most recently used
-                m, _ = snapcopy.snap(snap["m"])
+                if snap.get("models") is not None:
+                    if not self.abl_models_ok(snap["models"]):
+                        return 409, {"error": "this save cannot be restored exactly: the simulator's model has changed "
+                                              "since it was saved", "handle": h}
+                    m, _ = snapcopy.snap(snap["m"], models=[])
+                else:
+                    m, _ = snapcopy.snap(snap["m"])
                 self.abl.loads += 1
                 self.abl_restart(m, snap, "load", handle=h)
                 out = self.abl_reply(seat)
@@ -394,12 +450,16 @@ def make(Base):
                     out["verified"] = self.abl.verified
                 return 200, out
 
-        def abl_save_players(self) -> dict:
+        def abl_save_players(self, keys=None) -> dict:
             out = {}
             for seat, p in self.abl.players.items():
                 got = p.lock.acquire(timeout=10)
                 try:
-                    out[seat], _ = snapcopy.snap(p.player)
+                    models = [] if keys is not None else None
+                    out[seat], _ = snapcopy.snap(p.player, models=models)
+                    for x in models or ():
+                        if not any(x is y for y, _k in keys):
+                            keys.append((x, snapcopy.model_key(x)))
                 finally:
                     if got:
                         p.lock.release()
@@ -553,8 +613,9 @@ def make(Base):
             self.abl.players = {}
             self.abl.restore_players = {}
             if snap:
+                share = [] if snap.get("models") is not None else None
                 for seat, p in (snap.get("players") or {}).items():
-                    self.abl.restore_players[seat], _ = snapcopy.snap(p)
+                    self.abl.restore_players[seat], _ = snapcopy.snap(p, models=share)
             for st_name in builtin:
                 self.seats[st_name].joined = False
             self.abl_builtin_mod.start(self, self.plugin, builtin)
