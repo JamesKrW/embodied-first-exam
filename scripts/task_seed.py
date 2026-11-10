@@ -2,8 +2,10 @@
 """Run a task from one of its allowed seeds (docs/protocol/README.md §2). The runner chooses the seed, never the agent:
 
     python3 scripts/task_seed.py list tasks/<benchmark>/<task>                      # default, allowed, oracle
+    python3 scripts/task_seed.py rep tasks/<benchmark>/<task> K                      # the seed of repetition K (1, 2, 3, ...)
     python3 scripts/task_seed.py pick tasks/<benchmark>/<task> [--rng N]            # a seed drawn uniformly from `allowed`
-    python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --seed S --out DIR   # -> DIR/<task>, run that with Harbor
+    python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --rep K --out DIR    # -> DIR/<task>, run that with Harbor
+    python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --seed S --out DIR   # (or a given seed)
 
 `materialize` copies the task directory and, for a seed other than the default, puts that seed's frozen instance
 (`tests/seeds/<S>/instance.{json,npz}` of the task that holds the pair's instances: the privileged twin of a standard
@@ -15,8 +17,11 @@ explicitly (their defaults follow instance_seed); its `tests/seeds/`
 is removed, and every file gets its content-derived mtime (scripts/stamp_mtimes.py, issue #258). A seed without a
 committed instance, of a task with `build = "runtime"`, is written instead as a file `seed` (the integer) in each of
 those places, from which the task builds the seed's instance itself. A seed that is
-not allowed (a list, a range `{ from, to }` or "any") is refused. `--seed draw` draws one uniformly (with `--rng`;
-"any" draws from 0 to 2**31 - 1). Standard library only.
+not allowed (a list, a range `{ from, to }` or "any") is refused. `--rep K` runs repetition K's seed (`rep_seed`,
+docs/protocol/running.md "Repetitions"): the default seed for K = 1, then the next allowed seeds in increasing order (those
+above the default, then those below it), cycling through them when the task allows fewer than K. `--seed draw` draws
+one uniformly (with `--rng`; "any" draws from 0 to 2**31 - 1), for runs outside the official repetitions. Standard
+library only.
 """
 from __future__ import annotations
 
@@ -63,6 +68,22 @@ def pick(task: Path, rng: int | None) -> int:
     if isinstance(a, dict):
         return r.randint(a["from"], a["to"])
     return r.choice(a)
+
+
+def rep_seed(sd: dict, k: int) -> int:
+    """The seed of repetition k (k >= 1): the default seed, then the allowed seeds above it in increasing order, then those
+    below it ("any": every integer from 0 to ANY - 1), cycling when the task allows fewer than k seeds."""
+    if k < 1:
+        raise SystemExit(f"repetition {k}: repetitions count from 1")
+    d, a = sd["default"], sd["allowed"]
+    if a == "any":
+        return (d + k - 1) % ANY
+    lo, hi = (a["from"], a["to"]) if isinstance(a, dict) else (None, None)
+    if lo is not None:
+        n = hi - lo + 1
+        return lo + (d - lo + k - 1) % n
+    order = [d] + sorted(x for x in set(a) if x > d) + sorted(x for x in set(a) if x < d)
+    return order[(k - 1) % len(order)]
 
 
 def materialize(task: Path, seed: int, out: Path) -> Path:
@@ -112,22 +133,32 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     a_list = sub.add_parser("list")
     a_list.add_argument("task", type=Path)
+    a_rep = sub.add_parser("rep")
+    a_rep.add_argument("task", type=Path)
+    a_rep.add_argument("k", type=int, help="the repetition, from 1")
     a_pick = sub.add_parser("pick")
     a_pick.add_argument("task", type=Path)
     a_pick.add_argument("--rng", type=int)
     a_mat = sub.add_parser("materialize")
     a_mat.add_argument("task", type=Path)
-    a_mat.add_argument("--seed", required=True, help="an allowed seed, or `draw`")
+    which = a_mat.add_mutually_exclusive_group(required=True)
+    which.add_argument("--seed", help="an allowed seed, or `draw`")
+    which.add_argument("--rep", type=int, help="repetition K's seed (K from 1)")
     a_mat.add_argument("--rng", type=int)
     a_mat.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
     task = a.task.resolve()
     if a.cmd == "list":
         print(seeds(task))
+    elif a.cmd == "rep":
+        print(rep_seed(seeds(task), a.k))
     elif a.cmd == "pick":
         print(pick(task, a.rng))
     else:
-        seed = pick(task, a.rng) if a.seed == "draw" else int(a.seed)
+        if a.rep is not None:
+            seed = rep_seed(seeds(task), a.rep)
+        else:
+            seed = pick(task, a.rng) if a.seed == "draw" else int(a.seed)
         print(materialize(task, seed, a.out.resolve()), seed)
     return 0
 
