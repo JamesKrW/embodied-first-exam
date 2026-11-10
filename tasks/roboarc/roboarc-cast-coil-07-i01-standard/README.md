@@ -6,10 +6,10 @@
 | Mode | standard (`eai-standard/2.4`) |
 | Twin | `roboarc-cast-coil-07-i01-privileged` |
 | Simulator / robot | `roboarc` / `aloha-2` |
-| Family / instance | `cast_coil` / seed 0 |
+| Family / instance | `cast_coil` / seed 0 (allowed seeds: [0, 1, 2]; PROTOCOL §2) |
 | Oracle | `full` |
 | Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
-| Base image | `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:roboarc-2.2.0@sha256:96a0a895c0e4934adca39f7a370e67bf82bfb4db7ef049131a3ac0dc9d0f9057` |
 
 ## Task
 Standard-mode twin of `roboarc-cast-coil-07-i01-privileged` (same frozen instance): the agent gets only the `eai-standard/2.4` client
@@ -45,7 +45,7 @@ Caps per container (PROTOCOL §6).
 ## Details
 
 ### Goal
-Assemble the gold and silver Cast Coil pieces into their matching interlocking configuration, then release both.
+Assemble the two Cast Coil pieces into their matching interlocking configuration, then release both.
 
 ### Success requirements
 - Align the pieces' matching assembly frames with relative position error below 1 mm and relative angular error below 0.02 rad.
@@ -64,7 +64,7 @@ Assemble the gold and silver Cast Coil pieces into their matching interlocking c
 - Forcing is recorded, not judged: an arm drive (not a gripper drive) at 95% of its torque cap or more while that arm's gripper, or a part it holds, presses on anything else with 20 N or more in total is forcing; 0.5 s of it on every physics tick is a forcing event in the evidence (`meta["safety"]`), shown to the reviewer when a success is reviewed. Forcing does not end the episode and does not change the grade by itself.
 - Simulator breakdown (a non-finite state or a task contact deeper than 10 mm): the episode ends as an infrastructure error, not your failure, unless an arm was forcing (even for one tick) within the 0.25 s before it: then it is your failure (forced_breakdown: what broke and what forced it).
 - The release clearance is measured between axis-aligned bounding boxes: one around each collision geometry of the whole robot (every link of both arms) and one around each collision geometry of the pieces, so the true gap usually has to be larger than 5 mm.
-- Grasp regions (assisted grasping, see Grippers above; one sphere per graspable part): coil_silver: radius 25 mm; coil_gold: radius 25 mm. Both finger contacts must lie inside the part's sphere; a part touched elsewhere is grasped physically.
+- Grasp regions (assisted grasping, see Grippers above; one sphere per graspable part): coil_silver: radius 25 mm; coil_gold: radius 25 mm (the names are identifiers, not colours). Both finger contacts must lie inside the part's sphere; a part touched elsewhere is grasped physically.
 
 | | |
 |---|---|
@@ -75,7 +75,7 @@ Assemble the gold and silver Cast Coil pieces into their matching interlocking c
 | crash recovery | `eai-standard/2.4` §13: journal + per-call checkpoints, `restart: on-failure:6`, resume class `approx` |
 
 ### Provenance
-- Frozen instance: a MuJoCo instance (`simulator.physics_engine` "mujoco", its scene frozen under `instance_assets/mujoco/`), built by TopoGym source `6fb23e0d` (MuJoCo instance made before this image was built (TopoGym source 6fb23e0d; its bytes are bound into the release image efe:roboarc-0.2.0)); bound to this release's runtime (source `c9171f79`, tooling `d8692e15`).
-- Frozen instance files (`instance.json`, `instance_assets/`): not in this directory. The public image carries them in `/opt/robotangle/instances/cast-coil-07-i01/` (`images/roboarc/assets.json` pins each file's sha256), and `/opt/robotangle/stage_instance.py` copies this task's instance next to its `runtime_binding.json`, which names the instance's canonical sha256 and every asset's sha256. The tooling checks them again at every session start.
-- Release: dev/robotangle_mujoco `7947eaa7b`, image `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` (images/roboarc/).
+- Frozen instance: a MuJoCo instance (`simulator.physics_engine` "mujoco", its scene frozen under `instance_assets/mujoco/`), built by TopoGym source `6fb23e0d` (MuJoCo instance made before this image was built (TopoGym source 6fb23e0d; its bytes are bound into the release image efe:roboarc-2.2.0)); bound to this release's runtime (source `c9171f79`, tooling `d8692e15`).
+- Frozen instance files (`instance.json`, `instance_assets/`): not in this directory. The image carries them in `/opt/robotangle/instances/cast-coil-07-i01/` (`images/roboarc/assets.json` pins each file's sha256), and `/opt/robotangle/stage_instance.py` copies this task's instance next to its `runtime_binding.json`, which names the instance's canonical sha256 and every asset's sha256. The tooling checks them again at every session start.
+- Release: RoboARC 2.2.1 (release base `e0a930a38`), image `ghcr.io/mll-lab-nu/efe:roboarc-2.2.0` (images/roboarc/).
 - Name: RoboARC is the published name of this benchmark. Code identifiers keep the simulator's name: the simulator package `topogym`, the tooling `rcb_topogym.py`, `TOPOGYM_*` variables.

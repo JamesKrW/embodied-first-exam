@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "instance_sha256": "b9d7d5b62fdb95559aff2ab8025413dcebb748753e2b5850d24017d07a17faca",
+  "asset_files": {
+    "instance_assets/mujoco/meshes/goal_region_72c0473b2154297c.obj": "72c0473b2154297cd8cca13dbbf20d8cf64ce4c76e33729fafd7d5f8f63e6ade",
+    "instance_assets/mujoco/scene.json": "9589be72cebacb48b67adad35847f6efd984c1377e18be91cfe1490c4b0377d8",
+    "instance_assets/mujoco/scene.xml": "492c6e5f26813cc9454655b1d03cb5f567ba6896cf79787246f60fa35274611d"
+  },
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
+  "creation_source": {
+    "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+    "files": 455
+  },
+  "runtime": {
+    "dependencies": {
+      "torch": "2.11.0+cu128",
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "mujoco": "3.14.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.18.0"
+    },
+    "python": "3.11.15",
+    "source": {
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
+  },
+  "image": {
+    "reference": "roboarc-r4:2.2.0-noinst",
+    "id": "sha256:4c0613fbbd6682e3e53275dd77cf1bc4fa7ec0df0b56e4e31b04e9e296900739",
+    "repo_digests": []
+  },
+  "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
+}

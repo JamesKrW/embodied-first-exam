@@ -142,5 +142,163 @@
     "shadow": false
    }
   ]
+ },
+ "seeds": {
+  "1": {
+   "scene_look": {
+    "key": 2,
+    "height_m": 1.976,
+    "cct_k": 3698,
+    "brightness": 1.017
+   },
+   "nyx": {
+    "lights": [
+     {
+      "type": "point",
+      "pos": [
+       0.45,
+       -0.4643,
+       1.4564
+      ],
+      "intensity": 1.017,
+      "color": [
+       1.0,
+       0.6045,
+       0.3043
+      ],
+      "shadow": false
+     },
+     {
+      "type": "point",
+      "pos": [
+       -0.45,
+       -0.4643,
+       1.4564
+      ],
+      "intensity": 1.017,
+      "color": [
+       1.0,
+       0.6045,
+       0.3043
+      ],
+      "shadow": false
+     },
+     {
+      "type": "point",
+      "pos": [
+       0.45,
+       0.7357,
+       1.4564
+      ],
+      "intensity": 3.051,
+      "color": [
+       1.0,
+       0.6045,
+       0.3043
+      ],
+      "shadow": true
+     },
+     {
+      "type": "point",
+      "pos": [
+       -0.45,
+       0.7357,
+       1.4564
+      ],
+      "intensity": 1.017,
+      "color": [
+       1.0,
+       0.6045,
+       0.3043
+      ],
+      "shadow": false
+     }
+    ],
+    "env_intensity": 1.017,
+    "env_tint": [
+     1.0,
+     0.6045,
+     0.3043
+    ]
+   }
+  },
+  "2": {
+   "scene_look": {
+    "key": 3,
+    "height_m": 2.362,
+    "cct_k": 9657,
+    "brightness": 1.568
+   },
+   "nyx": {
+    "lights": [
+     {
+      "type": "point",
+      "pos": [
+       0.45,
+       -0.4643,
+       1.8424
+      ],
+      "intensity": 1.568,
+      "color": [
+       0.6296,
+       0.7092,
+       1.0
+      ],
+      "shadow": false
+     },
+     {
+      "type": "point",
+      "pos": [
+       -0.45,
+       -0.4643,
+       1.8424
+      ],
+      "intensity": 1.568,
+      "color": [
+       0.6296,
+       0.7092,
+       1.0
+      ],
+      "shadow": false
+     },
+     {
+      "type": "point",
+      "pos": [
+       0.45,
+       0.7357,
+       1.8424
+      ],
+      "intensity": 1.568,
+      "color": [
+       0.6296,
+       0.7092,
+       1.0
+      ],
+      "shadow": false
+     },
+     {
+      "type": "point",
+      "pos": [
+       -0.45,
+       0.7357,
+       1.8424
+      ],
+      "intensity": 4.704,
+      "color": [
+       0.6296,
+       0.7092,
+       1.0
+      ],
+      "shadow": true
+     }
+    ],
+    "env_intensity": 1.568,
+    "env_tint": [
+     0.6296,
+     0.7092,
+     1.0
+    ]
+   }
+  }
  }
 }

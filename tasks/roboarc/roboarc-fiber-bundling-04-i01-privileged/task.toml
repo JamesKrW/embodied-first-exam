@@ -3,11 +3,11 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/roboarc-fiber-bundling-04-i01-privileged"
-description = "RoboARC fiber_bundling (Franka Panda + Robotiq 2F-85, MuJoCo): produce one replayable trajectory. Pass every fine fiber and the front sheath through the fixed copper ring; keep the rear terminal anchored. Frozen scene instance (variation fiber_bundling_medium, seed 0)."
+description = "RoboARC fiber_bundling (Franka Panda + Robotiq 2F-85, MuJoCo): produce one replayable trajectory. Pass every fine fiber and the front sheath through the fixed ring; keep the rear terminal anchored. Frozen scene instance (variation fiber_bundling_medium, seed 0)."
 keywords = ["robotics", "roboarc", "mujoco", "panda_robotiq", "code-as-policy", "trajectory", "fiber_bundling"]
 
 [metadata]
-tooling_version = "19"
+tooling_version = "22"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU float64 physics, Nyx RGB)
 robot = "franka-robotiq-2f85"
@@ -19,6 +19,12 @@ grasp = "assisted (the contact_weld_v1 grasp regions on fiber_bundle)"
 success_rule = "task-native success (goal_complete True; frozen parameters; terminal revision terminal_v4_fiber_ring_plane)"
 instance_seed = 0                 # scene = environment/instance.json (variation fiber_bundling_medium, eval index None); identity = dataset.toml digest
 expert_time_estimate_hours = 2.0
+
+[metadata.seeds]
+# the seeds a runner may draw from (a list, { from = A, to = B } or "any") and the ones the reference solution
+# under solution/ is for, where they are not the default seed alone (docs/protocol/README.md §2)
+allowed = [0, 1, 2]
+build = "runtime"
 
 [verifier]
 timeout_sec = 45000.0

@@ -7,7 +7,7 @@ description = "RoboARC blanket_fold (ALOHA 2, MuJoCo): produce one replayable tr
 keywords = ["robotics", "roboarc", "mujoco", "aloha", "code-as-policy", "trajectory", "blanket_fold"]
 
 [metadata]
-tooling_version = "19"
+tooling_version = "22"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU physics, CUDA cloth step, Nyx RGB)
 robot = "aloha-2"
@@ -19,6 +19,12 @@ grasp = "assisted (the pbd_local_patch_v1 grasp regions on blanket)"
 success_rule = "task-native success (goal_complete True; frozen parameters; terminal revision release_settling_v1)"
 instance_seed = 0                 # scene = environment/instance.json (variation blanket_fold_hard, eval index None); identity = dataset.toml digest
 expert_time_estimate_hours = 2.0
+
+[metadata.seeds]
+# the seeds a runner may draw from (a list, { from = A, to = B } or "any") and the ones the reference solution
+# under solution/ is for, where they are not the default seed alone (docs/protocol/README.md §2)
+allowed = [0, 1, 2]
+build = "runtime"
 
 [verifier]
 timeout_sec = 45000.0

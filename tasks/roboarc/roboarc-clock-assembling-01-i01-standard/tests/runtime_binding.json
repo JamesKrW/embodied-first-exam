@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "instance_sha256": "a2c164018935353a34e074f2a761a58f2a30e19cf3f3481dfc5a063faec01af4",
+  "asset_files": {
+    "instance_assets/mujoco/meshes/clock_barrel_arbor_prism32_791d5b1afa1f68f7.obj": "791d5b1afa1f68f735814b3dc6c71e12a05515d7448e048511f660c4ae930e3d",
+    "instance_assets/mujoco/meshes/clock_barrel_drum_prism32_c5b8c15ef2ec70b8.obj": "c5b8c15ef2ec70b8bc71ba7bf5b9427ff11a3782c2cfa03675fd9c6090090072",
+    "instance_assets/mujoco/meshes/clock_barrel_ratchet_prism32_7553dcc53882aa9a.obj": "7553dcc53882aa9a43349e9e6d80f94bb41458d3ba19a69fdc212b37b606cd6f",
+    "instance_assets/mujoco/meshes/clock_bridge_boss_P1_prism32_a950aeb72abdde0a.obj": "a950aeb72abdde0a29acc1b1b4a3ce6c901668a7529cee60963ec7f56061deee",
+    "instance_assets/mujoco/meshes/clock_bridge_post_B_prism32_abdc65584ca2e2a4.obj": "abdc65584ca2e2a4beb7488474cd0a0597c7f00393237871e8bda22c63a9bf59",
+    "instance_assets/mujoco/meshes/clock_bridge_post_P1_prism32_9f2e5df77e76e37d.obj": "9f2e5df77e76e37db8d325e1cc8978418ff5b54d6b9f0039087175ca51b17315",
+    "instance_assets/mujoco/meshes/clock_center_arbor_prism32_4f63f030ed3c18b0.obj": "4f63f030ed3c18b0635ebb3ead67a058e26b8dc47ad9db41ce207f47c989afe0",
+    "instance_assets/mujoco/meshes/clock_center_disc_prism32_9d9b709bac9bc4d7.obj": "9d9b709bac9bc4d7322049e9ec85db2bcc651ed49cc0feaf5548414a89f3a4d7",
+    "instance_assets/mujoco/meshes/clock_center_pinion_prism32_204517eb3f1875dc.obj": "204517eb3f1875dc147c7ecacfd8f0d1f654d0724bef2e860674d8c2b7af6ef8",
+    "instance_assets/mujoco/meshes/clock_center_uppivot_prism32_275a68b15747098b.obj": "275a68b15747098bfc295024f068f29378af57e7fb1fd6c8d593f69fdd93c264",
+    "instance_assets/mujoco/meshes/clock_endstone_barrel_prism32_a2276ad544e0d82e.obj": "a2276ad544e0d82e441ad53343fb8113014ee5ee2f0faf07c6c6611ef1d1f0bb",
+    "instance_assets/mujoco/meshes/clock_fourth_disc_prism32_c8bb0b8e60789b76.obj": "c8bb0b8e60789b765282bc3e12827b1286cecad4143a23cae2d950925f5cd42d",
+    "instance_assets/mujoco/meshes/clock_fourth_pinion_prism32_c8752dd775b49614.obj": "c8752dd775b49614fe55d43e22e36b9c7cb5806f8009a7cea0cd874fe38209bd",
+    "instance_assets/mujoco/meshes/clock_gate_center_prism32_d5d1314f1433b9bd.obj": "d5d1314f1433b9bda6a2785602ead56f624d8ef50705f5e97a948258db72782e",
+    "instance_assets/mujoco/meshes/clock_pillar_P1_prism32_b6c679b1140146a4.obj": "b6c679b1140146a48c56b947dbb367cc3b337d774054ee50d68474d3a68d2279",
+    "instance_assets/mujoco/meshes/clock_probe_rod_prism32_069e50d6f1cd5c47.obj": "069e50d6f1cd5c4799cd9bc50698597f285dfbfae7b673297a1c57effc729861",
+    "instance_assets/mujoco/meshes/clock_screw1_head_prism32_b8c6e8dc8cfe9ee6.obj": "b8c6e8dc8cfe9ee6edd245d8b0f9349813b09a0cc4e9f4d78065921c13534fb0",
+    "instance_assets/mujoco/meshes/clock_third_disc_prism32_e17dc547214d6896.obj": "e17dc547214d68960a6a34f32f37fef3a75632faebb0df86be876534002309c2",
+    "instance_assets/mujoco/meshes/clock_third_pinion_prism32_163b73de2173abce.obj": "163b73de2173abce3ebdb26b8163d1285f63f4bea28906828aa00e84aa767fa9",
+    "instance_assets/mujoco/scene.json": "66f3bc3a0d811e0873832aaa4589ea491eaf60ac7363c8535b9417eee83bcf53",
+    "instance_assets/mujoco/scene.xml": "3ec52ecfa3f9d65969f8407d4a936ed1d22845fbb1e4f0b6a0c266dbeff1b061"
+  },
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
+  "creation_source": {
+    "sha256": "4163626dc97d1f13cf488cd6cd831fde4e412aa29fde888a6800b2c74f5c5a34",
+    "files": 466
+  },
+  "runtime": {
+    "dependencies": {
+      "torch": "2.11.0+cu128",
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "mujoco": "3.14.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.18.0"
+    },
+    "python": "3.11.15",
+    "source": {
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
+  },
+  "image": {
+    "reference": "roboarc:1.2.0-noinst",
+    "id": "sha256:72ecf073a9f359bc8f34eb080ad416a246f8da24bdd271a49f336dbc8fccfaf0",
+    "repo_digests": []
+  },
+  "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
+}

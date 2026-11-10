@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "instance_sha256": "714c98eeffe1b9bda0144ad113704587f6b2ac58ffc4dc5172797f7346b4ccf4",
+  "instance_sha256": "d171d7be3c0975508ddd9c03ef62d22f493e2bd0aa902d78b67b62b9ef8120ed",
   "asset_files": {
     "instance_assets/mujoco/meshes/ab_plate_ab_plate_0_part_03076777df859e27.obj": "03076777df859e274eda1cb377d0007e90174eb41f4100fdfc47182cdc35403a",
     "instance_assets/mujoco/meshes/ab_plate_ab_plate_0_part_034b00d484b8e7d1.obj": "034b00d484b8e7d1a82d93cbdfcad24efef54055072a9061ab3441bbd172989e",
@@ -304,19 +304,17 @@
     "instance_assets/mujoco/meshes/c_ring_c_ring_0_part_f9bf37f743442704.obj": "f9bf37f743442704bc0b2cc55b1059a2694c01142ef129ff966f7c2d86a048ff",
     "instance_assets/mujoco/meshes/c_ring_c_ring_0_part_f9d485ba74cbd137.obj": "f9d485ba74cbd13777593c17f05cc12d389d517586f30fb1c93f7b4caff9b4fd",
     "instance_assets/mujoco/meshes/c_ring_c_ring_0_part_fda97c5695f9795c.obj": "fda97c5695f9795cd451cfff60270afd85abb609a8de09370f497bdd23309bdf",
-    "instance_assets/mujoco/meshes/goal_region_ce7ffd0bb56c1008.obj": "ce7ffd0bb56c10086cbe160ef4ff9cf52bc28f41991911d516837d9a49b381b9",
-    "instance_assets/mujoco/scene.json": "3d2e900f825d16260dba0d850a95fd2a1cb1121776e2ef9eb49c1e77de3ec6c5",
-    "instance_assets/mujoco/scene.xml": "7d0dbb8fc256fa65715cb38c8b30580ee6c98ce50adc8847d41d1b1d6b0e13ef"
+    "instance_assets/mujoco/meshes/goal_region_6abead5065ac0827.obj": "6abead5065ac08278410b36350d37d5ce716665164858dfac372e9ff19e4559d",
+    "instance_assets/mujoco/scene.json": "805fffd585426629b254d1f537ef988ecc44cc7538b2ce11dc66543651a53b9c",
+    "instance_assets/mujoco/scene.xml": "176bc8e0c061445405376cb4594dbee4bfb3e49dc98e4fb11c6e325296fef085"
   },
-  "tooling_sha256": "d8692e15964ac9f4c536d52b1c86d0418a4f4e37ec94f98e5d91d0b4ad0dd766",
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
   "creation_source": {
-    "sha256": "d601866b4c91c858aa4e249b5bf5145b8fe3263b2885048a86016e34c314c208",
-    "files": 444
+    "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+    "files": 455
   },
   "runtime": {
     "dependencies": {
-      "genesis-world": "1.2.1",
-      "pyuipc": "0.0.25+topogym.det1.cuda128",
       "torch": "2.11.0+cu128",
       "numpy": "2.3.5",
       "scipy": "1.17.1",
@@ -326,20 +324,15 @@
     },
     "python": "3.11.15",
     "source": {
-      "sha256": "c9171f7932cebdee016b7ee1e8abd9a1afba7563a32364d91dffe85b14a51565",
-      "files": 443
-    },
-    "uipc_build_sha256": "39781d192a00d0cdc784f76e9ef2aa6fa404da510cf813ff06a04ea33b2597c1"
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
   },
   "image": {
-    "reference": "eai-roboarc:0.2.0-noinst",
-    "id": "sha256:9d0bd3a6996a9f2ce79759e331e6775a9263e7f1fcc17b52ec543aaed055e6c4",
+    "reference": "roboarc-r4:2.2.0-noinst",
+    "id": "sha256:4c0613fbbd6682e3e53275dd77cf1bc4fa7ec0df0b56e4e31b04e9e296900739",
     "repo_digests": []
   },
-  "uipc_builds": {
-    "audited": "39781d192a00d0cdc784f76e9ef2aa6fa404da510cf813ff06a04ea33b2597c1",
-    "sm86": "712470d2166b40058a4b6f304fb4a041bffc45c71ab37c7dec2d33d1a0b34011"
-  },
   "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
-  "nyx_direct_sha256": "4809c45a7a5cd7725f95f9e49e55a1dc9d184d2b2b59e780aac19cdaf98fac20"
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
 }

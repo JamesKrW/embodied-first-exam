@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "instance_sha256": "cb6e1b19ea6bf3bdc9ad8f5dc58976ee4a62af2cb208f34022e081dbeecb2f03",
+  "asset_files": {
+    "instance_assets/mujoco/meshes/goal_region_cdb271a76e481a8b.obj": "cdb271a76e481a8b72eaa862278f591f948fce4e1b31931756e3c63310d685c6",
+    "instance_assets/mujoco/meshes/slotted_chain_disc_b6a8509bed44e34b.obj": "b6a8509bed44e34bd8bda2d21938becd1fc9a0faa06ee15ed453fdde4939dfab",
+    "instance_assets/mujoco/scene.json": "6c695d6a54789db3f1c855d51f08e44cc787883b00b107d9b128e967635484fd",
+    "instance_assets/mujoco/scene.xml": "38f0bcaa0c836b2c8de8eba42648bd82bf191c578757f8e9468aeb01c60f9a09",
+    "instance_assets/mujoco_settled.npz": "f078086de6e475dfdddc0cda58f393849fadc15f9634d813715e9f891bbdf9c9"
+  },
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
+  "creation_source": {
+    "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+    "files": 455
+  },
+  "runtime": {
+    "dependencies": {
+      "torch": "2.11.0+cu128",
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "mujoco": "3.14.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.18.0"
+    },
+    "python": "3.11.15",
+    "source": {
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
+  },
+  "image": {
+    "reference": "roboarc-r4:2.2.0-noinst",
+    "id": "sha256:4c0613fbbd6682e3e53275dd77cf1bc4fa7ec0df0b56e4e31b04e9e296900739",
+    "repo_digests": []
+  },
+  "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
+}

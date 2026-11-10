@@ -9,6 +9,8 @@ every 8th physics step (one 2.5 ms tick = 8 steps of 0.3125 ms).
   - Arming (state rule of the source, evaluated after every physics step): a screw is armed once its origin is within
     1 mm of its hole's axis, 0 to 3 mm above its seat (under-head plane at |x| = 120.5 mm in the board frame), and its
     axis within 5 deg of the hole's.
+  - Welded-group contact switch-off (seat_weld.py, on in this scene): once a screw is welded, its end block (welded to
+    the board at the same moment) stops colliding with the board; every other contact of the block and the board stays.
   - Each physics step: mj_step, then (update()) the arming rule, then the welder; after every 8th step mj_forward,
     as the source's per-row step does. A control row of the task is 4 physics steps, so this falls after every second
     row.
@@ -36,7 +38,7 @@ class UppstaMechanism:
                                                        if m.geom(g).name.startswith(f"board_thread_{hole}_")],
                                          head_geoms=[f"{s}_head_{i}" for i in range(30)],
                                          clamped=[f"end_block_{hole}"], armed=False))
-        self.welder = seat_weld.SeatWelder(model, data, fs)
+        self.welder = seat_weld.SeatWelder(model, data, fs, group_contacts_off=True)
         self.bid = {n: m.body(n).id for n in ["board"] + list(SCREWS)}
         self._orig = (m.eq_data.copy(), m.geom_contype.copy(), m.geom_conaffinity.copy())
         self.events = []
@@ -52,6 +54,7 @@ class UppstaMechanism:
         self.welder.events = []
         self.events = []
         self.k = 0
+        self.welder.sync_contacts()
 
     def arm_rule(self):
         d = self.d
@@ -95,3 +98,4 @@ class UppstaMechanism:
         for f, (name, armed, welded, quiet) in zip(self.welder.f, s["fasteners"]):
             assert f.name == name
             f.armed, f.welded, f.quiet_since = armed, welded, quiet
+        self.welder.sync_contacts()

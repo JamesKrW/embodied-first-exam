@@ -25,9 +25,7 @@ episode end: a task's success predicate, or one of its failure predicates (e.g. 
              BREAKDOWN_PENETRATION_M) ends it with episode_end "simulator_instability" (evidence in
              status()["instability"]): a simulator failure that graders report as an infrastructure error, never as
              success or as the task's failure; unless the arm was forcing (the forcing condition, FORCING) within the
-             0.25 s before, then it is the agent's "forced_breakdown: ...". PBD cloth-rigid contacts are resolved
-             together per particle with a physically bounded push-out (_bound_pbd_rigid_contacts), which removes the
-             cause of the cloth blow-ups.
+             0.25 s before, then it is the agent's "forced_breakdown: ...".
 grasping   : a family may enable TopoGym's passive grasp assistance (instance.json simulator.grasp_assist; the rules are
              in robot_spec()["grippers"][...]["command"]); primitives()["object_in_hand"] says what a gripper holds.
 budget     : there is no step budget: the agent's wall clock is the limit. MAX_STEPS only stops runaway trajectories.
@@ -210,6 +208,24 @@ MAX_STEPS = int(os.environ.get("RCB_MAX_STEPS", "200000"))   # runaway guard on 
 _COMMON = dict(control_mode="JOINT_ABS", max_physics_steps=None, history_storage="segment", enable_rgb=True, enable_depth=True,
                enable_privileged=True, compute_backend="cuda", render_backend="nyx")
 TASKS: dict[str, dict] = {
+    # clock_assembling (2026-10-16; runs/watch_assembly_design_20261014): MuJoCo only; seating, meshing, the screws, the
+    # bridge's fixing, the click and the run test are the task's mechanism.
+    "clock_assembling": dict(
+        task_id="clock_assembling", robot="aloha",
+        text="Assemble the gear train of the enlarged watch movement on the table. Put the four wheels on their pivots in "
+             "the main plate in the train's order: the barrel (the large drum with the square on its arbor), then the "
+             "center wheel, the third wheel and the fourth wheel; each wheel's pinion must mesh with the previous wheel's "
+             "teeth, and a wheel lowered with its pinion's teeth on the other wheel's teeth stops until it is turned a "
+             "little. Lay the train bridge over the wheels on its two steady pins and pillars: every upper pivot (the "
+             "barrel: its arbor) must go into its hole in the bridge. A released wheel leans on its pivot, so a pivot can "
+             "miss its hole; the thin probe on its stand can push a wheel's rim to bring its pivot under the hole. Press "
+             "the bridge flat on its pillars, put the two screws into the bridge's screw holes and turn each clockwise by "
+             "two full turns. Then run the train: wind the barrel by turning its square (the ratchet under it turns with "
+             "it) counterclockwise seen from above by at least 120 degrees in strokes, as the click holds it; let go and "
+             "watch the fourth wheel: the mainspring must drive the train so that the fourth wheel turns freely, at least "
+             "5 turns in the rules' 5 s run, at 450 times the barrel's turn in the opposite direction. Holding parts at "
+             "the end is allowed.",
+        instances=[dict(variation_id="clock_assembling_gear_train", seed=0)], grasp_assist="recommended"),
     "cube_pick_place": dict(
         task_id="cube_pick_place", robot="panda_robotiq", fixture=True,
         text="Pick up the cube, hold it at least 5 cm above the table for at least 0.2 s, place it back at its original "
@@ -218,6 +234,35 @@ TASKS: dict[str, dict] = {
         instances=[dict(variation_id="base", seed=0)],
         simulator=dict(physics_dt_s=0.025, solver_substeps=40, control_decimation=1),
         grasp_assist=dict(model="contact_weld_v1", targets=[dict(entity="cube", link="box_baselink", radius_m=0.04)])),
+    # bed_bolt (2026-10-16; runs/bed_bolt_design_20261012): MuJoCo only; the thread is the task's mechanism.
+    "bed_bolt": dict(
+        task_id="bed_bolt", robot="aloha",
+        text="Drive the long bolt fully into the blind hole in the bed frame's corner block, inside the frame, with the "
+             "L-shaped hex key: carry the bolt to the hole and push its tip in until the thread catches, then turn it "
+             "with the key in its head's hex socket until the head seats on the block. The thread holds the bolt only "
+             "after two turns; once engaged, pushing or pulling does not drive the bolt and fingers cannot turn it. Leave "
+             "the seated bolt and the key still.",
+        instances=[dict(variation_id="bed_bolt_crossbar", seed=0)], grasp_assist="recommended"),
+    # battery_replacement (2026-10-16; runs/controller_battery_design_20261014): MuJoCo only; every mechanism physical.
+    "battery_replacement": dict(
+        task_id="battery_replacement", robot="aloha",
+        text="Replace the two old AA cells in the game controller's battery compartment with the two new cells from the "
+             "tray, each with its + end toward its slot's + contact, put both old cells in the recycling box and close "
+             "and latch the battery cover. The cover slides about 5 mm toward the controller's top edge to unlatch. A "
+             "seated cell cannot be pinched out: lever it up with the pry stick, its blade in the notch beside the cell's "
+             "+ end.",
+        instances=[dict(variation_id="battery_replacement_xbox_aa", seed=0)], grasp_assist="recommended"),
+    # wire_splicing (2026-10-18; runs/wire_splice_design_20261014): MuJoCo only; the wires are laid 1.5 mm above their
+    # resting height and settle for 1.5 s (600 ticks) at every build, as the design's start state (v5_lay.py).
+    "wire_splicing": dict(
+        task_id="wire_splicing", robot="aloha",
+        text="Splice the red and the blue wire: bend the red wire's bare end into a small eye round the yellow rod of the "
+             "bending post, thread the blue wire's bare end through the eye, turn the wires so that their insulated parts "
+             "point away from each other, wind the blue wire's bare tail tightly round the red wire's doubled end one and "
+             "a half turns, at least one full turn of it round both strands of the doubled end together, fold the red "
+             "wire's leftover end back over the coil, then let go and leave the splice still.",
+        instances=[dict(variation_id="wire_splicing_eye_wrap", seed=0)], grasp_assist="recommended",
+        simulator=dict(reset_physics_steps=600)),
     "blanket_flatten": dict(
         task_id="blanket_flatten", robot="aloha",
         text="Unfold and spread the blanket flat on the table. Remove folds, rolls and self-overlaps so the fabric covers "
@@ -241,19 +286,19 @@ TASKS: dict[str, dict] = {
         instances=[dict(variation_id="buzz_wire_3d_easy", seed=0)], grasp_assist="recommended"),
     "cast_coil": dict(
         task_id="cast_coil", robot="aloha",
-        text="Assemble the separated gold and silver Cast Coil pieces into their interlocking, alternating four-layer "
+        text="Assemble the two separated Cast Coil pieces into their interlocking, alternating four-layer "
              "target configuration. Align both pieces fully; contact or grasping alone is not completion. Release both "
              "pieces, withdraw the grippers and leave the assembled puzzle stable on the table.",
         instances=[dict(variation_id="cast_coil_easy", seed=0)], grasp_assist="recommended"),
     "cast_keyhole": dict(
         task_id="cast_keyhole", robot="aloha",
-        text="Separate the silver keyhole piece from the gold piece. Place the entire silver piece inside the green dashed "
-             "goal area and hold it still briefly. Keep the gold piece outside the area on the puzzle/system side. "
+        text="Separate the keyhole plate from the fork plate. Place the entire keyhole plate inside the green dashed "
+             "goal area and hold it still briefly. Keep the fork plate outside the area on the puzzle/system side. "
              "Holding the target with the gripper is allowed.",
         instances=[dict(variation_id="cast_keyhole_easy", seed=0)], grasp_assist="recommended"),
     "fiber_bundling": dict(
         task_id="fiber_bundling", robot="panda_robotiq",
-        text="Pass every fine fiber through the fixed copper ring, "
+        text="Pass every fine fiber through the fixed ring, "
              "tip first and in tip-to-root material order, until all roots and the front sheath have passed and cleared "
              "the ring. The rear terminal stays anchored and must not pass through the ring. Any gripper contact with a "
              "fine fiber ends the task in failure. Avoid sharp bends and collisions; passing only the tips is not "
@@ -273,7 +318,7 @@ TASKS: dict[str, dict] = {
         instances=[dict(variation_id="horseshoe_ring_easy", seed=0)], grasp_assist="recommended"),
     "interlocked_claws": dict(
         task_id="interlocked_claws", robot="aloha",
-        text="Separate the brown claw piece from the other claw. Place the entire brown piece inside the green dashed goal "
+        text="Separate the two claw pieces. Place the entire target claw piece inside the green dashed goal "
              "area and hold it still briefly. Keep the other piece outside the area on the puzzle/system side. Holding "
              "the target with the gripper is allowed.",
         instances=[dict(variation_id="interlocked_claws_hard", seed=0)], grasp_assist="recommended"),
@@ -314,6 +359,14 @@ TASKS: dict[str, dict] = {
         # Weld on any link and on the ring for the rigid-chain settings only; the FEM tiers' recommendation is none
         # (tasks/slotted_post_ring/common.py).
         instances=[dict(variation_id="slotted_post_ring_hard_chain", seed=0)], grasp_assist="recommended"),
+    # caliper_sorting (2026-10-16, Jianwen; runs/caliper_sorting_design_20261014): a new MuJoCo family.
+    "caliper_sorting": dict(
+        task_id="caliper_sorting", robot="aloha",
+        text="Measure the sleeves with the caliper and put every sleeve into the bin whose label gives its two caliper "
+             "readings. The sleeves look alike; only measuring tells their classes apart, and the caliper, fixed on a stand, "
+             "reads in its own unit. Its slider starts locked by the knob on its face. Release every sleeve in its bin and "
+             "leave all of them still.",
+        instances=[dict(variation_id="caliper_sorting_vernier", seed=0)], grasp_assist="recommended"),
 }
 for _name, _t in TASKS.items():
     _t.setdefault("simulator", {}); _t.setdefault("grasp_assist", None); _t.setdefault("fixture", False)
@@ -333,7 +386,8 @@ TASKS["lock_picking"]["simulator"] = {**TASKS["lock_picking"]["simulator"], "pre
 # MuJoCo (2026-10-09, the Genesis -> MuJoCo migration; docs/rcb/MUJOCO_CORE.md): these families build new instances on
 # topogym.world.mujoco (CPU float64; the scene frozen with the instance). Released Genesis instances keep their own frozen
 # simulator configuration and still load on Genesis.
-for _name in ("interlocked_claws", "fiber_bundling", "hedgehog_in_cage", "cast_keyhole", "lock_picking", "buzz_wire_3d", "horseshoe_ring", "cast_coil"):
+for _name in ("interlocked_claws", "fiber_bundling", "hedgehog_in_cage", "cast_keyhole", "lock_picking", "buzz_wire_3d", "horseshoe_ring", "cast_coil",
+              "bed_bolt", "clock_assembling", "battery_replacement", "caliper_sorting", "wire_splicing"):
     TASKS[_name]["simulator"] = {**{k: v for k, v in TASKS[_name]["simulator"].items() if k != "rigid_options"},
                                  "compute_backend": "cpu", "precision": "64", "physics_engine": "mujoco"}
 # lock_picking on MuJoCo: the stop frames' round slot ends as 1-degree collision wedges (0.15-degree ones are sliver
@@ -428,7 +482,8 @@ TASKS["blanket_fold"]["simulator"] = dict(TASKS["blanket_flatten"]["simulator"])
 # names it (nyx_direct_sha256). The other families' MuJoCo instances keep the render bridge's Genesis host ("nyx", the
 # default). RCB_RENDER, when set, overrides the field (_render_bridge).
 for _name in ("blanket_flatten", "blanket_fold", "buzz_wire_3d", "fiber_bundling", "hedgehog_in_cage", "horseshoe_ring",
-              "interlocked_claws", "knot_untying", "lock_picking", "rope_threading"):
+              "interlocked_claws", "knot_untying", "lock_picking", "rope_threading", "bed_bolt", "clock_assembling", "battery_replacement",
+              "wire_splicing"):
     TASKS[_name]["renderer"] = "direct"
 # cast_coil: every MuJoCo instance of the family, the five released tiers and the v2 design tiers
 # alike. Released tiers at birth: nyx_direct's input buffers equal the host's bit for bit, at most 12 pixels > 8 levels
@@ -443,6 +498,8 @@ TASKS["cast_keyhole"]["renderer"] = "direct"
 # boxes flicker on the host too); runs/robotangle_mujoco/v2/slotted_orbits/nyxtest.
 for _name in ("orbits", "slotted_post_ring"):
     TASKS[_name]["renderer"] = "direct"
+# caliper_sorting (2026-10-16, Jianwen): a MuJoCo-only family; its URDF parts carry one textured GLB visual per link.
+TASKS["caliper_sorting"]["renderer"] = "direct"
 
 
 def simulator_config(task: str, eval_index: int | None = None, *, variation_id: str | None = None,
@@ -1012,19 +1069,6 @@ def _plain(v):
     return v
 
 
-def _register_runtime_physics(margin: float) -> None:
-    """The kernels this tooling replaces act on every scene of its process, the preparation of a generated frozen state
-    included (topogym/world/physics/pbd_initial_state_generation.py), so they enter that state's recipe. An image without
-    generated states has nothing to register."""
-    try:
-        from topogym.world.physics.pbd_initial_state_generation import register_runtime_physics
-    except ImportError:
-        return
-    register_runtime_physics("rcb_topogym", dict(tooling_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-        deterministic_gpu_physics=DETERMINISTIC_GPU_PHYSICS, rigid_solve_arm=RIGID_SOLVE_ARM,
-        pbd_depenetration_margin_m_s=margin))
-
-
 def _initial_state_record(env) -> dict | None:
     """Where the episode's frozen PBD birth state came from: the instance's stored archive, or one generated from the
     instance's recipe on this GPU because the stored one was prepared on another (resource profile). None: no such state."""
@@ -1037,35 +1081,6 @@ def _initial_state_record(env) -> dict | None:
     keys = ("manifest_sha256", "state_sha256", "recipe_sha256", "recipe_match", "resource_profile", "stored_profile",
             "stored_manifest_sha256", "cache", "preparation_wall_s", "ensure_wall_s")
     return {"source": "generated", **{k: generated.get(k) for k in keys}}
-
-
-def _drop_fem_gradient_checkpoints(env) -> bool:
-    """Active FEM solvers only (tooling v4): bound Genesis 1.2.1's per-substep FEM checkpoint store.
-
-    Simulator.save_ckpt runs after every substep when requires_grad is False (substeps_local = 1), and FEMSolver.save_ckpt
-    (genesis/engine/solvers/fem_solver.py:1058), unlike RigidSolver's, has no requires_grad guard: each call stores the FEM
-    state in three new CUDA tensors (pos, vel, active) under a new name and never frees them. With 40 substeps per control
-    step that is ~120 MiB per control step for knot hard's rope: a 16 GB GPU runs out of memory after ~72 control steps
-    (limited trial tWKp7yB, 2026-10-01; libuipc then aborts) and shared lab GPUs fill up. The override runs Genesis' own
-    save_ckpt unchanged (the same kernels, the same forward frame roll) and then deletes every older checkpoint, so memory
-    stays at one checkpoint. Nothing reads the older ones: FEMSolver.load_ckpt (the backward pass, requires_grad only) is
-    their only reader, and TopoGym's state graph skips _ckpt. Returns True when installed; a no-op without an active FEM
-    solver or with gradients enabled."""
-    sim = env._world.scene.sim
-    fem = getattr(sim, "fem_solver", None)
-    if fem is None or not fem.is_active or sim.requires_grad:
-        return False
-    if getattr(fem.save_ckpt, "_topogym_bounded", False):
-        return True
-    upstream = fem.save_ckpt
-
-    def save_ckpt(ckpt_name, _fem=fem, _upstream=upstream):
-        _upstream(ckpt_name)
-        for key in [k for k in _fem._ckpt if k != ckpt_name]:
-            del _fem._ckpt[key]
-    save_ckpt._topogym_bounded = True
-    fem.save_ckpt = save_ckpt
-    return True
 
 
 def _vectorized_planar_clearance(points, material_s, diameter):
@@ -2369,330 +2384,9 @@ def _settle_only_when_reached(task) -> bool:
 
 
 
-# ---- deterministic GPU physics (tooling v17, 2026-10-05; jobs/journal/2026-10-05/determinism)
-# Scope (every Session, installed before the first scene is built):
-#   - every scene on the GPU: the rigid constraint solve is pinned to Genesis' monolith arm. This changes the rounding
-#     of blanket_flatten, lock_picking and of the robots / rigid bodies of the IPC scenes (knot_untying, rope_threading,
-#     slotted_post_ring, orbits); their libuipc FEM/ABD solve itself is unchanged (still not reproducible). CPU scenes:
-#     unchanged (the CPU backend only has the monolith arm).
-#   - blanket_flatten only (the only PBD scene): PBD stretch / bending / particle collision and the PBD-rigid link
-#     forces summed in fixed point.
-#   - instance shas: unchanged (every instance restores its frozen / settled state without a physics step).
-# Grading replays re-run an agent's actions in fresh processes. On the GPU families they did not reproduce the live run:
-# two fresh replays of one blanket trajectory already differed by 1.6e-13 m after the first control step, by millimetres
-# after 100 and in the outcome after ~1400 (one succeeded, one did not). In-process stage isolation (the same engine
-# buffers in, each kernel run three times) found the causes, all in scheduling-order arithmetic, none in the physics:
-#   1. Genesis' rigid constraint solve (func_solve_body) is a qd.perf_dispatch autotuner: with cooperative kernels on
-#      (GPU, n_dofs >= 16) it alternates the "monolith" and "decomposed" arms and re-times them every 5 s of wall clock,
-#      so the arm that integrates a substep depends on the host's load. The monolith arm, pinned, is reproducible (stage
-#      isolation and fresh-process replays); the switching is not. Pinned here for the whole process (both arms solve
-#      the same Newton problem; the CPU backend only ever runs the monolith, so the CPU families are unchanged).
-#   2. PBD constraint projection (stretch, bending) scatters `dpos += ...` from parallel loops over constraints: float
-#      atomics in GPU scheduler order.
-#   3. PBD particle collision sums neighbour contributions in the spatial hash's cell order, which an atomic counting
-#      sort assigns differently every substep (the reordered layout itself is scratch: rebuilt each substep before use).
-#   4. The PBD-rigid contact (_bound_pbd_rigid_contacts) applies coupling forces to robot links with float atomics.
-# 2-4 become integer sums: each contribution is rounded once to a fixed-point quantum and added with an int64 atomic;
-# integer addition is associative, so the total does not depend on the order; it is converted back to float once per
-# particle / link and accumulation. Quanta: particle corrections 2^-48 m (3.6e-15 m), link forces 2^-32 N (2.3e-10 N)
-# and torques 2^-32 N m. A contribution above PBD_FX_LIMIT_M (16 m) / 2^16 N / 2^17 N m, or not finite, makes that
-# particle's correction (link's force) NaN, so the instability guard ends the episode as before (16 m / 2^-48 = 2^52
-# quanta per contribution: 2^11 contributions per particle and accumulation fit in int64; forces 2^48 / 2^49 quanta, 2^14
-# contributions per link and substep; an 8181-particle cloth on one link is 2^13). The constraint math, its iteration
-# structure, which contributions exist and the apply loops are Genesis' expressions, unchanged. Genesis' files are not
-# edited (kernels replaced at runtime like _bound_pbd_rigid_contacts), so the frozen blanket states' backend identity,
-# which hashes them, still matches; the integer scratch lives outside the engine-buffer graph that checkpoints and frozen
-# states inventory (it holds zeros between kernels).
-# Measured (lab RTX PRO 6000, image 0.2.14-dev): see docs/rcb/benchmarks/topogym.md "Deterministic GPU physics".
-# The IPC families' libuipc solver keeps its own float atomics (not covered here).
-DETERMINISTIC_GPU_PHYSICS = "fixed_point_pbd_pinned_solve_arm_2026-10-05"
-RIGID_SOLVE_ARM = "func_solve_body_monolith"
-PBD_FX_SCALE_M, PBD_FX_QUANTUM_M, PBD_FX_LIMIT_M = 2.0 ** 48, 2.0 ** -48, 16.0
-COUPLING_FX_SCALE, COUPLING_FX_QUANTUM = 2.0 ** 32, 2.0 ** -32
-COUPLING_FORCE_LIMIT_N, COUPLING_TORQUE_LIMIT_NM = 65536.0, 131072.0
-
-
-def _deterministic_gpu_physics() -> dict:
-    """Install the deterministic replacements (the block comment above) right after genesis.init (Genesis' solver
-    modules cannot be imported before it), before the first scene is built. Idempotent; returns what is installed."""
-    import genesis as gs
-    if getattr(gs, "_initialized", False):
-        return _install_deterministic_gpu_physics()
-    if not getattr(gs.init, "_topogym_deterministic", False):
-        original = gs.init
-
-        def init(*args, **kwargs):
-            result = original(*args, **kwargs)
-            _install_deterministic_gpu_physics()
-            return result
-        init._topogym_deterministic = True
-        gs.init = init
-    return dict(version=DETERMINISTIC_GPU_PHYSICS, installed="at genesis.init")
-
-
-def _install_deterministic_gpu_physics() -> dict:
-    import quadrants as qd
-    import genesis as gs
-    from genesis.engine.solvers.pbd_solver import PBDSolver
-    from genesis.engine.solvers.rigid.constraint import solver as constraint_solver
-    from genesis.engine.solvers.rigid.constraint import solver_breakdown  # noqa: F401  (registers the decomposed arm)
-
-    info = dict(version=DETERMINISTIC_GPU_PHYSICS, rigid_solve_arm=RIGID_SOLVE_ARM)
-    if getattr(PBDSolver, "_topogym_deterministic", False):
-        return info
-
-    # 1. the rigid constraint-solve arm, pinned
-    dispatcher = constraint_solver.func_solve_body
-    arms = {impl.get_implementation2().__name__: impl for impl in dispatcher._dispatch_impls}
-    chosen = arms[RIGID_SOLVE_ARM]
-    autotuned = type(dispatcher).__call__
-
-    class _PinnedArm(type(dispatcher)):
-        def __call__(self, *args, **kwargs):
-            if chosen.is_compatible is None or chosen.is_compatible(*args, **kwargs):
-                return chosen(*args, **kwargs)
-            return autotuned(self, *args, **kwargs)   # not reached in TopoGym scenes (prefer_decomposed_solver != 1)
-    dispatcher.__class__ = _PinnedArm
-
-    # 2-3. PBD constraint projection and particle collision with order-independent sums
-    @qd.data_oriented
-    class _Scratch:
-        """Integer accumulators of one solver / coupler (not traversed by checkpoints; zeros between kernels)."""
-        def __init__(self, n, batch, k):
-            self.acc = qd.field(qd.i64, shape=(max(int(n), 1), int(batch), int(k)))
-            self.bad = qd.field(qd.i32, shape=(max(int(n), 1), int(batch)))
-
-    @qd.func
-    def _bad(x, limit):
-        # non-finite (all-ones exponent, read from the bits: fast-math cannot fold the test) or out of range
-        b = False
-        if qd.static(gs.qd_float == qd.f64):
-            b = ((qd.bit_cast(x, qd.i64) >> 52) & 0x7FF) == 0x7FF
-        else:
-            b = ((qd.bit_cast(x, qd.i32) >> 23) & 0xFF) == 0xFF
-        return b or qd.abs(x) > limit
-
-    @qd.func
-    def _fx(x, scale):
-        return qd.cast(qd.floor(x * scale + 0.5), qd.i64)
-
-    @qd.func
-    def _nan():
-        r = gs.qd_float(0.0)
-        if qd.static(gs.qd_float == qd.f64):
-            r = qd.bit_cast(qd.i64(0x7FF8000000000000), qd.f64)
-        else:
-            r = qd.bit_cast(qd.i32(0x7FC00000), qd.f32)
-        return r
-
-    def _scatter(det, i, i_b, c):
-        for k in qd.static(range(3)):
-            if _bad(c[k], PBD_FX_LIMIT_M):
-                det.bad[i, i_b] = 1
-            else:
-                qd.atomic_add(det.acc[i, i_b, k], _fx(c[k], PBD_FX_SCALE_M))
-    _scatter.__annotations__ = dict(det=qd.template())
-    _scatter = qd.func(_scatter)
-
-    def _take(det, i, i_b):
-        d = qd.Vector.zero(gs.qd_float, 3)
-        for k in qd.static(range(3)):
-            d[k] = qd.cast(det.acc[i, i_b, k], gs.qd_float) * PBD_FX_QUANTUM_M
-            det.acc[i, i_b, k] = 0
-        if det.bad[i, i_b] != 0:
-            det.bad[i, i_b] = 0
-            d = qd.Vector([_nan(), _nan(), _nan()], dt=gs.qd_float)
-        return d
-    _take.__annotations__ = dict(det=qd.template())
-    _take = qd.func(_take)
-
-    @qd.func
-    def _add3(acc, bad, c):
-        for k in qd.static(range(3)):
-            if _bad(c[k], PBD_FX_LIMIT_M):
-                bad = 1
-            else:
-                acc[k] += _fx(c[k], PBD_FX_SCALE_M)
-        return acc, bad
-
-    @qd.data_oriented
-    class _DeterministicPBD:
-        # Genesis 1.2.1 pbd_solver.py:411-430 (_kernel_solve_stretch), the scatter order-independent
-        def _kernel_solve_stretch(self, f):
-            for _ in qd.static(range(self._max_stretch_solver_iterations)):
-                for i_e, i_b in qd.ndrange(self._n_edges, self._B):
-                    v1 = self.edges_info[i_e].v1
-                    v2 = self.edges_info[i_e].v2
-
-                    w1 = self.particles[v1, i_b].free / self.particles_info[v1].mass
-                    w2 = self.particles[v2, i_b].free / self.particles_info[v2].mass
-                    n = self.particles[v1, i_b].pos - self.particles[v2, i_b].pos
-                    C = n.norm() - self.edges_info[i_e].len_rest
-                    alpha = self.edges_info[i_e].stretch_compliance / (self._substep_dt**2)
-                    dp = -C / (w1 + w2 + alpha) * n / n.norm(gs.EPS) * self.edges_info[i_e].stretch_relaxation
-                    _scatter(self._det, v1, i_b, dp * w1)
-                    _scatter(self._det, v2, i_b, -(dp * w2))
-
-                for i_p, i_b in qd.ndrange(self._n_particles, self._B):
-                    total = self.particles[i_p, i_b].dpos + _take(self._det, i_p, i_b)
-                    if self.particles[i_p, i_b].free and self.particles_info[i_p].material_type != self.MATERIAL.PARTICLE:
-                        self.particles[i_p, i_b].pos = self.particles[i_p, i_b].pos + total
-                        self.particles[i_p, i_b].dpos.fill(0)
-                    else:
-                        self.particles[i_p, i_b].dpos = total
-        _kernel_solve_stretch.__annotations__ = dict(f=qd.i32)
-        _kernel_solve_stretch = qd.kernel(_kernel_solve_stretch)
-
-        # Genesis 1.2.1 pbd_solver.py:432-483 (_kernel_solve_bending)
-        def _kernel_solve_bending(self, f):
-            for _ in qd.static(range(self._max_bending_solver_iterations)):
-                for i_ie, i_b in qd.ndrange(self._n_inner_edges, self._B):
-                    v1 = self.inner_edges_info[i_ie].v1
-                    v2 = self.inner_edges_info[i_ie].v2
-                    v3 = self.inner_edges_info[i_ie].v3
-                    v4 = self.inner_edges_info[i_ie].v4
-
-                    w1 = self.particles[v1, i_b].free / self.particles_info[v1].mass
-                    w2 = self.particles[v2, i_b].free / self.particles_info[v2].mass
-                    w3 = self.particles[v3, i_b].free / self.particles_info[v3].mass
-                    w4 = self.particles[v4, i_b].free / self.particles_info[v4].mass
-
-                    if w1 + w2 + w3 + w4 > 0.0:
-                        p2 = self.particles[v2, i_b].pos - self.particles[v1, i_b].pos
-                        p3 = self.particles[v3, i_b].pos - self.particles[v1, i_b].pos
-                        p4 = self.particles[v4, i_b].pos - self.particles[v1, i_b].pos
-                        l23 = p2.cross(p3).norm()
-                        l24 = p2.cross(p4).norm()
-                        n1 = p2.cross(p3) / l23
-                        n2 = p2.cross(p4) / l24
-                        d = qd.math.clamp(n1.dot(n2), -1.0, 1.0)
-
-                        q3 = (p2.cross(n2) + n1.cross(p2) * d) / l23
-                        q4 = (p2.cross(n1) + n2.cross(p2) * d) / l24
-                        q2 = -(p3.cross(n2) + n1.cross(p3) * d) / l23 - (p4.cross(n1) + n2.cross(p4) * d) / l24
-                        q1 = -q2 - q3 - q4
-                        sum_wq = w1 * q1.norm_sqr() + w2 * q2.norm_sqr() + w3 * q3.norm_sqr() + w4 * q4.norm_sqr()
-                        constraint = qd.acos(d) - qd.acos(-1.0)
-
-                        alpha = self.inner_edges_info[i_ie].bending_compliance / (self._substep_dt**2)
-                        constraint = (
-                            -qd.sqrt(1 - d**2)
-                            * constraint
-                            / (sum_wq + alpha)
-                            * self.inner_edges_info[i_ie].bending_relaxation
-                        )
-
-                        _scatter(self._det, v1, i_b, w1 * constraint * q1)
-                        _scatter(self._det, v2, i_b, w2 * constraint * q2)
-                        _scatter(self._det, v3, i_b, w3 * constraint * q3)
-                        _scatter(self._det, v4, i_b, w4 * constraint * q4)
-
-                for i_p, i_b in qd.ndrange(self._n_particles, self._B):
-                    total = self.particles[i_p, i_b].dpos + _take(self._det, i_p, i_b)
-                    if self.particles[i_p, i_b].free and self.particles_info[i_p].material_type != self.MATERIAL.PARTICLE:
-                        self.particles[i_p, i_b].pos = self.particles[i_p, i_b].pos + total
-                        self.particles[i_p, i_b].dpos.fill(0)
-                    else:
-                        self.particles[i_p, i_b].dpos = total
-        _kernel_solve_bending.__annotations__ = dict(f=qd.i32)
-        _kernel_solve_bending = qd.kernel(_kernel_solve_bending)
-
-        # Genesis 1.2.1 pbd_solver.py:525-558 (_func_solve_collision): neighbour j's two contributions to particle i
-        @qd.func
-        def _det_collision_terms(self, i, j, i_b):
-            c1 = qd.Vector.zero(gs.qd_float, 3)
-            c2 = qd.Vector.zero(gs.qd_float, 3)
-            cur_dist = (self.particles_reordered[i, i_b].pos - self.particles_reordered[j, i_b].pos).norm(gs.EPS)
-            rest_dist = (
-                self.particles_info_reordered[i, i_b].pos_rest - self.particles_info_reordered[j, i_b].pos_rest
-            ).norm(gs.EPS)
-            target_dist = self._particle_size
-            if cur_dist < target_dist and rest_dist > target_dist:
-                wi = self.particles_reordered[i, i_b].free / self.particles_info_reordered[i, i_b].mass
-                wj = self.particles_reordered[j, i_b].free / self.particles_info_reordered[j, i_b].mass
-                n = (self.particles_reordered[i, i_b].pos - self.particles_reordered[j, i_b].pos) / cur_dist
-                c1 = wi / (wi + wj) * (target_dist - cur_dist) * n
-                dv = (self.particles_reordered[i, i_b].pos - self.particles_reordered[i, i_b].ipos) - (
-                    self.particles_reordered[j, i_b].pos - self.particles_reordered[j, i_b].ipos
-                )
-                dpos = -(dv - n * n.dot(dv))
-                d = target_dist - cur_dist
-                mu_s = qd.max(self.particles_info_reordered[i, i_b].mu_s, self.particles_info_reordered[j, i_b].mu_s)
-                mu_k = qd.max(self.particles_info_reordered[i, i_b].mu_k, self.particles_info_reordered[j, i_b].mu_k)
-                if dpos.norm() < mu_s * d:
-                    c2 = wi / (wi + wj) * dpos
-                else:
-                    c2 = wi / (wi + wj) * dpos * qd.min(1.0, mu_k * d / dpos.norm(gs.EPS))
-            return c1, c2
-
-        # Genesis 1.2.1 pbd_solver.py:560-589 (_kernel_solve_collision): the per-particle gather, its sum order-independent
-        def _kernel_solve_collision(self, f):
-            for i_p, i_b in qd.ndrange(self._n_particles, self._B):
-                if self.particles_info_reordered[i_p, i_b].material_type != self.MATERIAL.PARTICLE:
-                    acc = qd.Vector([0, 0, 0], dt=qd.i64)
-                    bad = 0
-                    base = self.sh.pos_to_grid(self.particles_reordered[i_p, i_b].pos)
-                    for offset in qd.grouped(qd.ndrange((-1, 2), (-1, 2), (-1, 2))):
-                        slot_idx = self.sh.grid_to_slot(base + offset)
-                        for j in range(
-                            self.sh.slot_start[slot_idx, i_b],
-                            self.sh.slot_size[slot_idx, i_b] + self.sh.slot_start[slot_idx, i_b],
-                        ):
-                            if (
-                                i_p != j
-                                and (self.particles_reordered[i_p, i_b].free or self.particles_reordered[j, i_b].free)
-                                and not (
-                                    self.particles_info_reordered[i_p, i_b].material_type == self.MATERIAL.LIQUID
-                                    and self.particles_info_reordered[j, i_b].material_type == self.MATERIAL.LIQUID
-                                )
-                            ):
-                                c1, c2 = self._det_collision_terms(i_p, j, i_b)
-                                acc, bad = _add3(acc, bad, c1)
-                                acc, bad = _add3(acc, bad, c2)
-                    d = qd.Vector.zero(gs.qd_float, 3)
-                    for k in qd.static(range(3)):
-                        d[k] = qd.cast(acc[k], gs.qd_float) * PBD_FX_QUANTUM_M
-                    if bad != 0:
-                        d = qd.Vector([_nan(), _nan(), _nan()], dt=gs.qd_float)
-                    self.particles_reordered[i_p, i_b].dpos = self.particles_reordered[i_p, i_b].dpos + d
-
-            for i_p, i_b in qd.ndrange(self._n_particles, self._B):
-                if (
-                    self.particles_reordered[i_p, i_b].free
-                    and self.particles_info_reordered[i_p, i_b].material_type != self.MATERIAL.PARTICLE
-                ):
-                    self.particles_reordered[i_p, i_b].pos = (
-                        self.particles_reordered[i_p, i_b].pos + self.particles_reordered[i_p, i_b].dpos
-                    )
-                    self.particles_reordered[i_p, i_b].dpos.fill(0)
-        _kernel_solve_collision.__annotations__ = dict(f=qd.i32)
-        _kernel_solve_collision = qd.kernel(_kernel_solve_collision)
-
-    from genesis.engine.couplers import legacy_coupler
-    coupler_build = legacy_coupler.LegacyCoupler.build
-
-    def build_coupler(self):
-        coupler_build(self)
-        if self._rigid_pbd:
-            self._det = _Scratch(self.rigid_solver.n_links, self.pbd_solver._B, 6)
-    legacy_coupler.LegacyCoupler.build = build_coupler
-
-    pbd_build = PBDSolver.build
-
-    def build(self):
-        pbd_build(self)
-        if self.is_active:
-            self._det = _Scratch(self._n_particles, self._B, 3)
-    PBDSolver.build = build
-    for name in ("_kernel_solve_stretch", "_kernel_solve_bending", "_kernel_solve_collision", "_det_collision_terms"):
-        setattr(PBDSolver, name, _DeterministicPBD.__dict__[name])
-    PBDSolver._topogym_deterministic = True
-    return info
-
-
 # ---- PBD cloth contact (the blanket blow-up of 2026-10-03: trials mCa9CZt / r42VtjE, jobs/journal/2026-10-03/blanket_debug)
 SIMULATOR_INSTABILITY = "simulator_instability"     # the episode end of a numerically unstable simulation
-# Guard (a backstop; _bound_pbd_rigid_contacts removes the cause). PBD reports a particle's velocity over its last
+# Guard (a backstop). PBD reports a particle's velocity over its last
 # 0.625 ms substep. Runs that did not blow up reached at most 9.2 m/s, with Genesis' contact and the bounded one alike:
 # brief substep-scale oscillations while a gripper pinned or squeezed the cloth (no particle moved faster than 0.5 m/s
 # between 50 ms samples); a cloth dropped from the robot's reach lands below ~3 m/s. Every recorded Genesis blow-up
@@ -2707,211 +2401,6 @@ SIMULATOR_INSTABILITY = "simulator_instability"     # the episode end of a numer
 # their displacement should cross the limit by then as well; this limit was not measured again with the displacement
 # (docs/rcb/benchmarks/topogym.md, Cloth settle speed: follow-ups).
 PARTICLE_SPEED_LIMIT_M_S = 20.0
-# Depenetration allowance of the PBD-rigid contact (_bound_pbd_rigid_contacts): the speed beyond the colliding body's own
-# approach and the particle's own inward motion at which a contact may push a particle out (resolving penetration left by
-# an infeasible squeeze). Gravity's per-substep sag needs g * dt = 0.006 m/s; resting and pushed cloth never reaches it.
-PBD_DEPENETRATION_MARGIN_M_S = 0.05
-
-
-def _bound_pbd_rigid_contacts() -> float:
-    """PBD scenes (blanket_flatten): resolve a cloth particle's rigid contacts together and bound the push-out by the
-    contact's physics. Installed before the scene's first physics step (it replaces Genesis 1.2.1's
-    LegacyCoupler.kernel_pbd_rigid_collide; the Genesis files are not edited, so the frozen blanket states' backend
-    identity, which hashes those files, still matches). A no-op for scenes without PBD particles: the kernel runs only when
-    rigid and PBD solvers are both active. Genesis 1.2.1-1.4.3 and main (2026-10-03) share the replaced code unchanged.
-
-    Genesis (legacy_coupler.py:736-760, 895-916), once per substep after the cloth constraints: for each coupled geom in
-    turn, a particle within the particle radius r of the geom is moved out along that geom's SDF normal by the whole
-    penetration, and its velocity becomes the substep's whole displacement over dt (0.625 ms); the geom's link receives
-    -m dv/dt. With one contact this is ordinary position-based contact. With two rigid surfaces closer than 2r (closed
-    fingertips pressed onto the table through the cloth; finger pads closing on a cloth edge) the constraints cannot all
-    hold: each geom undoes the previous one, the last geom wins, the particle moves by up to ~2r per substep, partly
-    sideways along the tilted SDF normals at the fingertip's edges, and all of it becomes velocity. The cloth constraints
-    pull the particle back in the next substep, which feeds the cycle: 0.96 -> 21 -> 35 -> 159,526 m/s in three ticks (the
-    easy trial's replay), the cloth thrown metres off the table, "Cloth fell below the table".
-
-    Here, per particle and substep, at the particle's pre-contact position x (after the cloth constraints; v its velocity,
-    x0 its position at the substep's start):
-      1. all coupled geoms are evaluated at x and their push-outs p_g = n_g (r - sd_g) summed (one simultaneous
-         projection, independent of the geom order): one contact gives Genesis' push-out, orthogonal contacts (a table
-         corner against a finger) are resolved together, opposing contacts (a squeeze) give their compromise, so a
-         squeezed particle stays held between the two surfaces;
-      2. the push-out along each contact normal is bounded by what that contact can physically do within the substep:
-         stop the particle's own motion into the geom, follow the geom's own approach (its velocity at the contact point)
-         and resolve old penetration at PBD_DEPENETRATION_MARGIN_M_S. The sum is scaled by the tightest bound, so no
-         contact moves a particle out faster than the body pushing it (plus the margin), and none lags behind it (no
-         tunnelling). Penetration an infeasible squeeze leaves is carried and resolved at the margin's speed;
-      3. the velocity is the bounded displacement over dt (PBD's own velocity rule), so a contact cannot give a particle
-         more normal speed than the colliding body's plus the margin: no energy from depenetration. The cloth
-         constraints see the corrected positions (they start the next substep's solve), and because the correction now
-         has the size of the physical motion they propagate it as ordinary motion;
-      4. each geom's link receives Genesis' reaction to its own full penetration, m p_g / dt^2 (the PBD constraint force
-         of that contact), so squeezed cloth still resists the gripper as before (the grip of a closing gripper). The
-         reactions are summed per link in fixed point and applied once per link and substep (deterministic GPU physics,
-         tooling v17: Genesis' func_apply_coupling_force adds them with float atomics in scheduler order).
-    When one contact is active and its push-out is within the bound (cloth resting on the table, cloth pushed by a moving
-    body, a falling particle stopped by the table: every contact of an unsqueezed cloth), the particle runs Genesis' own
-    expressions, bit for bit. Returns the margin."""
-    import quadrants as qd
-    import genesis as gs
-    import genesis.utils.sdf as sdf
-    from genesis.engine.couplers import legacy_coupler
-    from genesis.utils import array_class
-    _deterministic_gpu_physics()   # allocates the coupler's fixed-point scratch at build (after genesis.init)
-    installed = getattr(legacy_coupler.LegacyCoupler.kernel_pbd_rigid_collide, "_topogym_depenetration_margin_m_s", None)
-    if installed is not None:
-        return installed
-    margin = float(PBD_DEPENETRATION_MARGIN_M_S)
-
-    def _coupling_force(det, links_state, pos, force, link_idx, i_b):
-        # genesis/engine/solvers/rigid/abd/misc.py:796-799 (func_apply_coupling_force), summed in fixed point
-        torque = (pos - links_state.root_COM[link_idx, i_b]).cross(force)
-        for k in qd.static(range(3)):
-            fb = False
-            tb = False
-            if qd.static(gs.qd_float == qd.f64):   # non-finite: all-ones exponent, read from the bits (fast-math safe)
-                fb = ((qd.bit_cast(force[k], qd.i64) >> 52) & 0x7FF) == 0x7FF
-                tb = ((qd.bit_cast(torque[k], qd.i64) >> 52) & 0x7FF) == 0x7FF
-            else:
-                fb = ((qd.bit_cast(force[k], qd.i32) >> 23) & 0xFF) == 0xFF
-                tb = ((qd.bit_cast(torque[k], qd.i32) >> 23) & 0xFF) == 0xFF
-            if fb or tb or qd.abs(force[k]) > COUPLING_FORCE_LIMIT_N or qd.abs(torque[k]) > COUPLING_TORQUE_LIMIT_NM:
-                det.bad[link_idx, i_b] = 1
-            else:
-                qd.atomic_add(det.acc[link_idx, i_b, k], qd.cast(qd.floor(force[k] * COUPLING_FX_SCALE + 0.5), qd.i64))
-                qd.atomic_add(det.acc[link_idx, i_b, 3 + k],
-                              qd.cast(qd.floor(torque[k] * COUPLING_FX_SCALE + 0.5), qd.i64))
-    _coupling_force.__annotations__ = dict(det=qd.template(), links_state=array_class.LinksState)
-    _coupling_force = qd.func(_coupling_force)
-
-    @qd.data_oriented
-    class _BoundedPBDRigidContact:
-        def kernel_pbd_rigid_collide(self, geoms_state, geoms_info, links_state, sdf_info, rigid_global_info,
-                                     collider_static_config):
-            for i_p, i_b in qd.ndrange(self.pbd_solver._n_particles, self.sph_solver._B):
-                if self.pbd_solver.particles_ng_reordered[i_p, i_b].active:
-                    r = self.pbd_solver.particle_size / 2
-                    dt = self.pbd_solver._substep_dt
-                    x = self.pbd_solver.particles_reordered[i_p, i_b].pos
-                    v = self.pbd_solver.particles_reordered[i_p, i_b].vel
-                    x0 = self.pbd_solver.particles_reordered[i_p, i_b].ipos
-                    mass = self.pbd_solver.particles_info_reordered[i_p, i_b].mass
-                    push = qd.Vector.zero(gs.qd_float, 3)
-                    n_contacts = 0
-                    g_first = 0
-                    n_first = qd.Vector.zero(gs.qd_float, 3)
-                    sd_first = gs.qd_float(0.0)
-                    # 1. every coupled geom at the pre-contact position; the push-outs summed
-                    for i_g in range(self.rigid_solver.n_geoms):
-                        if geoms_info.needs_coup[i_g]:
-                            signed_dist = sdf.sdf_func_world(
-                                geoms_state=geoms_state, geoms_info=geoms_info, sdf_info=sdf_info, pos_world=x,
-                                geom_idx=i_g, batch_idx=i_b)
-                            contact_normal = sdf.sdf_func_normal_world(
-                                geoms_state=geoms_state, geoms_info=geoms_info, rigid_global_info=rigid_global_info,
-                                collider_static_config=collider_static_config, sdf_info=sdf_info, pos_world=x,
-                                geom_idx=i_g, batch_idx=i_b)
-                            self.pbd_rigid_normal_reordered[i_p, i_b, i_g] = contact_normal
-                            if signed_dist < r:
-                                push = push + contact_normal * (r - signed_dist)
-                                if n_contacts == 0:
-                                    g_first = i_g
-                                    n_first = contact_normal
-                                    sd_first = signed_dist
-                                n_contacts += 1
-                    if n_contacts > 0:
-                        # 2. the tightest physical bound of the push-out along a contact normal
-                        scale = gs.qd_float(1.0)
-                        if n_contacts == 1:
-                            u = self.rigid_solver._func_vel_at_point(
-                                pos_world=x, link_idx=geoms_info.link_idx[g_first], i_b=i_b, links_state=links_state)
-                            allowed = (qd.max(u.dot(n_first), 0.0) + qd.max(-v.dot(n_first), 0.0) + margin) * dt
-                            along = push.dot(n_first)
-                            if along > allowed:
-                                scale = allowed / along
-                        else:
-                            for i_g in range(self.rigid_solver.n_geoms):
-                                if geoms_info.needs_coup[i_g]:
-                                    signed_dist = sdf.sdf_func_world(
-                                        geoms_state=geoms_state, geoms_info=geoms_info, sdf_info=sdf_info, pos_world=x,
-                                        geom_idx=i_g, batch_idx=i_b)
-                                    if signed_dist < r:
-                                        contact_normal = sdf.sdf_func_normal_world(
-                                            geoms_state=geoms_state, geoms_info=geoms_info,
-                                            rigid_global_info=rigid_global_info,
-                                            collider_static_config=collider_static_config, sdf_info=sdf_info,
-                                            pos_world=x, geom_idx=i_g, batch_idx=i_b)
-                                        u = self.rigid_solver._func_vel_at_point(
-                                            pos_world=x, link_idx=geoms_info.link_idx[i_g], i_b=i_b,
-                                            links_state=links_state)
-                                        allowed = (qd.max(u.dot(contact_normal), 0.0)
-                                                   + qd.max(-v.dot(contact_normal), 0.0) + margin) * dt
-                                        along = push.dot(contact_normal)
-                                        if along > allowed:
-                                            scale = qd.min(scale, allowed / along)
-                        new_pos = x
-                        new_vel = v
-                        if n_contacts == 1 and scale >= 1.0:
-                            # Genesis' own expressions (legacy_coupler.py:907-924), bit for bit
-                            stiffness = 1.0
-                            energy_loss = 0.0
-                            new_pos = x + stiffness * n_first * (self.pbd_solver.particle_size / 2 - sd_first)
-                            new_vel = (new_pos - x0) / self.pbd_solver._substep_dt
-                            delta_mv = mass * (new_vel - v)
-                            force = (-delta_mv / self.rigid_solver._substep_dt) * (1 - energy_loss)
-                            _coupling_force(self._det, links_state, x, force, geoms_info.link_idx[g_first], i_b)
-                        else:
-                            # 3. the bounded simultaneous push-out; the velocity from the displacement
-                            new_pos = x + scale * push
-                            new_vel = (new_pos - x0) / dt
-                            # 4. each link: the reaction to its own full penetration
-                            for i_g in range(self.rigid_solver.n_geoms):
-                                if geoms_info.needs_coup[i_g]:
-                                    signed_dist = sdf.sdf_func_world(
-                                        geoms_state=geoms_state, geoms_info=geoms_info, sdf_info=sdf_info, pos_world=x,
-                                        geom_idx=i_g, batch_idx=i_b)
-                                    if signed_dist < r:
-                                        contact_normal = sdf.sdf_func_normal_world(
-                                            geoms_state=geoms_state, geoms_info=geoms_info,
-                                            rigid_global_info=rigid_global_info,
-                                            collider_static_config=collider_static_config, sdf_info=sdf_info,
-                                            pos_world=x, geom_idx=i_g, batch_idx=i_b)
-                                        force = -mass * contact_normal * (r - signed_dist) / (
-                                            dt * self.rigid_solver._substep_dt)
-                                        _coupling_force(self._det, links_state, x, force, geoms_info.link_idx[i_g], i_b)
-                        self.pbd_solver.particles_reordered[i_p, i_b].pos = new_pos
-                        self.pbd_solver.particles_reordered[i_p, i_b].vel = new_vel
-            # each link once: Genesis' `cfrc_coupling -= torque / force` with the order-independent totals
-            for i_l, i_b in qd.ndrange(self.rigid_solver.n_links, self.pbd_solver._B):
-                frc = qd.Vector.zero(gs.qd_float, 3)
-                trq = qd.Vector.zero(gs.qd_float, 3)
-                for k in qd.static(range(3)):
-                    frc[k] = qd.cast(self._det.acc[i_l, i_b, k], gs.qd_float) * COUPLING_FX_QUANTUM
-                    trq[k] = qd.cast(self._det.acc[i_l, i_b, 3 + k], gs.qd_float) * COUPLING_FX_QUANTUM
-                    self._det.acc[i_l, i_b, k] = 0
-                    self._det.acc[i_l, i_b, 3 + k] = 0
-                if self._det.bad[i_l, i_b] != 0:
-                    self._det.bad[i_l, i_b] = 0
-                    nan = gs.qd_float(0.0)
-                    if qd.static(gs.qd_float == qd.f64):
-                        nan = qd.bit_cast(qd.i64(0x7FF8000000000000), qd.f64)
-                    else:
-                        nan = qd.bit_cast(qd.i32(0x7FC00000), qd.f32)
-                    frc = qd.Vector([nan, nan, nan], dt=gs.qd_float)
-                    trq = frc
-                links_state.cfrc_coupling_ang[i_l, i_b] = links_state.cfrc_coupling_ang[i_l, i_b] - trq
-                links_state.cfrc_coupling_vel[i_l, i_b] = links_state.cfrc_coupling_vel[i_l, i_b] - frc
-        # Real annotation objects (this module uses postponed annotations; Quadrants needs the types themselves)
-        kernel_pbd_rigid_collide.__annotations__ = dict(
-            geoms_state=array_class.GeomsState, geoms_info=array_class.GeomsInfo, links_state=array_class.LinksState,
-            sdf_info=array_class.SDFInfo, rigid_global_info=array_class.RigidGlobalInfo,
-            collider_static_config=qd.template())
-        kernel_pbd_rigid_collide = qd.kernel(kernel_pbd_rigid_collide)
-
-    kernel = _BoundedPBDRigidContact.__dict__["kernel_pbd_rigid_collide"]
-    kernel._topogym_depenetration_margin_m_s = margin
-    legacy_coupler.LegacyCoupler.kernel_pbd_rigid_collide = kernel
-    return margin
 
 
 def _guard_particle_speeds(task, on_trip: Callable[[dict], None]) -> bool:
@@ -3094,138 +2583,23 @@ def strict_goal(statuses) -> tuple[int, int] | None:
     return None
 
 
-# --------------------------------------------------------------------------- libuipc build per GPU
-# The image holds two builds of one libuipc recipe (pyuipc 0.0.25+topogym.det1.cuda128: libuipc 292c98c3 plus the
-# determinism patches, nvcc 12.8; images/robotangle/Dockerfile). Both have the same version and source commit, which the
-# frozen IPC settled states hold, so either restores them. They differ only in their uipc-build.json, whose sha256 names
-# the build (scripts/robotangle/release.json and every runtime binding: uipc_builds):
-#   audited  the wheel of every evidence run, in site-packages (/opt/uipc-build.json): SASS sm_89 and sm_120, PTX compute_120;
-#   sm86     its own prefix /opt/uipc_sm86: SASS sm_86 (runs on 8.6 and 8.7), PTX compute_86 (JIT-compiled on 9.x and 10.x).
-# The rule: compute capability 8.9 or 12.x loads the audited wheel, any other GPU the sm86 build, no visible GPU the audited
-# wheel (no libuipc scene runs there). A Session applies it before anything imports uipc and refuses a choice that
-# contradicts it; installed_runtime() and the session's runtime_binding name the build in use.
-UIPC_BUILDS = {"audited": None, "sm86": "/opt/uipc_sm86"}   # build -> its prefix (site-packages/, uipc-build.json); None: site-packages
-DEFAULT_UIPC_BUILD = "/opt/uipc-build.json"
-_GPU_CAPABILITIES: list | None = None
-_UIPC_BUILD: dict | None = None
-
-
-def gpu_capabilities() -> list[tuple[int, int]]:
-    """Compute capabilities of the CUDA devices this process sees (CUDA_VISIBLE_DEVICES applies), from the CUDA driver API
-    through ctypes: no context, no torch. Empty without a driver or a visible device."""
-    global _GPU_CAPABILITIES
-    if _GPU_CAPABILITIES is None:
-        import ctypes
-        caps = []
-        try:
-            cuda = ctypes.CDLL("libcuda.so.1")
-        except OSError:
-            cuda = None
-        count = ctypes.c_int(0)
-        if cuda is not None and cuda.cuInit(0) == 0 and cuda.cuDeviceGetCount(ctypes.byref(count)) == 0:
-            for index in range(count.value):
-                device, major, minor = ctypes.c_int(), ctypes.c_int(), ctypes.c_int()
-                if (cuda.cuDeviceGet(ctypes.byref(device), index) != 0
-                        or cuda.cuDeviceGetAttribute(ctypes.byref(major), 75, device) != 0     # ..._COMPUTE_CAPABILITY_MAJOR
-                        or cuda.cuDeviceGetAttribute(ctypes.byref(minor), 76, device) != 0):   # ..._COMPUTE_CAPABILITY_MINOR
-                    raise RuntimeError(f"CUDA driver error while reading the compute capability of device {index}")
-                caps.append((major.value, minor.value))
-        _GPU_CAPABILITIES = caps
-    return list(_GPU_CAPABILITIES)
-
-
-def uipc_build_for(capabilities) -> str:
-    """The rule (above): the libuipc build for the visible GPUs. Mixed compute capabilities are refused: a process loads
-    one build, and a RoboTangle container sees exactly one GPU (Nyx needs one)."""
-    caps = sorted({tuple(c) for c in capabilities})
-    if len(caps) > 1:
-        raise RuntimeError("The visible GPUs have different compute capabilities ("
-                           + ", ".join(f"{a}.{b}" for a, b in caps) + "): a process loads one libuipc build. Give the "
-                           "container exactly one GPU, as RoboTangle needs, or GPUs of one model.")
-    if not caps:
-        return "audited"
-    major, minor = caps[0]
-    return "audited" if (major, minor) == (8, 9) or major == 12 else "sm86"
-
-
+# --------------------------------------------------------------------------- runtime identity
 def _sha256_file(path) -> str | None:
     path = Path(path)
     return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
 
-def select_uipc_build(capability: tuple[int, int] | None = None) -> dict:
-    """Choose this process's libuipc build by the rule, once and before uipc is imported: the sm86 prefix goes first on
-    sys.path when the rule picks it. `capability` stands in for the GPU's (tests); a Session refuses a choice that
-    contradicts the visible GPU (uipc_build_in_use). Returns the build in use: its name, the compute capability it was
-    chosen for, its uipc-build.json and that file's sha256, and the uipc package Python imports."""
-    global _UIPC_BUILD
-    if _UIPC_BUILD is not None:
-        return _UIPC_BUILD
-    import importlib
-    import importlib.util
-    caps = [tuple(capability)] if capability is not None else gpu_capabilities()
-    name = uipc_build_for(caps)
-    prefix = UIPC_BUILDS[name]
-    record = Path(prefix, "uipc-build.json") if prefix else Path(DEFAULT_UIPC_BUILD)
-    site = Path(prefix, "site-packages") if prefix else None
-    if site is not None:
-        loaded = sys.modules.get("uipc")
-        if loaded is not None and not Path(loaded.__file__).resolve().is_relative_to(site):
-            raise InstanceMismatch(f"uipc was imported from {loaded.__file__} before the Session chose the {name} build ({site})")
-        if not record.is_file():
-            raise InstanceMismatch(f"this image has no {name} libuipc build ({record})")
-        if str(site) not in sys.path:
-            sys.path.insert(0, str(site))
-            importlib.invalidate_caches()
-    spec = importlib.util.find_spec("uipc")
-    module = Path(spec.origin).resolve() if spec is not None and spec.origin else None
-    others = [Path(p, "site-packages") for n, p in UIPC_BUILDS.items() if p and n != name]
-    if module is not None and ((site is not None and not module.is_relative_to(site))
-                               or any(module.is_relative_to(o) for o in others)):
-        raise InstanceMismatch(f"uipc resolves to {module}, not to the {name} libuipc build")
-    _UIPC_BUILD = dict(build=name, capability=list(caps[0]) if caps else None, uipc_build=str(record),
-                       uipc_build_sha256=_sha256_file(record), module=str(module) if module else None)
-    return _UIPC_BUILD
-
-
-def uipc_build_in_use() -> dict:
-    """select_uipc_build(), refused when it contradicts the rule for the visible GPU (a forced choice)."""
-    chosen = select_uipc_build()
-    rule = uipc_build_for(gpu_capabilities())
-    if chosen["build"] != rule:
-        raise InstanceMismatch(f"libuipc build {chosen['build']} (chosen for compute capability {chosen['capability']}) "
-                               f"contradicts the rule for the visible GPU ({gpu_capabilities() or 'none'}: {rule})")
-    return chosen
-
-
 def installed_runtime(root=None) -> dict:
-    """topogym.simulator.frozen_binding.installed_runtime() for an image with two libuipc builds: uipc_builds = the builds
-    the rule chooses from (name -> its uipc-build.json sha256, None if absent), uipc_build_sha256 = the one this process
-    uses (select_uipc_build)."""
+    """topogym.simulator.frozen_binding.installed_runtime(): the installed simulator source (SOURCE.json, re-hashed), the
+    Python version and the versions of the packages the runtime binding names."""
     from topogym.simulator.frozen_binding import installed_runtime as image_runtime
-    runtime = image_runtime(root)
-    runtime["uipc_builds"] = {name: _sha256_file(Path(prefix, "uipc-build.json") if prefix else DEFAULT_UIPC_BUILD)
-                              for name, prefix in UIPC_BUILDS.items()}
-    runtime["uipc_build_sha256"] = select_uipc_build()["uipc_build_sha256"]
-    return runtime
+    return image_runtime(root)
 
 
 def check_runtime(lock: dict) -> dict:
-    """frozen_binding.check_runtime() for an image with two libuipc builds. The binding's runtime names the default
-    (audited) build and lock["uipc_builds"] both allowed ones: the image must hold exactly those, and this process must use
-    the one the rule chooses for the visible GPU."""
-    from topogym.simulator.frozen_binding import BindingMismatch, validate_lock
-    validate_lock(lock)
-    builds = lock.get("uipc_builds")
-    if (not isinstance(builds, dict) or set(builds) != set(UIPC_BUILDS)
-            or builds["audited"] != lock["runtime"].get("uipc_build_sha256")):
-        raise BindingMismatch(f"Runtime binding lacks the libuipc builds {sorted(UIPC_BUILDS)} (uipc_builds; audited = runtime's)")
-    chosen = uipc_build_in_use()
-    expected = dict(lock["runtime"], uipc_builds=builds, uipc_build_sha256=builds[chosen["build"]])
-    actual = installed_runtime()
-    if actual != expected:
-        raise BindingMismatch("Actual installed source/dependencies/libuipc builds differ from the bound runtime")
-    return actual
+    """frozen_binding.check_runtime(): the image must install exactly the runtime the task's binding names."""
+    from topogym.simulator.frozen_binding import check_runtime as image_check
+    return image_check(lock)
 
 
 # --------------------------------------------------------------------------- generated assets on another CPU class
@@ -3388,7 +2762,6 @@ class Session:
             raise ValueError("TopoGym sessions follow the GPU-backend rule; the physics device comes from the instance")
         self.task, self.spec = task, dict(TASKS[task])
         self.runtime_binding = None
-        self.uipc_build = uipc_build_in_use()     # the libuipc build, by the rule, before anything imports uipc
         inst = None
         if instance is not None:
             if gripper_space is not None:
@@ -3405,10 +2778,10 @@ class Session:
                     lock = json.loads(lock_path.read_text())
                     check_inputs(instance, __file__, lock)
                     _check_render_bridge(lock)
-                    runtime = check_runtime(lock)       # this tooling's: both libuipc builds and the one in use
+                    runtime = check_runtime(lock)
                 except (OSError, ValueError, KeyError) as exc:
                     raise InstanceMismatch(f"Frozen runtime binding failed: {exc}") from exc
-                self.runtime_binding = dict(binding_id=binding_id(lock), runtime=runtime, uipc_build=self.uipc_build,
+                self.runtime_binding = dict(binding_id=binding_id(lock), runtime=runtime,
                                             creation_source=lock["creation_source"], image=lock["image"])
                 _accept_realized_identities()      # the binding pins the generator: archives accept this host's asset bytes
                 _install_frozen_assets(Path(instance).resolve().parent, inst.get("asset_identity") or {})
@@ -3442,41 +2815,27 @@ class Session:
         t0 = time.time()
         _log(f"building {cfg['task_id']} / {cfg['variation_id']} (seed {cfg['seed']}, eval index {self.eval_index}) ...")
         self.physics_engine = cfg.get("physics_engine", "genesis")
-        genesis = self.physics_engine == "genesis"
-        if genesis and cfg.get("compute_backend") == "cpu":
-            # Genesis' CPU getters are torch CPU ops, and torch sizes its pool to the host (256 threads on lab), which spins
-            # under a container's CPU quota. The results are the same at any count (2026-10-02 study).
-            import torch
-            torch.set_num_threads(4)
-        # Genesis' kernel replacements; a MuJoCo scene has none of these solvers.
-        self.deterministic_physics = _deterministic_gpu_physics() if genesis else None   # before genesis.init
-        margin = _bound_pbd_rigid_contacts() if genesis else None   # before the scene's first physics step
-        if genesis:
-            _register_runtime_physics(margin)
+        if self.physics_engine != "mujoco":
+            raise ValueError(f"physics_engine {self.physics_engine!r}: this tooling runs MuJoCo instances only (RoboARC 1.1.0)")
         self.env = Env(SimulatorConfig(**cfg))
         # Tooling v7: frames come only from env.sensor_frame() (render_frame / render_grid / render_depth / videos), so the
         # per-step observation skips the camera pass and a frame is rendered when asked (image 0.2.9; physics identical).
         self.env.defer_rgb = True
         self.env.reset(seed=int(cfg["seed"]))
-        if not genesis and instance is not None and cfg.get("enable_rgb", True):
+        if instance is not None and cfg.get("enable_rgb", True):
             # MuJoCo physics, today's Nyx frames: on the first frame the render bridge (render_bridge.py, next to this
             # file) builds the frozen instance's Genesis scene as a never-stepped Nyx host and shows MuJoCo's state in it,
             # or nyx_direct.py feeds Nyx from the world without that host (the task's renderer, TASKS "renderer").
             self.env._world.renderer_factory = lambda path=str(Path(instance).resolve()): _render_bridge(
                 path, self.env._world, self.spec.get("renderer", "nyx"))
-        if not genesis:
-            # where the scene's vendored robot assets came from (the vendored Panda, or the genesis package for all files)
-            sources = (self.env._world.manifest or {}).get("robot_asset_sources") or {}
-            if sources:
-                _log("robot assets: " + ", ".join(f"{k} {v}" for k, v in sorted(sources.items())))
-            if self.runtime_binding is not None:
-                self.runtime_binding["robot_assets"] = sources
-        self.fem_checkpoint_store_bounded = _drop_fem_gradient_checkpoints(self.env) if genesis else False
+        # where the scene's vendored robot assets came from
+        sources = (self.env._world.manifest or {}).get("robot_asset_sources") or {}
+        if sources:
+            _log("robot assets: " + ", ".join(f"{k} {v}" for k, v in sorted(sources.items())))
+        if self.runtime_binding is not None:
+            self.runtime_binding["robot_assets"] = sources
         self.knot_predicate_vectorized = _speed_up_knot_predicate(cfg["task_id"])
         self.settle_only_when_reached = _settle_only_when_reached(self.env._task)
-        # The bounded PBD-rigid contact applies when this scene couples rigid bodies with PBD particles (blanket_flatten)
-        self.pbd_depenetration_margin_m_s = (margin if genesis and getattr(self.env._world.scene.sim.coupler, "_rigid_pbd", False)
-                                             else None)
         self.instability: dict | None = None    # the first simulator instability of this episode (None: none)
         self.particle_speed_guard = _guard_particle_speeds(self.env._task, self._on_instability)
         if not self.spec["fixture"]:
@@ -4765,12 +4124,8 @@ def cmd_make_instance(a) -> None:
     s = Session(a.task, eval_index=a.eval_index, variation_id=a.variation, seed=a.scene_seed,
                 task_parameters=params, simulator_overrides=overrides, gripper_space=getattr(a, "gripper_space", "width"))
     from topogym.tasks.goal_description import TASK_IDS, describe_goal
-    if s.physics_engine == "mujoco":
-        import mujoco
-        engine = {"physics_engine": "mujoco", "mujoco_version": mujoco.__version__}
-    else:
-        import genesis as gs
-        engine = {"genesis_version": gs.__version__}
+    import mujoco
+    engine = {"physics_engine": "mujoco", "mujoco_version": mujoco.__version__}
     out = {"task": a.task, "topogym_task": s.config["task_id"], "variation_id": s.config["variation_id"], "seed": s.config["seed"],
            "eval_index": s.eval_index, "text": s.spec["text"], "simulator": s.config, "state_sha": s.instance_sha,
            "action_dim": s.action_dim, "action_layout": s.action_layout, "gripper_space": s.gripper_space,
@@ -4835,9 +4190,11 @@ def cmd_make_instance(a) -> None:
         shutil.copytree(s.env._world.scene_dir, target)
         out["simulator"]["mujoco_scene"] = "instance_assets/mujoco"
         ticks = int(s.config.get("reset_physics_steps") or 0)
-        if ticks:
+        if ticks and s.config["task_id"] in MUJOCO_CHAIN_FAMILIES:
             # Freeze the settled birth too: every later build restores it instead of settling `ticks` ticks again
-            # (SimulatorConfig.mujoco_settled_state; the restored state has the same state_sha).
+            # (SimulatorConfig.mujoco_settled_state; the restored state has the same state_sha). Only the chain families
+            # (their settling, MUJOCO_CHAIN_SETTLE_S): another MuJoCo instance keeps its reset_physics_steps and settles
+            # at every build (export_settled_state does not cover cloths).
             path = Path(a.out).resolve().parent / "instance_assets" / "mujoco_settled.npz"
             s.env._world.export_settled_state(path, settled_ticks=ticks)
             out["simulator"].update(reset_physics_steps=0, mujoco_settled_state="instance_assets/mujoco_settled.npz")
@@ -4895,7 +4252,7 @@ def cmd_describe(a) -> None:
     """What the task generator writes into instruction.md / README.md: cameras, robot, kinematics, the success predicate's
     source, the table height; one JSON line."""
     import inspect
-    runtime_identity = installed_runtime()      # this tooling's: both libuipc builds and the one in use
+    runtime_identity = installed_runtime()
     s = Session(a.task, instance=a.instance)
     t = s.env._task
     from topogym.tasks.goal_description import TASK_IDS, describe_goal

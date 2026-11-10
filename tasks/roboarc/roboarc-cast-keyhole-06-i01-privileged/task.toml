@@ -3,11 +3,11 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/roboarc-cast-keyhole-06-i01-privileged"
-description = "RoboARC cast_keyhole (ALOHA 2, MuJoCo): produce one replayable trajectory. Separate and place the entire silver keyhole piece inside the green dashed goal region. Keep the gold piece on the puzzle/system side. Frozen scene instance (variation cast_keyhole_double_maze, seed 0)."
+description = "RoboARC cast_keyhole (ALOHA 2, MuJoCo): produce one replayable trajectory. Separate and place the entire right-hand plate (`keyhole_silver`) inside the green dashed goal region. Keep the left-hand plate (`keyhole_gold`) on the puzzle/system side (the names are identifiers, not colours). At the start the right gripper holds the right-hand plate and the left gripper the left-hand plate. Frozen scene instance (variation cast_keyhole_double_maze, seed 0)."
 keywords = ["robotics", "roboarc", "mujoco", "aloha", "code-as-policy", "trajectory", "cast_keyhole"]
 
 [metadata]
-tooling_version = "19"
+tooling_version = "22"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU float64 physics, Nyx RGB)
 robot = "aloha-2"
@@ -19,6 +19,12 @@ grasp = "assisted (the contact_weld_v1 pre-weld: the grippers start closed on ke
 success_rule = "task-native success (goal_complete True; frozen parameters; terminal revision cast_keyhole_placement_v4_grasp_contact_2mm)"
 instance_seed = 0                 # scene = environment/instance.json (variation cast_keyhole_double_maze, eval index None); identity = dataset.toml digest
 expert_time_estimate_hours = 2.0
+
+[metadata.seeds]
+# the seeds a runner may draw from (a list, { from = A, to = B } or "any") and the ones the reference solution
+# under solution/ is for, where they are not the default seed alone (docs/protocol/README.md §2)
+allowed = [0, 1, 2]
+build = "runtime"
 
 [verifier]
 timeout_sec = 45000.0

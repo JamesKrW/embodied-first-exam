@@ -18,8 +18,8 @@
   "right_actuator8"
  ],
  "image": {
-  "id": "sha256:ed950d079b6304219d3b1ec2f428f851e383cec841d38a4c11bd0f25a42dea00",
-  "reference": "ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0"
+  "id": "sha256:9f9cbab8aa74f858b22ac1144162aad9f1b1e5b927f90f6f8251130f36d73868",
+  "reference": "ghcr.io/mll-lab-nu/efe:roboarc-ikea-1.1.0"
  },
  "initial_state_sha256": "700c53dd5fd9fe2b610f6bf2db29c52536b98d94f3dd9b191d016c656017238b",
  "nu": 16,
@@ -28,7 +28,7 @@
   "numpy": "2.5.4",
   "python": "3.12.15"
  },
- "scene_digest": "8c5f29daaa7e14c2f38f7ca4fcb2c6ca825be6f4c589301df1b787730c24e8bc",
+ "scene_digest": "0acbefad697b3b2884c893398bf1cab51aed42c83ec85c3e500d9b625e877460",
  "scene_files": {
   "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
   "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -107,7 +107,7 @@
   "assets/parts/screw_ring_l/screw_ring_l_m002.obj": "6d1852ce42ab3a998bce674ea087c8f1dbb96d9884026dd85b287a868d9a48ab",
   "assets/parts/screw_ring_r/screw_ring_r_m002.obj": "6d1852ce42ab3a998bce674ea087c8f1dbb96d9884026dd85b287a868d9a48ab",
   "gladom_mechanism.py": "30e62324503ea4ea56b59ff6f9dfec1ae63086a8b31a81e690ca54cdd9e5cce0",
-  "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+  "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
   "layout.json": "426e35a9b90b7df11e012032c991ab2e3b258a21cdb1c68bb06abb99956d7766",
   "scene.py": "70731a8ba1418304edac30f57147c27416b9fcc810e07d6e7a92898b5ad5ab33",
   "scene.xml": "51da2391a2b62b79cd9ba3f81a68aa3e0273981ae34511806c54032b66b91b8c",

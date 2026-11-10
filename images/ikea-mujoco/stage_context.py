@@ -11,7 +11,8 @@ Per task (assets.json "tasks") it copies what the scene loads at run time: scene
 sw_cutover.json (where present), the scene's own Python modules (ikea_runtime.py, success.py, the mechanism modules;
 not the `_*.py` dev scripts) and assets/. Development material (check/, mech_test/, dev/, videos, the direct-force
 references) stays out. Every staged file must match its sha256 in assets.json; the image copies context/scenes/ to
-/opt/ikea/scenes/ and the pins ("note", "tasks" of assets.json: IMAGE_KEYS) next to it. Python standard library only.
+/opt/ikea/scenes/ and the pins ("note", "tasks" of assets.json: IMAGE_KEYS) next to it. The context also gets the EPA
+patch script and the base image's requirements.lock. Python standard library only.
 """
 from __future__ import annotations
 import argparse, hashlib, json, pathlib, re, shutil, sys
@@ -97,6 +98,7 @@ def main() -> int:
         return 1
     (a.out / "assets.json").write_text(json.dumps({k: pins[k] for k in IMAGE_KEYS}, indent=1, sort_keys=True) + "\n")
     shutil.copyfile(ROOT / "images/ikea-mujoco/mujoco-3.14.0-epa/bytepatch_libmujoco.py", a.out / "bytepatch_libmujoco.py")
+    shutil.copyfile(ROOT / "images/ikea-mujoco/requirements.lock", a.out / "requirements.lock")   # the base image's wheels
     print(f"staged {len(tasks)} scenes in {a.out}")
     return 0
 

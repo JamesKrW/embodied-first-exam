@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "instance_sha256": "2fcb906bb62ae592bc309ebd9c1182c582300cd5c54e463d6e6ca38f3149bf36",
+  "instance_sha256": "6922847eb273786c65de1635dfe258af0f9dd1e0e81f7309e640b2aff47a2fc8",
   "asset_files": {
-    "instance_assets/mujoco/meshes/goal_region_5d0489e393032bc1.obj": "5d0489e393032bc19314134eb7730017dc00ab9ef4318dae950f71faa0fcbcd5",
+    "instance_assets/mujoco/meshes/goal_region_2b274d457f32e3d9.obj": "2b274d457f32e3d9175bc6b64e6be0401604d323ce6b91ba86b6b46aad7e6ea8",
     "instance_assets/mujoco/meshes/hedgehog_ball_hedgehog_0_72b9c608ef1dd6ed.obj": "72b9c608ef1dd6eddf09dece121c671757d7c950f35b385b8c295532dfb651c0",
     "instance_assets/mujoco/meshes/hedgehog_ball_hedgehog_1_609ba8c19be3679f.obj": "609ba8c19be3679fbceb35d5b9f70dd44d83e5ed9e58f47e58b280a0f045c807",
     "instance_assets/mujoco/meshes/hedgehog_ball_hedgehog_2_50404e5fbcafe620.obj": "50404e5fbcafe6204ce4060fdf5787a29f0d9bb6d4a896e0434f41f44f05b226",
@@ -272,18 +272,16 @@
     "instance_assets/mujoco/meshes/hedgehog_cage_cage_98_fad58563312565d4.obj": "fad58563312565d4b1ec168ab166f4ae4a71d7b311f80ad5620153925c1c60af",
     "instance_assets/mujoco/meshes/hedgehog_cage_cage_99_4935ee7422de919f.obj": "4935ee7422de919f833065742396b2e0ebbcb94126988a9bba66c25fa772b704",
     "instance_assets/mujoco/meshes/hedgehog_cage_cage_9_483361d90238c397.obj": "483361d90238c397cf6f9fa4f9cdad54a8be11415f2848a82c5681720e993df5",
-    "instance_assets/mujoco/scene.json": "8a0472af1eeaf095eb93174eba570cb3c055b0f3f041c087688c81572d9fbf97",
-    "instance_assets/mujoco/scene.xml": "18607d5a5c29f10de7b85d5e2abf44bf4189874112deb4f30c6ee2f02aacdbc1"
+    "instance_assets/mujoco/scene.json": "8f60bd899e51ce07b8094b72f489e0386c82d69a12a3da7940be043e384bb92f",
+    "instance_assets/mujoco/scene.xml": "691b5842c0c94dcf4089d45e74ebfc32dd15930f22165c3d664ce4985e70914d"
   },
-  "tooling_sha256": "d8692e15964ac9f4c536d52b1c86d0418a4f4e37ec94f98e5d91d0b4ad0dd766",
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
   "creation_source": {
-    "sha256": "d1eb6f13b637abfdee0d4bb3aaa675b3ff352d6f02a76f856eb9e42b0e8c2d1b",
-    "files": 437
+    "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+    "files": 455
   },
   "runtime": {
     "dependencies": {
-      "genesis-world": "1.2.1",
-      "pyuipc": "0.0.25+topogym.det1.cuda128",
       "torch": "2.11.0+cu128",
       "numpy": "2.3.5",
       "scipy": "1.17.1",
@@ -293,20 +291,15 @@
     },
     "python": "3.11.15",
     "source": {
-      "sha256": "c9171f7932cebdee016b7ee1e8abd9a1afba7563a32364d91dffe85b14a51565",
-      "files": 443
-    },
-    "uipc_build_sha256": "39781d192a00d0cdc784f76e9ef2aa6fa404da510cf813ff06a04ea33b2597c1"
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
   },
   "image": {
-    "reference": "eai-roboarc:0.2.0-noinst",
-    "id": "sha256:9d0bd3a6996a9f2ce79759e331e6775a9263e7f1fcc17b52ec543aaed055e6c4",
+    "reference": "roboarc-r4:2.2.0-noinst",
+    "id": "sha256:4c0613fbbd6682e3e53275dd77cf1bc4fa7ec0df0b56e4e31b04e9e296900739",
     "repo_digests": []
   },
-  "uipc_builds": {
-    "audited": "39781d192a00d0cdc784f76e9ef2aa6fa404da510cf813ff06a04ea33b2597c1",
-    "sm86": "712470d2166b40058a4b6f304fb4a041bffc45c71ab37c7dec2d33d1a0b34011"
-  },
   "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
-  "nyx_direct_sha256": "4809c45a7a5cd7725f95f9e49e55a1dc9d184d2b2b59e780aac19cdaf98fac20"
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
 }

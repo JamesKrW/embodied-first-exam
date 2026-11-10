@@ -16,11 +16,17 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2)
 oracle = "full"
 grasp = "physical (finger friction; no assisted grasp, no welds to a gripper)"
 success_rule = "the scene's success.py (port of the source assembly grader) + the terminal rules (released, at rest, no breakdown), after the last row and after a 1.0 s hold"
-instance_seed = 0                 # one frozen scene: images/ikea-mujoco scene gladom, digest 8c5f29daaa7e
+instance_seed = 0                 # one frozen scene: images/ikea-mujoco scene gladom, digest 0acbefad697b
 expert_time_estimate_hours = 10
 
+[metadata.seeds]
+# the seeds a runner may draw from (a list, { from = A, to = B } or "any") and the ones the reference solution
+# under solution/ is for, where they are not the default seed alone (docs/protocol/README.md §2)
+allowed = [0, 1, 2]
+build = "runtime"
+
 [verifier]
-timeout_sec = 17520.0
+timeout_sec = 24840.0
 environment_mode = "separate"     # verifier runs in its own sandbox (tests/Dockerfile); the agent container is gone by then
 network_mode = "no-network"
 

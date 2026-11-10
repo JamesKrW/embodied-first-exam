@@ -1,7 +1,7 @@
 # RoboARC (simulator package `topogym`) · fiber_bundling — frozen instance
 
 You control a simulated robot (**a 7-DoF Franka Panda arm with a Robotiq 2F-85 parallel gripper on a fixed base**; RoboARC on MuJoCo 3.14.0 physics, Nyx rendering) via Python.
-**Task:** Pass every fine fiber and the front sheath through the fixed copper ring; keep the rear terminal anchored.
+**Task:** Pass every fine fiber and the front sheath through the fixed ring; keep the rear terminal anchored.
 
 ## Success requirements
 
@@ -9,7 +9,7 @@ You control a simulated robot (**a 7-DoF Franka Panda arm with a Robotiq 2F-85 p
 - All fiber points must finish beyond the exit side of the ring tube, allowing for fiber thickness. The branching face of the front sheath must also pass through and clear the tube with its full thickness. The fixed rear terminal must remain anchored and does not pass through.
 - Keep the angle between every pair of adjacent fiber segments at most 60 degrees in the final configuration.
 - Touch and grasp only the thick sheath with the gripper. Keep the completed passage valid through confirmation; holding is allowed, with no separate release or speed threshold.
-- Seen from the ring's entry side, looking through the ring in the feed direction, the red fiber's root must end 130 deg counterclockwise from the top of the ring (about 7:40 on a clock face), within ±20 deg.
+- Seen from the ring's entry side, looking through the ring in the feed direction, the root of one of the two red fibers must end 130 deg counterclockwise from the top of the ring (about 7:40 on a clock face), within ±20 deg.
 - Keep all final conditions satisfied together for at least 0.5 s of simulation time. If any final condition stops holding, the confirmation interval starts again. A brief qualifying pose is not enough; let the simulation advance through the full interval.
 
 ## Task failure conditions

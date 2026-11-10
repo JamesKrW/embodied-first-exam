@@ -18,8 +18,8 @@
   "right_actuator8"
  ],
  "image": {
-  "id": "sha256:ed950d079b6304219d3b1ec2f428f851e383cec841d38a4c11bd0f25a42dea00",
-  "reference": "ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0"
+  "id": "sha256:9f9cbab8aa74f858b22ac1144162aad9f1b1e5b927f90f6f8251130f36d73868",
+  "reference": "ghcr.io/mll-lab-nu/efe:roboarc-ikea-1.1.0"
  },
  "initial_state_sha256": "4e9e040022202b3e368d3f36c7f1ac64121cbd21f0345ed82f76f4f674b1483b",
  "nu": 16,
@@ -28,7 +28,7 @@
   "numpy": "2.5.4",
   "python": "3.12.15"
  },
- "scene_digest": "25535efa33fd5d8059aa7a0a00dd947d20814b4de856e88726a66f84e78ac5f9",
+ "scene_digest": "c16a27fdfc97e8c91054522581e8acaf05c1fa90a04427ab06a7931b606ddbf4",
  "scene_files": {
   "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
   "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -106,7 +106,7 @@
   "assets/parts/member_b/member_b_m005.obj": "673b7feda0e6a851f0f49044c4ddb644f49dfa1858c2a3e2c960290b832ef9e4",
   "assets/parts/same_screw/same_screw_m000.obj": "8d740bcfcebd2280ee270676967a6b06e6e52a8eed0910b08af024808951c8f8",
   "assets/parts/same_screw/same_screw_vis000.obj": "8d740bcfcebd2280ee270676967a6b06e6e52a8eed0910b08af024808951c8f8",
-  "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+  "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
   "layout.json": "32a3b00a5cfe40316dda621bd5128a3c308ccd6f3d883bf69a32626a9ee0e9da",
   "mechanism.py": "1569b687550e3288b127e74362f2a202d75d25a46ba6f96189782ccdaf8d29b1",
   "scene.py": "b30d85abf6d156e08c3a3a28122acfb826d01ed31b92563aff254d7ea4cefcf1",

@@ -16,14 +16,16 @@ History (travel, turns, jaw peak) accumulates while the part is near its seat: l
 tilt < 15 deg, gap > -3 mm (the source's escape limits); it restarts when the part leaves that region.
 Welds are never switched off (the source has no disassembly); reset() clears everything.
 Not ported: the source's 0.15 N / 0.25 s pull test before a press-in joint (a controller-applied test).
-Seated screws (speed, user decision 2026-10-16): when a screw's weld latches, every geom of that screw and the
-internal-thread insert geoms of its hole (<host>_ins<i>_tooth*/wall*, the insert at the screw's target) get
-contype = conaffinity = 0, so a seated screw has no contacts; the clamped leg keeps its own weld. The switch is
-tied to the weld state (engage, set_state, reset), so every replay and every restored state reproduces it.
-Cut-over (coordinator 2026-10-16): the switch-off is active only from the start of op SW_FROM_OP (sw_cutover.json
-or env var, default off; with it off nothing changes). Start of that op = all earlier ops latched and, if SW_FROM_T is
-given, sim time >= SW_FROM_T (the recorded step boundary). At that moment every screw already welded switches off,
-afterwards each new screw at its latch.
+Contact switch-off (speed), from the cut-over in sw_cutover.json (here from the first operation on):
+  * welded parts (ikea_runtime.RetentionMechanism, the same rule in every scene that has a cut-over; 2026-10-17): the
+    seat and the parts welded to it form one rigid group, and contacts between two bodies of the group are off (a
+    welded leg no longer touches the seat); each keeps every other contact (the robot, the table, unwelded parts);
+  * seated screws (user decision 2026-10-16): when a screw's weld latches, every geom of that screw and the
+    internal-thread insert geoms of its hole (<host>_ins<i>_tooth*/wall*, the insert at the screw's target) get
+    contype = conaffinity = 0, so a seated screw has no contacts at all.
+Both follow the weld state (engage, set_state, reset), so every replay and every restored state reproduces them. At the
+cut-over every part already welded switches off, afterwards each part at its latch. The scene reads nothing from the
+environment.
 """
 import math
 import numpy as np
@@ -34,23 +36,6 @@ REGION_LAT = 0.015
 REGION_DEG = 15.0
 REGION_GAP_MIN = -0.003
 
-
-def sw_cutover(ops):
-    """Cut-over of the seated-screw contact switch-off: (0-based op index or None, sim time or None).
-    Env vars SW_FROM_OP (1-based op number or op key) / SW_FROM_T (s) override sw_cutover.json next to this file
-    ({"from_op": null, "from_t": null}); unset/null = off, the mechanism then behaves exactly as the original."""
-    import json, os
-    cfg = {}
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sw_cutover.json')
-    if os.path.exists(p):
-        cfg = json.load(open(p))
-    op = os.environ.get('SW_FROM_OP', cfg.get('from_op')); t = os.environ.get('SW_FROM_T', cfg.get('from_t'))
-    if op in (None, '', 'none', 'off'):
-        return None, None
-    keys = [o['key'] for o in ops]
-    i = keys.index(op) if op in keys else int(op) - 1
-    assert 0 <= i < len(ops), op
-    return i, (None if t in (None, '') else float(t))
 
 class KyrreMechanism(RetentionMechanism):
     def __init__(self, model, data, task, period=4):
@@ -77,8 +62,7 @@ class KyrreMechanism(RetentionMechanism):
         """Per screw operation: its geoms + its hole's insert geoms (switched off once its weld latches)."""
         import re
         m = self.m; names = [m.geom(g).name for g in range(m.ngeom)]
-        self.sw_orig = (m.geom_contype.copy(), m.geom_conaffinity.copy())
-        self.sw_geoms = {}; self.sw_from, self.sw_from_t = sw_cutover(self.ops); self.sw_active = False
+        self.screw_geoms = {}
         for i, o in enumerate(self.ops):
             if o['mode'] != 'screw':
                 continue
@@ -91,44 +75,19 @@ class KyrreMechanism(RetentionMechanism):
             k = min(dist, key=dist.get)
             assert dist[k] < 0.002, (o['key'], dist)
             own = [g for g in range(m.ngeom) if m.geom_bodyid[g] == self.part_id[i]]
-            self.sw_geoms[i] = np.array(own + ins[k])
-        self.sync_screw_contacts()
+            self.screw_geoms[i] = np.array(own + ins[k])
+        self.sync_contacts()
 
-    def sw_check(self):
-        """Cut-over reached: all ops before SW_FROM_OP latched and sim time >= SW_FROM_T (if given)."""
-        if self.sw_from is None:
-            return False
-        if self.sw_from_t is not None and self.d.time < self.sw_from_t - 1e-7:
-            return False
-        return bool(all(self.d.eq_active[self.eq_ids[j]] for j in range(self.sw_from)))
-
-    def sw_poll(self):
-        if self.sw_from is not None and not self.sw_active and self.sw_check():
-            self.sw_active = True; self.sync_screw_contacts()
-
-    def sync_screw_contacts(self):
-        """Screw geoms + hole insert geoms collide unless the cut-over is reached and the screw's weld is on."""
-        if not hasattr(self, 'sw_geoms'):
-            return
-        if self.sw_from is None:
-            return
-        self.sw_active = self.sw_check()
-        ct, ca = self.sw_orig
-        for i, g in self.sw_geoms.items():
-            on = not (self.sw_active and self.d.eq_active[self.eq_ids[i]])
-            self.m.geom_contype[g] = ct[g] if on else 0
-            self.m.geom_conaffinity[g] = ca[g] if on else 0
-
-    def engage(self, o):
-        super().engage(o)
-        self.sync_screw_contacts()
+    def contact_off_geoms(self):
+        """The seated screws: each latched screw's geoms + its hole's insert geoms."""
+        g = [v for i, v in getattr(self, 'screw_geoms', {}).items() if self.d.eq_active[self.eq_ids[i]]]
+        return np.concatenate(g) if g else ()
 
     def reset(self):
         super().reset()
         n = len(self.ops)
         self.maxgap = np.full(n, np.nan); self.turn = np.zeros(n); self.jaw_peak = np.zeros(n)
         self.prev_p = None; self.prev_R = None
-        self.sync_screw_contacts()
 
     def state(self):
         s = super().state()
@@ -141,7 +100,6 @@ class KyrreMechanism(RetentionMechanism):
         h = s['hist']
         self.maxgap = np.array(h['maxgap'], float); self.turn = np.array(h['turn']); self.jaw_peak = np.array(h['jaw_peak'])
         self.prev_p = None if h['prev_p'] is None else np.array(h['prev_p']); self.prev_R = None if h['prev_R'] is None else np.array(h['prev_R'])
-        self.sync_screw_contacts()
 
     def geometry_all(self):
         """Source geometry() for every operation: worst connector gap / lateral, part-axis tilt (deg)."""

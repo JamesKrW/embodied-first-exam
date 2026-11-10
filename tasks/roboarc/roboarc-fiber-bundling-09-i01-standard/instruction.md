@@ -1,7 +1,7 @@
 # RoboARC (simulator package `topogym`) · fiber_bundling — STANDARD MODE (robot as a service, eai-standard/2.4)
 
 You control a robot (**a 7-DoF Franka Panda arm with a Robotiq 2F-85 parallel gripper on a fixed base**) **as if it were real hardware**: the simulator runs in a service you cannot open. You get one
-client and one episode. **Task:** Pass every fine fiber and the front sheath through the fixed copper ring; keep the rear terminal anchored.
+client and one episode. **Task:** Pass every fine fiber and the front sheath through the fixed ring; keep the rear terminal anchored.
 
 ## Success requirements
 
@@ -10,7 +10,7 @@ client and one episode. **Task:** Pass every fine fiber and the front sheath thr
 - Keep the angle between every pair of adjacent fiber segments at most 60 degrees in the final configuration.
 - Touch and grasp only the thick sheath with the gripper. Keep the completed passage valid through confirmation; holding is allowed, with no separate release or speed threshold.
 - Route the sheath past the formboard peg (its top 45 mm above the sheath's start axis) with the peg on the sheath's left, looking along the sheath from the rear terminal toward the ring. The sheath must lie beside the peg, below its top, within 20 mm of its surface.
-- Seen from the ring's entry side, looking through the ring in the feed direction, the red fiber's root must end 140 deg counterclockwise from the top of the ring (about 7:20 on a clock face), within ±15 deg.
+- Seen from the ring's entry side, looking through the ring in the feed direction, the root of one of the two red fibers must end 140 deg counterclockwise from the top of the ring (about 7:20 on a clock face), within ±15 deg.
 - Keep all final conditions satisfied together for at least 0.5 s of simulation time. If any final condition stops holding, the confirmation interval starts again. A brief qualifying pose is not enough; let the simulation advance through the full interval.
 
 ## Task failure conditions

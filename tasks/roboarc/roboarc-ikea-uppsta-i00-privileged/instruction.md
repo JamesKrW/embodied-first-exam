@@ -1,0 +1,84 @@
+# IKEA MuJoCo · UPPSTÅ toy hammering block — frozen scene
+
+You control a simulated robot (**two 7-DoF Franka Panda arms, each with the MuJoCo Menagerie Panda hand (two-finger, tendon-coupled)**; plain MuJoCo 3.14.0 on the CPU, float64) via Python.
+**Task:** Build the UPPSTÅ hammering block: set two dowels into one board end, press end block b onto them and drive screw b with the hex key; turn it over, set the other two dowels, press end block a on and drive screw a; stand the block on its feet and push the eight pegs into their holes.
+
+## Success requirements
+
+- Both screws are seated and their seat welds engaged, each in its own hole within 0.6 mm along and across the hole axis, its axis within 2 degrees (spin free).
+- Measured in the board frame against the scene's 'assembled' keyframe: both end blocks within 0.6 mm and 1 degree; every dowel position holds a dowel within 0.6 mm, its axis within 2 degrees (the four dowels are interchangeable).
+- Every peg hole holds a peg (the eight are interchangeable) within 1 mm of the hole axis, its axis within 2 degrees, pushed down to the up position (at most 0.5 mm above it).
+- The block stands on its feet (the board's assembled up direction within 1 degree of world +z) and no robot body touches any part at the end.
+
+The benchmark's terminal rules, the same in every IKEA MuJoCo task, come on top of these requirements. When your rows end: (1) the requirements above hold; (2) the parts are released: no robot link touches any part; (3) every part is at rest: at most 0.01 m/s and 0.05 rad/s; (4) the simulation never broke down: no non-finite state, no MuJoCo BADQACC / BADQPOS / BADQVEL warning, no contact of a part deeper than 10 mm, at any time. The grader then holds your last row for 1.0 s more and requires (1)-(4) again at its end.
+
+The requirements are the scene's own `success.py` (`/opt/ikea/scenes/uppsta/success.py`); the terminal rules are the
+tooling's (`rcb_ikea.py`, `Session.final_check()`). `s.status()` checks all of it on the current state
+(`"goal"` = success.py, `"released"`, `"at_rest"`, `"breakdown"`, `"report"` = success.py's details);
+`s.final_check()` is the grader's verdict on your rows (the current state, then the 1.0 s hold).
+
+## Physics and mechanism
+
+- Parts move only through contact with the robot, gravity and the scene's own mechanism. Each screw's coarse right-hand thread (2.5 mm pitch) runs in a helical thread in the board end: a screw advances only by being turned, by the hex key in its socket. Dowels and pegs hold by compliant flutes (spring-loaded slide joints, an interference fit) and friction. A screw's seat weld is armed once it is on its hole's axis within 3 mm of its seat; once its head touches and it has stopped relative to the board for 0.05 s, the screw and the end block it clamps are welded to the board at their current pose, and the screw and its hole's thread stop colliding. The scene's tick is 8 physics steps (2.5 ms); a row here is 4 of them (1.25 ms, 800 Hz).
+- Grasps are physical: friction from the finger contacts. Nothing attaches a part to a gripper, and there is no assist.
+- The scene (model, solver settings, mechanism) is frozen. The grader builds its own copy; changing the model or the
+  scene files in your container has no effect on the grade.
+
+This is a *fixed scene*: the parts and the robot start in the same state at every reset (the scene's keyframe `box`).
+You may reset and retry as many times as you want, read any simulator state, and save and restore states. Your
+deliverable is **one replayable trajectory**, not a general policy.
+
+## Deliverable
+Write the final trajectory to `/app/output/trajectory.npz` with `Session.save_trajectory(...)` (below).
+It is replayed open-loop from the same initial state in a fresh process, once, and scored 1 if the replay passes
+`final_check()` (the requirements and the terminal rules at the end of your rows and after the 1.0 s hold), else 0. Also leave the script that
+produced it at `/app/output/gen.py`. Save a real trajectory as soon as practical and keep saving progress; do not stop
+early.
+
+## Tooling (already installed; run `python` from any directory)
+```python
+from rcb_ikea import Session
+s = Session("uppsta")                   # builds the frozen scene /opt/ikea/scenes/uppsta (scene.py load())
+s.model, s.data                       # the MuJoCo MjModel / MjData (privileged: read anything; mujoco is importable)
+s.S                                   # the scene object: s.S.mech (mechanism state), s.S.success(), s.S.task (task.json)
+s.actuators                           # the 16 actuator names, in action order
+s.step(row)                           # one control tick: data.ctrl[:] = s.applied(row) (ctrlrange + speed rule), 4 physics steps (+ the mechanism)
+s.run(rows)                           # several ticks
+s.hold_action()                       # the current ctrl row (repeating it holds the targets)
+s.status()                            # {'success', 'goal', 'released', 'at_rest', 'breakdown', 'rows', 'state_sha', 'report', ...}
+s.final_check()                       # the grader's verdict: status() now and after holding the last row 1.0 s (state restored)
+st = s.get_state(); s.set_state(st)   # save / restore: physics, mechanism and monitor state, and the rows recorded so far
+s.reset()                             # a fresh build of the scene: exactly the grader's initial state; clears the rows
+s.replay(rows)                        # reset, replay open-loop, return final_check()  -> use this to self-check
+s.save_trajectory(path="/app/output/trajectory.npz")   # the rows recorded since the last reset (or pass rows)
+```
+Scene details: `/opt/ikea/scenes/uppsta/` (scene.py, task.json, layout.json, success.py, the mechanism modules, scene.xml).
+There is no planner or skill library: inverse kinematics, grasping, screwing and every other skill are yours to build
+(MuJoCo's Jacobians, `mujoco.mj_jacSite`, and saved states make that practical).
+
+CLI equivalent of the grader's replay (one replay):
+`python /opt/tools/rcb_ikea.py replay --task uppsta --traj /app/output/trajectory.npz`
+
+## Conventions
+- Action: one row of 16 actuator controls per control tick, float64: per arm (`left/`, then `right/`): `actuator1`..`actuator7` = joint position targets (rad; joint 7, the wrist, has no joint limit in these scenes, unlike the real Panda), `actuator8` = gripper command (0 = closed, 255 = open; the hand squeezes at its tendon force limit, about 70 N per finger, at any width when commanded 0). Out-of-range values are
+  clamped to each actuator's ctrlrange. Speed rule (the robot's real limits; clamp, not fail; `rcb_ikea.JOINT_SPEED_LIMITS_RAD_S`): each arm joint target moves at most 0.00271875 rad per control tick on joints 1-4 (`actuator1`..`actuator4`: 2.175 rad/s) and 0.0032625 rad on joints 5-7 (`actuator5`..`actuator7`: 2.61 rad/s), the Franka Panda's joint velocity limits, from the target applied on the previous tick; a target that asks for more is moved by the limit only (`Session.applied()`, in `s.step` and in the grader's replay alike), so a fast row is spread over the ticks after it. The gripper command (`actuator8`) moves at most 0.227679 units per control tick (182.143 units/s), the same way: the Franka Hand's finger speed (50 mm/s per finger, so 0.1 m/s of commanded finger width; `rcb_ikea.GRIPPER_WIDTH_SPEED_M_S`, converted with this scene's `actuator8` gain and stiffness), so a full open-to-closed command (255 to 0) takes 1.4 s. A row within the limits (+1e-9) is applied unchanged. The arms are position servos; the actuators'
+  gains and force limits are in the model.
+- Trajectory file: `ctrl` (N, 16) float64, `substeps` = 4, `timestep` = 0.0003125 (what `save_trajectory`
+  writes). Each row is applied for 4 physics steps of 0.3125 ms: a 1.25 ms control tick (800 Hz).
+  At most 860000 rows (1075 s of simulated time): the grader refuses a longer trajectory (`bad_trajectory`), because its replay must fit the verifier's time limit. One control tick takes about 8.9 ms of wall clock here: budget your experiments against the
+  time limit (`## Time limit`).
+- World frame: MuJoCo's, +z up, metres; quaternions are MuJoCo's **WXYZ**. Tool frames (sites): `left/tcp` / `right/tcp` (between the fingertips).
+- The episode does not end on success: the grader checks once, after your last row and again after the 1.0 s hold.
+  End your rows with the parts released, the arms clear of them and everything at rest.
+- One `Session` per process (the scene's modules are imported once).
+
+## External material
+You may install packages you need (pip, apt), and you may read anything installed in your container, the simulator's and this benchmark's own source code included. Please solve the task yourself: do not search the web for, or download, a ready-made solution to it, such as published or reference solutions, recorded demonstrations, or policies trained for it. This is an honour rule; trials are reviewed. The network reaches your model's API and the package registries (PyPI, Debian / Ubuntu archives) only.
+
+## Resources
+Your container: **4 CPUs**, **4 GiB of memory**, **1024 processes and threads** and **10 GiB** of disk (new files under `/app`, `/tmp` and `/root`). Your container has no GPU. CPU only slows you down; a process that goes over any other cap can be killed. Usage and caps: `/run/rcb-limits/usage.json`.
+
+## Time limit
+You have 10800 seconds to complete this task. Do not cheat by using online solutions or hints specific to this task.
+
+This is wall-clock time from the start of your session; the time a simulator takes to start counts. When it is up you are stopped without warning and only what is in `/app/output/` at that moment is graded, so save a deliverable as soon as you have one and overwrite it whenever you have a better one. Your session started when you received this task. `/run/rcb-limits/usage.json`, rewritten every few seconds, gives the time left on this limit (`time_left_s`) and its end (`deadline_utc`), counted from a little before your session started, so it never gives you more time than you have: read it (or run `date`) before you decide that time is short, never guess. Waiting counts too: a tool call that sends input to a process that keeps running (an interactive interpreter, a simulator loop, a server) can wait for the whole wait or yield time you give it even when the answer is printed at once, so give such calls a short wait and poll again if the output is not complete, or run one-shot scripts that exit when they are done. Installing packages is not cheating (`## External material` above).

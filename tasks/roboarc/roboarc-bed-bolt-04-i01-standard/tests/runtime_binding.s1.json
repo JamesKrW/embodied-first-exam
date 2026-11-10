@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "instance_sha256": "444da820f15f4cdfebc2d51c902d535dacd2e166cf4fd63eb4f2d9be2c5da7de",
+  "asset_files": {
+    "instance_assets/mujoco/meshes/bed_frame_leg_LN_prism32_4993ec41cdee1692.obj": "4993ec41cdee1692465618c887ea95a243043b9721669e08228f2f7e05e5ca2d",
+    "instance_assets/mujoco/meshes/bolt_bolt_head_prism32_25d46461555e2948.obj": "25d46461555e2948a2491a2bbee6f24b69937bb47f7417879a8ce2e1e7f5d211",
+    "instance_assets/mujoco/meshes/bolt_bolt_shank_prism32_b3a3d1d0bf21f453.obj": "b3a3d1d0bf21f45329918c40b3c230c5a4419915f8c53d950207af66efb72330",
+    "instance_assets/mujoco/meshes/bolt_bolt_tip_prism32_0b9802239412f070.obj": "0b9802239412f070e5a6b9aa845f4f83ad94d98d80b1c6d2ffdcb34ae799ab66",
+    "instance_assets/mujoco/meshes/bolt_sock_end_m0_c939da78fa2a9c3f.obj": "c939da78fa2a9c3fbb2acd7b088caf26a9936ff370a3edd902e74d46f40e0dc5",
+    "instance_assets/mujoco/meshes/bolt_sock_end_m1_3f4908af21613994.obj": "3f4908af21613994b95f6759ed667fa7617f4a148ba317c0c5379183bc62a606",
+    "instance_assets/mujoco/meshes/bolt_sock_end_m2_a9c4fcd02452bb33.obj": "a9c4fcd02452bb3325aab60ab3bab6185bcecce9069839b8e87cb364d9ecac9f",
+    "instance_assets/mujoco/meshes/bolt_sock_end_m3_89f2e600aa701677.obj": "89f2e600aa70167794c7da000636b54486a1f4533cf3804cc9444f9e7ba1cf4a",
+    "instance_assets/mujoco/meshes/bolt_sock_quad_m0_19d4bfbe41d3ba66.obj": "19d4bfbe41d3ba66d56049f6513993302a9ff5abe574cc0231ba00e627cb28ea",
+    "instance_assets/mujoco/meshes/bolt_sock_quad_m1_f3cc165455def907.obj": "f3cc165455def9075f0d099e144071d1f05daa9b751873d988aed74ccd1d1c5e",
+    "instance_assets/mujoco/meshes/bolt_sock_quad_m2_6be5920724038015.obj": "6be59207240380151dba9f6518985f466e40239eab1f46273b6d10a764db4f4f",
+    "instance_assets/mujoco/meshes/bolt_sock_quad_m3_5885a1cfdccd1667.obj": "5885a1cfdccd1667754e35a8b89e212e1de9a7f2ea6af4243a32e3b183e90ef0",
+    "instance_assets/mujoco/meshes/key_key_long_m_c616f0015c44ffc9.obj": "c616f0015c44ffc92e72db593ac5bc3330c41cd45e91c78606684338d3306ae6",
+    "instance_assets/mujoco/meshes/key_key_long_tip_m_33e1dfe91ca31689.obj": "33e1dfe91ca316896de88484e93e7d9300af094a11456385d4e67aac2a46aef5",
+    "instance_assets/mujoco/meshes/key_key_ratchet_house_prism32_dfd565c819a0084f.obj": "dfd565c819a0084ff3fba9223573a81f034c424c4a888ca87ef5547803f270b1",
+    "instance_assets/mujoco/meshes/key_key_short_m_9c0f05e248e55cf9.obj": "9c0f05e248e55cf9bb07307dc802932266e26b8fafd3a36c8099e5ab831a26e4",
+    "instance_assets/mujoco/meshes/key_key_short_tip_wing_m0_8dc8e1988457b79a.obj": "8dc8e1988457b79a3a43fd0d367e7b7a0b0a1553de1c73e7178c802770b31e8b",
+    "instance_assets/mujoco/meshes/key_key_short_tip_wing_m1_4d90c076112a7177.obj": "4d90c076112a71777652f5afddebb99415b849d5ba4c775fd6bb8a4ba08c71e4",
+    "instance_assets/mujoco/meshes/key_key_short_tip_wing_m2_4398acb5aeae8776.obj": "4398acb5aeae87761f20cdbfdbc42651feda16afd15c3173b8ecfda7659fcb43",
+    "instance_assets/mujoco/meshes/key_key_short_tip_wing_m3_ca13f27153f6fd8d.obj": "ca13f27153f6fd8db3f9c32749c4d867688856efe9e97cc567b3422d85e7be72",
+    "instance_assets/mujoco/scene.json": "b3e81d9f2a2aaf8b42572a96b6b007b0ab9f5f15f30ceef724e0bc5defcf8802",
+    "instance_assets/mujoco/scene.xml": "2fb79afea4e62e32dddc8b782cd25acdcf23216411c729f367beb81ede932921"
+  },
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
+  "creation_source": {
+    "sha256": "cf508cee05bebd2ea708dea733a98894f0ce5e03d9546c77c489f2942a57f969",
+    "files": 454
+  },
+  "runtime": {
+    "dependencies": {
+      "torch": "2.11.0+cu128",
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "mujoco": "3.14.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.18.0"
+    },
+    "python": "3.11.15",
+    "source": {
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
+  },
+  "image": {
+    "reference": "roboarc-b1:2.1.0-noinst",
+    "id": "sha256:ecad5301f34b9e6e19350118e27feffc1ab323d05898b1aeef93a745155ef1e6",
+    "repo_digests": []
+  },
+  "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
+}

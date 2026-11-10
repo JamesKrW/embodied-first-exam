@@ -34,9 +34,15 @@ oracle = "full"
 difficulty = "medium"
 grasp = "physical (no assisted grasping)"
 success_rule = "task-native success (goal_complete True; frozen parameters; terminal revision terminal_v5_fixed_contact_active_clearance_1mm)"
-tooling_version = "19"
+tooling_version = "22"
 instance_seed = 0
 expert_time_estimate_hours = 3
+
+[metadata.seeds]
+# the seeds a runner may draw from (a list, { from = A, to = B } or "any") and the ones the reference solution
+# under solution/ is for, where they are not the default seed alone (docs/protocol/README.md §2)
+allowed = [0, 1, 2]
+build = "runtime"
 
 [verifier]
 timeout_sec = 1200.0
