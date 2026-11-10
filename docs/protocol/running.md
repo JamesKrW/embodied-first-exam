@@ -144,11 +144,11 @@ the results site) compare trials only within one comparable configuration (`task
 version, mode, cutoff, reset budget, S, network), report success together with cost (tokens, money, turns, wall clock,
 simulation steps), and align reasoning effort, `max_turns` and the token budget before comparing agents. Validated and
 unvalidated tasks (`validated_of`: `[metadata] validated`, else `oracle = "full"`) are ranked together: totals count
-every core task, the flag is shown as a marker and may be used as a filter. A task's success in a mode is the mean of its
-three repetitions (0, 1/3, 2/3 or 1), and a success rate is the mean of the three repetitions' rates, shown with their
-spread (the standard deviation of the three rates); the rate of repetition 1 alone and pass@3 (solved in at least one
-repetition) are reported beside it, and the first-attempt result `first_success` is averaged over the repetitions the
-same way; each repetition's rate counts every core task. The main table and every headline number
+every core task, the flag is shown as a marker and may be used as a filter. The headline success is the mean over the three
+repetitions: a task's success in a mode is the mean of its three (0, 1/3, 2/3 or 1), and a success rate is the mean of
+the three repetitions' rates, shown with their spread (the standard deviation of the three rates); each repetition's
+rate counts every core task. The first-attempt result `first_success` is the secondary number beside it, averaged over
+the repetitions the same way, and each trial keeps its first attempt's trajectory and video as before (PROTOCOL §4). The main table and every headline number
 (success rates, rankings, totals) count core only: the tasks of [`core_set.toml`](../core_set.toml), each in its
 `default_mode` (`task_conventions.core_tasks()`); a run of the core tasks in another mode is reported apart (`set_of`:
 `core` for every mode of a listed task, else `excluded`). Task dirs the list leaves out stay in the repository under
