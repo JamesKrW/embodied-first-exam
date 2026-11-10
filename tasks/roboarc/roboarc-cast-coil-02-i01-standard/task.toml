@@ -34,7 +34,7 @@ protocol = "eai-standard/2.4"
 oracle = "full"
 grasp = "assisted (the contact_weld_v1 grasp regions on coil_gold, coil_silver)"
 success_rule = "task-native success (goal_complete True; frozen parameters; terminal revision release_settling_v2_grasp_contact_2mm)"
-tooling_version = "19"
+tooling_version = "22"
 instance_seed = 0
 expert_time_estimate_hours = 3
 

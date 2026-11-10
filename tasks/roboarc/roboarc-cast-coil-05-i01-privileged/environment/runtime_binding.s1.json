@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "instance_sha256": "4dd9f09d7636467f7f365db714ebb13478236e6d64e70c3e85d1ccb52a2cd4a1",
+  "asset_files": {
+    "instance_assets/mujoco/scene.json": "463296f3d8a136523bb213762c8a9caef1846cc5e8c2e9efb0fa1f5ff9695b5e",
+    "instance_assets/mujoco/scene.xml": "ee5d679d89707c2bb18e3d5a35fa15a9f8672a5eb5841abb5b25b5a853642124"
+  },
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
+  "creation_source": {
+    "sha256": "aae08c2e43e74bbcdf3916d72fdcdfe50280f968818f7d3f431fcd003ced13c2",
+    "files": 437
+  },
+  "runtime": {
+    "dependencies": {
+      "torch": "2.11.0+cu128",
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "mujoco": "3.14.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.18.0"
+    },
+    "python": "3.11.15",
+    "source": {
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
+  },
+  "image": {
+    "reference": "eai-roboarc:0.2.1-noinst",
+    "id": "sha256:cd2ac87464fd0840be7d5a71da4311eb483a8f29075b87802333be1caa569986",
+    "repo_digests": []
+  },
+  "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
+}

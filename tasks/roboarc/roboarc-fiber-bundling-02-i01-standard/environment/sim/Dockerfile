@@ -1,9 +1,9 @@
 # The `sim` sidecar's image (environment/docker-compose.yaml builds it): its base image, this directory at /srv, and at
 # their paths under /srv the files it shares with other tasks, from pinned files-only images (images/<name>/
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
-FROM ghcr.io/mll-lab-nu/efe:roboarc-0.2.0
+FROM ghcr.io/mll-lab-nu/efe:roboarc-2.2.0@sha256:96a0a895c0e4934adca39f7a370e67bf82bfb4db7ef049131a3ac0dc9d0f9057
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0@sha256:beb13ec1db0d85df2c5527529cda03101b15dd6cf524d34b9b288273131f44ca \
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.5.0@sha256:8c65ad7d9650114e298c79a9c88641e849925182b4afa47a4099ded49b73dc5f \
      /standard/sim/finalize.sh \
      /nyx_direct.py \
      /rcb_topogym.py \

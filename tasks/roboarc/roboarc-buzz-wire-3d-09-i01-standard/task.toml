@@ -34,7 +34,7 @@ oracle = "full"
 difficulty = "medium"
 grasp = "assisted (the contact_weld_v1 grasp regions on wand)"
 success_rule = "task-native success (goal_complete True; frozen parameters; terminal revision terminal_v4_traversal_then_deck_release)"
-tooling_version = "19"
+tooling_version = "22"
 instance_seed = 0
 expert_time_estimate_hours = 3
 

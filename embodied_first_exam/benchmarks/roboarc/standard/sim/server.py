@@ -34,6 +34,34 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import rcb_limited as L  # noqa: E402
 
+
+def _encode_mp4_ffmpeg(frames, fps: int) -> bytes:
+    """rcb_limited.encode_mp4's output (H.264 mp4, yuv420p, faststart) through the image's ffmpeg binary: the RoboARC
+    image ships ffmpeg, not imageio. Odd sizes are padded to even ones."""
+    import subprocess, tempfile
+    frames = np.ascontiguousarray(np.stack([np.asarray(f, dtype=np.uint8) for f in frames]))
+    n, h, w, _ = frames.shape
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tf:
+        path = tf.name
+    try:
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}",
+                        "-r", str(fps), "-i", "-", "-an", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-c:v", "libx264",
+                        "-pix_fmt", "yuv420p", "-movflags", "+faststart", path],
+                       input=frames.tobytes(), check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        with open(path, "rb") as f:
+            return f.read()
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+try:
+    import imageio  # noqa: F401  -- the shared layer's encoder needs it
+except ImportError:
+    L.encode_mp4 = _encode_mp4_ffmpeg
+
 PROTOCOL = L.PROTOCOL
 DATA = os.environ.get("RCB_DATA", "/data"); os.makedirs(DATA, exist_ok=True); os.makedirs(os.path.join(DATA, "calls"), exist_ok=True)
 TASK = os.environ.get("RCB_TASK", "cube_pick_place"); INSTANCE = os.environ.get("RCB_INSTANCE", os.path.join(os.path.dirname(__file__), "instance.json"))

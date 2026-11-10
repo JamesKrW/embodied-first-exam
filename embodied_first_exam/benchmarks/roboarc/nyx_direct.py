@@ -37,6 +37,9 @@ import ctypes
 import hashlib
 import math
 import os
+import random
+import shutil
+import sys
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -51,6 +54,170 @@ SCENE_FILE = "nyx_scene.json"
 # NVIDIA places at (+1/8, -3/8) px from the pixel centre (x right, y down): the MuJoCo raster samples there too.
 GENESIS_DEPTH_SAMPLE = (0.125, -0.375)
 EPS = 1e-15                     # genesis.EPS (camera frame degeneracy threshold)
+# Start-up retry (rig): a Nyx renderer whose build fails (gs-nyx or the CUDA driver raises: it could not start, load the
+# scene or allocate) is set aside and built again after a back-off (x 1-1.5, so processes that failed together do not
+# retry together), at most STARTUP_ATTEMPTS times; the error is raised only after the last attempt. IKEA's standard
+# sidecars lost their Nyx build that way when several started at the same moment on a full shared GPU (ws, 2026-10-17:
+# 24478 of 24564 MiB; ikea_nyx.py's retry). Only the build is retried: a frame that fails later stays an error. A crash
+# of the process itself in the build (a SIGSEGV) cannot be caught here: the standard service then exits non-zero and
+# compose restarts it (crash recovery), and that start builds the renderer again with this retry. A GPU that cannot run
+# Nyx at all (check_device, below) is not retried: UnsupportedDevice is raised at the first attempt.
+STARTUP_ATTEMPTS = 3
+STARTUP_BACKOFF_S = (10.0, 30.0)    # before the 2nd and the 3rd attempt
+# The native renderer of a failed build is kept as it is, never shut down: on ws2 (2026-10-17, a build failed at
+# allocate_scene_buffers) unload_scene / shutdown of that half-built renderer, with or without the SDK's shutdown, made
+# the next build crash the process (SIGSEGV), while a new build next to the untouched one started and rendered (the
+# kept renderer holds about 0.4 GB of VRAM). Only this module's own CUDA buffers are released.
+_FAILED_BUILDS: list = []
+# The Vulkan device extensions Nyx needs on its GPU (checked before the native renderer is created, check_device): ray
+# queries in its path-tracing shaders (with acceleration structures) and the CUDA-Vulkan interop of its frame buffers.
+# NVIDIA exposes VK_KHR_ray_query only on GPUs with RT cores: on an A100 or H100 (driver 610.43.02, 2026-10-21) the
+# driver offers the ray-tracing pipeline and acceleration structures but no ray queries, the shader compiler rejects
+# Nyx's pipelines and the renderer then dies with a segmentation fault, which no caller can catch. A CPU Vulkan driver
+# (Mesa lavapipe) has ray queries, but CUDA cannot import its memory: the same crash. The check reads the extension
+# list of the Vulkan device that is the CUDA device (same UUID) with a throw-away Vulkan instance, in well under a
+# second, and changes nothing else: on a GPU that has the extensions the build goes on exactly as before.
+NYX_VULKAN_EXTENSIONS = ("VK_KHR_ray_query", "VK_KHR_acceleration_structure", "VK_KHR_external_memory_fd")
+# Where Nyx runs (docs/RUNNING.md, GPU requirements), for the error message.
+NYX_GPU_CLASSES = ("Nyx needs an NVIDIA GPU with RT cores: GeForce RTX 20-series or newer, RTX workstation GPUs, T4, L4, "
+                   "L40 / L40S, A10 / A10G, A40; data-centre GPUs without RT cores (V100, A100, A30, H100, H200) do not "
+                   "offer VK_KHR_ray_query, and there is no software fallback")
+# The reason this process's GPU cannot run Nyx, once known: later builds raise it at once (rig).
+_UNSUPPORTED: list = []
+
+
+class UnsupportedDevice(RuntimeError):
+    """This host's GPU cannot run Nyx: a property of the hardware or its driver, never a transient failure, so rig()
+    raises it at once, without the start-up retry. Physics, replays and grading do not need Nyx; only images do."""
+
+
+class _NoVulkanDriver(Exception):
+    """vkCreateInstance found no Vulkan driver (VK_ERROR_INCOMPATIBLE_DRIVER)."""
+
+
+def device_problem(cuda_name: str, cuda_uuid: bytes, vulkan_devices) -> str | None:
+    """Why Nyx cannot render on the CUDA device (`cuda_name`, its 16-byte UUID), given the Vulkan devices this process
+    sees, [(name, uuid, extension names)]; None when it can. Nyx renders on the Vulkan device that is the CUDA device
+    (the same UUID) and needs NYX_VULKAN_EXTENSIONS there."""
+    twins = [d for d in vulkan_devices if bytes(d[1]) == bytes(cuda_uuid)]
+    if not twins:
+        seen = ", ".join(repr(d[0]) for d in vulkan_devices) or "none"
+        return (f"no Vulkan device is the CUDA device {cuda_name!r} (Vulkan devices: {seen}); Nyx renders through "
+                "CUDA-Vulkan interop on one NVIDIA GPU, whose Vulkan driver the container needs "
+                "(NVIDIA_DRIVER_CAPABILITIES=all)")
+    have = set(twins[0][2])
+    missing = [e for e in NYX_VULKAN_EXTENSIONS if e not in have]
+    if missing:
+        return (f"the GPU {cuda_name!r} does not offer the Vulkan extension(s) {', '.join(missing)} that Nyx's path tracer "
+                f"needs. {NYX_GPU_CLASSES}")
+    return None
+
+
+def _vulkan_loader() -> str:
+    """The Vulkan loader Nyx itself loads: the one gs-nyx ships next to its modules (they find it through $ORIGIN),
+    else the system's."""
+    try:
+        import importlib.util
+        spec = importlib.util.find_spec("gs_nyx")
+        for d in (spec.submodule_search_locations or []) if spec else []:
+            p = Path(d) / "libvulkan.so.1"
+            if p.is_file():
+                return str(p)
+    except Exception:           # noqa: BLE001 -- the system loader then
+        pass
+    return "libvulkan.so.1"
+
+
+def _vulkan_devices(loader: str | None = None) -> list:
+    """Every Vulkan physical device this process sees: [(name, 16-byte device UUID, frozenset of extension names)].
+    Raises _NoVulkanDriver when there is no Vulkan driver at all."""
+    vk = ctypes.CDLL(loader or _vulkan_loader())
+    c_p, c_u32 = ctypes.c_void_p, ctypes.c_uint32
+
+    class AppInfo(ctypes.Structure):
+        _fields_ = [("sType", ctypes.c_int), ("pNext", c_p), ("pApplicationName", ctypes.c_char_p),
+                    ("applicationVersion", c_u32), ("pEngineName", ctypes.c_char_p), ("engineVersion", c_u32),
+                    ("apiVersion", c_u32)]
+
+    class InstanceInfo(ctypes.Structure):
+        _fields_ = [("sType", ctypes.c_int), ("pNext", c_p), ("flags", c_u32), ("pApplicationInfo", ctypes.POINTER(AppInfo)),
+                    ("enabledLayerCount", c_u32), ("ppEnabledLayerNames", c_p), ("enabledExtensionCount", c_u32),
+                    ("ppEnabledExtensionNames", c_p)]
+
+    class IDProperties(ctypes.Structure):        # VkPhysicalDeviceIDProperties
+        _fields_ = [("sType", ctypes.c_int), ("pNext", c_p), ("deviceUUID", ctypes.c_ubyte * 16),
+                    ("driverUUID", ctypes.c_ubyte * 16), ("deviceLUID", ctypes.c_ubyte * 8), ("deviceNodeMask", c_u32),
+                    ("deviceLUIDValid", c_u32)]
+
+    class Properties2(ctypes.Structure):         # VkPhysicalDeviceProperties2; the core properties as raw bytes
+        _fields_ = [("sType", ctypes.c_int), ("pNext", c_p), ("properties", ctypes.c_ubyte * 4096)]
+
+    class ExtensionProperties(ctypes.Structure):
+        _fields_ = [("extensionName", ctypes.c_char * 256), ("specVersion", c_u32)]
+
+    vk.vkCreateInstance.argtypes = [c_p, c_p, ctypes.POINTER(c_p)]
+    vk.vkCreateInstance.restype = ctypes.c_int
+    vk.vkDestroyInstance.argtypes = [c_p, c_p]
+    vk.vkDestroyInstance.restype = None
+    vk.vkEnumeratePhysicalDevices.argtypes = [c_p, ctypes.POINTER(c_u32), c_p]
+    vk.vkEnumeratePhysicalDevices.restype = ctypes.c_int
+    vk.vkGetPhysicalDeviceProperties2.argtypes = [c_p, c_p]
+    vk.vkGetPhysicalDeviceProperties2.restype = None
+    vk.vkEnumerateDeviceExtensionProperties.argtypes = [c_p, ctypes.c_char_p, ctypes.POINTER(c_u32), c_p]
+    vk.vkEnumerateDeviceExtensionProperties.restype = ctypes.c_int
+    app = AppInfo(0, None, b"nyx_direct device check", 1, b"none", 1, (1 << 22) | (1 << 12))   # Vulkan 1.1
+    info = InstanceInfo(1, None, 0, ctypes.pointer(app), 0, None, 0, None)
+    instance = c_p()
+    r = vk.vkCreateInstance(ctypes.byref(info), None, ctypes.byref(instance))
+    if r == -9:                 # VK_ERROR_INCOMPATIBLE_DRIVER
+        raise _NoVulkanDriver()
+    if r != 0:
+        raise RuntimeError(f"vkCreateInstance returned {r}")
+    try:
+        n = c_u32(0)
+        if vk.vkEnumeratePhysicalDevices(instance, ctypes.byref(n), None) != 0:
+            raise RuntimeError("vkEnumeratePhysicalDevices failed")
+        handles = (c_p * max(n.value, 1))()
+        if vk.vkEnumeratePhysicalDevices(instance, ctypes.byref(n), handles) not in (0, 5):     # VK_INCOMPLETE
+            raise RuntimeError("vkEnumeratePhysicalDevices failed")
+        out = []
+        for h in handles[:n.value]:
+            ids = IDProperties(1000071004, None)                 # VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES
+            props = Properties2(1000059001, ctypes.cast(ctypes.pointer(ids), c_p))   # ..._PROPERTIES_2
+            vk.vkGetPhysicalDeviceProperties2(h, ctypes.byref(props))
+            name = bytes(props.properties[20:276]).split(b"\0")[0].decode(errors="replace")   # deviceName
+            m = c_u32(0)
+            vk.vkEnumerateDeviceExtensionProperties(h, None, ctypes.byref(m), None)
+            exts = (ExtensionProperties * max(m.value, 1))()
+            vk.vkEnumerateDeviceExtensionProperties(h, None, ctypes.byref(m), exts)
+            out.append((name, bytes(ids.deviceUUID), frozenset(e.extensionName.decode() for e in exts[:m.value])))
+        return out
+    finally:
+        vk.vkDestroyInstance(instance, None)
+
+
+def check_device(cuda) -> None:
+    """Before the native renderer exists: raise UnsupportedDevice when the CUDA device `cuda` (_Cuda) cannot run Nyx
+    (device_problem; no Vulkan driver at all). A check that cannot be completed (an unexpected Vulkan or CUDA error)
+    leaves the decision to the build, as before this check existed."""
+    if _UNSUPPORTED:
+        raise UnsupportedDevice(_UNSUPPORTED[0])
+    try:
+        name, uuid = cuda.identity()
+        try:
+            devices = _vulkan_devices()
+        except _NoVulkanDriver:
+            problem = (f"no Vulkan driver for the GPU {name!r}; Nyx renders through Vulkan (in a container the NVIDIA "
+                       "Container Toolkit mounts it with NVIDIA_DRIVER_CAPABILITIES=all)")
+        else:
+            problem = device_problem(name, uuid, devices)
+    except Exception as exc:    # noqa: BLE001 -- not a verdict on the device
+        print(f"[nyx_direct] device check skipped: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        return
+    if problem:
+        _UNSUPPORTED.append(f"Nyx cannot render on this host: {problem}. Physics, replays and grading do not need Nyx; "
+                            "camera images and replay videos do (docs/RUNNING.md, GPU requirements)")
+        raise UnsupportedDevice(_UNSUPPORTED[0])
 
 
 # --------------------------------------------------------------------------------------------- CUDA (driver API)
@@ -83,6 +250,15 @@ class _Cuda:
 
     def current(self):
         self._check(self.lib.cuCtxSetCurrent(self.ctx), "cuCtxSetCurrent")
+
+    def identity(self) -> tuple[str, bytes]:
+        """The device's name and 16-byte UUID (the UUID its Vulkan driver reports for the same GPU)."""
+        name = ctypes.create_string_buffer(256)
+        self._check(self.lib.cuDeviceGetName(name, 256, self.dev), "cuDeviceGetName")
+        uuid = (ctypes.c_ubyte * 16)()
+        get = getattr(self.lib, "cuDeviceGetUuid_v2", None) or self.lib.cuDeviceGetUuid
+        self._check(get(ctypes.byref(uuid), self.dev), "cuDeviceGetUuid")
+        return name.value.decode(errors="replace"), bytes(uuid)
 
     def alloc(self, nbytes: int) -> int:
         ptr = ctypes.c_uint64()
@@ -446,6 +622,8 @@ class Surface:
     normal: str | None = None           # image path
     emissive_texture: Any = None
     double_sided: bool | None = None
+    arm: str | None = None              # image path: ambient occlusion, roughness, metalness (a seed's look only)
+    uv_scale: tuple | None = None       # texture repeats over a box's faces (a seed's look only)
 
     @classmethod
     def plastic(cls, color, roughness, metallic=None):
@@ -489,6 +667,10 @@ class Surface:
             self.diffuse = ("image", str(visual_root(rule["diffuse_map"])), None)
         if "normal_map" in rule:
             self.normal = str(visual_root(rule["normal_map"]))
+        if "arm_map" in rule:
+            self.arm = str(visual_root(rule["arm_map"]))
+        if "uv_scale" in rule:
+            self.uv_scale = tuple(float(v) for v in rule["uv_scale"])
 
 
 def material_override(nps, surface: Surface, *, plane_size=None, genesis_assets=None, overridden=False):
@@ -546,11 +728,15 @@ def material_override(nps, surface: Surface, *, plane_size=None, genesis_assets=
     has_diffuse = texture(surface.diffuse, P.AlbedoTexture, "albedoTexture")
     texture(None if surface.normal is None else ("image", surface.normal, None), P.NormalTexture, "normalTexture")
     has_emission = texture(surface.emissive_texture, P.EmissionTexture, "emissionTexture") or has_emission
+    texture(None if surface.arm is None else ("image", surface.arm, None), P.ArmTexture, "armTexture")
     mat.set_properties(P.Sidedness)
     mat.sidedness = nps.EMaterialSidedness.Double
     if has_diffuse and plane_size is not None:
         mat.set_properties(P.UVScale)
         mat.uvScale = nps.float2(float(plane_size[0]), float(plane_size[1]))
+    elif surface.uv_scale is not None:
+        mat.set_properties(P.UVScale)
+        mat.uvScale = nps.float2(*surface.uv_scale)
     if has_emission:
         mat.set_properties(P.AlbedoColor)
         mat.albedoColor = nps.float4(0.0, 0.0, 0.0, 1.0)
@@ -588,12 +774,20 @@ def full_material(nps, surface: Surface, *, genesis_assets=None):
     return mat
 
 
-def color_material(nps, rgba_u8):
-    """The exporter's material of a vertex-coloured visual geometry: albedo = its main colour / 255."""
+def color_material(nps, rgba_u8, pbr=(None, None)):
+    """The exporter's material of a vertex-coloured visual geometry: albedo = its main colour / 255. ``pbr``: the
+    (roughness, metalness) an appearance seed's look draws as well (renderer.pbr_materials; None: not set)."""
     mat = nps.MaterialAsset()
     mat.set_properties(nps.EMaterialProperty.AlbedoColor)
     c = np.asarray(rgba_u8, dtype=np.float64) / 255.0
     mat.albedoColor = nps.float4(c[0], c[1], c[2], c[3])
+    roughness, metallic = pbr
+    if roughness is not None:
+        mat.set_properties(nps.EMaterialProperty.PerceptualRoughness)
+        mat.perceptualRoughness = roughness
+    if metallic is not None:
+        mat.set_properties(nps.EMaterialProperty.Metalness)
+        mat.metalness = metallic
     return mat
 
 
@@ -790,8 +984,8 @@ class NyxScene:
         options = dict(spec.morph_options or {})
         e.options = options
         if kind == "mjcf":
-            if e.fixed:
-                raise NotImplementedError(f"{spec.name}: a fixed MJCF entity encodes its base in the model")
+            # fixed or free: each visual geom at its link's MuJoCo body (a fixed entity's links are static bodies whose
+            # world pose already holds the entity's base, so the base is not applied again)
             return self._mjcf(spec.name, Path(spec.asset_path), Surface.from_spec(spec.surface))
         if kind == "urdf":
             e.path = Path(spec.asset_path)
@@ -982,6 +1176,9 @@ class NyxScene:
         n_instances = sum(len(e.geoms) if e.kind == "mjcf" else (len(e.slots) if e.kind == "mesh" else 1)
                           for e in ordered)
         cams, lights = self.camera_defs(), self.lights()
+        # an appearance seed's look (topogym.world.look) also draws the roughness and metalness of MJCF materials and
+        # mesh surfaces; the released look draws their albedo only
+        pbr = bool(self.cfg["renderer"].get("pbr_materials", False))
         asset.instance_resize(n_instances)
         asset.camera_resize(len(cams))
         asset.light_resize(len(lights))
@@ -1031,7 +1228,8 @@ class NyxScene:
                     inst.scale = yup(nps.float3(1.0, 1.0, 1.0))
                     mesh_name = self._export_geom(folder, g)
                     inst.mesh_uri = os.path.relpath(folder / mesh_name).replace("\\", "/")
-                    inst.matOverride = color_material(nps, g["rgba_u8"])
+                    inst.matOverride = color_material(nps, g["rgba_u8"], g["pbr"] if pbr and e.name != "robot" else
+                                                      (None, None))
                     inst.smooth, inst.enabled, inst.uuid = False, True, uuid
                     inst.name = g["node"]
                     asset.set_instance(index, inst)
@@ -1047,7 +1245,11 @@ class NyxScene:
                     s = (scale, scale, scale) if isinstance(scale, (int, float)) else tuple(scale)
                     inst.scale = yup(nps.float3(*s))
                     inst.mesh_uri = os.path.relpath(str(e.path)).replace("\\", "/")
-                    inst.matOverride = color_material(nps, _u8_color(_rgba(e.surface)))
+                    if e.surface.emissive is not None:       # a glowing marker (the goal region's dashed boundary)
+                        inst.matOverride = material_override(nps, e.surface, genesis_assets=self.genesis_assets)
+                    else:
+                        inst.matOverride = color_material(nps, _u8_color(_rgba(e.surface)),
+                                                          (e.surface.roughness, e.surface.metallic) if pbr else (None, None))
                     inst.smooth, inst.enabled, inst.uuid = False, True, uuid
                     asset.set_instance(index, inst)
                     index += 1
@@ -1109,6 +1311,8 @@ class NyxScene:
         env.texture = str(self._visual_root(self.cfg["renderer"]["env_map"]))
         env.layout = nps.EEnvMapLayout.LongLat
         env.multiplier = float(self.cfg["renderer"]["env_intensity"])
+        if self.cfg["renderer"].get("env_tint") is not None:       # a seed's look: the lights' colour temperature
+            env.tint = nps.float3(*(float(v) for v in self.cfg["renderer"]["env_tint"]))
         asset.set_env_map(0, env)
         path = folder / SCENE_FILE
         nps.export_scene_file(str(path), asset)
@@ -1169,7 +1373,12 @@ def light_asset(nps, d: dict):
 
 
 def _genesis_assets_dir():
-    """Where genesis-world keeps its textures (the ground plane's checker), found without importing genesis."""
+    """Where the ground plane's checker texture is (genesis-world 1.2.1's textures/checker.png, Apache-2.0): the release
+    image's copy, $TOPOGYM_VISUAL_ASSET_ROOT/genesis (RoboARC 1.1.0 on), else the textures of an installed genesis-world,
+    found without importing genesis, else nyx_assets/ next to this file."""
+    root = os.environ.get("TOPOGYM_VISUAL_ASSET_ROOT")
+    if root and (Path(root) / "genesis" / "textures" / "checker.png").is_file():
+        return str(Path(root) / "genesis")
     from importlib.util import find_spec
     spec = find_spec("genesis")
     if spec is None or not spec.submodule_search_locations:
@@ -1305,7 +1514,10 @@ def _mj_geom_trimesh(mj, i, *, is_col: bool):
     mesh = trimesh.Trimesh(**params, process=False)
     mesh.visual = ColorVisuals(vertex_colors=np.tile(np.array(color), [len(mesh.vertices), 1]))
     mesh.vertex_normals          # Genesis reads every visual mesh's normals: cached, the OBJ export writes them
-    return dict(trimesh=mesh, rgba_u8=np.asarray(mesh.visual.main_color, dtype=np.uint8), geom=i)
+    # the material's roughness and metalness when it declares them (MuJoCo: -1 unset), drawn under a seed's look only
+    pbr = (None, None) if mat_id < 0 or is_col else \
+        tuple(None if v < 0 else float(v) for v in (mj.mat_roughness[mat_id], mj.mat_metallic[mat_id]))
+    return dict(trimesh=mesh, rgba_u8=np.asarray(mesh.visual.main_color, dtype=np.uint8), geom=i, pbr=pbr)
 
 
 def chain_cord_host(instance_path) -> dict | None:
@@ -1528,6 +1740,16 @@ class NyxDirect:
     """gs-nyx driven from MuJoCo states: start, load the exported scene, allocate, then per frame the plugin's calls."""
 
     def __init__(self, scene: NyxScene, folder, *, device: int = 0, mj_model=None, camera_device: str = "cpu"):
+        self.renderer = self.cuda = self._raster = None
+        self._sdk_started = False
+        self.startup = None             # rig(): the build's attempts
+        try:
+            self._start(scene, folder, device=device, mj_model=mj_model, camera_device=camera_device)
+        except BaseException:
+            self._release()             # a failed build frees this module's CUDA buffers before a retry
+            raise
+
+    def _start(self, scene: NyxScene, folder, *, device: int, mj_model, camera_device: str) -> None:
         import gs_nyx.nyx_py_sdk as nps
         import gs_nyx.nyx_py_renderer as npr
         self.nps, self.npr = nps, npr
@@ -1549,6 +1771,7 @@ class NyxDirect:
         self.names = [c["name"] for c in self.cams]
         _preload_nvrtc()
         self.cuda = _Cuda(device)
+        check_device(self.cuda)         # a GPU Nyx cannot run on is an error here, not a crash in the native renderer
         self.renderer = npr.NyxRenderer()
         params = npr.BridgeStartupParams()
         params.cudaDevice = int(device)
@@ -1674,7 +1897,17 @@ class NyxDirect:
                          pbd_birth=None if host is None else frozen_pbd_birth(host), carriers=carriers)
         owned = folder is None
         folder = Path(folder) if folder is not None else Path("__nyx_cache__") / f"direct-{os.getpid()}-{id(world):x}"
-        nyx = cls(scene, folder, mj_model=world.model, **kwargs)
+        if owned:
+            # a fresh export folder: the export keeps a mesh file it finds (named by its content), and a build that
+            # died (a crashed process before a crash-recovery restart, which may get the same pid) can leave a
+            # half-written one there
+            shutil.rmtree(folder, ignore_errors=True)
+        try:
+            nyx = cls(scene, folder, mj_model=world.model, **kwargs)
+        except BaseException:
+            if cord is not None:
+                cord["assets"].cleanup()
+            raise
         nyx._owned_folder = folder if owned else None
         if cord is not None:
             nyx._cord_assets = cord["assets"]                 # the FEM declarations' generated files, kept while rendering
@@ -1852,6 +2085,19 @@ class NyxDirect:
             out["deform_verts"] = self.deform_pos.copy()
         return out
 
+    def _release(self) -> None:
+        """After a failed build: this module's CUDA buffers are freed; the half-built native renderer and the SDK are
+        left as they are (kept in _FAILED_BUILDS: shutting them down made the next build crash, see STARTUP_ATTEMPTS)."""
+        if self.cuda is not None:
+            try:
+                self.cuda.close()
+            except Exception:       # noqa: BLE001 -- best effort: the error that matters is the build's own
+                pass
+        if self.renderer is not None:
+            _FAILED_BUILDS.append(self.renderer)
+        self.renderer = self.cuda = None
+        self._sdk_started = False
+
     def close(self) -> None:
         if self._raster is not None:
             self._raster.close()
@@ -1944,8 +2190,29 @@ class DirectRig:
 
 def rig(instance_path, world, headless) -> DirectRig:
     """The DirectRig of a built MuJoCo world: NyxDirect on its render host's route (from_world with the instance) and
-    `headless`, render_bridge's headless rig of the same scene (rcb_topogym._render_bridge builds both)."""
-    return DirectRig(NyxDirect.from_world(world, instance=instance_path), headless)
+    `headless`, render_bridge's headless rig of the same scene (rcb_topogym._render_bridge builds both). The build is
+    retried as STARTUP_ATTEMPTS says; each failed attempt (its error) goes to stderr, the attempts to NyxDirect.startup
+    (the standard service's nyx_ready event), and the last attempt's error is raised. A GPU Nyx cannot run on
+    (UnsupportedDevice, check_device) is raised at once: no retry, and no new build once it is known."""
+    if _UNSUPPORTED:
+        raise UnsupportedDevice(_UNSUPPORTED[0])
+    t, failed = time.time(), []
+    for attempt in range(1, STARTUP_ATTEMPTS + 1):
+        try:
+            nyx = NyxDirect.from_world(world, instance=instance_path)
+            break
+        except UnsupportedDevice as exc:
+            print(f"[nyx_direct {time.strftime('%Y-%m-%dT%H:%M:%S')}] {exc}", file=sys.stderr, flush=True)
+            raise
+        except Exception as exc:    # noqa: BLE001 -- gs-nyx and the CUDA driver raise RuntimeError; anything else is retried too
+            failed.append({"error": f"{type(exc).__name__}: {exc}"})
+            print(f"[nyx_direct {time.strftime('%Y-%m-%dT%H:%M:%S')}] start-up attempt {attempt} of {STARTUP_ATTEMPTS} "
+                  f"failed: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+            if attempt == STARTUP_ATTEMPTS:
+                raise
+            time.sleep(STARTUP_BACKOFF_S[attempt - 1] * random.Random().uniform(1.0, 1.5))
+    nyx.startup = {"startup_s": round(time.time() - t, 2), "attempts": attempt, "failed_attempts": failed}
+    return DirectRig(nyx, headless)
 
 
 class RasterDepth:

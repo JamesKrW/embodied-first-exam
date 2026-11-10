@@ -28,7 +28,7 @@ services:
     working_dir: /tmp
     # The frozen instance comes from the image (images/roboarc/assets.json): the entrypoint stages it next to a copy of
     # runtime_binding.json and checks it (images/roboarc/stage_instance.py), then runs the command.
-    entrypoint: ["sh", "-c", "python /opt/robotangle/stage_instance.py blanket-flatten-07-i01 /tmp/robotangle-instance --binding /srv/runtime_binding.json && exec \"$$@\"", "stage"]
+    entrypoint: ["sh", "-c", "python /opt/robotangle/stage_instance.py blanket-flatten-07-i01 /tmp/robotangle-instance --binding /srv/runtime_binding.json --seed-file /srv/seed && exec \"$$@\"", "stage"]
     command: sh /srv/run.sh
     restart: on-failure:6          # N >= 3 (docs/protocol/standard_mode.md); a resume continues the episode
     environment:

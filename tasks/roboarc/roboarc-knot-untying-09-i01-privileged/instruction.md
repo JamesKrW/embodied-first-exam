@@ -9,7 +9,7 @@ You control a simulated robot (**two 6-DoF ALOHA (ViperX) arms with parallel-jaw
 - Keep the entire rope close to the tabletop: no point more than 1 mm below it, and no point higher than one rope diameter plus 3 mm above it.
 - Release all target parts and disengage any assisted grasp. Keep at least 1 mm of verified clearance between the rope and grippers or other robot links that can move. World-fixed bases may touch the rope normally. Interior overlap with any robot part is forbidden; ambiguous bounding-volume overlaps require a native-solid geometry check.
 - During confirmation, every target point or rigid body's linear speed must be at most 1 mm/s and its displacement from the start of confirmation at most 1 mm.
-- Put the whole centre line of the rope inside the green dashed goal region: the inner edge of the 2 mm wide dashed green line is the containment limit; it encloses a rectangle 460 mm wide (left to right in cam_high's image) and 330 mm deep. Every point of the centre line counts; the rope's own thickness may reach over the line.
+- Put the whole centre line of the rope inside the green dashed goal region: the inner edge of the dashed green line is the containment limit; it encloses a rectangle 460 mm wide (left to right in cam_high's image) and 330 mm deep. Every point of the centre line counts; the rope's own thickness may reach over the line.
 - Keep all final conditions satisfied together for at least 0.5 s of simulation time. If any final condition stops holding, the confirmation interval starts again. A brief qualifying pose is not enough; let the simulation advance through the full interval.
 
 ## Grader details (in addition to the requirements above)

@@ -2,14 +2,14 @@
 # tooling and the frozen instance baked in. Nothing the agent did in its container reaches this one — Harbor
 # uploads only the declared artifacts (/app/output/), so a patched success check or a swapped interpreter in
 # the agent container cannot influence the verdict.
-FROM ghcr.io/mll-lab-nu/efe:roboarc-0.2.0
+FROM ghcr.io/mll-lab-nu/efe:roboarc-2.2.0@sha256:96a0a895c0e4934adca39f7a370e67bf82bfb4db7ef049131a3ac0dc9d0f9057
 # MuJoCo task: numpy / OpenBLAS SIMD masking, so every CPU class generates the frozen bytes
 ENV NPY_DISABLE_CPU_FEATURES=AVX512F,AVX512CD,AVX512_SKX,AVX512_CLX,AVX512_CNL,AVX512_ICL,AVX512_SPR OPENBLAS_CORETYPE=Haswell
 COPY runtime_binding.json /tests/runtime_binding.json
 COPY grade.py test.sh /tests/
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0@sha256:beb13ec1db0d85df2c5527529cda03101b15dd6cf524d34b9b288273131f44ca /rcb_topogym.py /tests/rcb_topogym.py
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0@sha256:beb13ec1db0d85df2c5527529cda03101b15dd6cf524d34b9b288273131f44ca /render_bridge.py /tests/render_bridge.py
-COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.4.0@sha256:beb13ec1db0d85df2c5527529cda03101b15dd6cf524d34b9b288273131f44ca /nyx_direct.py /tests/nyx_direct.py
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.5.0@sha256:8c65ad7d9650114e298c79a9c88641e849925182b4afa47a4099ded49b73dc5f /rcb_topogym.py /tests/rcb_topogym.py
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.5.0@sha256:8c65ad7d9650114e298c79a9c88641e849925182b4afa47a4099ded49b73dc5f /render_bridge.py /tests/render_bridge.py
+COPY --from=ghcr.io/mll-lab-nu/efe:roboarc-files-0.5.0@sha256:8c65ad7d9650114e298c79a9c88641e849925182b4afa47a4099ded49b73dc5f /nyx_direct.py /tests/nyx_direct.py
 RUN python /opt/robotangle/stage_instance.py interlocked-claws-06-i01 /tests --purge   # the frozen instance, from the image (images/roboarc/assets.json), checked against runtime_binding.json
 RUN chmod +x /tests/test.sh && mkdir -p /app/output /logs/verifier
 ENV PYTHONPATH=/tests:/opt/topogym

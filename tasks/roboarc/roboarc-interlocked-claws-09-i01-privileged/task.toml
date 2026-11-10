@@ -3,11 +3,11 @@ artifacts = [{ source = "/var/rcb-monitor/", service = "rcb_monitor" }, "/app/ou
 
 [task]
 name = "embodied-first-exam/roboarc-interlocked-claws-09-i01-privileged"
-description = "RoboARC interlocked_claws (ALOHA 2, MuJoCo): produce one replayable trajectory. Separate and place the entire brown claw piece inside the green dashed goal region. Keep the other claw piece on the puzzle/system side. In this design the brown claw piece is a key and the other piece is a teal lock. Frozen scene instance (variation interlocked_claws_rd_medium, seed 0)."
+description = "RoboARC interlocked_claws (ALOHA 2, MuJoCo): produce one replayable trajectory. Separate and place the entire key piece inside the green dashed goal region. Keep the lock piece on the puzzle/system side. The key piece is the long straight bar with a short crossbar at one end; the lock piece is the open frame of bars it passes through. Frozen scene instance (variation interlocked_claws_rd_medium, seed 0)."
 keywords = ["robotics", "roboarc", "mujoco", "aloha", "code-as-policy", "trajectory", "interlocked_claws"]
 
 [metadata]
-tooling_version = "19"
+tooling_version = "22"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU float64 physics, Nyx RGB)
 robot = "aloha-2"
@@ -19,6 +19,13 @@ grasp = "assisted (the contact_weld_v1 pre-weld: the grippers start closed on pi
 success_rule = "task-native success (goal_complete True; frozen parameters; terminal revision placement_region_v3_grasp_contact_2mm)"
 instance_seed = 0                 # scene = environment/instance.json (variation interlocked_claws_rd_medium, eval index None); identity = dataset.toml digest
 expert_time_estimate_hours = 2.0
+
+[metadata.seeds]
+# the seeds a runner may draw from (a list, { from = A, to = B } or "any") and the ones the reference solution
+# under solution/ is for, where they are not the default seed alone (docs/protocol/README.md §2)
+allowed = [0, 1, 2]
+oracle = [0, 1]
+build = "runtime"
 
 [verifier]
 timeout_sec = 45000.0

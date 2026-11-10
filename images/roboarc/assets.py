@@ -8,14 +8,11 @@ usage:
   python3 images/roboarc/assets.py pin <dir> <rev>  maintainers: write assets.json from a local copy of revision <rev>
 
 The dataset holds:
-  instances/<base>/instance.json, instance_assets/**   the frozen instance of each task base. Task directories keep only
-                                                       runtime_binding.json, which pins the same hashes; the image stages
-                                                       the instance (images/roboarc/stage_instance.py)
-  image/release-<commit9>.tar.gz                       git archive of the release commit (release.json), the paths the
-                                                       image copies
-  image/uipc-prebuilt/                                 the audited libuipc wheel and its uipc-build.json
-  image/uipc-sm86/                                     the sm_86 libuipc build of the same recipe and its uipc-build.json
-                                                       (since image 0.2.21; release.json uipc_builds)
+  instances/<base>/instance.json, instance_assets/**   the frozen instance of each task base, and its appearance seeds
+                                                       (instances/<base>/seeds/<S>/). Task directories keep only
+                                                       runtime_binding.json (runtime_binding.s<S>.json), which pins the
+                                                       same hashes; the image stages the instance
+                                                       (images/roboarc/stage_instance.py)
 Access: a member of the organization that owns the dataset, logged in with `hf auth login` or with HF_TOKEN in the environment. The token is
 never printed. fetch needs huggingface_hub (pip install huggingface_hub); check and pin use the standard library only.
 """

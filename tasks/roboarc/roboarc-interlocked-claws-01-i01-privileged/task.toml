@@ -7,7 +7,7 @@ description = "RoboARC interlocked_claws (ALOHA 2, MuJoCo): produce one replayab
 keywords = ["robotics", "roboarc", "mujoco", "aloha", "code-as-policy", "trajectory", "interlocked_claws"]
 
 [metadata]
-tooling_version = "19"
+tooling_version = "22"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU float64 physics, Nyx RGB)
 robot = "aloha-2"

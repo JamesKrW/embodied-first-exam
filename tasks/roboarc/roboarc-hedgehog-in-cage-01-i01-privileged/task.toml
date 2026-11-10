@@ -7,7 +7,7 @@ description = "RoboARC hedgehog_in_cage (Franka Panda + Robotiq 2F-85, MuJoCo): 
 keywords = ["robotics", "roboarc", "mujoco", "panda_robotiq", "code-as-policy", "trajectory", "hedgehog_in_cage"]
 
 [metadata]
-tooling_version = "19"
+tooling_version = "22"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU float64 physics, Nyx RGB)
 robot = "franka-robotiq-2f85"

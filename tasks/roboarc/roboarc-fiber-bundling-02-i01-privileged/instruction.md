@@ -1,7 +1,7 @@
 # RoboARC (simulator package `topogym`) · fiber_bundling — frozen instance
 
 You control a simulated robot (**a 7-DoF Franka Panda arm with a Robotiq 2F-85 parallel gripper on a fixed base**; RoboARC on MuJoCo 3.14.0 physics, Nyx rendering) via Python.
-**Task:** Pass every fine fiber and the front sheath through the fixed copper ring; keep the rear terminal anchored.
+**Task:** Pass every fine fiber and the front sheath through the fixed ring; keep the rear terminal anchored.
 
 ## Success requirements
 

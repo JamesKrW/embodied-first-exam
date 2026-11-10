@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
-"""Stage one RoboARC task's frozen instance from the image into a task directory, and check it against the task's
+"""Stage one RoboTangle task's frozen instance from the image into a task directory, and check it against the task's
 runtime binding. Standard library only.
 
-usage: python /opt/robotangle/stage_instance.py <base> <dest> [--binding <runtime_binding.json>] [--purge]
+usage: python /opt/robotangle/stage_instance.py <base> <dest> [--binding <runtime_binding.json>] [--seed-file <seed>] [--purge]
 
-The image (images/roboarc/Dockerfile) carries every task's frozen instance, instance.json + instance_assets/, under
-/opt/robotangle/instances/<base>/. The files come from the private RoboARC asset dataset (organization members only)
-at the revision pinned in images/roboarc/assets.json, and the image build checks each file's sha256 there. A task
+The image (images/robotangle/Dockerfile) carries every task's frozen instance, instance.json + instance_assets/, under
+/opt/robotangle/instances/<base>/. The files come from the private Hugging Face dataset eai-v2-internal/robotangle-assets
+at the revision pinned in scripts/robotangle/assets.json, and the image build checks each file's sha256 there. A task
 directory holds only runtime_binding.json, which names the instance's canonical sha256 and the sha256 of every asset.
 This script:
   - copies the instance into <dest>, next to <dest>/runtime_binding.json (--binding copies that file there first);
   - checks both against the binding, by the rule of topogym.simulator.frozen_binding.check_inputs, which every session
     applies again at start;
   - with --purge, removes /opt/robotangle/instances afterwards, so a task image keeps only its own instance.
+Seeds (docs/RUNNING.md "Seeds"): a task that allows several seeds has a file `seed` (the integer the runner chose; the
+committed one says the default, 0) and, for every other seed S, `runtime_binding.s<S>.json` next to its
+runtime_binding.json. With --seed-file, seed 0 is the base's own instance as above; a seed S > 0 is staged from
+/opt/robotangle/instances/<base>/seeds/<S>/ against runtime_binding.s<S>.json (from the directory of --binding, else
+<dest>), which becomes <dest>/runtime_binding.json. A seed without its instance or binding, or a seed file that is not
+a non-negative integer, fails: nothing falls back to another seed. Every runtime_binding.s*.json is removed from <dest>
+afterwards.
 Privileged tasks run it in environment/Dockerfile and tests/Dockerfile. Standard tasks run it in the sim service's
 entrypoint, before `sh /srv/run.sh`, and RCB_INSTANCE points into <dest>.
 """
@@ -34,25 +41,53 @@ def file_sha(p: pathlib.Path) -> str:
     return h.hexdigest()
 
 
+def option(argv: list[str], name: str) -> pathlib.Path | None:
+    if name not in argv:
+        return None
+    i = argv.index(name)
+    v = pathlib.Path(argv[i + 1])
+    del argv[i:i + 2]
+    return v
+
+
+def read_seed(f: pathlib.Path) -> int:
+    t = f.read_text().strip()
+    if not t.isdigit():
+        raise ValueError(f"seed file {f} says {t!r}, not a non-negative integer")
+    return int(t)
+
+
 def main(argv: list[str]) -> int:
     purge = "--purge" in argv
     argv = [a for a in argv if a != "--purge"]
-    binding = None
-    if "--binding" in argv:
-        i = argv.index("--binding")
-        binding = pathlib.Path(argv[i + 1])
-        del argv[i:i + 2]
+    binding = option(argv, "--binding")
+    seed_file = option(argv, "--seed-file")
     if len(argv) != 2:
         print(__doc__, file=sys.stderr)
         return 2
     base, dest = argv[0], pathlib.Path(argv[1])
-    src = SRC / base
+    try:
+        seed = 0 if seed_file is None else read_seed(seed_file)
+    except (OSError, ValueError) as e:
+        print(f"FAIL stage_instance {base}: {e}", file=sys.stderr)
+        return 1
+    src = SRC / base if seed == 0 else SRC / base / "seeds" / str(seed)
     if not (src / "instance.json").is_file():
-        print(f"FAIL stage_instance: no frozen instance for {base} in this image ({src})", file=sys.stderr)
+        print(f"FAIL stage_instance: no frozen instance for {base}" + (f" seed {seed}" if seed else "")
+              + f" in this image ({src})", file=sys.stderr)
         return 1
     dest.mkdir(parents=True, exist_ok=True)
-    if binding is not None:
+    if seed:                                   # the seed's own binding, never another seed's
+        bdir = binding.parent if binding is not None else dest
+        sb = bdir / f"runtime_binding.s{seed}.json"
+        if not sb.is_file():
+            print(f"FAIL stage_instance {base}: seed {seed} has no binding {sb}", file=sys.stderr)
+            return 1
+        shutil.copyfile(sb, dest / "runtime_binding.json")
+    elif binding is not None:
         shutil.copyfile(binding, dest / "runtime_binding.json")
+    for p in dest.glob("runtime_binding.s*.json"):
+        p.unlink()
     lock = json.loads((dest / "runtime_binding.json").read_text())
     shutil.copyfile(src / "instance.json", dest / "instance.json")
     if (dest / "instance_assets").exists():
@@ -82,7 +117,8 @@ def main(argv: list[str]) -> int:
         return 1
     if purge:
         shutil.rmtree(SRC)
-    print(f"ok stage_instance {base}: instance {canon[:12]}, {len(assets)} asset files -> {dest}")
+    print(f"ok stage_instance {base}" + (f" seed {seed}" if seed_file is not None else "")
+          + f": instance {canon[:12]}, {len(assets)} asset files -> {dest}")
     return 0
 
 

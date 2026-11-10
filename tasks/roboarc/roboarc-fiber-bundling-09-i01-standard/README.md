@@ -6,10 +6,10 @@
 | Mode | standard (`eai-standard/2.4`) |
 | Twin | `roboarc-fiber-bundling-09-i01-privileged` |
 | Simulator / robot | `roboarc` / `franka-robotiq-2f85` |
-| Family / instance | `fiber_bundling` / seed 0 |
+| Family / instance | `fiber_bundling` / seed 0 (allowed seeds: [0, 1, 2]; PROTOCOL §2) |
 | Oracle | `full` |
 | Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
-| Base image | `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:roboarc-2.2.0@sha256:96a0a895c0e4934adca39f7a370e67bf82bfb4db7ef049131a3ac0dc9d0f9057` |
 
 ## Task
 Standard-mode twin of `roboarc-fiber-bundling-09-i01-privileged` (same frozen instance): the agent gets only the `eai-standard/2.4` client
@@ -45,7 +45,7 @@ Caps per container (PROTOCOL §6).
 ## Details
 
 ### Goal
-Pass every fine fiber and the front sheath through the fixed copper ring; keep the rear terminal anchored.
+Pass every fine fiber and the front sheath through the fixed ring; keep the rear terminal anchored.
 
 ### Success requirements
 - Pass every fiber tip first, then successive material points through to its root. The actual crossing history must be observed; placing fibers on the far side or passing only the tips is not completion.
@@ -53,7 +53,7 @@ Pass every fine fiber and the front sheath through the fixed copper ring; keep t
 - Keep the angle between every pair of adjacent fiber segments at most 60 degrees in the final configuration.
 - Touch and grasp only the thick sheath with the gripper. Keep the completed passage valid through confirmation; holding is allowed, with no separate release or speed threshold.
 - Route the sheath past the formboard peg (its top 45 mm above the sheath's start axis) with the peg on the sheath's left, looking along the sheath from the rear terminal toward the ring. The sheath must lie beside the peg, below its top, within 20 mm of its surface.
-- Seen from the ring's entry side, looking through the ring in the feed direction, the red fiber's root must end 140 deg counterclockwise from the top of the ring (about 7:20 on a clock face), within ±15 deg.
+- Seen from the ring's entry side, looking through the ring in the feed direction, the root of one of the two red fibers must end 140 deg counterclockwise from the top of the ring (about 7:20 on a clock face), within ±15 deg.
 - Keep all final conditions satisfied together for at least 0.5 s of simulation time. If any final condition stops holding, the confirmation interval starts again. A brief qualifying pose is not enough; let the simulation advance through the full interval.
 
 ### Task failure conditions
@@ -78,7 +78,7 @@ Pass every fine fiber and the front sheath through the fixed copper ring; keep t
 | crash recovery | `eai-standard/2.4` §13: journal + per-call checkpoints, `restart: on-failure:6`, resume class `approx` |
 
 ### Provenance
-- Frozen instance: a MuJoCo instance (`simulator.physics_engine` "mujoco", its scene frozen under `instance_assets/mujoco/`), built by TopoGym source `f24ccdce` (MuJoCo instance made before this image was built (TopoGym source f24ccdce; its bytes are bound into the release image efe:roboarc-0.2.0)); bound to this release's runtime (source `c9171f79`, tooling `d8692e15`).
-- Frozen instance files (`instance.json`, `instance_assets/`): not in this directory. The public image carries them in `/opt/robotangle/instances/fiber-bundling-09-i01/` (`images/roboarc/assets.json` pins each file's sha256), and `/opt/robotangle/stage_instance.py` copies this task's instance next to its `runtime_binding.json`, which names the instance's canonical sha256 and every asset's sha256. The tooling checks them again at every session start.
-- Release: dev/robotangle_mujoco `7947eaa7b`, image `ghcr.io/mll-lab-nu/efe:roboarc-0.2.0` (images/roboarc/).
+- Frozen instance: a MuJoCo instance (`simulator.physics_engine` "mujoco", its scene frozen under `instance_assets/mujoco/`), built by TopoGym source `f24ccdce` (MuJoCo instance made before this image was built (TopoGym source f24ccdce; its bytes are bound into the release image efe:roboarc-2.2.0)); bound to this release's runtime (source `c9171f79`, tooling `d8692e15`).
+- Frozen instance files (`instance.json`, `instance_assets/`): not in this directory. The image carries them in `/opt/robotangle/instances/fiber-bundling-09-i01/` (`images/roboarc/assets.json` pins each file's sha256), and `/opt/robotangle/stage_instance.py` copies this task's instance next to its `runtime_binding.json`, which names the instance's canonical sha256 and every asset's sha256. The tooling checks them again at every session start.
+- Release: RoboARC 2.2.0 (release base `e0a930a38`), image `ghcr.io/mll-lab-nu/efe:roboarc-2.2.0` (images/roboarc/).
 - Name: RoboARC is the published name of this benchmark. Code identifiers keep the simulator's name: the simulator package `topogym`, the tooling `rcb_topogym.py`, `TOPOGYM_*` variables.

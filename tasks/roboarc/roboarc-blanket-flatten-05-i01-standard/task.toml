@@ -34,7 +34,7 @@ oracle = "full"
 difficulty = "medium"
 grasp = "assisted (the pbd_local_patch_v1 grasp regions on blanket)"
 success_rule = "task-native success (goal_complete True; frozen parameters; terminal revision release_settling_v1)"
-tooling_version = "19"
+tooling_version = "22"
 instance_seed = 0
 expert_time_estimate_hours = 3
 

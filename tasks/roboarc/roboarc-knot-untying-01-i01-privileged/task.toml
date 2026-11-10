@@ -7,7 +7,7 @@ description = "RoboARC knot_untying (ALOHA 2, MuJoCo): produce one replayable tr
 keywords = ["robotics", "roboarc", "mujoco", "aloha", "code-as-policy", "trajectory", "knot_untying"]
 
 [metadata]
-tooling_version = "19"
+tooling_version = "22"
 task_type = "trajectory"          # trajectory | policy   (see docs/protocol/README.md)
 simulator = "roboarc"             # RoboARC on MuJoCo 3.14.0 (CPU physics, Nyx RGB)
 robot = "aloha-2"
