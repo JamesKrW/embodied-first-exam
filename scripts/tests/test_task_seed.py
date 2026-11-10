@@ -14,6 +14,7 @@ CHECK = [sys.executable, str(ROOT / "ci_checks/check-seeds.py")]
 SEED = [sys.executable, str(ROOT / "scripts/task_seed.py")]
 sys.path.insert(0, str(ROOT / "scripts"))
 import task_conventions as tc  # noqa: E402  (task_dir: the task tree)
+import task_seed  # noqa: E402  (rep_seed)
 
 
 def run(cmd):
@@ -38,7 +39,17 @@ def with_build(toml: Path, build: str | None) -> None:
     toml.write_text(s)
 
 
+def reps(sd: dict, n: int = 5) -> list[int]:
+    return [task_seed.rep_seed(sd, k) for k in range(1, n + 1)]
+
+
 def main() -> int:
+    # repetitions (docs/protocol/running.md "Repetitions"): the default first, then the next allowed seeds, cycling
+    assert reps({"default": 0, "allowed": [0]}) == [0, 0, 0, 0, 0]
+    assert reps({"default": 5, "allowed": [9, 5, 1, 3]}) == [5, 9, 1, 3, 5]
+    assert reps({"default": 0, "allowed": [0, 7]}) == [0, 7, 0, 7, 0]
+    assert reps({"default": 99, "allowed": {"from": 0, "to": 100}}) == [99, 100, 0, 1, 2]
+    assert reps({"default": 4, "allowed": "any"}, 3) == [4, 5, 6]
     with tempfile.TemporaryDirectory() as td:
         tasks = Path(td) / "tasks"
         tasks.mkdir()
@@ -58,6 +69,12 @@ def main() -> int:
         assert rc == 0, out
         rc, out = run(SEED + ["pick", str(std), "--rng", "1"])
         assert rc == 0 and out.strip() in ("0", "7"), out
+        for k, want in ((1, "0"), (2, "7"), (3, "0")):
+            rc, out = run(SEED + ["rep", str(std), str(k)])
+            assert rc == 0 and out.strip() == want, (k, out)
+        rc, out = run(SEED + ["materialize", str(std), "--rep", "2", "--out", str(Path(td) / "rep2")])
+        assert rc == 0 and out.split()[-1] == "7", out
+        assert re.search(r"(?m)^instance_seed = 7$", (Path(td) / "rep2" / std.name / "task.toml").read_text())
         # materialize: the seed's instance in every place the task runs and grades from, the seed recorded
         out_dir = Path(td) / "run"
         for t, places in ((priv, ["environment", "tests"]), (std, ["environment/sim"])):
@@ -112,7 +129,7 @@ def main() -> int:
         with_build(priv / "task.toml", "runtime")
         rc, out = run(CHECK + [str(priv)])
         assert rc != 0 and "is not in seeds.allowed" in out, out
-    print("task seeds: check-seeds.py and task_seed.py hold on a pair with two seeds, a range and \"any\"")
+    print("task seeds: check-seeds.py and task_seed.py hold on a pair with two seeds, a range and \"any\"; repetitions get their seeds")
     return 0
 
 

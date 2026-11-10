@@ -137,6 +137,8 @@ uv tool install embodied-first-exam --with-executables-from harbor
 harbor run -d embodied-first-exam -a codex -m openai/gpt-6-astra
 ```
 
+An official result is three repetitions of each task: repetition k runs from the task's seed for k (`scripts/task_seed.py materialize --rep k`; every task now has one seed, so the three repetitions repeat the same run). See [docs/protocol/running.md](docs/protocol/running.md#repetitions).
+
 ```bash
 # the core tasks in another mode: --privileged (391 tasks), --standard, --realtime
 harbor run -d embodied-first-exam --privileged -a codex -m openai/gpt-6-astra

@@ -101,3 +101,5 @@ actively. The realtime mode is offered where a benchmark's tasks call for it, dy
   already used for a model in existing results (`gpt6_luna`, `gpt6_astra`, `fable_5_1`).
 - `effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, or `default` when the harness sets none.
 - Provider, service tier, reset budget and other settings go in the results metadata, not in the id.
+- Repetition k ≥ 2 of a run (docs/protocol/running.md "Repetitions"): `_rep<k>` appended to the model token,
+  `claude_code-opus_5_5_rep2-high`.

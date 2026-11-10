@@ -21,27 +21,47 @@ A result is official only when its run had all of these:
   the state its session ended in). A batch run with another budget records it in its results' metadata.
 - **The task's own cutoff**, no multiplier (`--timeout-multiplier`, `--agent-timeout-multiplier`, an agent
   `override_timeout_sec`), and **nothing added to the instruction** (no prompt template, no extra instruction, in `AK` or elsewhere).
-- **The runner's seed, the task's network, reruns only after an infrastructure failure** (the next three sections), and the
-  effective configuration recorded with the result (Results).
+- **Three repetitions of every task, each on the runner's seed for it, the task's network, reruns only after an
+  infrastructure failure** (the next four sections), and the effective configuration recorded with the result (Results).
 
 ## Seeds
 The seed is the runner's, never the agent's. A task's default seed is `[metadata] instance_seed`, the task directory as
 committed; the seeds a runner may draw from are `[metadata.seeds] allowed` (a list, a range `{ from = A, to = B }` or
 `"any"`; without the table, the default seed alone), and `oracle` names the ones the reference solution is for (PROTOCOL
-§2). Official batches draw one uniformly per trial; a run on the default seed only records `default-only`. The verifier
-grades the drawn seed's instance from its own copy (`build = "runtime"`: from its own seed file). To run another allowed
-seed, or one drawn from the allowed list, let the runner write a copy and run that:
+§2). An official run takes each trial's seed from its repetition (Repetitions, below); a seed drawn at random
+(`--seed draw`) is for runs outside the official ones. The verifier grades the seed's instance from its own copy
+(`build = "runtime"`: from its own seed file). To run another allowed seed, let the runner write a copy and run that:
 
 ```bash
 python3 scripts/task_seed.py list tasks/<benchmark>/<task>                      # {'default': 0, 'allowed': [0, ...], 'oracle': [...]}; default = instance_seed
-python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --seed draw --out /tmp/run1   # prints the copy and the seed
+python3 scripts/task_seed.py rep tasks/<benchmark>/<task> 2                     # the seed of repetition 2
+python3 scripts/task_seed.py materialize tasks/<benchmark>/<task> --rep 2 --out /tmp/run1      # prints the copy and the seed (or --seed S, --seed draw)
 harbor run -p /tmp/run1/<task> -a <agent> ...
 ```
 
 The agent never chooses or sees the list: another seed's instance lives under the privileged task's `tests/seeds/`,
-and the copy carries only the drawn one. Every task allows its default seed only, and `scripts/run_agent_batch.sh`
-runs each job on it, from a stamped copy of the task as it is (with the gateway, the copy's egress is the gateway; with
+and the copy carries only the one it runs. Every task allows its default seed only, and `scripts/run_agent_batch.sh`
+runs every repetition of each job on it, from a stamped copy of the task as it is (with the gateway, the copy's egress is the gateway; with
 a CPU cap above the host's count, `HOST_CPUS`, the copy has that cap clamped, Resources below).
+
+## Repetitions
+An official run makes **three repetitions** of every task it runs, in each mode it runs it in: three separate trials,
+each from a new environment, under one run id and one configuration. Repetition k runs from the task's seed for k
+(`python3 scripts/task_seed.py rep <task> <k>`, `materialize --rep <k>`): the default seed for k = 1, then the next
+allowed seeds in increasing order (those above the default, then those below it). So a task that allows three seeds or
+more runs on three distinct seeds, one that allows fewer cycles through the ones it allows, and a task with its default
+seed only runs that seed three times. The seeds depend only on the task, so every agent meets the same instance in the
+same repetition.
+- A repetition is neither a rerun (Infrastructure failures, below) nor a reset: repetition k that failed for
+  infrastructure is rerun as repetition k, on its seed and configuration; a repetition's result never voids, replaces or
+  is replaced by another's; and `first_success` stays the first episode of each trial (PROTOCOL §4).
+- Repetition 1 is published under the run id, repetition k ≥ 2 under the run id with `_rep<k>` appended to its model
+  token (`claude_code-opus_5_5_rep2-high`), each with its own `attempts.json`; `config.json` records the seed.
+  `scripts/run_agent_batch.sh` runs one repetition per batch, the one its `RUN_ID` names.
+- A recorded result stays its repetition's when the task's seeds change later: a repetition counts if it ran on a seed
+  the task allowed when it ran, on the task's current version or one mapped to it. A task that comes to allow more seeds
+  takes the rule above only for the repetitions it has no result for yet; the ones it has, on the default seed
+  included, are kept.
 
 ## Network
 The default is the allowlist (PROTOCOL Appendix H.6); whether a task has open network is its author's decision,
@@ -124,7 +144,11 @@ the results site) compare trials only within one comparable configuration (`task
 version, mode, cutoff, reset budget, S, network), report success together with cost (tokens, money, turns, wall clock,
 simulation steps), and align reasoning effort, `max_turns` and the token budget before comparing agents. Validated and
 unvalidated tasks (`validated_of`: `[metadata] validated`, else `oracle = "full"`) are ranked together: totals count
-every core task, the flag is shown as a marker and may be used as a filter. The main table and every headline number
+every core task, the flag is shown as a marker and may be used as a filter. A task's success in a mode is the mean of its
+three repetitions (0, 1/3, 2/3 or 1), and a success rate is the mean of the three repetitions' rates, shown with their
+spread (the standard deviation of the three rates); the rate of repetition 1 alone and pass@3 (solved in at least one
+repetition) are reported beside it, and the first-attempt result `first_success` is averaged over the repetitions the
+same way; each repetition's rate counts every core task. The main table and every headline number
 (success rates, rankings, totals) count core only: the tasks of [`core_set.toml`](../core_set.toml), each in its
 `default_mode` (`task_conventions.core_tasks()`); a run of the core tasks in another mode is reported apart (`set_of`:
 `core` for every mode of a listed task, else `excluded`). Task dirs the list leaves out stay in the repository under
