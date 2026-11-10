@@ -60,7 +60,7 @@ RUN printf '%s\n' pillow==11.0.0 warp-lang==1.12.0 > /tmp/constraints.txt && exp
     mkdir -p /data && cp -r /opt/ispatialgym/ispatialgym/assets/datasets/ispatialgym-assets /data/ispatialgym-assets && \
     python -c "import omnigibson, ispatialgym.run_isg, ispatialgym.eval.loader" && \
     python -m pip list --format=freeze 2>/dev/null | LC_ALL=C sort > /tmp/pip.state && \
-    { echo "1ca2e10ba91e36facc1ad53b2cd47358374fd7dcda5884fca34c6fcd50906367  /tmp/pip.state" | sha256sum -c - || \
+    { echo "2c9f1fb29308dbec2d5c523006d5d4ef7e03b2fc83f600940872ac12f9be35c4  /tmp/pip.state" | sha256sum -c - || \
       { echo "pip packages differ from images/ispatialgym/pip.lock (the tested image): this build cannot reproduce the" \
           "pinned base (docs/protocol/running.md, Base images). Packages installed here:" >&2; \
         cat /tmp/pip.state >&2; exit 1; }; } && \

@@ -108,7 +108,7 @@ evdev==2.0.0
 executing==2.2.1
 fastapi==0.115.7
 fastjsonschema==2.22.2
-filelock==3.13.1
+filelock==3.32.3
 flatbuffers==25.12.19
 flatten-dict==0.5.0
 flufl.lock==9.1.0
