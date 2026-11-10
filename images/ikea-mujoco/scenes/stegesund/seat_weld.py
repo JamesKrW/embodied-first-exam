@@ -27,6 +27,16 @@ Every weld of a fastener (its own and its clamped parts') pins the same point, t
 (anchor = that point in the host frame, relpose position = that point in body1's frame), with the current relative
 orientation. Body origins far from the joint cannot then turn small rotational give into drift (fixed 09:27 for the
 host after UPPSTÅ's 2.9 mm off-axis, 10:05 for clamped parts after SKÅDIS's 0.25 mm spring-back).
+
+Welded-group contact switch-off (speed; opt-in per scene: `SeatWelder(..., group_contacts_off=True)`, default off, and
+then the welder never touches any other collision bit). A clamped part welded to its host is one rigid body with it, as
+the seated fastener is, but it keeps its own contacts with the host (UPPSTÅ: an end block's 114 pieces on the board,
+~900 contacts, for the rest of the episode). With the switch on, the bodies joined by latched welds (each welded
+fastener's host and its clamped parts, transitively) form one rigid group, and contacts between two bodies of the same
+group are off; the group's geoms keep every other contact exactly as before. The bits are the scheme of
+ikea_runtime.RetentionMechanism's switch-off (kyrre): a group's geoms get contype = the group's own bit (16 and up) and
+conaffinity = their own bits plus the other groups' bits; the build checks that the scene's collision bits make this
+exact. They are a pure function of the weld state (`sync_contacts()`, called on every weld event, reset and set_state).
 """
 from __future__ import annotations
 
@@ -38,6 +48,7 @@ import numpy as np
 # RoboARC's weld class (profiles.py _RIGID["weld"])
 WELD_SOLREF = ".00125 1"
 WELD_SOLIMP = ".9 .95 .001 .5 2"
+GROUP_BIT0 = 16                   # collision bits 16.. mark the welded groups (no scene geom uses them)
 
 
 def _weld(name, b1, b2):
@@ -104,8 +115,9 @@ def _geoms(m, names):
 
 
 class SeatWelder:
-    def __init__(self, m, d, fasteners, hold_s=0.05, v_eps=1e-4, w_eps=0.05):
+    def __init__(self, m, d, fasteners, hold_s=0.05, v_eps=1e-4, w_eps=0.05, group_contacts_off=False):
         self.m, self.d, self.f = m, d, list(fasteners)
+        self.group_contacts_off = bool(group_contacts_off)
         self.hold_s, self.v_eps, self.w_eps = hold_s, v_eps, w_eps
         self.events: list[dict] = []
         name2id = lambda kind, n: mujoco.mj_name2id(m, kind, n)
@@ -122,6 +134,77 @@ class SeatWelder:
                    [n for n in [f.body, f.host] + f.clamped if name2id(B, n) < 0])
             if bad:
                 raise ValueError(f"seat_weld: fastener {f.name}: not in the model: {bad}")
+
+        if self.group_contacts_off:
+            self._prepare_groups()
+
+    # -- welded-group contact switch-off (opt-in)
+    def _prepare_groups(self):
+        m = self.m
+        self._orig = (m.geom_contype.copy(), m.geom_conaffinity.copy())
+        self._body_orig = (m.body_contype.copy(), m.body_conaffinity.copy())
+        ct, ca = self._orig
+        live = (ct | ca) != 0
+        if ((ct | ca) >> GROUP_BIT0).any():
+            raise ValueError("seat_weld: a geom uses collision bits >= %d" % GROUP_BIT0)
+        members = {b for f in self.f for b in [f.hid] + [mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, c) for c in f.clamped]}
+        off = {g for f in self.f for g in f.off_geoms}
+        cls = {(int(ct[g]), int(ca[g])) for g in np.flatnonzero(live)}
+        own = {(int(ct[g]), int(ca[g])) for g in np.flatnonzero(live) if int(m.geom_bodyid[g]) in members and g not in off}
+        hit = lambda a, b: bool((a[0] & b[1]) | (b[0] & a[1]))
+        for e in own:      # exactness: a group geom vs any other geom collides iff (its ct & our ca); two groups always
+            if any(hit(e, o) != bool(o[0] & e[1]) for o in cls) or not all(hit(e, f) for f in own):
+                raise ValueError("seat_weld: the collision bits %s do not allow an exact group switch-off" % (e,))
+        self._members = sorted(members)
+        self._geoms = {b: np.flatnonzero(live & (m.geom_bodyid == b)) for b in members}
+
+    def groups(self):
+        """The rigid groups of the latched welds: sorted lists of body ids (2 or more), ordered by their first body."""
+        root = {}
+        def find(x):
+            while root.get(x, x) != x:
+                x = root[x]
+            return x
+        for f in self.f:
+            if f.welded:
+                for c in f.clamped:
+                    a, b = find(f.hid), find(mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_BODY, c))
+                    if a != b:
+                        root[max(a, b)] = min(a, b)
+        comp = {}
+        for b in self._members:
+            comp.setdefault(find(b), set()).add(b)
+        return sorted((sorted(c) for c in comp.values() if len(c) > 1), key=lambda c: c[0])
+
+    def sync_contacts(self):
+        """The model's collision bits from the weld state: the original bits, the welded groups' bits, and every welded
+        fastener's own and thread-hole geoms off. A no-op unless the scene opted in."""
+        if not self.group_contacts_off:
+            return
+        m = self.m; ct, ca = self._orig
+        nct, nca = ct.copy(), ca.copy()
+        groups = self.groups()
+        if len(groups) > 31 - GROUP_BIT0:
+            raise ValueError("seat_weld: more than %d welded groups" % (31 - GROUP_BIT0))
+        bits = [1 << (GROUP_BIT0 + k) for k in range(len(groups))]
+        allbits = sum(bits)
+        for grp, bit in zip(groups, bits):
+            g = np.concatenate([self._geoms[b] for b in grp])
+            nct[g] = bit
+            nca[g] = ca[g] | (allbits & ~bit)
+        for f in self.f:
+            if f.welded:
+                nct[f.off_geoms] = 0
+                nca[f.off_geoms] = 0
+        m.geom_contype[:] = nct
+        m.geom_conaffinity[:] = nca
+        # MuJoCo's body-pair pre-filter reads body_contype / body_conaffinity (OR over the body's geoms): keep a superset
+        bct, bca = self._body_orig[0].copy(), self._body_orig[1].copy()
+        if groups:
+            np.bitwise_or.at(bct, m.geom_bodyid, nct)
+            np.bitwise_or.at(bca, m.geom_bodyid, nca)
+        m.body_contype[:] = bct
+        m.body_conaffinity[:] = bca
 
     def arm(self, name):
         """Start checking this fastener for seating (call when its drive starts)."""
@@ -143,6 +226,7 @@ class SeatWelder:
                 if t - f.quiet_since >= self.hold_s:
                     ev = {"time": t, "fastener": f.name, "host": f.host, "clamped": list(f.clamped)}
                     self.apply_event(self.m, self.d, ev, self.f)
+                    self.sync_contacts()
                     self.events.append(ev); new.append(ev)
             else:
                 f.quiet_since = None

@@ -18,8 +18,8 @@
   "right_actuator8"
  ],
  "image": {
-  "id": "sha256:ed950d079b6304219d3b1ec2f428f851e383cec841d38a4c11bd0f25a42dea00",
-  "reference": "ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0"
+  "id": "sha256:9f9cbab8aa74f858b22ac1144162aad9f1b1e5b927f90f6f8251130f36d73868",
+  "reference": "ghcr.io/mll-lab-nu/efe:roboarc-ikea-1.1.0"
  },
  "initial_state_sha256": "067105ad8f8329ec711f06a431d9d977385a03c897e62a176801f979e1fc2d45",
  "nu": 16,
@@ -28,7 +28,7 @@
   "numpy": "2.5.4",
   "python": "3.12.15"
  },
- "scene_digest": "869e1978078a13aebe13d76ed4f061103a3745d4415c3f8e6309dd86735853b4",
+ "scene_digest": "23a2fca95f651e687b30c8f246cd6e97a9e929fb2f1436432468e322ed36bf8c",
  "scene_files": {
   "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
   "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -916,7 +916,7 @@
   "assets/parts/shelf/shelf_m024_93.obj": "b5edcb5eab575cbcbb41e139c79cbeb597ab998a2f9ae59b6875a430920fad96",
   "assets/parts/shelf/shelf_m024_94.obj": "8554a5a40b7e8e12fb4a539033cd56c8d7fd06c07c3435d82a3b67d05f4f4173",
   "assets/parts/shelf/shelf_m024_95.obj": "8ce6d2e75031997b6ba1006c9fe827e7a284215aa82073821000149068c3e7dd",
-  "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+  "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
   "layout.json": "b94ef8fcdad6e059b030430a3fa4ecde08413f091c1ef1b5941efb465ed834d3",
   "scene.py": "a2d6147451c49be6f5ef42e1712004acb6bf3571f43efb1dcd86b7b3892a8a7c",
   "scene.xml": "c26eedea209cef619e32b0da89bd7c38d5f5c8be4c84032cab524d5f7b7236c0",

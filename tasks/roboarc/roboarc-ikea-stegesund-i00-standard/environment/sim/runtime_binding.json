@@ -18,8 +18,8 @@
   "right/actuator8"
  ],
  "image": {
-  "id": "sha256:ed950d079b6304219d3b1ec2f428f851e383cec841d38a4c11bd0f25a42dea00",
-  "reference": "ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0"
+  "id": "sha256:9f9cbab8aa74f858b22ac1144162aad9f1b1e5b927f90f6f8251130f36d73868",
+  "reference": "ghcr.io/mll-lab-nu/efe:roboarc-ikea-1.1.0"
  },
  "initial_state_sha256": "917b2bc63ab1ec624593f08b7aff161dc4f0dea407d53bbeee89396b49fd701c",
  "nu": 16,
@@ -28,7 +28,7 @@
   "numpy": "2.5.4",
   "python": "3.12.15"
  },
- "scene_digest": "4e0cbabcd4c7f692a36f30c40fc028298dd6426c7f8680919d8c3ae628507bef",
+ "scene_digest": "d13192b82ad1037a5d709489e01a2f0c657bc8eb2ea09ef97df1de7c7b3a2eef",
  "scene_files": {
   "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
   "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -98,10 +98,10 @@
   "assets/panda/link7_5.obj": "099071d3090b51471ba52f4f90814fd3089f4975d196e4d488117073d0bfe491",
   "assets/panda/link7_6.obj": "99469e2d95ab74ce0292f2f16954c87a8a7dc16652e62e970fe37c94330a81bb",
   "assets/panda/link7_7.obj": "426c3db8a19373f3dc73d4bec672e948121b2914c10e2e7b9c7ea80643a19e54",
-  "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+  "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
   "scene.py": "4e2a4df1dacc33c792ba82f301660851491f64c3a3df3e3e6bd75540a3dddc4c",
   "scene.xml": "8d70a3641fe78f443d3758da4f828a4c21f6f72f46a967991e5b8e8bc1c2a9a2",
-  "seat_weld.py": "db90bbc6822adc2817accf7146c209f3bf3b6ca4972bc6c2eec800a564dcfe68",
+  "seat_weld.py": "93e95dd94685ed1811e578ce5ccd8029ead51d02fedbac62bd27e605e1ce59c5",
   "stegesund_mech.py": "a6e2904ecb1d9bcd9ba96a80dc1a0a5274777e95f84ccec5b9472f8da9ab7d14",
   "success.py": "f273b4c25a390383a4104e093c226e1f7215b305ff7b5e3fc72b8d0e13dbb3e0",
   "task.json": "50b236845847feca9f555f7a1de039acb8f625ba9898e465b13dc11a493a7f0e"

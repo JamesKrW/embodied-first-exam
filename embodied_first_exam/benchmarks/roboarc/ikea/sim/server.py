@@ -22,10 +22,10 @@ OpenCV intrinsics and per-frame extrinsics (robot frame). RGB: Nyx, RoboARC's re
 render process with its own Python environment, fed the scene once and per-frame poses; RCB_RENDER=egl draws MuJoCo's
 raster instead, for tests only). Depth on request: MuJoCo's raster (EGL) at the same cameras, as RoboARC's.
 
-Speed rule (clamp, not fail; the robots' real limits, rcb_ikea.JOINT_SPEED_LIMITS_RAD_S / GRIPPER_SPEED_LIMITS, the one
-table that rcb_ikea.Session.applied() also enforces in both modes and in the grader's replay): each limited target (the arm
-joints; a gripper only if the table limits it, none today) moves at most its limit x control step from the previous control
-step's target. A row that asks for more takes the control steps it needs (each one executed, journaled and recorded, so
+Speed rule (clamp, not fail; the robots' real limits, rcb_ikea.JOINT_SPEED_LIMITS_RAD_S / GRIPPER_WIDTH_SPEED_M_S, the
+one table that rcb_ikea.Session.applied() also enforces in both modes and in the grader's replay): each limited target (the
+arm joints; the Franka Hand's command, at 0.1 m/s of commanded finger width; the ViperX gripper is not limited) moves at
+most its limit x control step from the previous control step's target. A row that asks for more takes the control steps it needs (each one executed, journaled and recorded, so
 a replay of the recorded trajectory runs exactly what ran, and the Session clamp leaves those rows unchanged) and meta["clipped"] says
 so. An unlimited gripper switches at the row.
 
@@ -70,6 +70,9 @@ DATA = os.environ.get("RCB_DATA", "/data"); os.makedirs(os.path.join(DATA, "call
 TASK = os.environ.get("RCB_TASK", "lack")
 BINDING = json.load(open(os.environ.get("RCB_BINDING", os.path.join(HERE, "runtime_binding.json"))))
 RIG_SPEC = json.load(open(os.environ.get("RCB_RIG", os.path.join(HERE, "rig.json"))))
+# the trial's appearance seed (scripts/task_seed.py materialize writes it; 0 as committed): it chooses the Nyx lighting
+# (rig.json "seeds", ikea_nyx.nyx_settings) and nothing else
+SEED = int(open(os.path.join(HERE, "seed")).read())
 OBS_CALIBRATION = os.environ.get("RCB_OBS_CALIBRATION", "1") == "1"
 MAX_CHUNK_S = float(os.environ.get("RCB_MAX_CHUNK_S", "10")); MAX_WATCH_S = float(os.environ.get("RCB_MAX_WATCH_S", "30"))
 WALL_CLOCK_S = float(os.environ.get("RCB_WALL_CLOCK_S", "10800"))
@@ -150,7 +153,8 @@ NYX = None
 if RENDER == "nyx":
     import tempfile
     import ikea_nyx  # noqa: E402
-    NYX = ikea_nyx.NyxRig(m, RIG, RIG_SPEC, tempfile.mkdtemp(prefix="ikea_nyx_"), log_path=os.path.join(DATA, "nyx.log"))
+    NYX = ikea_nyx.NyxRig(m, RIG, RIG_SPEC, tempfile.mkdtemp(prefix="ikea_nyx_"), log_path=os.path.join(DATA, "nyx.log"),
+                          seed=SEED)
     log({"ev": "nyx_ready", **NYX.startup})
 
 # ---------------------------------------------------------------- the robot, from the model (two arms: left_, right_)

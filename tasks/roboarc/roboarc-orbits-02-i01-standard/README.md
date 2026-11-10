@@ -1,0 +1,82 @@
+# roboarc-orbits-02-i01-standard
+
+| | |
+|---|---|
+| Benchmark | RoboARC |
+| Mode | standard (`eai-standard/2.4`) |
+| Twin | `roboarc-orbits-02-i01-privileged` |
+| Simulator / robot | `roboarc` / `aloha-2` |
+| Family / instance | `orbits` / seed 0 (allowed seeds: [0, 1, 2]; PROTOCOL §2) |
+| Oracle | `full` |
+| Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
+| Base image | `ghcr.io/mll-lab-nu/efe:roboarc-2.2.0@sha256:96a0a895c0e4934adca39f7a370e67bf82bfb4db7ef049131a3ac0dc9d0f9057` |
+
+## Task
+Standard-mode twin of `roboarc-orbits-02-i01-privileged` (same frozen instance): the agent gets only the `eai-standard/2.4` client
+(docs/protocol/standard_mode.md); the simulator runs in the `sim` sidecar (`environment/docker-compose.yaml`, GPU on the
+sidecar), which owns the scene and records the episode as a (T, 14) trajectory; its collect hook
+(`environment/sim/finalize.sh`) writes the live episode's verdict, then renders the video in one video-only
+replay of the recorded rows (no grading replay). The verifier runs in a separate sandbox (`tests/Dockerfile`) over the sidecar's artifacts. Compare against
+the privileged task to measure the cost of losing resets, privileged state and the tooling's primitives.
+
+## Difficulty
+Same scene, instance and success rule as `roboarc-orbits-02-i01-privileged` (see its Difficulty). In standard mode the agent loses resets, privileged state and planning primitives: it sees camera images and proprioception only, acts through the client, and gets one episode, so it has to estimate the scene from images and recover from its own mistakes without starting over.
+
+## Reference solution
+`solution/solve.sh` streams the recorded rows of the standard-mode oracle episode (`solution/oracle_qpos.npy`, one `joint_position` row per 25 ms control step, `hold`; the same rows as the privileged reference) through the client (`solution/oracle_replay.py`). That episode scored 1 (live and fresh replay) on the project's RoboARC 1.1.0 release image (2026-10-20; simulator source a7487c51, tooling cae5375e).
+
+## Verification
+See `tests/grade.py`.
+
+`nop`: no record yet on this base (`harbor run -p tasks/roboarc/roboarc-orbits-02-i01-standard -a nop`).
+
+## Resources
+Caps per container (PROTOCOL §6).
+
+| Container | CPUs | Memory | Processes | GPU memory | Disk |
+|---|---|---|---|---|---|
+| `main` (the agent's) | 4 | 16 GiB | 1024 | no GPU | 10 GiB |
+| `sim` | 2 | 9 GiB | 1024 | 4 GiB | — |
+| verifier (as `main`) | 4 | 16 GiB | no cap | no GPU | 10 GiB |
+
+- GPU: any NVIDIA GPU, held by `sim`.
+- Recommended GPU: L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer).
+
+## Details
+
+### Goal
+Separate and place the entire cord and wooden handle together inside the green dashed goal region. Keep the rings, posts and fixed assembly on the puzzle/system side.
+
+### Success requirements
+- Put every part of the entire cord and wooden handle together inside the fixed goal volume, leaving at least 1 mm inside its horizontal border. The centre alone is insufficient; no tip, spike, ring segment or cord segment may remain outside.
+- Keep the target above the tabletop (contact tolerance 1 mm below the surface) and within the goal volume's height. It need not touch the table. The goal volume extends 170 mm above the tabletop.
+- Keep the rings, posts and fixed assembly, and every other remaining puzzle component, entirely on the system side of the fixed separator. Moving the whole puzzle into the goal is not completion.
+- Keep the handle's linear speed at most 10 mm/s and angular speed at most 0.02 rad/s, and every cord link's linear speed at most 10 mm/s. Holding the target with the gripper is allowed; release is not required.
+- Keep the cord loop closed: its two halves stay joined at the middle within 3 mm.
+- Keep all final conditions satisfied together for at least 0.5 s of simulation time. If any final condition stops holding, the confirmation interval starts again. A brief qualifying pose is not enough; let the simulation advance through the full interval.
+
+### Task failure conditions
+- Breaking the cord loop at its middle tie ends the episode in failure.
+
+### Grader details (in addition to the requirements above)
+- Goal square in this instance: the inner edge of the dashed green line is the containment limit (the whole line lies outside it); it encloses a 398.0 mm x 398.0 mm square. Every point counts: for a rigid part every vertex of its visual and collision meshes; for the cord every vertex of its links (capsules).
+- The separator is an invisible, fixed vertical plane parallel to the goal square's near edge, 5 mm beyond the point of all remaining components that was closest to the goal square at the start; the square's near edge is at least 30 mm beyond it. The remaining components here are fixed.
+- The cord is a chain of 75 rigid capsule links (16.42 mm long, 3.74 mm thick) on ball joints that bend and twist against springs, with damping. The links do not deform: nothing about the cord's shape or volume ends the episode. A cord link or the handle moving faster than 3 m/s or spinning faster than 120 rad/s is slowed by extra damping (a speed clamp); this is not reported and does not end the episode.
+- Robot safety (this benchmark's tooling): no gripper target goes lower than 15 mm below the tabletop; a commanded target that would bring any part of a gripper lower is stopped there, on the commanded path. The fingertips reach about 16 mm beyond the tool frame (TCP) along its approach axis, open or closed. Arm drive torques are capped (the effort limits in robot_spec), so an arm pushing against an obstacle stalls at that torque. An arm with any part more than 5 mm deep in a fixed object (a fixture, the table) is stopped where it is: its joint targets become its measured joints for that control step, so it stops pushing (reported in clipped[]).
+- Forcing is recorded, not judged: an arm drive (not a gripper drive) at 95% of its torque cap or more while that arm's gripper, or a part it holds, presses on anything else with 20 N or more in total is forcing; 0.5 s of it on every physics tick is a forcing event in the evidence (`meta["safety"]`), shown to the reviewer when a success is reviewed. Forcing does not end the episode and does not change the grade by itself.
+- Simulator breakdown (a MuJoCo instability: a non-finite or diverging acceleration, position or velocity): the episode ends as an infrastructure error, not your failure, unless an arm was forcing (even for one tick) within the 0.25 s before it: then it is your failure (forced_breakdown: what broke and what forced it).
+- Grasp regions (assisted grasping, see Grippers above; one or more spheres per graspable part): cord: 53 spheres of radius 8 mm. Both finger contacts must lie inside one of the part's spheres; a part touched elsewhere is grasped physically.
+
+| | |
+|---|---|
+| mode | standard (RGB, optional depth, proprioception, calibrated cameras, no reset) |
+| action space | `eai-standard/2.4`: `submit` chunks of `joint_position` (14, streamed at the 40 Hz control rate with the agent's `dt`) or `ee_pose` (16, IK per row); `observe` frames or a watch window; binary RCB1 responses |
+| oracle | `full` (`solution/`) |
+| verification | `success` = the live success: the task predicate on the live simulator with the instance's own thresholds (its confirmation time included), as the sim service recorded it (`final.json`: `graded_by` live, `replays` 0); no grading replay. The frozen instance is checked when the service builds it (`instance_mismatch`: infrastructure). After the verdict is written, one video-only fresh-process replay in the sidecar's collect hook renders `/logs/verifier/replay.mp4` (and, for a success held for review, the frames around its live review events); a failed video never changes the verdict |
+| crash recovery | `eai-standard/2.4` §13: journal + per-call checkpoints, `restart: on-failure:6`, resume class `approx` |
+
+### Provenance
+- Frozen instance: a MuJoCo instance (`simulator.physics_engine` "mujoco", its scene frozen under `instance_assets/mujoco/`), built by TopoGym source `1552f29d` (MuJoCo instance made in the release image (efe:roboarc-2.2.0; make-instance orbits_easier, scene seed 0)); bound to this release's runtime (source `1552f29d`, tooling `f2320e4c`).
+- Frozen instance files (`instance.json`, `instance_assets/`): not in this directory. The image carries them in `/opt/robotangle/instances/orbits-02-i01/` (`images/roboarc/assets.json` pins each file's sha256), and `/opt/robotangle/stage_instance.py` copies this task's instance next to its `runtime_binding.json`, which names the instance's canonical sha256 and every asset's sha256. The tooling checks them again at every session start.
+- Release: RoboARC 2.2.1 (release base `e0a930a38`), image `ghcr.io/mll-lab-nu/efe:roboarc-2.2.0` (images/roboarc/).
+- Name: RoboARC is the published name of this benchmark. Code identifiers keep the simulator's name: the simulator package `topogym`, the tooling `rcb_topogym.py`, `TOPOGYM_*` variables.

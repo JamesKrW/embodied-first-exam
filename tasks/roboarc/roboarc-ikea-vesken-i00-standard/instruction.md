@@ -66,7 +66,7 @@ One call returns at most 1000 images (`max_frames_per_call`, PROTOCOL §3 "Image
   its `dt`, `linear` interpolates the arm targets. A chunk covers at most 10 s. Out-of-range values are clipped to the
   actuator's control range and reported in `meta["clipped"]`. Speed rule (the robot's real limits; clamp, not fail): arm joint targets move at most 0.0054375 rad per control step on joints 1-4 (`actuator1`..`actuator4`: 2.175 rad/s) and 0.006525 rad on joints 5-7 (`actuator5`..`actuator7`: 2.61 rad/s), the Franka Panda's joint velocity limits
   (`spec()["robot_spec"]["controller"]`); a row that asks for more takes the control steps it needs, and
-  `meta["clipped"]` says so. The gripper command is not limited: it switches at the row. The arms are position servos with the scene's
+  `meta["clipped"]` says so. The gripper command (`actuator8`) moves at most 0.455357 units per control step (182.143 units/s), the same way: the Franka Hand's finger speed (50 mm/s per finger, so 0.1 m/s of commanded finger width; `rcb_ikea.GRIPPER_WIDTH_SPEED_M_S`, converted with this scene's `actuator8` gain and stiffness), so a full open-to-closed command (255 to 0) takes 1.4 s. A row whose gripper command asks for more takes the control steps it needs too. The arms are position servos with the scene's
   gains and force limits; use `obs.group("joint_cmd", now=True)` as the starting row to move smoothly.
 - **Cameras** (ALOHA-style, 848 x 480, vertical field of view 58 deg): `cam_high` (static, above the front of the work
   area, looking down), `cam_low` (static, low at the front), `cam_left_wrist` and `cam_right_wrist` (on each hand, looking
@@ -83,7 +83,7 @@ One call returns at most 1000 images (`max_frames_per_call`, PROTOCOL §3 "Image
   parts, the success check itself.
 
 ## Time per call
-One control step takes about 3.3 ms of wall clock here (the simulation runs at about 0.77x real time), so a `submit` of the maximum 10 s chunk takes about 13 s. The client waits long enough for any call; a client timeout or a connection error means the connection or the
+One control step takes about 4.9 ms of wall clock here (the simulation runs at about 0.51x real time), so a `submit` of the maximum 10 s chunk takes about 19 s. The client waits long enough for any call; a client timeout or a connection error means the connection or the
 service failed (see above), not that the call is still on its way: do not resend it blindly. `r.operation_status()`
 (the last call's operation, or `r.operation_status(operation_id)`) asks the service what became of a call.
 

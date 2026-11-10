@@ -18,8 +18,8 @@
   "right_actuator8"
  ],
  "image": {
-  "id": "sha256:ed950d079b6304219d3b1ec2f428f851e383cec841d38a4c11bd0f25a42dea00",
-  "reference": "ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0"
+  "id": "sha256:9f9cbab8aa74f858b22ac1144162aad9f1b1e5b927f90f6f8251130f36d73868",
+  "reference": "ghcr.io/mll-lab-nu/efe:roboarc-ikea-1.1.0"
  },
  "initial_state_sha256": "0bddce57c9bcaf3480205cd25a4134e864c11f9d00a624393b84646024e6daa8",
  "nu": 16,
@@ -28,7 +28,7 @@
   "numpy": "2.5.4",
   "python": "3.12.15"
  },
- "scene_digest": "b8e0348698b0a26dc45a628b84c42af46dba1c9cba573fe99317a1def31521bc",
+ "scene_digest": "e669195502062a454a48a5515106687336845b867dace378a5c92316d2cae27d",
  "scene_files": {
   "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
   "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -98,7 +98,7 @@
   "assets/panda/link7_5.obj": "099071d3090b51471ba52f4f90814fd3089f4975d196e4d488117073d0bfe491",
   "assets/panda/link7_6.obj": "99469e2d95ab74ce0292f2f16954c87a8a7dc16652e62e970fe37c94330a81bb",
   "assets/panda/link7_7.obj": "426c3db8a19373f3dc73d4bec672e948121b2914c10e2e7b9c7ea80643a19e54",
-  "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+  "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
   "lack_mechanism.py": "994ae05b4a2d86e0fdfa33670e7469a65ccacaa5d8634ee4ac2c0c2d109c8646",
   "layout.json": "551d559c1667d08237410486f59cb0fc862e95b790e2433618b71cf45bbf3ef5",
   "scene.py": "947d27aeff82a9bbbb46f8fad68e5b52922bee66c7d17d2e3a764d8487c45ccd",

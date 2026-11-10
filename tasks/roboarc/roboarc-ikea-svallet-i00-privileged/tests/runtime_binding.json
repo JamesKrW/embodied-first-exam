@@ -16,8 +16,8 @@
   "right_gripper"
  ],
  "image": {
-  "id": "sha256:ed950d079b6304219d3b1ec2f428f851e383cec841d38a4c11bd0f25a42dea00",
-  "reference": "ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0"
+  "id": "sha256:9f9cbab8aa74f858b22ac1144162aad9f1b1e5b927f90f6f8251130f36d73868",
+  "reference": "ghcr.io/mll-lab-nu/efe:roboarc-ikea-1.1.0"
  },
  "initial_state_sha256": "22360c69fb8a50efa7b43c43aa856883dea1cae5db7afad9926235211f7b9248",
  "nu": 14,
@@ -26,7 +26,7 @@
   "numpy": "2.5.4",
   "python": "3.12.15"
  },
- "scene_digest": "0ac62b72465133c4e52753b6c1bf7c9600cfe485d3b5b67d1e5e5ff18153012b",
+ "scene_digest": "3c8ceadcfe226264047b5ba818c127e58806e5b3dacaf40f8e923ed8b4877993",
  "scene_files": {
   "assets/aloha/d405_solid.stl": "8a9a84dd9c9a67687e5ad0b37a7ed334dbfea6b0f995fef28524cc8da5f21ed2",
   "assets/aloha/vx300s_1_base.stl": "d100cafe656671ca8fde98fb6a4cf2d1b746995c51c61c25ad9ea2715635d146",
@@ -162,7 +162,7 @@
   "assets/parts/shade/shade_shell_45.obj": "c0faae46f68ae6f2b4b2784e385712ede32818ed2b21c34d3aae955df7cd468e",
   "assets/parts/shade/shade_shell_46.obj": "44babfc96e5bb60998d2f170cd0f33046829d11700625c8b8394452f9cba88bf",
   "assets/parts/shade/shade_shell_47.obj": "164fa53cd6ec540539ec002dc60882d1ffb6c07d0511261a28b384f8cc2ec9f7",
-  "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+  "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
   "layout.json": "d894b688f30914ccce9c76668066eeefeaa56fd6415b27e0c42310efab8958e9",
   "scene.py": "126443264214fa176a57c423022fd7df3953a21c5e938bc2e3f0929f64c68d01",
   "scene.xml": "ce0b416a734ade87758b4af8b4a1493a00f663202c38af1cca8f209875f3585f",

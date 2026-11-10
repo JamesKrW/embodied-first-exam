@@ -16,8 +16,14 @@ dynamics = "static"               # scene dynamics (docs/protocol/README.md §2)
 oracle = "full"
 grasp = "physical (finger friction; no assisted grasp, no welds to a gripper)"
 success_rule = "the scene's success.py (port of the source assembly grader) + the terminal rules (released, at rest, no breakdown), after the last row and after a 1.0 s hold"
-instance_seed = 0                 # one frozen scene: images/ikea-mujoco scene eket, digest 22795734d50c
+instance_seed = 0                 # one frozen scene: images/ikea-mujoco scene eket, digest cd515879e4ee
 expert_time_estimate_hours = 8
+
+[metadata.seeds]
+# the seeds a runner may draw from (a list, { from = A, to = B } or "any") and the ones the reference solution
+# under solution/ is for, where they are not the default seed alone (docs/protocol/README.md §2)
+allowed = [0, 1, 2]
+build = "runtime"
 
 [verifier]
 timeout_sec = 5460.0

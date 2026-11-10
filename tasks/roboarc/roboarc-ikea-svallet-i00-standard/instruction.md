@@ -66,7 +66,7 @@ One call returns at most 1000 images (`max_frames_per_call`, PROTOCOL §3 "Image
   its `dt`, `linear` interpolates the arm targets. A chunk covers at most 10 s. Out-of-range values are clipped to the
   actuator's control range and reported in `meta["clipped"]`. Speed rule (the robot's real limits; clamp, not fail): arm joint targets move at most 0.00785397 rad per control step on every arm joint (3.14159 rad/s, the ViperX 300 s joint velocity limit)
   (`spec()["robot_spec"]["controller"]`); a row that asks for more takes the control steps it needs, and
-  `meta["clipped"]` says so. The gripper command is not limited: it switches at the row. The arms are position servos with the scene's
+  `meta["clipped"]` says so. The gripper command is not limited. It switches at the row. The arms are position servos with the scene's
   gains and force limits; use `obs.group("joint_cmd", now=True)` as the starting row to move smoothly.
 - **Cameras** (ALOHA-style, 848 x 480, vertical field of view 58 deg): `cam_high` (static, above the front of the work
   area, looking down), `cam_low` (static, low at the front), `cam_left_wrist` and `cam_right_wrist` (on each hand, looking

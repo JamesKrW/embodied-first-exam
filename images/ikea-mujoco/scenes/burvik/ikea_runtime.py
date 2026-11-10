@@ -6,6 +6,7 @@ Only depends on mujoco + numpy. Provides:
     switched on at runtime once the source's geometric/contact/dwell gates hold)
   * small pose / contact helpers
   * cylinder_prisms: every cylinder a robot geom can touch is compiled as a 32-facet convex prism (at every build)
+  * the welded-part contact switch-off (RetentionMechanism, from the scene's sw_cutover.json; no file = off)
 """
 import json, os, math, hashlib
 import numpy as np
@@ -94,6 +95,28 @@ class Helpers:
                 total += fw if x2 == ia else -fw
         return total
 
+# ---------------------------------------------------------------- welded-part contact switch-off
+WELD_GROUP_BIT0 = 16              # collision bits 16.. mark the welded groups (no scene geom uses them)
+
+
+def contact_cutover(scene_dir, ops):
+    """The scene's sw_cutover.json {"from_op": <1-based op number or op key, or null>, "from_t": <s or null>}: the welded-part
+    contact switch-off is on from the start of that operation (every earlier operation latched and, if from_t is given, sim
+    time >= from_t). No file, or from_op null: off, and the mechanism never touches the model's collision bits. The scene
+    reads nothing from the environment. Returns (0-based op index or None, time or None)."""
+    p = os.path.join(scene_dir, 'sw_cutover.json')
+    if not os.path.exists(p):
+        return None, None
+    cfg = json.load(open(p))
+    op, t = cfg.get('from_op'), cfg.get('from_t')
+    if op in (None, '', 'none', 'off'):
+        return None, None
+    keys = [o['key'] for o in ops]
+    i = keys.index(op) if op in keys else int(op) - 1
+    assert 0 <= i < len(ops), op
+    return i, (None if t in (None, '') else float(t))
+
+
 # ---------------------------------------------------------------- retention mechanism
 class RetentionMechanism:
     """Source-defined post-seat retention joints, one weld equality per operation.
@@ -103,14 +126,114 @@ class RetentionMechanism:
     operation's gates (pose error to the assembled target, relative speed, counterpart contact,
     optional thread turns and extra source conditions) hold continuously for the dwell time.
     Welds are never switched off by the mechanism (the source has no disassembly); reset() clears.
+
+    Welded-part contact switch-off (speed; on only where the scene has a sw_cutover.json, contact_cutover()): from the
+    cut-over on, the bodies joined by latched welds (each operation's part and host, transitively) form one rigid group,
+    and contacts between two bodies of the same group are off: the group's geoms get contype = the group's own bit and
+    conaffinity = their own bits plus the other groups' bits, so they still collide with everything else exactly as
+    before (checked at the build: the scene's collision bits must make that exact, or the build fails). A scene may switch
+    more geoms off (contact_off_geoms(), e.g. a seated screw). The bits follow the weld state (engage, reset, set_state),
+    so every replay and every restored state reproduces them. (A subclass that does not call this __init__ has no
+    cut-over: the class defaults below keep the switch-off off.)
     """
-    def __init__(self, model, data, task, period=4):
+    sw_from = None
+    sw_from_t = None
+    sw_active = False
+
+    def __init__(self, model, data, task, period=4, scene_dir=HERE):
         self.m, self.d, self.task = model, data, task
         self.h = Helpers(model, data)
         self.period = period
         self.ops = [o for o in task['operations'] if o.get('weld')]
         self.eq = {o['key']: model.equality(o['weld']['eq']).id for o in self.ops}
+        self.sw_from, self.sw_from_t = contact_cutover(scene_dir, self.ops)
+        self._prepare_weld_contacts()
         self.reset()
+
+    # -- welded-part contact switch-off
+    def _prepare_weld_contacts(self):
+        m = self.m
+        self.sw_active = False
+        if self.sw_from is None:
+            return
+        self.sw_orig = (m.geom_contype.copy(), m.geom_conaffinity.copy())
+        self.sw_body_orig = (m.body_contype.copy(), m.body_conaffinity.copy())
+        self.sw_pairs = [(m.body(o['part']).id, m.body(o['host']).id, self.eq[o['key']]) for o in self.ops]
+        ct, ca = self.sw_orig
+        live = (ct | ca) != 0
+        if ((ct | ca) >> WELD_GROUP_BIT0).any():
+            raise ValueError('welded-part contact switch-off: a geom uses collision bits >= %d' % WELD_GROUP_BIT0)
+        members = {b for p in self.sw_pairs for b in p[:2]}
+        cls = {(int(ct[g]), int(ca[g])) for g in np.flatnonzero(live)}
+        own = {(int(ct[g]), int(ca[g])) for g in np.flatnonzero(live) if int(m.geom_bodyid[g]) in members}
+        hit = lambda a, b: bool((a[0] & b[1]) | (b[0] & a[1]))
+        for e in own:      # exactness: a group geom vs a non-group geom collides iff (its ct & our ca); two groups always
+            if any(hit(e, o) != bool(o[0] & e[1]) for o in cls) or not all(hit(e, f) for f in own):
+                raise ValueError('welded-part contact switch-off: the collision bits %s do not allow an exact switch-off' % (e,))
+        self.sw_geoms = {b: np.flatnonzero(live & (m.geom_bodyid == b)) for b in members}
+
+    def sw_check(self):
+        """Cut-over reached: every operation before sw_cutover's from_op latched and sim time >= its from_t (if given)."""
+        if self.sw_from is None:
+            return False
+        if self.sw_from_t is not None and self.d.time < self.sw_from_t - 1e-7:
+            return False
+        return bool(all(self.d.eq_active[self.eq[o['key']]] for o in self.ops[:self.sw_from]))
+
+    def sw_poll(self):
+        if self.sw_from is not None and not self.sw_active and self.sw_check():
+            self.sync_contacts()
+
+    def contact_off_geoms(self):
+        """Geoms the scene switches off entirely once the cut-over is reached (none here; e.g. kyrre's seated screws)."""
+        return ()
+
+    def weld_groups(self):
+        """The rigid groups of latched welds: sorted lists of body ids (2 bodies or more), ordered by their first body."""
+        root = {}
+        def find(x):
+            while root.get(x, x) != x:
+                x = root[x]
+            return x
+        for p, h, e in self.sw_pairs:
+            if self.d.eq_active[e]:
+                a, b = find(p), find(h)
+                if a != b:
+                    root[max(a, b)] = min(a, b)
+        comp = {}
+        for p, h, e in self.sw_pairs:
+            for b in (p, h):
+                comp.setdefault(find(b), set()).add(b)
+        return sorted((sorted(c) for c in comp.values() if len(c) > 1), key=lambda c: c[0])
+
+    def sync_contacts(self):
+        """The model's collision bits from the weld state (a no-op where the scene has no cut-over)."""
+        if self.sw_from is None or not hasattr(self, 'sw_orig'):
+            return
+        m = self.m; ct, ca = self.sw_orig
+        self.sw_active = self.sw_check()
+        nct, nca = ct.copy(), ca.copy()
+        if self.sw_active:
+            groups = self.weld_groups()
+            if len(groups) > 31 - WELD_GROUP_BIT0:
+                raise ValueError('welded-part contact switch-off: more than %d groups' % (31 - WELD_GROUP_BIT0))
+            bits = [1 << (WELD_GROUP_BIT0 + k) for k in range(len(groups))]
+            allbits = sum(bits)
+            for grp, bit in zip(groups, bits):
+                g = np.concatenate([self.sw_geoms[b] for b in grp])
+                nct[g] = bit
+                nca[g] = ca[g] | (allbits & ~bit)
+            off = np.asarray(list(self.contact_off_geoms()), dtype=np.int64)
+            nct[off] = 0
+            nca[off] = 0
+        m.geom_contype[:] = nct
+        m.geom_conaffinity[:] = nca
+        # MuJoCo's body-pair pre-filter reads body_contype / body_conaffinity (OR over the body's geoms): keep a superset
+        bct, bca = self.sw_body_orig[0].copy(), self.sw_body_orig[1].copy()
+        np.bitwise_or.at(bct, m.geom_bodyid, nct)
+        np.bitwise_or.at(bca, m.geom_bodyid, nca)
+        m.body_contype[:] = bct
+        m.body_conaffinity[:] = bca
 
     def reset(self):
         self.dwell = {o['key']: 0. for o in self.ops}
@@ -121,6 +244,7 @@ class RetentionMechanism:
         self.counter = 0
         for o in self.ops:
             self.d.eq_active[self.eq[o['key']]] = 0
+        self.sync_contacts()
 
     def active(self, key):
         return bool(self.d.eq_active[self.eq[key]])
@@ -136,6 +260,7 @@ class RetentionMechanism:
         self.prev_q = {k: np.array(v) for k, v in s['prev_q'].items()}; self.counter = s['counter']
         for k, i in self.eq.items():
             self.m.eq_data[i] = s['eq_data'][k]; self.d.eq_active[i] = int(s['eq_active'][k])
+        self.sync_contacts()
 
     # -- geometry of one operation (all in world frame)
     def measure(self, o):
@@ -164,6 +289,11 @@ class RetentionMechanism:
         return dict(gap=gap, lateral=lat, angle=ang, speed=speed, qrel=qrel, axis_host=np.asarray(o['axis'], float))
 
     def update(self):
+        self.sw_poll()
+        self._update_welds()
+        self.sw_poll()
+
+    def _update_welds(self):
         self.counter += 1
         if self.counter % self.period:
             return
@@ -202,6 +332,7 @@ class RetentionMechanism:
         self.m.eq_data[i, 0:3] = 0; self.m.eq_data[i, 3:6] = r; self.m.eq_data[i, 6:10] = q; self.m.eq_data[i, 10] = 1
         self.d.eq_active[i] = 1
         self.engaged_at[o['key']] = float(self.d.time)
+        self.sync_contacts()
 
 # ---------------------------------------------------------------- cylinder -> prism
 PRISM_FACETS = 32

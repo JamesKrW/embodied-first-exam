@@ -423,7 +423,7 @@ caps_measured = "per-container peaks in 61 past trials: the agent's container me
 
 # 54 task(s)
 [[cap]]
-match = "^roboarc-(interlocked-claws|buzz-wire-3d|cast-keyhole|cast-coil|hedgehog-in-cage|horseshoe-ring|lock-picking)-.*-privileged$"
+match = "^roboarc-(interlocked-claws|buzz-wire-3d|cast-keyhole|cast-coil|hedgehog-in-cage|horseshoe-ring|lock-picking|battery-replacement|bed-bolt|caliper-sorting|clock-assembling)-.*-privileged$"
 main = { cpus = 16, memory_gb = 30, pids = 8192, gpu_memory_gb = 12, disk_gb = 10 }
 recommended_gpu = "L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer)"
 measured = "MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards"
@@ -431,7 +431,7 @@ caps_measured = "GPU memory: a per-trial peak of 1.1 GiB on 24 GB cards, measure
 
 # 54 task(s)
 [[cap]]
-match = "^roboarc-(interlocked-claws|buzz-wire-3d|cast-keyhole|cast-coil|hedgehog-in-cage|horseshoe-ring|lock-picking)-.*-standard$"
+match = "^roboarc-(interlocked-claws|buzz-wire-3d|cast-keyhole|cast-coil|hedgehog-in-cage|horseshoe-ring|lock-picking|battery-replacement|bed-bolt|caliper-sorting|clock-assembling)-.*-standard$"
 main = { cpus = 4, memory_gb = 16, pids = 4096, disk_gb = 10 }
 sim = { cpus = 4, memory_gb = 9, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer)"
@@ -440,7 +440,7 @@ caps_measured = "per-container peaks in 166 past trials: the agent's container m
 
 # 31 task(s)
 [[cap]]
-match = "^roboarc-(rope-threading|knot-untying|fiber-bundling|slotted-post-ring|orbits)-.*-privileged$"
+match = "^roboarc-(rope-threading|knot-untying|fiber-bundling|slotted-post-ring|orbits|wire-splicing)-.*-privileged$"
 main = { cpus = 7, memory_gb = 23, pids = 1024, gpu_memory_gb = 4, disk_gb = 10 }
 recommended_gpu = "L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer)"
 measured = "MuJoCo measurements with rendering off, not of every family; GPU memory: a per-trial peak of 1.1 GB on 24 GB cards"
@@ -448,7 +448,7 @@ caps_measured = "per-container peaks in 92 past trials: the agent's container me
 
 # 31 task(s)
 [[cap]]
-match = "^roboarc-(rope-threading|knot-untying|fiber-bundling|slotted-post-ring|orbits)-.*-standard$"
+match = "^roboarc-(rope-threading|knot-untying|fiber-bundling|slotted-post-ring|orbits|wire-splicing)-.*-standard$"
 main = { cpus = 4, memory_gb = 16, pids = 1024, disk_gb = 10 }
 sim = { cpus = 2, memory_gb = 9, pids = 1024, gpu_memory_gb = 4 }
 recommended_gpu = "L40S 48GB / RTX 4090 24GB / L4 24GB (sm_86 or newer)"

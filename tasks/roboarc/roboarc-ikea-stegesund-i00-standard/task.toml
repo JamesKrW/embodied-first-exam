@@ -35,8 +35,14 @@ protocol = "eai-standard/2.4"           # the shared 2.4 service layer; 2.1 / 2.
 oracle = "full"
 grasp = "physical (finger friction; no assisted grasp, no welds to a gripper)"
 success_rule = "the scene's success.py + the terminal rules (released, at rest, no breakdown): evaluated by the sim service on the live episode after each call (the first settled success ends the episode) and at its end: at the last row and again after a 1.0 s hold of it (on a copy); no grading replay"
-instance_seed = 0                 # one frozen scene: images/ikea-mujoco scene stegesund, digest 4e0cbabcd4c7
+instance_seed = 0                 # one frozen scene: images/ikea-mujoco scene stegesund, digest d13192b82ad1
 expert_time_estimate_hours = 8
+
+[metadata.seeds]
+# the seeds a runner may draw from (a list, { from = A, to = B } or "any") and the ones the reference solution
+# under solution/ is for, where they are not the default seed alone (docs/protocol/README.md §2)
+allowed = [0, 1, 2]
+build = "runtime"
 
 [verifier]
 timeout_sec = 600.0

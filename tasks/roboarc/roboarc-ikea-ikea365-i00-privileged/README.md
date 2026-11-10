@@ -6,21 +6,21 @@
 | Mode | privileged |
 | Twin | `roboarc-ikea-ikea365-i00-standard` |
 | Simulator / robot | `mujoco` / `franka-panda-bimanual` |
-| Family / instance | `ikea_ikea365` / seed 0 |
+| Family / instance | `ikea_ikea365` / seed 0 (allowed seeds: [0, 1, 2]; PROTOCOL §2) |
 | Oracle | `full` |
 | Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
-| Base image | `ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:roboarc-ikea-1.1.0@sha256:2c56d9226aaf97a325b610d464a1cd81e87db1a6285e923539397f493e21136b` |
 
 ## Task
 IKEA 365+ serving stand (AA-2568481-2) in plain MuJoCo 3.14.0 (CPU, float64) with two 7-DoF Franka Panda arms, each with the MuJoCo Menagerie Panda hand (two-finger, tendon-coupled): produce one replayable trajectory. Rebuild the IKEA 365+ serving stand: take the screw out of member A and park it, lay member B across member A, bring the screw back and screw it in through both members until it seats, turn the stand over, and place the bowl on it.
 
 ## Difficulty
 Bimanual furniture assembly with physical grasps (no assist), 16-D actuator action at 400 Hz
-(4 physics steps of 0.625 ms per row); the reference needs 89126 rows
-(222.8 s of simulated time).
+(4 physics steps of 0.625 ms per row); the reference needs 96747 rows
+(241.87 s of simulated time).
 
 ## Reference solution
-`solution/solve.sh` copies `solution/trajectory.npz` (sha256 `d32ff622ac43e114…`) to `/app/output/`: the task's one reference, shared with the standard twin (its `solution/oracle_actions.npz`, the same rows): a closed-loop reference built on the final physics: the demo through the clamp as the phase guide; the right hand threads the returned screw itself before releasing it; the screwdriver is centred on the true screw axis, spins with a 5-15 N axial push and goes torque-free at the seat so the welds engage on an unloaded screw; guide tracks (damped-least-squares IK) steer the hands onto member B, the turned stand and the bowl; the rows are the targets executed after the joint-speed clamp. It never trips the joint-speed clamp.
+`solution/solve.sh` copies `solution/trajectory.npz` (sha256 `81781f77b2deb2a9…`) to `/app/output/`: the task's one reference, shared with the standard twin (its `solution/oracle_actions.npz`, the same rows): a closed-loop reference built on the final physics: the demo through the clamp as the phase guide; the right hand threads the returned screw itself before releasing it; the screwdriver is centred on the true screw axis, spins with a 5-15 N axial push and goes torque-free at the seat so the welds engage on an unloaded screw; guide tracks (damped-least-squares IK) steer the hands onto member B, the turned stand and the bowl; each demo row held (the guide tracks still running) until the slewed Franka Hand reaches its command, and the returned screw servoed onto its return gate's pose in member A (the slew shifts the screw in the grasp); the rows are the targets executed after the joint-speed and hand-speed clamp. It never trips the speed clamp (arm joints and Franka Hand).
 
 ## Verification
 Open-loop replay of `/app/output/trajectory.npz` from the scene's initial state in one fresh process
@@ -30,7 +30,7 @@ the last row). Pass iff the replay passes. The
 scene in the verifier image must match `tests/runtime_binding.json` file by file (`instance_exact`) and build to its
 initial-state hash (`instance_ok`). Replay video (evidence only, never the verdict): another process replays the same rows and renders `/logs/verifier/replay.mp4` (CPU OSMesa, 512 x 288, at most 750 frames over the episode and the 1.0 s hold; `video_rendered`).
 
-Harbor checks (2026-10-16, workstation B (Ryzen 9 7950X; shared, loaded), Docker, Harbor 0.23.0, a fresh mtime base, image 0.3.0 sha256:ed950d079b63, the replay-video verifier, image `ghcr.io/mll-lab-nu/efe:ikea-mujoco-0.3.0` id `ed950d079b63`): `oracle` scored 1 (two replays, 359.5 s wall); `nop` scored 0. Reference timing against the 10800 s budget: one unobserved replay 604 s (5.6 %, inside the 40 % bar) on a dedicated Xeon Gold 6230R core of a CPU cluster (2.1 GHz, a slow trial-class CPU), end and settled hashes equal to the Harbor runs'.
+Harbor checks (2026-10-18, a Ryzen 9 7950X workstation (shared, heavily loaded: load 40-90 on 32 threads), Docker, Harbor 0.23.0, image 0.3.1 sha256:b9552184c2de, the replay-video verifier, the Franka Hand slew, image `ghcr.io/mll-lab-nu/eai-ikea-mujoco:0.3.1` id `b9552184c2de`): `oracle` scored 1 (two replays, 1665.2 s wall); `nop` scored 0. Image 0.3.2 (kyrre's native-cylinder scene; this scene byte-identical to 0.3.1), 2026-10-19: a fresh replay of the reference ends and settles on the same hashes (`7db46c5971cd` / `0e2e03a9c068`, on a Ryzen 9 7950X workstation). Reference timing: one unobserved replay of the hand-slew reference 249 s (2.3 %; 5.8 % of the 4320 s bar) on a quiet i9-14900HX host (one process at a time, image 0.3.1's scene); 835 s on a loaded Ryzen 9 7950X workstation (load 40-90); 649 s on a dedicated Xeon Gold 6230R core (2.1 GHz, a slow trial-class CPU; reported only), end and settled hashes equal on every host and in the Harbor replays.
 
 ## Resources
 Caps per container (PROTOCOL §6).
@@ -47,7 +47,7 @@ Caps per container (PROTOCOL §6).
 |---|---|
 | Grasping | physical (finger friction), no assist |
 | Success rule | the scene's `success.py` + the terminal rules (released, at rest, no breakdown), at the end of the rows and after a 1.0 s hold |
-| Scene | `/opt/ikea/scenes/ikea365/` in the image; digest `25535efa33fd5d80…` (images/ikea-mujoco/assets.json) |
+| Scene | `/opt/ikea/scenes/ikea365/` in the image; digest `c16a27fdfc97e8c9…` (images/ikea-mujoco/assets.json) |
 | Initial state | sha256 `4e9e040022202b3e…` of the mjSTATE_INTEGRATION vector |
 
 ### Goal
@@ -65,5 +65,5 @@ The M4 x 0.5 thread is exact convex pieces: the screw advances only by being tur
 ### Provenance
 - Scene and demo: the IKEA MuJoCo tree (`scenes/ikea365/`, `demos/ikea365/actions.npz`), MuJoCo 3.14.0, RoboARC rigid settings
   (timestep 0.625 ms, Newton, 100 iterations, elliptic cones).
-- The scene files are not in this repository: the image carries them (`images/ikea-mujoco/README.md`, build context from
-  `images/ikea-mujoco/stage_context.py`, pinned by `images/ikea-mujoco/assets.json`).
+- The scene files are not in this repository: the image carries them (`images/ikea-mujoco/README.md`, build
+  context from `images/ikea-mujoco/stage_context.py`, pinned by `images/ikea-mujoco/assets.json`).

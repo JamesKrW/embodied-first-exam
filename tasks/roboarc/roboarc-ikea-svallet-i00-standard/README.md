@@ -6,10 +6,10 @@
 | Mode | standard (`eai-standard/2.4`) |
 | Twin | `roboarc-ikea-svallet-i00-privileged` |
 | Simulator / robot | `mujoco` / `aloha-2` |
-| Family / instance | `ikea_svallet` / seed 0 |
+| Family / instance | `ikea_svallet` / seed 0 (allowed seeds: [0, 1, 2]; PROTOCOL §2) |
 | Oracle | `full` |
 | Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
-| Base image | `ghcr.io/mll-lab-nu/efe:ikea-mujoco-sim-0.4.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:roboarc-ikea-sim-1.1.0@sha256:f22a1e9042c7877d33703960313cf548f2af7f15d6fcfa61db83315bfdacba1e` |
 
 ## Task
 IKEA SVALLET work lamp (AA-2140039-1), unpowered steps 1-2 in plain MuJoCo 3.14.0 (CPU, float64) with two 6-DoF ViperX 300 s arms (MuJoCo Menagerie ALOHA), each with its own parallel gripper, through the robot service (eai-standard/2.4; 2.1 / 2.2
@@ -25,7 +25,7 @@ time).
 ## Reference solution
 `solution/solve.sh` runs `solution/oracle_replay.py`: it submits the control steps of `solution/oracle_actions.npz` through
 the client as `joint_position` chunks of 10 s, `hold`, one control step per row, as float64 (the client's transport;
-`Robot.submit` sends float32), so the service executes exactly those rows. The rows are the privileged twin's reference trajectory brought within the joint-speed rule (method `track --lag 0.1`: target glitches of one to a few control steps, which the servos never followed, replaced by the running median (344 rows); then every privileged row in order through a slew-limited tracker: each control step an arm joint target moves toward the current row by at most its limit, and the next row is taken once every joint is within 0.1 rad of it, so time is stretched only where the rows are faster than the limits (65529 privileged rows, 3885 control steps added, 69414 in all)),
+`Robot.submit` sends float32), so the service executes exactly those rows. The rows are the privileged twin's reference trajectory brought within the joint-speed rule (`make --method track --lag 0.1`: target glitches of one to a few control steps, which the servos never followed, replaced by the running median (344 rows); then every privileged row in order through a slew-limited tracker: each control step an arm joint target moves toward the current row by at most its limit, and the next row is taken once every joint is within 0.1 rad of it, so time is stretched only where the rows are faster than the limits (65529 privileged rows, 3885 control steps added, 69414 in all)),
 so the service's speed limiter never has to act (`n_clipped` 0).
 
 ## Verification
@@ -40,7 +40,7 @@ the scene file by file against `runtime_binding.json` and by its initial-state h
 The verifier (`tests/grade.py`, separate sandbox, no network, the shared client base) transcribes `final.json`: pass iff
 the live episode succeeded (`graded_by_live` 1, `replays` 0). No grading replay runs.
 
-Earlier validation, under the former grading by two verifier replays (not re-run under the live grading): Harbor checks on workstation A (RTX 4090; shared, loaded) (oracle), workstation B (nop), Harbor 0.23.0, image 0.3.0 sha256:ed950d079b63 / -sim 0.4.0 (Nyx RGB; built per host from one context: B a466a594c463, C 53d8800bfa22, A 3f9218fb9864); the live, replay and settled hashes equal the 0.3.0 (EGL) run's (2026-10-16): `oracle` scored 1 (sim 0.4.0 (Nyx): live settled success at control step 68000 (17 calls), both replays pass final_check() and end in the live state (live_matches_replay 1, deterministic 1), live end hash = the 0.3.0 run's; live service time 397 s, verifier replays 353 s); `nop` scored 0.
+Earlier validation, under the former grading by two verifier replays (not re-run under the live grading): Harbor checks on two RTX 4090 workstations (shared, loaded; the oracle on one, nop on the other), Harbor 0.23.0, image 0.3.0 sha256:ed950d079b63 / -sim 0.4.0 (Nyx RGB; built on each of three hosts from one context: a466a594c463, 53d8800bfa22, 3f9218fb9864); the live, replay and settled hashes equal the 0.3.0 (EGL) run's (2026-10-16): `oracle` scored 1 (sim 0.4.0 (Nyx): live settled success at control step 68000 (17 calls), both replays pass final_check() and end in the live state (live_matches_replay 1, deterministic 1), live end hash = the 0.3.0 run's; live service time 397 s, verifier replays 353 s); `nop` scored 0.
 
 ## Resources
 Caps per container (PROTOCOL §6).
@@ -60,10 +60,10 @@ Caps per container (PROTOCOL §6).
 | Grasping | physical (finger friction), no assist |
 | Success rule | the scene's `success.py` + the terminal rules (released, at rest, no breakdown), on the live episode: after every call and at its end, at the last row and again after a 1.0 s hold of it (on a copy) |
 | Frame | every pose the agent gets or gives is in the robot frame: origin at the left arm's base link, +z up (`spec.world`); the scene's own world frame never leaves the sim service |
-| Speed rule | targets within the robot's real limits (3.14159 rad/s on every arm joint; the table and its sources: `rcb_ikea.JOINT_SPEED_LIMITS_RAD_S` / `GRIPPER_SPEED_LIMITS`), clamped per control step, as the privileged twin's Session; faster rows take the control steps they need (`meta.clipped`), as RoboARC's rule |
+| Speed rule | targets within the robot's real limits (3.14159 rad/s on every arm joint; the table and its sources: `rcb_ikea.JOINT_SPEED_LIMITS_RAD_S` / `GRIPPER_WIDTH_SPEED_M_S`), clamped per control step, as the privileged twin's Session; faster rows take the control steps they need (`meta.clipped`), as RoboARC's rule |
 | Cameras | `cam_high`, `cam_low` (static), `cam_left_wrist`, `cam_right_wrist` (on the hands); 848 x 480, fovy 58 deg; added at service start (`environment/sim/ikea_rig.py`, `rig.json`), the model is unchanged; RGB: Nyx, RoboARC's renderer and look (path tracer, 32 spp, denoised; studio HDRI and point lights; `environment/sim/ikea_nyx.py` with RoboARC's `nyx_direct.py`); depth: MuJoCo's raster; on the sidecar's GPU |
 | Video | `/data/live.mp4` (cam_high, 10 frames per simulated second, recorded during the live episode), copied to the verifier logs; never affects the verdict |
-| Scene | `/opt/ikea/scenes/svallet/` in the images; digest `0ac62b72465133c4…` |
+| Scene | `/opt/ikea/scenes/svallet/` in the images; digest `3c8ceadcfe226264…` |
 | Initial state | sha256 `22360c69fb8a50ef…` of the mjSTATE_INTEGRATION vector |
 
 ### Budget

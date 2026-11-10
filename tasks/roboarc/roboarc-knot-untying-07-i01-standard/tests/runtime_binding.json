@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "instance_sha256": "f544db721a02df20de057c11f613060b8a6075e574236e783d39dd4d6572530f",
+  "asset_files": {
+    "instance_assets/frozen_assets/rope_volume.npz": "d3ac8611b46d2b2c76f13d39232d3a0d47761edd567d67d33b5c8c7a78e87af5",
+    "instance_assets/mujoco/meshes/cyl0_prism32_d1b1c118f46c7eda.obj": "d1b1c118f46c7edabd9f7380ffa364a99dd73104510b6bf75f0dcde46b8d9741",
+    "instance_assets/mujoco/rope_rope.npz": "88feda8b2c34952774d6d635c6d794d8d21b7d64a2fac547cefc9f3b1e02f4e6",
+    "instance_assets/mujoco/scene.json": "a484697f4f1f4240dcb81991899e205c8cee09b50a55977090611f8a744cd927",
+    "instance_assets/mujoco/scene.xml": "662489cad692affe6ef20c575aaf6686b7884e6302f05546f49258923f9279ba",
+    "instance_assets/mujoco_birth/manifest.json": "300842a314881ee0ee3c843a9a51ae7f43352b49cd74eacafc24cbb63b54be17",
+    "instance_assets/rope_birth/arrays.npz": "294da15dd575da4cc38822aabf170340fdd29e730eae0b5673974473e3af2010",
+    "instance_assets/rope_birth/manifest.json": "300842a314881ee0ee3c843a9a51ae7f43352b49cd74eacafc24cbb63b54be17"
+  },
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
+  "creation_source": {
+    "sha256": "c9171f7932cebdee016b7ee1e8abd9a1afba7563a32364d91dffe85b14a51565",
+    "files": 443
+  },
+  "runtime": {
+    "dependencies": {
+      "torch": "2.11.0+cu128",
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "mujoco": "3.14.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.18.0"
+    },
+    "python": "3.11.15",
+    "source": {
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
+  },
+  "image": {
+    "reference": "eai-roboarc:0.2.1-noinst",
+    "id": "sha256:cd2ac87464fd0840be7d5a71da4311eb483a8f29075b87802333be1caa569986",
+    "repo_digests": []
+  },
+  "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
+}

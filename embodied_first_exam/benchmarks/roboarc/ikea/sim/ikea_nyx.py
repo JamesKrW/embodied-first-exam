@@ -1,5 +1,5 @@
 """Nyx RGB for the IKEA MuJoCo standard sim service (served from the ikea-mujoco-files image in every IKEA standard task's sim sidecar): RoboARC's renderer and look, driven through RoboARC's nyx_direct.py
-(from the roboarc-files image, next to this file), fed from the IKEA scene's compiled MjModel.
+(from the same image, next to this file), fed from the IKEA scene's compiled MjModel.
 
 Two processes. The physics process (server.py: the base image's python + numpy 2.5.4 + the patched mujoco 3.14.0) builds
 `NyxRig` once: it writes the compiled model (scene.mjb), the floor's texture (PNG) and scene.json into a work folder and
@@ -18,7 +18,9 @@ pose, nyx_direct.quat_mul / quat_rotate). Cameras: the rig's poses and vertical 
 calibration the service reports is unchanged), 848 x 480; RoboARC's renderer settings (configs/presentation_configs/
 nyx_lab.yaml, nyx_direct.NyxScene.export): FastPathTracer, 32 spp, denoiser, Reinhard tone mapping, SMAA, the studio_small_09
 HDRI at intensity 1.0, RoboARC's four point lights (positions in rig.json, mk_standard_tasks.py: RoboARC's offsets from
-its table centre, 1.48 m above the work surface). Depth stays MuJoCo's raster (ikea_rig.Rig.depth), as RoboARC's.
+its table centre, 1.48 m above the work surface). Appearance seeds 1 and 2 light the scene differently (nyx_settings: the
+lights, the HDRI's intensity and its tint of rig.json "seeds"); seed 0 is the look above. Depth stays MuJoCo's raster
+(ikea_rig.Rig.depth), as RoboARC's.
 
 Protocol (render process stdout is the reply pipe; Nyx's own console output goes to stderr):
   request:  one JSON line {"op": "render", "cams": [indices], "nbody": n} + xpos (n, 3) + xquat (n, 4) + camera poses
@@ -26,12 +28,23 @@ Protocol (render process stdout is the reply pipe; Nyx's own console output goes
   reply:    one JSON line {"ok": true, "ms": ...} + the frames (H, W, 3) uint8 of the requested cameras, in order
 """
 from __future__ import annotations
-import hashlib, json, os, subprocess, sys, time
+import hashlib, json, os, random, select, shutil, subprocess, sys, time
 
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 VISIBLE_GROUPS = (0, 1, 2)          # mjvOption.geomgroup's default: what MuJoCo's renderer drew
+# Start-up retry: a render process that dies or sends no ready line while it starts is killed and started again, after
+# a back-off (x 1-1.5, so sidecars that failed together do not retry together), at most STARTUP_ATTEMPTS times. On host A
+# (2026-10-17) 3 of 4 sidecars that started at the same moment lost it while the shared GPU was full (24478 of 24564 MiB:
+# other users' jobs plus the four render processes' scene uploads), with no output; on host B the same pressure gave a
+# SIGSEGV in the render process's build. The next start succeeded. Only the start-up is retried:
+# a render process lost in the middle of an episode stays an infrastructure error (server.py, crash recovery). A GPU that
+# cannot run Nyx at all (nyx_direct.check_device: no Vulkan ray queries, e.g. an A100 or H100) is not retried: the render
+# process says so in its ready line and UnsupportedGPU is raised at the first attempt.
+STARTUP_ATTEMPTS = 3
+STARTUP_BACKOFF_S = (10.0, 30.0)    # before the 2nd and the 3rd attempt
+READY_TIMEOUT_S = 300.0             # a ready line takes 11-16 s (build_s) on a loaded host; no line by then is a failed start
 
 
 # ============================================================================================ physics process side
@@ -64,14 +77,31 @@ def _plane_texture(model, g, folder) -> dict | None:
 
 
 
+def nyx_settings(rig_spec: dict, seed: int) -> dict:
+    """The renderer settings of appearance seed `seed`: rig.json "nyx" (seed 0: the released look), with seed S's lights,
+    environment-map intensity and tint (rig.json "seeds", mk_standard_tasks.py seed_nyx) in their place."""
+    if seed == 0:
+        return rig_spec["nyx"]
+    seeds = rig_spec.get("seeds", {})
+    if str(seed) not in seeds:
+        raise ValueError(f"rig.json has no lighting for appearance seed {seed} (it has seeds 0, {', '.join(sorted(seeds))})")
+    return {**rig_spec["nyx"], **seeds[str(seed)]["nyx"]}
+
+
 class RenderError(RuntimeError):
     """The Nyx render process failed (it died, refused or sent a short frame): the service's infrastructure, never the
     agent's doing (server.py ends the episode with reason "error", an infrastructure failure)."""
 
+
+class UnsupportedGPU(RenderError):
+    """This host's GPU cannot run Nyx (the render process's nyx_direct.UnsupportedDevice, e.g. no VK_KHR_ray_query on a
+    GPU without RT cores): a property of the host, so the start is not retried."""
+
+
 class NyxRig:
     """The render process of one scene and rig (physics-process side)."""
 
-    def __init__(self, model, rig, rig_spec: dict, folder: str, log_path: str | None = None):
+    def __init__(self, model, rig, rig_spec: dict, folder: str, log_path: str | None = None, seed: int = 0):
         import mujoco
         self.rig, self.names = rig, list(rig.names)
         self.folder = os.path.abspath(folder)
@@ -79,12 +109,14 @@ class NyxRig:
         mujoco.mj_saveModel(model, os.path.join(self.folder, "scene.mjb"), None)
         geoms = visible_geoms(model)
         planes = {g: _plane_texture(model, g, self.folder) for g in geoms if int(model.geom_type[g]) == int(mujoco.mjtGeom.mjGEOM_PLANE)}
-        nyx = rig_spec["nyx"]
+        nyx = nyx_settings(rig_spec, seed)
         cams = [{"name": c, "res": [rig.W, rig.H], "fov": rig.fovy(c), "near": nyx["near"],
                  "far": nyx["far_link"] if rig.mounts[c]["type"] == "link" else nyx["far"]} for c in self.names]
         scene = {"geoms": geoms, "planes": {str(g): v for g, v in planes.items()}, "cameras": cams, "lights": nyx["lights"],
                  "spp": nyx["spp"], "denoise": nyx["denoise"], "env_intensity": nyx["env_intensity"],
                  "env_map": os.environ.get("RCB_NYX_ENV_MAP", "/opt/nyx-assets/studio_small_09_2k.hdr")}
+        if "env_tint" in nyx:            # a seed's look: the lights' colour temperature
+            scene["env_tint"] = nyx["env_tint"]
         with open(os.path.join(self.folder, "scene.json"), "w") as f:
             json.dump(scene, f)
         self.nbody = int(model.nbody)
@@ -93,16 +125,87 @@ class NyxRig:
         self._start()
 
     def _start(self) -> None:
+        """Start the render process, retried as STARTUP_ATTEMPTS says; each failed attempt (the error, the exit code,
+        the tail of the process's stderr) goes to the log, and RenderError is raised only after the last one."""
+        t, failed = time.time(), []
+        for attempt in range(1, STARTUP_ATTEMPTS + 1):
+            at = os.path.getsize(self.log_path) if self.log_path and os.path.exists(self.log_path) else 0
+            # a fresh export folder: a failed attempt can leave a half-written mesh there, and the export keeps a mesh
+            # file it finds (named by its content)
+            shutil.rmtree(os.path.join(self.folder, "nyx"), ignore_errors=True)
+            try:
+                ready = self._spawn()
+                break
+            except UnsupportedGPU as exc:
+                code = self._reap()
+                self._note(f"start-up attempt {attempt} of {STARTUP_ATTEMPTS}: {exc}; exit code {code}; not retried")
+                raise
+            except RenderError as exc:
+                code = self._reap()
+                failed.append({"error": str(exc), "exit": code})
+                self._note(f"start-up attempt {attempt} of {STARTUP_ATTEMPTS} failed: {exc}; exit code {code}; "
+                           f"stderr tail:\n{self._tail(at)}")
+                if attempt == STARTUP_ATTEMPTS:
+                    raise RenderError(f"Nyx render process failed to start ({attempt} attempts; last: {exc}, exit {code})") from None
+                time.sleep(STARTUP_BACKOFF_S[attempt - 1] * random.Random().uniform(1.0, 1.5))
+        self.startup = {**ready, "startup_s": round(time.time() - t, 2), "attempts": attempt, "failed_attempts": failed}
+
+    def _spawn(self) -> dict:
+        """One start: the process, then its ready line (within READY_TIMEOUT_S)."""
         python = os.environ.get("RCB_NYX_PYTHON", "/opt/nyx/bin/python")
         log = open(self.log_path, "ab") if self.log_path else subprocess.DEVNULL
-        t = time.time()
-        self.proc = subprocess.Popen([python, "-I", os.path.join(HERE, "ikea_nyx.py"), "serve", self.folder],
-                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, cwd=self.folder,
-                                     env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"})
-        ready = self._line()
+        try:
+            self.proc = subprocess.Popen([python, "-I", os.path.join(HERE, "ikea_nyx.py"), "serve", self.folder],
+                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log, cwd=self.folder,
+                                         env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"})
+        finally:
+            if log is not subprocess.DEVNULL:
+                log.close()                  # the process has its own copy
+        if not select.select([self.proc.stdout], [], [], READY_TIMEOUT_S)[0]:
+            self.proc.kill()
+            raise RenderError(f"Nyx render process sent no ready line in {READY_TIMEOUT_S:.0f} s")
+        try:
+            ready = self._line()
+        except ValueError as exc:            # not a JSON line
+            raise RenderError(f"Nyx render process: bad ready line ({exc})") from None
+        if ready.get("unsupported"):
+            raise UnsupportedGPU(ready["unsupported"])
         if not ready.get("ready"):
             raise RenderError(f"Nyx render process failed to start: {ready}")
-        self.startup = {**ready, "startup_s": round(time.time() - t, 2)}
+        return ready
+
+    def _reap(self) -> int | None:
+        """A failed start's process, ended and reaped: its exit code (negative: the signal; -9 also when it was killed
+        here because it hung), None if it could not be reaped."""
+        try:
+            code = self.proc.wait(timeout=10)        # it closed the pipe: it is ending by itself
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+            try:
+                code = self.proc.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                code = None
+        for f in (self.proc.stdin, self.proc.stdout):
+            try:
+                f.close()
+            except OSError:
+                pass
+        return code
+
+    def _tail(self, at: int, n: int = 4000) -> str:
+        """The last n bytes the process wrote to the log (from offset `at`, where this attempt began)."""
+        if not self.log_path or not os.path.exists(self.log_path):
+            return "(no log)"
+        with open(self.log_path, "rb") as f:
+            f.seek(max(at, os.path.getsize(self.log_path) - n))
+            return f.read().decode(errors="replace").strip() or "(empty)"
+
+    def _note(self, text: str) -> None:
+        line = f"[ikea_nyx {time.strftime('%Y-%m-%dT%H:%M:%S')}] {text}\n"
+        if self.log_path:
+            with open(self.log_path, "ab") as f:
+                f.write(line.encode())
+        print(line, end="", file=sys.stderr, flush=True)
 
     def _line(self) -> dict:
         line = self.proc.stdout.readline()
@@ -158,7 +261,13 @@ def _serve(folder: str) -> int:
     mj = mujoco.MjModel.from_binary_path(os.path.join(folder, "scene.mjb"))
     t0 = time.perf_counter()
     scene = IkeaScene(mj, spec)
-    nyx = IkeaNyx(scene, os.path.join(folder, "nyx"))
+    try:
+        nyx = IkeaNyx(scene, os.path.join(folder, "nyx"))
+    except N.UnsupportedDevice as exc:      # checked before the native renderer exists: say why, instead of crashing
+        print(f"[ikea_nyx] {exc}", file=sys.stderr, flush=True)
+        reply.write((json.dumps({"ready": False, "unsupported": str(exc)}) + "\n").encode())
+        reply.flush()
+        return 1
     reply.write((json.dumps({"ready": True, "instances": len(scene.slots), "meshes": scene.n_mesh_files,
                              "build_s": round(time.perf_counter() - t0, 2)}) + "\n").encode())
     reply.flush()
@@ -312,6 +421,8 @@ class IkeaScene:
         env.texture = str(self.spec["env_map"])
         env.layout = nps.EEnvMapLayout.LongLat
         env.multiplier = float(self.spec["env_intensity"])
+        if "env_tint" in self.spec:
+            env.tint = nps.float3(*(float(v) for v in self.spec["env_tint"]))
         asset.set_env_map(0, env)
         path = folder / N.SCENE_FILE
         nps.export_scene_file(str(path), asset)

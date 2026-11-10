@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "instance_sha256": "bc079d301438e8e3cd9060604175be464f340add2a3b1ce09996dc67651815f5",
+  "asset_files": {
+    "instance_assets/mujoco/meshes/bed_frame_leg_LN_prism32_4993ec41cdee1692.obj": "4993ec41cdee1692465618c887ea95a243043b9721669e08228f2f7e05e5ca2d",
+    "instance_assets/mujoco/meshes/bolt_bolt_head_prism32_25d46461555e2948.obj": "25d46461555e2948a2491a2bbee6f24b69937bb47f7417879a8ce2e1e7f5d211",
+    "instance_assets/mujoco/meshes/bolt_bolt_shank_prism32_b3a3d1d0bf21f453.obj": "b3a3d1d0bf21f45329918c40b3c230c5a4419915f8c53d950207af66efb72330",
+    "instance_assets/mujoco/meshes/bolt_bolt_tip_prism32_0b9802239412f070.obj": "0b9802239412f070e5a6b9aa845f4f83ad94d98d80b1c6d2ffdcb34ae799ab66",
+    "instance_assets/mujoco/meshes/bolt_sock_bump_m0_b24fc40bd9179269.obj": "b24fc40bd917926937cc1e4ecb0fba4d5d1bce7ceca646ec0d8584a34d608538",
+    "instance_assets/mujoco/meshes/bolt_sock_bump_m1_2ef3e8d9f203c740.obj": "2ef3e8d9f203c7403750cfdb215f9ffa9db5cb96efae9fb40d4071b67ce2db75",
+    "instance_assets/mujoco/meshes/bolt_sock_bump_m2_0cf34b1310da13e7.obj": "0cf34b1310da13e71c8141c403ee1400cf01ec6eb56b74015ded49cfea4d4b9f",
+    "instance_assets/mujoco/meshes/bolt_sock_bump_m3_2ee604ad618e569d.obj": "2ee604ad618e569d0c24ac62da88bd8ce1479e0aefda1c650d71a0c1b0df93ef",
+    "instance_assets/mujoco/meshes/bolt_sock_bump_m4_8185c8ce042262ee.obj": "8185c8ce042262eec91f1d7125ab29d008d194043d7538817360cb7d7bac2aa4",
+    "instance_assets/mujoco/meshes/bolt_sock_bump_m5_b36e5866d04795f5.obj": "b36e5866d04795f548cb21054750b8c4b249f106ebb44fdd3f3483954eedc27c",
+    "instance_assets/mujoco/meshes/key_key_long_m_c54f563d04251dea.obj": "c54f563d04251dea459577c7fca3357006b5dfe48526004539a86c50a7fddb65",
+    "instance_assets/mujoco/meshes/key_key_long_tip_core_m_d4ab4f46cf8f8270.obj": "d4ab4f46cf8f8270c8f577a412860166daabe1b85d05b2fff41275540f395904",
+    "instance_assets/mujoco/meshes/key_key_long_tip_lobe_0_m_218aee912502a9a4.obj": "218aee912502a9a48abfe0fc22fc0b09ab6c27bbfed6feeeece4f22a3865f33c",
+    "instance_assets/mujoco/meshes/key_key_long_tip_lobe_1_m_b3cc07bb6945c2c5.obj": "b3cc07bb6945c2c57a97474837f4be980bcd3cea0295a64d32dc22f8d7dd858a",
+    "instance_assets/mujoco/meshes/key_key_long_tip_lobe_2_m_f6ad6a487ae8ce12.obj": "f6ad6a487ae8ce12bd75d5555a34e35f13d7163d62f8984584e2318b8262bdde",
+    "instance_assets/mujoco/meshes/key_key_long_tip_lobe_3_m_ef0469f3e6b177aa.obj": "ef0469f3e6b177aada961ed10d48675a58ecd2735ed6dedb16cd122cfc421e18",
+    "instance_assets/mujoco/meshes/key_key_long_tip_lobe_4_m_8055935928c7ffff.obj": "8055935928c7ffff79585a1ac9ed570dc760decb8aaacb7b5606b758fa5cb2d6",
+    "instance_assets/mujoco/meshes/key_key_long_tip_lobe_5_m_a391fd14b2c7fd85.obj": "a391fd14b2c7fd8561d6eb247ee115c05890aff7613e34df84c1f667077e4bdb",
+    "instance_assets/mujoco/meshes/key_key_short_m_bdfa40082734428a.obj": "bdfa40082734428a0b528a7150ba579029d73d5c166caad4ea8b4f73084df07c",
+    "instance_assets/mujoco/meshes/key_key_short_tip_core_m_9735b379e0edf18f.obj": "9735b379e0edf18f846d3bee66c0ff260305f38852024b952387c2743bdfa519",
+    "instance_assets/mujoco/meshes/key_key_short_tip_lobe_0_m_c4c773d80628e726.obj": "c4c773d80628e726f9e769989738e9714e4b556d5f40e15c14a2f80d26862b29",
+    "instance_assets/mujoco/meshes/key_key_short_tip_lobe_1_m_9605bd61b047fd2c.obj": "9605bd61b047fd2cab36df85a6d230790ae1159f6360172ec70771e5570cd159",
+    "instance_assets/mujoco/meshes/key_key_short_tip_lobe_2_m_98015ef32c360bf2.obj": "98015ef32c360bf2127713bbb45573aadd5a9145fe8eabc1374744661fb22e0c",
+    "instance_assets/mujoco/meshes/key_key_short_tip_lobe_3_m_28ca7194c593d8e9.obj": "28ca7194c593d8e92fa607364439b1865d238597d060770408868448e0e003c2",
+    "instance_assets/mujoco/meshes/key_key_short_tip_lobe_4_m_7312a2609fe41ffd.obj": "7312a2609fe41ffd49665255be44145238ed3815790a918bdce8ea082681a4e5",
+    "instance_assets/mujoco/meshes/key_key_short_tip_lobe_5_m_a980911ba4b3011e.obj": "a980911ba4b3011e60d0594d704ae1c48a3be1527e2003dce5ca7b58b0c414c8",
+    "instance_assets/mujoco/scene.json": "03950bb9ed2862d66ac5969fae643cfcac3b7b3306aca8275cab3cad3e5e3e5b",
+    "instance_assets/mujoco/scene.xml": "33a87b9535eee1d824a9f283189d2c542657372a62f8e65982e831fc867cee3f"
+  },
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
+  "creation_source": {
+    "sha256": "cf508cee05bebd2ea708dea733a98894f0ce5e03d9546c77c489f2942a57f969",
+    "files": 454
+  },
+  "runtime": {
+    "dependencies": {
+      "torch": "2.11.0+cu128",
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "mujoco": "3.14.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.18.0"
+    },
+    "python": "3.11.15",
+    "source": {
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
+  },
+  "image": {
+    "reference": "roboarc-b1:2.1.0-noinst",
+    "id": "sha256:ecad5301f34b9e6e19350118e27feffc1ab323d05898b1aeef93a745155ef1e6",
+    "repo_digests": []
+  },
+  "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
+}

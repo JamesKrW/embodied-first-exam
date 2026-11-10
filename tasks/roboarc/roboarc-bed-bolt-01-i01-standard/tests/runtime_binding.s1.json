@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "instance_sha256": "7dcfbd3d213e023edf88177f44f2271dc0c1806bf4da4e6eed4415fcd492a9a4",
+  "asset_files": {
+    "instance_assets/mujoco/meshes/bed_frame_leg_LN_prism32_4993ec41cdee1692.obj": "4993ec41cdee1692465618c887ea95a243043b9721669e08228f2f7e05e5ca2d",
+    "instance_assets/mujoco/meshes/bolt_bolt_head_prism32_25d46461555e2948.obj": "25d46461555e2948a2491a2bbee6f24b69937bb47f7417879a8ce2e1e7f5d211",
+    "instance_assets/mujoco/meshes/bolt_bolt_shank_prism32_b3a3d1d0bf21f453.obj": "b3a3d1d0bf21f45329918c40b3c230c5a4419915f8c53d950207af66efb72330",
+    "instance_assets/mujoco/meshes/bolt_bolt_tip_prism32_0b9802239412f070.obj": "0b9802239412f070e5a6b9aa845f4f83ad94d98d80b1c6d2ffdcb34ae799ab66",
+    "instance_assets/mujoco/meshes/key_key_long_m_c616f0015c44ffc9.obj": "c616f0015c44ffc92e72db593ac5bc3330c41cd45e91c78606684338d3306ae6",
+    "instance_assets/mujoco/meshes/key_key_long_tip_m_33e1dfe91ca31689.obj": "33e1dfe91ca316896de88484e93e7d9300af094a11456385d4e67aac2a46aef5",
+    "instance_assets/mujoco/meshes/key_key_short_m_ebba21255bb25b8b.obj": "ebba21255bb25b8b639fc3a49c9489a76567e815550e5c5b9326e48a1480c7b7",
+    "instance_assets/mujoco/meshes/key_key_short_tip_m_0e76a0819d634e1f.obj": "0e76a0819d634e1f5958f31fe9ee861b6dd20f89d285e0f7878cdc94f6327e62",
+    "instance_assets/mujoco/scene.json": "f9e77239f2a39801a18620a75b3401d728c2d4522a8b17ef425949894a828135",
+    "instance_assets/mujoco/scene.xml": "9b65dc102aed2964e9716ddb303bbeb3e256585ae96793cf8770253ce4525f00"
+  },
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
+  "creation_source": {
+    "sha256": "cf508cee05bebd2ea708dea733a98894f0ce5e03d9546c77c489f2942a57f969",
+    "files": 454
+  },
+  "runtime": {
+    "dependencies": {
+      "torch": "2.11.0+cu128",
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "mujoco": "3.14.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.18.0"
+    },
+    "python": "3.11.15",
+    "source": {
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
+  },
+  "image": {
+    "reference": "roboarc-b1:2.1.0-noinst",
+    "id": "sha256:ecad5301f34b9e6e19350118e27feffc1ab323d05898b1aeef93a745155ef1e6",
+    "repo_digests": []
+  },
+  "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
+}

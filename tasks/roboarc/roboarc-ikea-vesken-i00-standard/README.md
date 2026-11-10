@@ -6,10 +6,10 @@
 | Mode | standard (`eai-standard/2.4`) |
 | Twin | `roboarc-ikea-vesken-i00-privileged` |
 | Simulator / robot | `mujoco` / `franka-panda-bimanual` |
-| Family / instance | `ikea_vesken` / seed 0 |
+| Family / instance | `ikea_vesken` / seed 0 (allowed seeds: [0, 1, 2]; PROTOCOL §2) |
 | Oracle | `full` |
 | Agent time budget | 10800 s; tokens: protocol default (docs/protocol/running.md "Official runs") |
-| Base image | `ghcr.io/mll-lab-nu/efe:ikea-mujoco-sim-0.4.0` |
+| Base image | `ghcr.io/mll-lab-nu/efe:roboarc-ikea-sim-1.1.0@sha256:f22a1e9042c7877d33703960313cf548f2af7f15d6fcfa61db83315bfdacba1e` |
 
 ## Task
 IKEA VESKEN shelf unit (AA-1842283-5), body steps 1-8 in plain MuJoCo 3.14.0 (CPU, float64) with two 7-DoF Franka Panda arms, each with the MuJoCo Menagerie Panda hand (two-finger, tendon-coupled), through the robot service (eai-standard/2.4; 2.1 / 2.2
@@ -19,13 +19,13 @@ chunks, stateless kinematics, every pose in the robot's frame; no reset and no p
 ## Difficulty
 The privileged twin's bimanual assembly with physical grasps, from cameras and proprioception only, in one episode
 without reset; 16-D actuator action at 400 Hz, joint targets within the robot's joint
-velocity limits (joints 1-4 2.175 rad/s, joints 5-7 2.61 rad/s). The reference needs 352000 control steps (880.0 s of simulated
+velocity limits (joints 1-4 2.175 rad/s, joints 5-7 2.61 rad/s, the hand command 182.143 units/s). The reference needs 388000 control steps (970.0 s of simulated
 time).
 
 ## Reference solution
 `solution/solve.sh` runs `solution/oracle_replay.py`: it submits the control steps of `solution/oracle_actions.npz` through
 the client as `joint_position` chunks of 10 s, `hold`, one control step per row, as float64 (the client's transport;
-`Robot.submit` sends float32), so the service executes exactly those rows. The rows are the task's one reference, the same file as the privileged twin's `solution/trajectory.npz`: a closed-loop reference built on the final physics: the demo as the phase guide, one operation per snap; each grasp approach offset to where the part really is, each carried part held on its reference pose (near the host: on its connector error) by an integral loop through damped-least-squares IK, a gentle press until the weld engages, one arm move re-pathed in joint space to avoid a self-contact; the rows are the targets executed within the joint-speed limits,
+`Robot.submit` sends float32), so the service executes exactly those rows. The rows are the task's one reference, the same file as the privileged twin's `solution/trajectory.npz`: a closed-loop reference built on the final physics: the demo as the phase guide, one operation per snap; each grasp approach offset to where the part really is, each carried part held on its reference pose (near the host: on its connector error) by an integral loop through damped-least-squares IK, a gentle press until the weld engages, one arm move re-pathed in joint space to avoid a self-contact, the right hand lifting the bottom tray clear of a passing left wrist, two wrist rolls that keep caps from tipping or being hit; the rows are the targets executed within the joint-speed and Franka Hand speed limits,
 so the service's speed limiter never has to act (`n_clipped` 0).
 
 ## Verification
@@ -40,7 +40,7 @@ the scene file by file against `runtime_binding.json` and by its initial-state h
 The verifier (`tests/grade.py`, separate sandbox, no network, the shared client base) transcribes `final.json`: pass iff
 the live episode succeeded (`graded_by_live` 1, `replays` 0). No grading replay runs.
 
-Earlier validation, under the former grading by two verifier replays (not re-run under the live grading): Harbor checks on workstation B (Ryzen 9 7950X, RTX 4090; shared, loaded) (oracle), workstation B (nop), Harbor 0.23.0, image 0.3.0 sha256:ed950d079b63 / -sim 0.4.0 (Nyx RGB; built per host from one context: B a466a594c463, C 53d8800bfa22, A 3f9218fb9864); the live, replay and settled hashes equal the 0.3.0 (EGL) run's (2026-10-16): `oracle` scored 1 (sim 0.4.0 (Nyx): live settled success at control step 352000 (88 calls), both replays pass final_check() and end in the live state (live_matches_replay 1, deterministic 1), live end hash = the 0.3.0 run's; live service time 1145 s, verifier replays 628 s); `nop` scored 0.
+Earlier validation, under the former grading by two verifier replays (not re-run under the live grading): Harbor checks on a Ryzen 9 7950X / RTX 4090 workstation (shared, loaded), Harbor 0.23.0, image 0.3.0 sha256:ed950d079b63 / -sim 0.4.0 a466a594c463 (Nyx RGB) (2026-10-18): `oracle` scored 1 (graded by the live episode: live success at control step 388000 (97 calls, n_clipped 0 on every call), live service time 1889 s on the loaded workstation); `nop` scored 0.
 
 ## Resources
 Caps per container (PROTOCOL §6).
@@ -60,10 +60,10 @@ Caps per container (PROTOCOL §6).
 | Grasping | physical (finger friction), no assist |
 | Success rule | the scene's `success.py` + the terminal rules (released, at rest, no breakdown), on the live episode: after every call and at its end, at the last row and again after a 1.0 s hold of it (on a copy) |
 | Frame | every pose the agent gets or gives is in the robot frame: origin at the left arm's base link, +z up (`spec.world`); the scene's own world frame never leaves the sim service |
-| Speed rule | targets within the robot's real limits (joints 1-4 2.175 rad/s, joints 5-7 2.61 rad/s; the table and its sources: `rcb_ikea.JOINT_SPEED_LIMITS_RAD_S` / `GRIPPER_SPEED_LIMITS`), clamped per control step, as the privileged twin's Session; faster rows take the control steps they need (`meta.clipped`), as RoboARC's rule |
+| Speed rule | targets within the robot's real limits (joints 1-4 2.175 rad/s, joints 5-7 2.61 rad/s, the hand command 182.143 units/s; the table and its sources: `rcb_ikea.JOINT_SPEED_LIMITS_RAD_S` / `GRIPPER_WIDTH_SPEED_M_S`), clamped per control step, as the privileged twin's Session; faster rows take the control steps they need (`meta.clipped`), as RoboARC's rule |
 | Cameras | `cam_high`, `cam_low` (static), `cam_left_wrist`, `cam_right_wrist` (on the hands); 848 x 480, fovy 58 deg; added at service start (`environment/sim/ikea_rig.py`, `rig.json`), the model is unchanged; RGB: Nyx, RoboARC's renderer and look (path tracer, 32 spp, denoised; studio HDRI and point lights; `environment/sim/ikea_nyx.py` with RoboARC's `nyx_direct.py`); depth: MuJoCo's raster; on the sidecar's GPU |
 | Video | `/data/live.mp4` (cam_high, 10 frames per simulated second, recorded during the live episode), copied to the verifier logs; never affects the verdict |
-| Scene | `/opt/ikea/scenes/vesken/` in the images; digest `237d67be6d9be327…` |
+| Scene | `/opt/ikea/scenes/vesken/` in the images; digest `0164bf56e1ea3810…` |
 | Initial state | sha256 `66aaaacbc3da0fb3…` of the mjSTATE_INTEGRATION vector |
 
 ### Budget

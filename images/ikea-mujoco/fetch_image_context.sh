@@ -8,7 +8,7 @@
 #   - every file's sha256 is checked against the same file's per-task "files" entry of assets.json;
 #   - the scene code from git, images/ikea-mujoco/scenes/<task>/;
 #   - then images/ikea-mujoco/stage_context.py on the two together, which checks every staged file again and writes the
-#     context (scenes/, assets.json, bytepatch_libmujoco.py).
+#     context (scenes/, assets.json, bytepatch_libmujoco.py, requirements.lock).
 # Needs python3 and huggingface_hub (pip install huggingface_hub).
 # usage: images/ikea-mujoco/fetch_image_context.sh [<download dir>]   (default: $RCB_IKEA_ASSETS or ~/.cache/ikea-mujoco-assets)
 set -euo pipefail

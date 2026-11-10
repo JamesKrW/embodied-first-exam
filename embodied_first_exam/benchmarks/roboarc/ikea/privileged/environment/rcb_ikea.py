@@ -4,7 +4,8 @@ runtime and mechanism (latched retention welds, spring jaws, ...), two robot arm
     from rcb_ikea import Session
     s = Session("lack")                 # builds /opt/ikea/scenes/lack (scene.py load(): keyframe 'home')
     s.model, s.data                     # the MuJoCo model and data (privileged: read anything)
-    s.step(row)                         # one control tick: data.ctrl[:] = row, then SUBSTEPS physics steps + mechanism
+    s.step(row)                         # one control tick: data.ctrl[:] = s.applied(row) (ctrlrange + speed clamp), then
+                                        # SUBSTEPS physics steps + mechanism
     s.status()                          # {'success', 'goal', 'released', 'at_rest', 'breakdown', 'rows', 'state_sha', ...}
     s.final_check()                     # the grader's verdict: status() now and after the SETTLE_S hold of the last row
     st = s.get_state(); s.set_state(st) # save / restore (physics, mechanism, monitor, the rows recorded so far)
@@ -13,7 +14,8 @@ runtime and mechanism (latched retention welds, spring jaws, ...), two robot arm
     s.save_trajectory(path="/app/output/trajectory.npz")   # the rows recorded since the last reset (or pass ctrl)
 
 The trajectory is replayed by the grader exactly like replay(): a fresh process builds the scene, then for every row
-`data.ctrl[:] = row; S.step(SUBSTEPS)`. The verdict (verdict(), the benchmark's terminal rules on top of success.py):
+`data.ctrl[:] = s.applied(row); S.step(SUBSTEPS)` (applied(): the control range, then the speed clamp: arm joints and
+the Franka Hand at the robots' real limits, see JOINT_SPEED_LIMITS_RAD_S / GRIPPER_WIDTH_SPEED_M_S). The verdict (verdict(), the benchmark's terminal rules on top of success.py):
   - at the end of your rows: success.py holds, no robot link touches any part (released), every part is at rest
     (linear speed <= REST_LIN_M_S, angular <= REST_ANG_RAD_S), and the simulation never broke down;
   - then the grader holds your last row for SETTLE_S more seconds (not recorded, not yours to change) and the same
@@ -51,18 +53,24 @@ _BAD_WARNINGS = ("mjWARN_BADQACC", "mjWARN_BADQPOS", "mjWARN_BADQVEL")
 # (Session.step) - THE one table, the standard service reads it too. A row within limit + SPEED_TOL of the previous
 # target is applied unchanged (bit for bit), so rows already within the limits (up to floating-point round-off) are never
 # touched. Arm joints (rad/s): Franka Panda (Franka datasheet) j1-j4 2.1750, j5-j7 2.6100; ViperX 300 s (Interbotix
-# vx300s) 3.14159 (the value the standard references were made with). Grippers: see GRIPPER_SPEED_LIMITS. The Franka
-# Hand rule (318.75 units/s = 0.1 m/s of finger width, the hand's 0.05 m/s per finger, over the command's 255 units for
-# 0.08 m) stops the instant-close finger slam (~2.5 m/s, 11.6 kN pad contacts; stress reproducer eket__mutate__s420015).
+# vx300s) 3.14159 (the value the standard references were made with). Grippers: see GRIPPER_WIDTH_SPEED_M_S.
 SPEED_TOL = 1e-9
 JOINT_SPEED_LIMITS_RAD_S = {
     "panda": {f"actuator{i}": v for i, v in zip(range(1, 8), (2.175, 2.175, 2.175, 2.175, 2.61, 2.61, 2.61))},
     "viperx": {j: 3.14159 for j in ("waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate")},
 }
-# The Franka Hand slew (318.75 command units/s = 0.1 m/s of finger width) is the long-term rule. It is off until the
-# references are retimed for it in both modes; the current ones close faster and lose lack's and ikea365's goals under
-# it (2026-10-16): GRIPPER_SPEED_LIMITS = {"panda": {"actuator8": 318.75}}.
-GRIPPER_SPEED_LIMITS: dict = {}   # command units per second
+# Grippers, the same clamp on the command: the Franka Hand's fingers move at most 50 mm/s each (Franka Hand product
+# manual 220010/1.2/EN, April 2022, 5.1 Mechanical data: "Travel Speed (per finger) 50 mm/s", travel range 80 mm), so
+# the commanded finger width changes at most 0.1 m/s. The scenes drive the hand's two fingers through one tendon (`split`,
+# 0.5 x each finger joint, so width = 2 x its length) with a position servo `actuator8`: its target length is
+# (gain x command + bias0) / stiffness, so the width moves 2 x gain / stiffness per command unit, and the limit in command
+# units/s is 0.1 / that (gripper_speed_limits(); per scene: 318.75 units/s where gain = 1.56862745 (lack, stenerik: 255
+# units = 0.08 m), 182.142857 where gain = 2.74509804, bias0 = -300 (255 units = 0.14 m of target width: 0.08 m from open to
+# fully closed, then 0.06 m of squeeze below closed)). It stops the instant-close finger slam (~2.5 m/s, 11.6 kN pad contacts;
+# stress reproducer eket__mutate__s420015). The ViperX gripper is not limited.
+GRIPPER_WIDTH_SPEED_M_S = {"panda": {"actuator8": 0.1}}   # commanded finger width, m/s
+
+
 # End-pose rule (the benchmark's, on top of a scene's success.py where the source grader checks only its operations'
 # history): every listed part must end within POS_M / ANGLE_DEG of its goal pose in the frame of FRAME. EKET: the
 # source grader accepts the back's slide once and never looks at the back again (it has no frame joint), so a back
@@ -81,9 +89,31 @@ def joint_speed_limits(actuators: list) -> np.ndarray:
     out = np.full(len(actuators), np.inf)
     for i, n in enumerate(actuators):
         j = re.sub(r"^(left|right)[_/]", "", n)
-        for table in (*JOINT_SPEED_LIMITS_RAD_S.values(), *GRIPPER_SPEED_LIMITS.values()):
+        for table in JOINT_SPEED_LIMITS_RAD_S.values():
             if j in table:
                 out[i] = table[j]
+    return out
+
+
+def gripper_speed_limits(model) -> np.ndarray:
+    """Command units/s per actuator (inf: not limited) for the grippers of GRIPPER_WIDTH_SPEED_M_S: the width speed over
+    the width one command unit moves the servo's target by (2 x gain / stiffness for the Panda hand's `split` tendon of two
+    0.5-coefficient finger joints; asserted)."""
+    out = np.full(int(model.nu), np.inf)
+    for i in range(int(model.nu)):
+        j = re.sub(r"^(left|right)[_/]", "", model.actuator(i).name)
+        for table in GRIPPER_WIDTH_SPEED_M_S.values():
+            if j not in table:
+                continue
+            assert int(model.actuator_trntype[i]) == int(mujoco.mjtTrn.mjTRN_TENDON), model.actuator(i).name
+            assert int(model.actuator_gaintype[i]) == int(mujoco.mjtGain.mjGAIN_FIXED), model.actuator(i).name
+            assert int(model.actuator_biastype[i]) == int(mujoco.mjtBias.mjBIAS_AFFINE), model.actuator(i).name
+            t = int(model.actuator_trnid[i, 0])
+            coef = [float(model.wrap_prm[w]) for w in range(int(model.tendon_adr[t]), int(model.tendon_adr[t]) + int(model.tendon_num[t]))]
+            assert len(coef) == 2 and coef[0] == coef[1] == 0.5, (model.actuator(i).name, coef)
+            gain, stiffness = float(model.actuator_gainprm[i, 0]), -float(model.actuator_biasprm[i, 1])
+            assert gain > 0 and stiffness > 0, model.actuator(i).name
+            out[i] = table[j] * stiffness / (2.0 * gain)
     return out
 
 
@@ -349,13 +379,14 @@ class Session:
         self.actuators = [self.model.actuator(i).name for i in range(self.nu)]
         self.rows: list[np.ndarray] = []
         self.validity = Validity(self.model, self.data)
-        self.step_limit = joint_speed_limits(self.actuators) * self.control_dt   # rad per control tick (inf: none)
+        # per control tick: rad (arm joints), command units (a limited gripper); inf: not limited
+        self.step_limit = np.minimum(joint_speed_limits(self.actuators), gripper_speed_limits(self.model)) * self.control_dt
         self._limited = np.isfinite(self.step_limit)
         cr = np.asarray(self.model.actuator_ctrlrange, dtype=np.float64)
         cl = np.asarray(self.model.actuator_ctrllimited).astype(bool)
         self._clo = np.where(cl, cr[:, 0], -np.inf)
         self._chi = np.where(cl, cr[:, 1], np.inf)
-        self.slewed_ticks = 0                         # ticks on which the joint-speed clamp moved some target
+        self.slewed_ticks = 0                         # ticks on which the speed clamp moved some target
         rule = END_POSE_RULES.get(self.task)
         self._end_pose = None
         if rule:
@@ -549,7 +580,9 @@ def main(argv=None) -> int:
     files = scene_files(s.scene_dir)
     print(json.dumps({"task": a.task, "initial_state_sha256": s.state_sha(), "nu": s.nu, "timestep": s.timestep,
                       "substeps": SUBSTEPS, "actuators": s.actuators, "scene_digest": digest(files),
-                      "scene_files": files, "cylinder_prisms": getattr(s.S, "cylinder_prisms", []), "runtime": {"mujoco": mujoco.__version__, "numpy": np.__version__,
+                      "scene_files": files, "cylinder_prisms": getattr(s.S, "cylinder_prisms", []),
+                      "speed_limits_per_s": {n: float(v) for n, v in zip(s.actuators, s.step_limit / s.control_dt) if np.isfinite(v)},
+                      "runtime": {"mujoco": mujoco.__version__, "numpy": np.__version__,
                                                         "python": sys.version.split()[0]}}))
     return 0
 

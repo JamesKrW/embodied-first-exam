@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "instance_sha256": "71b12e8f0bfe37c90f105188ef349e9fa7bdcbf807758501eb6a8d139592b6d7",
+  "asset_files": {
+    "instance_assets/mujoco/meshes/controller_chamfer_0_2af7dd9b736d4d9e.obj": "2af7dd9b736d4d9e83cbcfe0de0c6a96c18063df919bb57f0e1259d47f717fbd",
+    "instance_assets/mujoco/meshes/controller_chamfer_10_751b7f51b17dc921.obj": "751b7f51b17dc921849e8334e4a51e352ec7fba3550adae466a50686ef1c9cad",
+    "instance_assets/mujoco/meshes/controller_chamfer_11_e2f3491f2f3adb7f.obj": "e2f3491f2f3adb7fc80b16561b1ae89d0f15af626e7befe9c50618c3fda96073",
+    "instance_assets/mujoco/meshes/controller_chamfer_12_16a8890acb33c40a.obj": "16a8890acb33c40ab1d21571fe99bbefa1ade4dd94e2ebc0edd65a472349682b",
+    "instance_assets/mujoco/meshes/controller_chamfer_13_53a13a8c96286048.obj": "53a13a8c9628604862475566087ac39da0880c7213388040b1664af6c8fc3fa3",
+    "instance_assets/mujoco/meshes/controller_chamfer_14_ef96120879f6fb2b.obj": "ef96120879f6fb2bf3d357c05087b2e178057c579a986b0cad317f583a02a6cd",
+    "instance_assets/mujoco/meshes/controller_chamfer_15_a35902ed38e44c63.obj": "a35902ed38e44c6358466a5e50249f34499ef45bd0b6fcea793d02c15204f3d4",
+    "instance_assets/mujoco/meshes/controller_chamfer_1_1325d604c10f1bac.obj": "1325d604c10f1bac72d8056fd3dd1baf0388b1aee71d2059a938743587797781",
+    "instance_assets/mujoco/meshes/controller_chamfer_2_ca42aea2f1935d9e.obj": "ca42aea2f1935d9e45af8aa7255712e2d4fc90028f20bbe2e87cda160a6ab0ba",
+    "instance_assets/mujoco/meshes/controller_chamfer_3_9dd2b26fa2795806.obj": "9dd2b26fa2795806de4cf39a45f9a5f4688395ef95422b5429eb45c63aba7e88",
+    "instance_assets/mujoco/meshes/controller_chamfer_4_db1d84bcc6a653f3.obj": "db1d84bcc6a653f376efe6d1d9530549bc7ccf76e2fce9a6b40f479f71d22d0c",
+    "instance_assets/mujoco/meshes/controller_chamfer_5_873c5cd40cf1256b.obj": "873c5cd40cf1256bb6856f9af12634af27b4c27fbaa1c56fb210a52f28cf6b0a",
+    "instance_assets/mujoco/meshes/controller_chamfer_6_ce93b8154ca86821.obj": "ce93b8154ca86821d9a17a97404a256328e09f1d6db2f844deea7fad447d9224",
+    "instance_assets/mujoco/meshes/controller_chamfer_7_67a37997c73e938f.obj": "67a37997c73e938f1c8aa2da384bbd3aa76ef8b1a34d5538279894ea025a7b84",
+    "instance_assets/mujoco/meshes/controller_chamfer_8_df6f63a098e49059.obj": "df6f63a098e49059513059b404a346ecb0da6d5cbf80c14996b7d0714adefde5",
+    "instance_assets/mujoco/meshes/controller_chamfer_9_a3a1c1e2a2f03205.obj": "a3a1c1e2a2f03205acbe592365d79aaef98964c6419daa247c7978afbbd601ce",
+    "instance_assets/mujoco/meshes/controller_funnel_0_3db1c8bf3d25c1a6.obj": "3db1c8bf3d25c1a6eb098c00ea2f6a5cf722a110a4a9fe2f4767d2bd9986c050",
+    "instance_assets/mujoco/meshes/controller_funnel_1_a7e140e14f214dc9.obj": "a7e140e14f214dc93b87c57604aa815bed2da0d1b3d21fa7098dbdfab4e89d0c",
+    "instance_assets/mujoco/meshes/controller_funnel_2_47a80b1a1ef548ee.obj": "47a80b1a1ef548eea043a66180a96d13eefeebf7f733226b2f97f743c4608b46",
+    "instance_assets/mujoco/meshes/controller_funnel_3_f8bf19e0123793d8.obj": "f8bf19e0123793d83ba3aba0f5c080b5c16fe206d28c3221a532dda17e517f78",
+    "instance_assets/mujoco/meshes/controller_ramp_0_a1c5785a195f93a9.obj": "a1c5785a195f93a965f53f8a47c81f42a0118d1047cffcff98d9697e75f6da37",
+    "instance_assets/mujoco/meshes/controller_ramp_1_3fd047b8266c3c8b.obj": "3fd047b8266c3c8bf5230fe4aa133f6a483bd4f417bf2c305d64aa77e06370fb",
+    "instance_assets/mujoco/meshes/controller_rib_roof_ce2cc254e887b89d.obj": "ce2cc254e887b89d6821ffb9f20a2e7e0a1e191d69d751088749734fc7542d8a",
+    "instance_assets/mujoco/meshes/controller_xbox_bottom_184b4cd249af853b.obj": "184b4cd249af853b942c9000ea51bfb5760f546926f4b03e6692eaffa679a1b2",
+    "instance_assets/mujoco/meshes/controller_xbox_bumper_L_6ec00ee9f5f09731.obj": "6ec00ee9f5f097313e38ac3bd24855227b58556849b773d16fb58e63680824f8",
+    "instance_assets/mujoco/meshes/controller_xbox_bumper_R_d01577fc82571e7e.obj": "d01577fc82571e7e431fd77187f7fc9e988ca3080cdb21cc7ead44feb86776cd",
+    "instance_assets/mujoco/meshes/controller_xbox_grip_L_f85a258a91810a45.obj": "f85a258a91810a45a510ffb86a2a3fe67096828da53f2ba2ffaeec68561a584d",
+    "instance_assets/mujoco/meshes/controller_xbox_grip_R_4e2c515ff45070cc.obj": "4e2c515ff45070cc403e97e06bca04f800fab344cced5931be0aeeecfce49c1d",
+    "instance_assets/mujoco/meshes/controller_xbox_shoulder_L_e5ca4525f44e93b7.obj": "e5ca4525f44e93b73607b4f888ba8fe1ac5063d9816d7184c477166c7f3fa64f",
+    "instance_assets/mujoco/meshes/controller_xbox_shoulder_R_f0d9e321ed482d07.obj": "f0d9e321ed482d07b050ebb4e3f60c3a54cb2916a84f09517ae80761e6c3b243",
+    "instance_assets/mujoco/meshes/controller_xbox_side_L_7c3b8910522422b9.obj": "7c3b8910522422b9c59b64d0933d5915b04241355e32a40c5dd908c1a7f7e408",
+    "instance_assets/mujoco/meshes/controller_xbox_side_R_24485e36c51a4c0e.obj": "24485e36c51a4c0e6199268ab853259686a680c794e45f9242ec347ff8fa4c64",
+    "instance_assets/mujoco/meshes/controller_xbox_top_482cce8676462ea8.obj": "482cce8676462ea8ead61923d17d7523466f1a82e243a8a7fc271031ebd8cb5d",
+    "instance_assets/mujoco/meshes/controller_xbox_trigger_L_55aeeb7bbba2dd27.obj": "55aeeb7bbba2dd277bccd4c4e79c381ae2d0c1a5f94306575e599fd9f16c0080",
+    "instance_assets/mujoco/meshes/controller_xbox_trigger_R_74e421e5e2279074.obj": "74e421e5e22790743ec5efc3be24f3d6cd585fbe1af4fb29fa4e39572865ac1c",
+    "instance_assets/mujoco/meshes/old_A_col_prism32_0f1fc3251b363fdf.obj": "0f1fc3251b363fdfee9af8068186a227eb2fe97400d3a7bc3f58f854f58713fb",
+    "instance_assets/mujoco/meshes/old_A_nub_prism32_6def0b4e56bf0528.obj": "6def0b4e56bf0528d8f3cc394b9d2f32c78dd967b014190f0a2e6798e11d67e0",
+    "instance_assets/mujoco/scene.json": "17b92f514524a74736ec9379b2ab4d8e9b1aa1636bd7f63bf6d52bc196a339ea",
+    "instance_assets/mujoco/scene.xml": "1aae4e803e928b1eabac2b94c22cd63a9fcaa3d8ea0dfca1a849e75a36704479"
+  },
+  "tooling_sha256": "f2320e4c5508a807eb72b31e95317ef4347bbbe5dec4384a5eb34df2df11529f",
+  "creation_source": {
+    "sha256": "cacc831d220dedfdbaf16d3066dafca03e83ebbaedc14af4d83d2458a22c8b3f",
+    "files": 449
+  },
+  "runtime": {
+    "dependencies": {
+      "torch": "2.11.0+cu128",
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "mujoco": "3.14.0",
+      "newton": "1.6.1",
+      "warp-lang": "1.18.0"
+    },
+    "python": "3.11.15",
+    "source": {
+      "sha256": "1552f29dcec4b4102a93d1d8bb033e336ddea757443c6b08b127a877a0fba580",
+      "files": 455
+    }
+  },
+  "image": {
+    "reference": "roboarc-s1:1.2.0-noinst",
+    "id": "sha256:5cd9ee80b8e75f4c75711ab489e4e5ccf087c9347ec8cd1f02ab62d719a85c48",
+    "repo_digests": []
+  },
+  "render_bridge_sha256": "0e04db54feded2929769443e183e2db1e6138eaec62701070fbd462925d8a2b0",
+  "nyx_direct_sha256": "bf41e3f747b337d5452f57f54c23cc44cca01f7956cd2df84dc24fdf1caad956"
+}

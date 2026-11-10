@@ -6,7 +6,7 @@
  "revision": "e16299e2741e263335c118952fbaf3779fba7e35",
  "tasks": {
   "burvik": {
-   "digest": "e93617b7455107c21c93b9d95d541a9b2399a3a387269a58c8fd88f901488410",
+   "digest": "49dbcc4041d4f2becbd4ffb131790ddbe3a465e9350f9b2a207c869d9c4fb972",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -147,7 +147,7 @@
     "assets/parts/leg_3/leg_3_thread_vis2.obj": "b72bb76ba489e0ad79b3ceb94b67adcd25c0caa383f3b3850b93e3d499919e7d",
     "assets/parts/top/top_thread_vis299.obj": "b534519332fad05705f2896667e8042eff0a27686625bbb17061e1f9211dc129",
     "assets/parts/top/top_thread_vis300.obj": "c3df74c5e6e521e05fa2a48496c61c2d3044e7491804f3a49ce3eafbfa576ab7",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "layout.json": "546be4e99fde7c56f33f4f4d2d0a8d64448916a2738ba061150b8f1c19e4fe10",
     "mechanism.py": "5625c80d679ecf2dd3ee54b7692476e4741db5e257822b42da7ba687913c3227",
     "scene.py": "d43a235523e733acadf4ced9262e1851a61c3b60b47bacb7f8ce73ca59cafd2a",
@@ -157,7 +157,7 @@
    }
   },
   "eket": {
-   "digest": "22795734d50cdce9861145107b2557d990a7b76a4df8905400b4c9b1c2c1e489",
+   "digest": "cd515879e4eee6daadd57d2b99a29636fde9dcef0b48c38e9bb0a7c6cb902d82",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -400,7 +400,7 @@
     "assets/parts/top/top_m014.obj": "54f7282d39761522106afa5905d97d24e5c0088cc4d9e00a6221af8e3e9ca25f",
     "assets/parts/top/top_m015.obj": "3110e27ef8cd1c0cef68aceeb73e74fec35597fd5da1dd0c5db37f8742b859a1",
     "eket_ops.py": "5d631feaa74523b737a572f063d5436c622f29a21beb4ad83f34239840c0c7fe",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "layout.json": "7e3a616009fd7da58231a0d276a37b2babae17646af88b66e8c6440874ae7c31",
     "scene.py": "d59c4c4cefe5493d715285af3a4cf5e8ccd1534796276bc091d0ba1d9b23e8ed",
     "scene.xml": "2d3eab0215b72ae91e8ca43168becc8f7a7efcdd42b04b24d9ca72f3d3970c61",
@@ -409,7 +409,7 @@
    }
   },
   "gladom": {
-   "digest": "8c5f29daaa7e14c2f38f7ca4fcb2c6ca825be6f4c589301df1b787730c24e8bc",
+   "digest": "0acbefad697b3b2884c893398bf1cab51aed42c83ec85c3e500d9b625e877460",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -488,7 +488,7 @@
     "assets/parts/screw_ring_l/screw_ring_l_m002.obj": "6d1852ce42ab3a998bce674ea087c8f1dbb96d9884026dd85b287a868d9a48ab",
     "assets/parts/screw_ring_r/screw_ring_r_m002.obj": "6d1852ce42ab3a998bce674ea087c8f1dbb96d9884026dd85b287a868d9a48ab",
     "gladom_mechanism.py": "30e62324503ea4ea56b59ff6f9dfec1ae63086a8b31a81e690ca54cdd9e5cce0",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "layout.json": "426e35a9b90b7df11e012032c991ab2e3b258a21cdb1c68bb06abb99956d7766",
     "scene.py": "70731a8ba1418304edac30f57147c27416b9fcc810e07d6e7a92898b5ad5ab33",
     "scene.xml": "51da2391a2b62b79cd9ba3f81a68aa3e0273981ae34511806c54032b66b91b8c",
@@ -497,7 +497,7 @@
    }
   },
   "ikea365": {
-   "digest": "25535efa33fd5d8059aa7a0a00dd947d20814b4de856e88726a66f84e78ac5f9",
+   "digest": "c16a27fdfc97e8c91054522581e8acaf05c1fa90a04427ab06a7931b606ddbf4",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -575,7 +575,7 @@
     "assets/parts/member_b/member_b_m005.obj": "673b7feda0e6a851f0f49044c4ddb644f49dfa1858c2a3e2c960290b832ef9e4",
     "assets/parts/same_screw/same_screw_m000.obj": "8d740bcfcebd2280ee270676967a6b06e6e52a8eed0910b08af024808951c8f8",
     "assets/parts/same_screw/same_screw_vis000.obj": "8d740bcfcebd2280ee270676967a6b06e6e52a8eed0910b08af024808951c8f8",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "layout.json": "32a3b00a5cfe40316dda621bd5128a3c308ccd6f3d883bf69a32626a9ee0e9da",
     "mechanism.py": "1569b687550e3288b127e74362f2a202d75d25a46ba6f96189782ccdaf8d29b1",
     "scene.py": "b30d85abf6d156e08c3a3a28122acfb826d01ed31b92563aff254d7ea4cefcf1",
@@ -585,7 +585,7 @@
    }
   },
   "kyrre": {
-   "digest": "934a5ebff43489e4bb7fbc351cf7d0deed3f26ee2124c414d745bb5f2f231583",
+   "digest": "27de0629369b8f2db9f1ebe1adb33220ec886b2f889aa81d7c4679e2effb1aa9",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -748,10 +748,10 @@
     "assets/parts/seat_insert5_ring5.obj": "f525783e0d322d76e9330d8c915d452262ce98da2510bc3d072093c8464ff9b6",
     "assets/parts/seat_insert5_ring6.obj": "e754c7f2fb1f3f695a1ff1b61c13fd0158603c0cca91845e1d39b4d95a60fe00",
     "assets/parts/seat_insert5_ring7.obj": "515b769ec010c631b928e5fb0396ab4e435818e0128e2bc89e9af3d043f9f9fa",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
-    "kyrre_mechanism.py": "d3b9370dbb6702a54f4c72a1cc9cc29f4bb316cebbba413ad3190280289fdb97",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
+    "kyrre_mechanism.py": "ec02e4c272862cf5d60b616c5079c2a046acc81f413cb4d5890807f2b7a47636",
     "layout.json": "1c594934839bd6c886e3e46576c4228354666e40e26b9f6bb24b5dfdc99be0a0",
-    "scene.py": "1d5f33b50438eb9d08a5149051671cd8760f723d6f225e4f330cbc2a136e6e00",
+    "scene.py": "4935e2d2ac67cd4d42b31d445371737b09b6eca962b110e5d8f0529b45937ff3",
     "scene.xml": "b1122bcaf67b9cf78c3820130eeabb8770fe4f74d9d2dc8812627dda0412ed28",
     "success.py": "185415222e51b8ec20bdff4c00f0f022349b59f99e3c41b25ac0e6ea3e122be7",
     "sw_cutover.json": "8b63f778cb83bc13814b9295d2e1bd427db2aa7965cdd2a0c44eb93822cc948a",
@@ -759,7 +759,7 @@
    }
   },
   "lack": {
-   "digest": "b8e0348698b0a26dc45a628b84c42af46dba1c9cba573fe99317a1def31521bc",
+   "digest": "e669195502062a454a48a5515106687336845b867dace378a5c92316d2cae27d",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -829,7 +829,7 @@
     "assets/panda/link7_5.obj": "099071d3090b51471ba52f4f90814fd3089f4975d196e4d488117073d0bfe491",
     "assets/panda/link7_6.obj": "99469e2d95ab74ce0292f2f16954c87a8a7dc16652e62e970fe37c94330a81bb",
     "assets/panda/link7_7.obj": "426c3db8a19373f3dc73d4bec672e948121b2914c10e2e7b9c7ea80643a19e54",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "lack_mechanism.py": "994ae05b4a2d86e0fdfa33670e7469a65ccacaa5d8634ee4ac2c0c2d109c8646",
     "layout.json": "551d559c1667d08237410486f59cb0fc862e95b790e2433618b71cf45bbf3ef5",
     "scene.py": "947d27aeff82a9bbbb46f8fad68e5b52922bee66c7d17d2e3a764d8487c45ccd",
@@ -839,7 +839,7 @@
    }
   },
   "stegesund": {
-   "digest": "4e0cbabcd4c7f692a36f30c40fc028298dd6426c7f8680919d8c3ae628507bef",
+   "digest": "d13192b82ad1037a5d709489e01a2f0c657bc8eb2ea09ef97df1de7c7b3a2eef",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -909,17 +909,17 @@
     "assets/panda/link7_5.obj": "099071d3090b51471ba52f4f90814fd3089f4975d196e4d488117073d0bfe491",
     "assets/panda/link7_6.obj": "99469e2d95ab74ce0292f2f16954c87a8a7dc16652e62e970fe37c94330a81bb",
     "assets/panda/link7_7.obj": "426c3db8a19373f3dc73d4bec672e948121b2914c10e2e7b9c7ea80643a19e54",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "scene.py": "4e2a4df1dacc33c792ba82f301660851491f64c3a3df3e3e6bd75540a3dddc4c",
     "scene.xml": "8d70a3641fe78f443d3758da4f828a4c21f6f72f46a967991e5b8e8bc1c2a9a2",
-    "seat_weld.py": "db90bbc6822adc2817accf7146c209f3bf3b6ca4972bc6c2eec800a564dcfe68",
+    "seat_weld.py": "93e95dd94685ed1811e578ce5ccd8029ead51d02fedbac62bd27e605e1ce59c5",
     "stegesund_mech.py": "a6e2904ecb1d9bcd9ba96a80dc1a0a5274777e95f84ccec5b9472f8da9ab7d14",
     "success.py": "f273b4c25a390383a4104e093c226e1f7215b305ff7b5e3fc72b8d0e13dbb3e0",
     "task.json": "50b236845847feca9f555f7a1de039acb8f625ba9898e465b13dc11a493a7f0e"
    }
   },
   "stenerik": {
-   "digest": "6133d0456460e5325a4ceab19dac71d2ff9b09b3f567304f7bd3928eca46c808",
+   "digest": "cc2dd3a687a0484a8c53a68bdfc14a5c446a0a99f73d4be3cdab238d1c241442",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -1001,7 +1001,7 @@
     "assets/parts/screw_4/screw_4_m000.obj": "8d740bcfcebd2280ee270676967a6b06e6e52a8eed0910b08af024808951c8f8",
     "assets/parts/screw_5/screw_5_m000.obj": "8d740bcfcebd2280ee270676967a6b06e6e52a8eed0910b08af024808951c8f8",
     "assets/parts/screw_6/screw_6_m000.obj": "8d740bcfcebd2280ee270676967a6b06e6e52a8eed0910b08af024808951c8f8",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "layout.json": "45d6fd317ad30f66fa7ec9175e1163cdca11ace731a8b8fe2a34484ae6ed1f2c",
     "scene.py": "ccb9af2895e97f448941dbcec65fc88adfc15ba44b0ff0830ecf8ecc20336707",
     "scene.xml": "27cec26976b78e88a3a77ee7fccca38e166ff34fbe73f09947125c9f71fff833",
@@ -1011,7 +1011,7 @@
    }
   },
   "svallet": {
-   "digest": "0ac62b72465133c4e52753b6c1bf7c9600cfe485d3b5b67d1e5e5ff18153012b",
+   "digest": "3c8ceadcfe226264047b5ba818c127e58806e5b3dacaf40f8e923ed8b4877993",
    "files": {
     "assets/aloha/d405_solid.stl": "8a9a84dd9c9a67687e5ad0b37a7ed334dbfea6b0f995fef28524cc8da5f21ed2",
     "assets/aloha/vx300s_1_base.stl": "d100cafe656671ca8fde98fb6a4cf2d1b746995c51c61c25ad9ea2715635d146",
@@ -1147,7 +1147,7 @@
     "assets/parts/shade/shade_shell_45.obj": "c0faae46f68ae6f2b4b2784e385712ede32818ed2b21c34d3aae955df7cd468e",
     "assets/parts/shade/shade_shell_46.obj": "44babfc96e5bb60998d2f170cd0f33046829d11700625c8b8394452f9cba88bf",
     "assets/parts/shade/shade_shell_47.obj": "164fa53cd6ec540539ec002dc60882d1ffb6c07d0511261a28b384f8cc2ec9f7",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "layout.json": "d894b688f30914ccce9c76668066eeefeaa56fd6415b27e0c42310efab8958e9",
     "scene.py": "126443264214fa176a57c423022fd7df3953a21c5e938bc2e3f0929f64c68d01",
     "scene.xml": "ce0b416a734ade87758b4af8b4a1493a00f663202c38af1cca8f209875f3585f",
@@ -1157,7 +1157,7 @@
    }
   },
   "uppsta": {
-   "digest": "a7743b1de9a7bc5533686bbb64baad9698a55a62441419f86a046bed84b536ef",
+   "digest": "8c884957c9be172b7d46a09bbbda733b62fc83161a08b58c0baf0f499df66a23",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -1227,17 +1227,17 @@
     "assets/panda/link7_5.obj": "099071d3090b51471ba52f4f90814fd3089f4975d196e4d488117073d0bfe491",
     "assets/panda/link7_6.obj": "99469e2d95ab74ce0292f2f16954c87a8a7dc16652e62e970fe37c94330a81bb",
     "assets/panda/link7_7.obj": "426c3db8a19373f3dc73d4bec672e948121b2914c10e2e7b9c7ea80643a19e54",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "scene.py": "cd9b0fb6068a81011eb79a46e5435e353cf333d67597c99257325711d66296fd",
     "scene.xml": "6b5140ee201c5881566f359cb3cc3618df0cf5f9edb3f7797434004edc7f88f1",
-    "seat_weld.py": "db90bbc6822adc2817accf7146c209f3bf3b6ca4972bc6c2eec800a564dcfe68",
+    "seat_weld.py": "93e95dd94685ed1811e578ce5ccd8029ead51d02fedbac62bd27e605e1ce59c5",
     "success.py": "db809001f972c7d85293e1aeee661642c1215e9106fd97f3f33f7bac2d6cf1aa",
     "task.json": "bad3bb6cf87ed6c9b2275f4d619f698ec8143284fc8ecf6c6f1a4c1bd6d5b8ad",
-    "uppsta_mech.py": "b4c1edb5b4408e30ba8a7b0915fe4b4b5e1f7472eee4b96e2f747ade1bc3ff2f"
+    "uppsta_mech.py": "29a0a4e5670bc30289ffda067f35ce873fe7f17ca9ff17025f79217846517d85"
    }
   },
   "variera": {
-   "digest": "869e1978078a13aebe13d76ed4f061103a3745d4415c3f8e6309dd86735853b4",
+   "digest": "23a2fca95f651e687b30c8f246cd6e97a9e929fb2f1436432468e322ed36bf8c",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -2125,7 +2125,7 @@
     "assets/parts/shelf/shelf_m024_93.obj": "b5edcb5eab575cbcbb41e139c79cbeb597ab998a2f9ae59b6875a430920fad96",
     "assets/parts/shelf/shelf_m024_94.obj": "8554a5a40b7e8e12fb4a539033cd56c8d7fd06c07c3435d82a3b67d05f4f4173",
     "assets/parts/shelf/shelf_m024_95.obj": "8ce6d2e75031997b6ba1006c9fe827e7a284215aa82073821000149068c3e7dd",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "layout.json": "b94ef8fcdad6e059b030430a3fa4ecde08413f091c1ef1b5941efb465ed834d3",
     "scene.py": "a2d6147451c49be6f5ef42e1712004acb6bf3571f43efb1dcd86b7b3892a8a7c",
     "scene.xml": "c26eedea209cef619e32b0da89bd7c38d5f5c8be4c84032cab524d5f7b7236c0",
@@ -2134,7 +2134,7 @@
    }
   },
   "vesken": {
-   "digest": "237d67be6d9be3275c254185328cc4a41a75f39b405f6e3efa00a59afc0565eb",
+   "digest": "0164bf56e1ea38101dd3fb5a8829486ce1b7190a95c2226af962242393600d09",
    "files": {
     "assets/panda/LICENSE": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
     "assets/panda/finger_0.obj": "215098c0fcdf7192f6c503a37cf49e3efecf8a9e1320f02b17c5584d89cc5b2c",
@@ -2218,7 +2218,7 @@
     "assets/parts/pins/pin_8eebf459d7.obj": "61d7771e9cd5aabbc228525c9ac424d5126df4f84c5b27a890c10efa1d55e94c",
     "assets/parts/pins/pin_bb8134e19d.obj": "62018cc102fba82cff8a722b4ec6111fad2812072808c44a98f0607ba50d4b77",
     "assets/parts/pins/pin_eeba589a0b.obj": "1d0a67323154a280080f0162c38ddfe74fd135945b2335532d83a2966b7ee007",
-    "ikea_runtime.py": "5e924c14a18595411b8d5e987681a05dad7758fe507836bc00069390ea35d8a3",
+    "ikea_runtime.py": "e3d9ad5cca303636ad23b9dd2766838c771c6b08e30f644886bf4332d520bf11",
     "layout.json": "424439eded6fb2b959c2a2fe0568270bdd6a8f164dad1f2e9e4e81bba57a1404",
     "scene.py": "1bca310fa30b9da1d0fde24e0cafd62c0c43b7c6517f3cde77fe0622f7a60c7f",
     "scene.xml": "2c147d56b72fb69cefe163eb61774e74aa04320fa225985831c52ad4b2f6ebd9",

@@ -1,9 +1,9 @@
 # The `sim` sidecar's image (environment/docker-compose.yaml builds it): its base image, this directory at /srv, and at
 # their paths under /srv the files it shares with other tasks, from pinned files-only images (images/<name>/
 # FILES.json, scripts/files_image.py). .dockerignore keeps the build's own two files out of /srv.
-FROM ghcr.io/mll-lab-nu/efe:ikea-mujoco-sim-0.4.0
+FROM ghcr.io/mll-lab-nu/efe:roboarc-ikea-sim-1.1.0@sha256:f22a1e9042c7877d33703960313cf548f2af7f15d6fcfa61db83315bfdacba1e
 COPY . /srv/
-COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.4.3@sha256:c15ce62523e6a0cffb1bfdb52a1241b54a5abd957ab05a341d6db210d52c2a38 \
+COPY --from=ghcr.io/mll-lab-nu/efe:ikea-mujoco-files-0.5.0@sha256:fdebfb286aacaf4e9b5b5391c213f7800f655e1f8f3e5665e681020ad7a0824a \
      /sim/finalize.sh \
      /sim/ikea_nyx.py \
      /sim/ikea_rig.py \

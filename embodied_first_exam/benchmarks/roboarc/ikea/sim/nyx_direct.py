@@ -37,6 +37,7 @@ import ctypes
 import hashlib
 import math
 import os
+import sys
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -51,6 +52,155 @@ SCENE_FILE = "nyx_scene.json"
 # NVIDIA places at (+1/8, -3/8) px from the pixel centre (x right, y down): the MuJoCo raster samples there too.
 GENESIS_DEPTH_SAMPLE = (0.125, -0.375)
 EPS = 1e-15                     # genesis.EPS (camera frame degeneracy threshold)
+# The Vulkan device extensions Nyx needs on its GPU (checked before the native renderer is created, check_device): ray
+# queries in its path-tracing shaders (with acceleration structures) and the CUDA-Vulkan interop of its frame buffers.
+# NVIDIA exposes VK_KHR_ray_query only on GPUs with RT cores: on an A100 or H100 (driver 610.43.02, 2026-10-21) the
+# driver offers the ray-tracing pipeline and acceleration structures but no ray queries, the shader compiler rejects
+# Nyx's pipelines and the renderer then dies with a segmentation fault, which no caller can catch. A CPU Vulkan driver
+# (Mesa lavapipe) has ray queries, but CUDA cannot import its memory: the same crash. The check reads the extension
+# list of the Vulkan device that is the CUDA device (same UUID) with a throw-away Vulkan instance, in well under a
+# second, and changes nothing else: on a GPU that has the extensions the build goes on exactly as before.
+NYX_VULKAN_EXTENSIONS = ("VK_KHR_ray_query", "VK_KHR_acceleration_structure", "VK_KHR_external_memory_fd")
+# Where Nyx runs (docs/RUNNING.md, GPU requirements), for the error message.
+NYX_GPU_CLASSES = ("Nyx needs an NVIDIA GPU with RT cores: GeForce RTX 20-series or newer, RTX workstation GPUs, T4, L4, "
+                   "L40 / L40S, A10 / A10G, A40; data-centre GPUs without RT cores (V100, A100, A30, H100, H200) do not "
+                   "offer VK_KHR_ray_query, and there is no software fallback")
+# The reason this process's GPU cannot run Nyx, once known: later builds raise it at once.
+_UNSUPPORTED: list = []
+
+
+class UnsupportedDevice(RuntimeError):
+    """This host's GPU cannot run Nyx: a property of the hardware or its driver, never a transient failure (ikea_nyx.py's
+    render process reports it in its ready line, and the physics side does not retry the start). Only images need Nyx."""
+
+
+class _NoVulkanDriver(Exception):
+    """vkCreateInstance found no Vulkan driver (VK_ERROR_INCOMPATIBLE_DRIVER)."""
+
+
+def device_problem(cuda_name: str, cuda_uuid: bytes, vulkan_devices) -> str | None:
+    """Why Nyx cannot render on the CUDA device (`cuda_name`, its 16-byte UUID), given the Vulkan devices this process
+    sees, [(name, uuid, extension names)]; None when it can. Nyx renders on the Vulkan device that is the CUDA device
+    (the same UUID) and needs NYX_VULKAN_EXTENSIONS there."""
+    twins = [d for d in vulkan_devices if bytes(d[1]) == bytes(cuda_uuid)]
+    if not twins:
+        seen = ", ".join(repr(d[0]) for d in vulkan_devices) or "none"
+        return (f"no Vulkan device is the CUDA device {cuda_name!r} (Vulkan devices: {seen}); Nyx renders through "
+                "CUDA-Vulkan interop on one NVIDIA GPU, whose Vulkan driver the container needs "
+                "(NVIDIA_DRIVER_CAPABILITIES=all)")
+    have = set(twins[0][2])
+    missing = [e for e in NYX_VULKAN_EXTENSIONS if e not in have]
+    if missing:
+        return (f"the GPU {cuda_name!r} does not offer the Vulkan extension(s) {', '.join(missing)} that Nyx's path tracer "
+                f"needs. {NYX_GPU_CLASSES}")
+    return None
+
+
+def _vulkan_loader() -> str:
+    """The Vulkan loader Nyx itself loads: the one gs-nyx ships next to its modules (they find it through $ORIGIN),
+    else the system's."""
+    try:
+        import importlib.util
+        spec = importlib.util.find_spec("gs_nyx")
+        for d in (spec.submodule_search_locations or []) if spec else []:
+            p = Path(d) / "libvulkan.so.1"
+            if p.is_file():
+                return str(p)
+    except Exception:           # noqa: BLE001 -- the system loader then
+        pass
+    return "libvulkan.so.1"
+
+
+def _vulkan_devices(loader: str | None = None) -> list:
+    """Every Vulkan physical device this process sees: [(name, 16-byte device UUID, frozenset of extension names)].
+    Raises _NoVulkanDriver when there is no Vulkan driver at all."""
+    vk = ctypes.CDLL(loader or _vulkan_loader())
+    c_p, c_u32 = ctypes.c_void_p, ctypes.c_uint32
+
+    class AppInfo(ctypes.Structure):
+        _fields_ = [("sType", ctypes.c_int), ("pNext", c_p), ("pApplicationName", ctypes.c_char_p),
+                    ("applicationVersion", c_u32), ("pEngineName", ctypes.c_char_p), ("engineVersion", c_u32),
+                    ("apiVersion", c_u32)]
+
+    class InstanceInfo(ctypes.Structure):
+        _fields_ = [("sType", ctypes.c_int), ("pNext", c_p), ("flags", c_u32), ("pApplicationInfo", ctypes.POINTER(AppInfo)),
+                    ("enabledLayerCount", c_u32), ("ppEnabledLayerNames", c_p), ("enabledExtensionCount", c_u32),
+                    ("ppEnabledExtensionNames", c_p)]
+
+    class IDProperties(ctypes.Structure):        # VkPhysicalDeviceIDProperties
+        _fields_ = [("sType", ctypes.c_int), ("pNext", c_p), ("deviceUUID", ctypes.c_ubyte * 16),
+                    ("driverUUID", ctypes.c_ubyte * 16), ("deviceLUID", ctypes.c_ubyte * 8), ("deviceNodeMask", c_u32),
+                    ("deviceLUIDValid", c_u32)]
+
+    class Properties2(ctypes.Structure):         # VkPhysicalDeviceProperties2; the core properties as raw bytes
+        _fields_ = [("sType", ctypes.c_int), ("pNext", c_p), ("properties", ctypes.c_ubyte * 4096)]
+
+    class ExtensionProperties(ctypes.Structure):
+        _fields_ = [("extensionName", ctypes.c_char * 256), ("specVersion", c_u32)]
+
+    vk.vkCreateInstance.argtypes = [c_p, c_p, ctypes.POINTER(c_p)]
+    vk.vkCreateInstance.restype = ctypes.c_int
+    vk.vkDestroyInstance.argtypes = [c_p, c_p]
+    vk.vkDestroyInstance.restype = None
+    vk.vkEnumeratePhysicalDevices.argtypes = [c_p, ctypes.POINTER(c_u32), c_p]
+    vk.vkEnumeratePhysicalDevices.restype = ctypes.c_int
+    vk.vkGetPhysicalDeviceProperties2.argtypes = [c_p, c_p]
+    vk.vkGetPhysicalDeviceProperties2.restype = None
+    vk.vkEnumerateDeviceExtensionProperties.argtypes = [c_p, ctypes.c_char_p, ctypes.POINTER(c_u32), c_p]
+    vk.vkEnumerateDeviceExtensionProperties.restype = ctypes.c_int
+    app = AppInfo(0, None, b"nyx_direct device check", 1, b"none", 1, (1 << 22) | (1 << 12))   # Vulkan 1.1
+    info = InstanceInfo(1, None, 0, ctypes.pointer(app), 0, None, 0, None)
+    instance = c_p()
+    r = vk.vkCreateInstance(ctypes.byref(info), None, ctypes.byref(instance))
+    if r == -9:                 # VK_ERROR_INCOMPATIBLE_DRIVER
+        raise _NoVulkanDriver()
+    if r != 0:
+        raise RuntimeError(f"vkCreateInstance returned {r}")
+    try:
+        n = c_u32(0)
+        if vk.vkEnumeratePhysicalDevices(instance, ctypes.byref(n), None) != 0:
+            raise RuntimeError("vkEnumeratePhysicalDevices failed")
+        handles = (c_p * max(n.value, 1))()
+        if vk.vkEnumeratePhysicalDevices(instance, ctypes.byref(n), handles) not in (0, 5):     # VK_INCOMPLETE
+            raise RuntimeError("vkEnumeratePhysicalDevices failed")
+        out = []
+        for h in handles[:n.value]:
+            ids = IDProperties(1000071004, None)                 # VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES
+            props = Properties2(1000059001, ctypes.cast(ctypes.pointer(ids), c_p))   # ..._PROPERTIES_2
+            vk.vkGetPhysicalDeviceProperties2(h, ctypes.byref(props))
+            name = bytes(props.properties[20:276]).split(b"\0")[0].decode(errors="replace")   # deviceName
+            m = c_u32(0)
+            vk.vkEnumerateDeviceExtensionProperties(h, None, ctypes.byref(m), None)
+            exts = (ExtensionProperties * max(m.value, 1))()
+            vk.vkEnumerateDeviceExtensionProperties(h, None, ctypes.byref(m), exts)
+            out.append((name, bytes(ids.deviceUUID), frozenset(e.extensionName.decode() for e in exts[:m.value])))
+        return out
+    finally:
+        vk.vkDestroyInstance(instance, None)
+
+
+def check_device(cuda) -> None:
+    """Before the native renderer exists: raise UnsupportedDevice when the CUDA device `cuda` (_Cuda) cannot run Nyx
+    (device_problem; no Vulkan driver at all). A check that cannot be completed (an unexpected Vulkan or CUDA error)
+    leaves the decision to the build, as before this check existed."""
+    if _UNSUPPORTED:
+        raise UnsupportedDevice(_UNSUPPORTED[0])
+    try:
+        name, uuid = cuda.identity()
+        try:
+            devices = _vulkan_devices()
+        except _NoVulkanDriver:
+            problem = (f"no Vulkan driver for the GPU {name!r}; Nyx renders through Vulkan (in a container the NVIDIA "
+                       "Container Toolkit mounts it with NVIDIA_DRIVER_CAPABILITIES=all)")
+        else:
+            problem = device_problem(name, uuid, devices)
+    except Exception as exc:    # noqa: BLE001 -- not a verdict on the device
+        print(f"[nyx_direct] device check skipped: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+        return
+    if problem:
+        _UNSUPPORTED.append(f"Nyx cannot render on this host: {problem}. Physics, replays and grading do not need Nyx; "
+                            "camera images and replay videos do (docs/RUNNING.md, GPU requirements)")
+        raise UnsupportedDevice(_UNSUPPORTED[0])
 
 
 # --------------------------------------------------------------------------------------------- CUDA (driver API)
@@ -83,6 +233,15 @@ class _Cuda:
 
     def current(self):
         self._check(self.lib.cuCtxSetCurrent(self.ctx), "cuCtxSetCurrent")
+
+    def identity(self) -> tuple[str, bytes]:
+        """The device's name and 16-byte UUID (the UUID its Vulkan driver reports for the same GPU)."""
+        name = ctypes.create_string_buffer(256)
+        self._check(self.lib.cuDeviceGetName(name, 256, self.dev), "cuDeviceGetName")
+        uuid = (ctypes.c_ubyte * 16)()
+        get = getattr(self.lib, "cuDeviceGetUuid_v2", None) or self.lib.cuDeviceGetUuid
+        self._check(get(ctypes.byref(uuid), self.dev), "cuDeviceGetUuid")
+        return name.value.decode(errors="replace"), bytes(uuid)
 
     def alloc(self, nbytes: int) -> int:
         ptr = ctypes.c_uint64()
@@ -1549,6 +1708,7 @@ class NyxDirect:
         self.names = [c["name"] for c in self.cams]
         _preload_nvrtc()
         self.cuda = _Cuda(device)
+        check_device(self.cuda)         # a GPU Nyx cannot run on is an error here, not a crash in the native renderer
         self.renderer = npr.NyxRenderer()
         params = npr.BridgeStartupParams()
         params.cudaDevice = int(device)
