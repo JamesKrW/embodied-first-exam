@@ -95,6 +95,7 @@ BENCHMARK_TABLE = [
     ("roboarc-", "RoboARC", "roboarc"),  # with its IKEA furniture-assembly suite, roboarc-ikea-<item>-i00 (tasks/roboarc/README.md)
     ("bigym2-", "BiGym 2.0", "bigym2"),
     ("yamlab-", "YAMLab", "yamlab"),
+    ("robodojo-original-", "RoboDojo Original", "robodojo-original"),  # before "robodojo-": RoboDojo's standard tasks with RoboDojo's own instructions
     ("robodojo-", "RoboDojo", "robodojo"),
     ("embodied-olympics-fun-", "Embodied Olympics - Fun", "embodied-olympics-fun"),  # the single-humanoid sports families
     ("embodied-olympics-match-", "Embodied Olympics - Match", "embodied-olympics-match"),  # the matches Embodied Olympics exports with its own service, and their twins
@@ -975,6 +976,7 @@ AGENT_END_STEP_UNIT = {
         "steps as its move takes at 0.25 m/s (at least one); `get_obs(seconds=s)` holds the robot for s x 25 steps. "
         "`get_obs()` without `seconds`, `/spec`, `/status` and `/kinematics` use none"),
 }
+AGENT_END_STEP_UNIT["RoboDojo Original"] = AGENT_END_STEP_UNIT["RoboDojo"]   # the same service and step
 
 
 def agent_end_of(task: Path) -> dict | None:
