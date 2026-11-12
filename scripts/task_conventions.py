@@ -95,6 +95,7 @@ BENCHMARK_TABLE = [
     ("roboarc-", "RoboARC", "roboarc"),  # with its IKEA furniture-assembly suite, roboarc-ikea-<item>-i00 (tasks/roboarc/README.md)
     ("bigym2-", "BiGym 2.0", "bigym2"),
     ("yamlab-", "YAMLab", "yamlab"),
+    ("robodojo-original-autoend-", "RoboDojo Original Auto-end", "robodojo-original-autoend"),  # before "robodojo-original-": the same, ended by RoboDojo's success
     ("robodojo-original-", "RoboDojo Original", "robodojo-original"),  # before "robodojo-": RoboDojo's standard tasks with RoboDojo's own instructions
     ("robodojo-", "RoboDojo", "robodojo"),
     ("embodied-olympics-fun-", "Embodied Olympics - Fun", "embodied-olympics-fun"),  # the single-humanoid sports families
@@ -977,6 +978,31 @@ AGENT_END_STEP_UNIT = {
         "`get_obs()` without `seconds`, `/spec`, `/status` and `/kinematics` use none"),
 }
 AGENT_END_STEP_UNIT["RoboDojo Original"] = AGENT_END_STEP_UNIT["RoboDojo"]   # the same service and step
+AGENT_END_STEP_UNIT["RoboDojo Original Auto-end"] = AGENT_END_STEP_UNIT["RoboDojo"]
+# An agent-ended episode that the task's success also ends (the sim service's `RCB_END_ON_SUCCESS: "1"`, with a step
+# limit and no resets; tasks/robodojo-original-autoend/README.md): the benchmark evaluator's own end. The agent never
+# ends the episode (no /finish); the success ends it and shows (meta done, reason "success"); its `## Episode end`:
+END_ON_SUCCESS_RE = re.compile(r'^\s*RCB_END_ON_SUCCESS:\s*"?1"?\s*(?:#.*)?$', re.M)
+END_ON_SUCCESS_INTRO = (
+    "The episode ends by itself as soon as the task's success check passes: you do not end it, and there is nothing to "
+    "send or hand in. This section overrides anything above, and anything in `/spec`, that says a success is never "
+    "shown, that a success does not end the episode, or that you end the episode yourself.")
+END_ON_SUCCESS_BULLETS = (
+    "After every step the service runs the task's success check, as the benchmark's own evaluator does. At the first step "
+    "where it passes, the episode ends there as a success: the call that reached it stops at that step and answers "
+    "`meta[\"done\"]` = true and `meta[\"reason\"]` = `\"success\"`; after it every `/submit` is refused (409).",
+    "Until then nothing tells you whether you have succeeded: no response, status, error or counter depends on the check.",
+    "Every other end is not a success: the step limit, the time limit or the token budget (below), a simulator error, "
+    "and the task's own failure rules, which end the episode as a failure.",
+    "There is no reset: the one episode you run is the one graded.")
+END_ON_SUCCESS_LIMITS = "**Limits.** Unless the check has passed by then, the episode ends at whichever of these comes first:"
+END_ON_SUCCESS_STEP = (
+    "the step limit: **{n:,} steps**{unit}. `meta[\"control_steps\"]` counts the steps used so far; "
+    "`meta[\"steps_left\"]` and `/status` `steps_left` give what is left, `spec[\"max_control_steps\"]` the limit ({n}). "
+    "At the {nth} step the episode ends by itself (`meta[\"done\"]`, `meta[\"reason\"]` = `\"step_limit\"`, unless "
+    "the check passes at that step; a chunk that reaches it stops there); after it every `/submit` is refused (409). "
+    "This overrides anything above, and anything in `/spec`, that says there is no step budget, that the time limit is "
+    "your only budget, or that the episode is capped at another number of steps;")
 
 
 def agent_end_of(task: Path) -> dict | None:
@@ -988,7 +1014,7 @@ def agent_end_of(task: Path) -> dict | None:
     if not AGENT_END_RE.search(c):
         return None
     m = STEP_LIMIT_RE.search(c)
-    return {"step_limit": int(m.group(1)) if m else None}
+    return {"step_limit": int(m.group(1)) if m else None, "end_on_success": bool(END_ON_SUCCESS_RE.search(c))}
 
 
 def _ordinal(n: int) -> str:
@@ -1006,11 +1032,21 @@ def render_agent_end(task: Path) -> str | None:
         t = re.sub(r"`[^`]*`", lambda m: m.group(0).replace(" ", "\0"), t)
         return textwrap.fill(t, 120, initial_indent=first, subsequent_indent=rest, break_long_words=False,
                              break_on_hyphens=False).replace("\0", " ")
-    limits = ([AGENT_END_STEP.format(n=n, nth=_ordinal(n), unit=AGENT_END_STEP_UNIT.get(bench_of(task), ""))] if n else []) \
-        + [AGENT_END_TIME, AGENT_END_TOKENS.format(tin=TOKEN_BUDGET[0], tout=TOKEN_BUDGET[1]), AGENT_END_FINISH]
-    return (AGENT_END_HEADING + "\n" + wrap(AGENT_END_INTRO) + "\n\n"
-            + "\n".join(wrap(b, "- ", "  ") for b in AGENT_END_BULLETS) + "\n\n"
-            + wrap(AGENT_END_LIMITS) + "\n" + "\n".join(wrap(b, "- ", "  ") for b in limits) + "\n")
+    unit = AGENT_END_STEP_UNIT.get(bench_of(task), "")
+    tokens = AGENT_END_TOKENS.format(tin=TOKEN_BUDGET[0], tout=TOKEN_BUDGET[1])
+    if ae["end_on_success"]:
+        c = read_text(task / "environment/docker-compose.yaml") or ""
+        if not n or re.search(r'^\s*RCB_RESET_BUDGET:\s*"?[1-9]', c, re.M):
+            raise RuntimeError(f"{task.name}: RCB_END_ON_SUCCESS needs RCB_STEP_LIMIT and no resets")
+        intro, bullets, head = END_ON_SUCCESS_INTRO, END_ON_SUCCESS_BULLETS, END_ON_SUCCESS_LIMITS
+        limits = [END_ON_SUCCESS_STEP.format(n=n, nth=_ordinal(n), unit=unit), AGENT_END_TIME, tokens.rstrip(";") + "."]
+    else:
+        intro, bullets, head = AGENT_END_INTRO, AGENT_END_BULLETS, AGENT_END_LIMITS
+        limits = ([AGENT_END_STEP.format(n=n, nth=_ordinal(n), unit=unit)] if n else []) \
+            + [AGENT_END_TIME, tokens, AGENT_END_FINISH]
+    return (AGENT_END_HEADING + "\n" + wrap(intro) + "\n\n"
+            + "\n".join(wrap(b, "- ", "  ") for b in bullets) + "\n\n"
+            + wrap(head) + "\n" + "\n".join(wrap(b, "- ", "  ") for b in limits) + "\n")
 
 
 def render_cutoff(sec: int, mode: str, bench: str = "", name: str = "") -> str:
