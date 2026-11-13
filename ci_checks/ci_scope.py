@@ -75,6 +75,7 @@ UNITS: dict[str, list[str]] = {
     "RoboDojo": _own("robodojo"),
     "RoboDojo Original": ["images/robodojo/", "embodied_first_exam/benchmarks/robodojo/", "images/robodojo-files/"],   # RoboDojo's image, service and graders
     "RoboDojo Original Auto-end": ["images/robodojo/", "embodied_first_exam/benchmarks/robodojo/", "images/robodojo-files/"],   # the same
+    "RoboDojo Original Astra Prompt": ["images/robodojo/", "embodied_first_exam/benchmarks/robodojo/", "images/robodojo-files/"],   # the same
     "Panda Dynamic Scenes": _own("pandadyn"),
     "AM-Bench": _own("ambench"),
     "iSpatialGym": _own("ispatialgym", "images/ispatialgym-goals-files/"),

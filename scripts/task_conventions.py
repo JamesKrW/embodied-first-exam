@@ -96,6 +96,7 @@ BENCHMARK_TABLE = [
     ("bigym2-", "BiGym 2.0", "bigym2"),
     ("yamlab-", "YAMLab", "yamlab"),
     ("robodojo-original-autoend-", "RoboDojo Original Auto-end", "robodojo-original-autoend"),  # before "robodojo-original-": the same, ended by RoboDojo's success
+    ("robodojo-original-astra-", "RoboDojo Original Astra Prompt", "robodojo-original-astra"),  # before "robodojo-original-": Auto-end + the text RoboDojo's own GPT-6 Astra evaluation gave the model
     ("robodojo-original-", "RoboDojo Original", "robodojo-original"),  # before "robodojo-": RoboDojo's standard tasks with RoboDojo's own instructions
     ("robodojo-", "RoboDojo", "robodojo"),
     ("embodied-olympics-fun-", "Embodied Olympics - Fun", "embodied-olympics-fun"),  # the single-humanoid sports families
@@ -979,6 +980,7 @@ AGENT_END_STEP_UNIT = {
 }
 AGENT_END_STEP_UNIT["RoboDojo Original"] = AGENT_END_STEP_UNIT["RoboDojo"]   # the same service and step
 AGENT_END_STEP_UNIT["RoboDojo Original Auto-end"] = AGENT_END_STEP_UNIT["RoboDojo"]
+AGENT_END_STEP_UNIT["RoboDojo Original Astra Prompt"] = AGENT_END_STEP_UNIT["RoboDojo"]
 # An agent-ended episode that the task's success also ends (the sim service's `RCB_END_ON_SUCCESS: "1"`, with a step
 # limit and no resets; tasks/robodojo-original-autoend/README.md): the benchmark evaluator's own end. The agent never
 # ends the episode (no /finish); the success ends it and shows (meta done, reason "success"); its `## Episode end`:
